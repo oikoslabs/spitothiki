@@ -185,7 +185,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .dialog-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 24px; }
 .field-counter { margin: 4px 0 0; text-align: right; }
 .nav-item span:not(.nav-icon):not(.nav-count) { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-body[data-view="pantry"] .topbar .button-add { display: none; }
+body[data-screen="pantry"] .topbar .button-add { display: none; }
 .field-warning { margin: 10px 0 0; color: #9a6a12; font-size: 12px; }
 .form-error { margin: 12px 0 0; color: var(--red); font-size: 12px; }
 .confirm-message { color: var(--muted); font-size: 13px; }

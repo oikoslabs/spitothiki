@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test"
+    "test": "node --test",
+    "smoke": "node tests/smoke/browser-smoke.mjs"
   }
 }
