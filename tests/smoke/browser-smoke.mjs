@@ -83,6 +83,25 @@ const steps = [
     await page.reload({ waitUntil: 'networkidle0' });
     return ok;
   }],
+  ['category icons in filters and form', async () => {
+    const chips = await page.$$eval('.filter-chip', (els) => els.map((el) => el.textContent));
+    const option = await page.$eval('#item-category option[value="Γαλακτοκομικά"]', (el) => el.textContent);
+    return chips.some((t) => t.includes('🧺')) && option.includes('🥛');
+  }],
+  ['dark mode toggle persists', async () => {
+    await nav('settings');
+    await page.click('[data-action="set-theme"][data-theme="dark"]'); await wait();
+    const dark = await page.evaluate(() => document.documentElement.dataset.theme === 'dark' && getComputedStyle(document.body).backgroundColor !== 'rgb(245, 246, 240)');
+    await page.reload({ waitUntil: 'networkidle0' });
+    const kept = await page.evaluate(() => document.documentElement.dataset.theme === 'dark');
+    await page.click('[data-action="set-theme"][data-theme="auto"]'); await wait();
+    const auto = await page.evaluate(() => !document.documentElement.dataset.theme);
+    await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: 'dark' }]); await wait();
+    const system = await page.evaluate(() => getComputedStyle(document.body).backgroundColor === 'rgb(18, 26, 22)');
+    await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: 'light' }]);
+    await nav('pantry');
+    return dark && kept && auto && system;
+  }],
   ['reload keeps screen and data', async () => {
     await page.reload({ waitUntil: 'networkidle0' }); await wait();
     return (await page.$eval('.nav-item.is-active', (el) => el.dataset.view)) === 'pantry' && (await count('.inventory-card')) === 2;

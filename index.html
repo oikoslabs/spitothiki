@@ -6,6 +6,7 @@
   <meta name="theme-color" content="#f5f6f0">
   <meta name="description" content="Οργάνωσε τα τρόφιμα του σπιτιού, τις ημερομηνίες λήξης και τη λίστα αγορών σου.">
   <title>Σπιτοθήκη — Το σπίτι σε τάξη</title>
+  <script>try { const t = localStorage.getItem('spitothiki:theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch {}</script>
   <link rel="stylesheet" href="styles.css">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
@@ -55,7 +56,7 @@
       <input class="field-input" id="item-name" name="name" required maxlength="80" placeholder="π.χ. Γάλα, ρύζι, ελαιόλαδο" aria-describedby="item-name-count">
       <p class="field-hint field-counter" id="item-name-count" aria-live="polite">0/80</p>
       <div class="field-row">
-        <div><label class="field-label" for="item-category">Κατηγορία</label><select class="field-input" id="item-category" name="category"><option>Γαλακτοκομικά</option><option>Φρούτα & λαχανικά</option><option>Κρέας & ψάρι</option><option>Ξηρά τρόφιμα</option><option>Κατεψυγμένα</option><option>Ροφήματα</option><option>Καθαριότητα</option><option>Άλλο</option></select></div>
+        <div><label class="field-label" for="item-category">Κατηγορία</label><select class="field-input" id="item-category" name="category"><option value="Γαλακτοκομικά">🥛 Γαλακτοκομικά</option><option value="Φρούτα & λαχανικά">🥬 Φρούτα & λαχανικά</option><option value="Κρέας & ψάρι">🍗 Κρέας & ψάρι</option><option value="Ξηρά τρόφιμα">🌾 Ξηρά τρόφιμα</option><option value="Κατεψυγμένα">🧊 Κατεψυγμένα</option><option value="Ροφήματα">☕ Ροφήματα</option><option value="Καθαριότητα">🧽 Καθαριότητα</option><option value="Άλλο">🧺 Άλλο</option></select></div>
         <div><label class="field-label" for="item-location">Πού βρίσκεται;</label><select class="field-input" id="item-location" name="location"><option value="">Δεν ορίστηκε</option><option>Ντουλάπι</option><option>Ψυγείο</option><option>Κατάψυξη</option><option>Μπάνιο</option><option>Άλλο</option></select></div>
       </div>
       <div class="field-row field-row-three">
