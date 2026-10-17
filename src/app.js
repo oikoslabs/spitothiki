@@ -1,4 +1,4 @@
-import { createPantryItem, createShoppingItem, expiryStatus, pantrySummary, toggleShoppingItem } from './domain.js';
+import { MAX_QUANTITY, createPantryItem, createShoppingItem, expiryStatus, normalizeSearch, normalizeUnit, pantrySummary, toggleShoppingItem } from './domain.js';
 import { loadState, parseBackup, saveState } from './storage.js';
 
 const viewRoot = document.querySelector('#view-content');
@@ -9,7 +9,8 @@ const backupFile = document.querySelector('#backup-file');
 const toast = document.querySelector('#toast');
 
 let state = loadState();
-let activeView = 'overview';
+const VIEWS = ['overview', 'pantry', 'shopping', 'settings'];
+let activeView = VIEWS.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'overview';
 let pantryQuery = '';
 let pantryCategory = 'Όλα';
 let toastTimer;
@@ -35,7 +36,9 @@ function formatDate(value) {
   if (!value) return '';
   const date = new Date(`${value}T00:00:00`);
   if (Number.isNaN(date.getTime())) return '';
-  return new Intl.DateTimeFormat('el-GR', { day: 'numeric', month: 'short' }).format(date);
+  const options = { day: 'numeric', month: 'short' };
+  if (date.getFullYear() !== new Date().getFullYear()) options.year = 'numeric';
+  return new Intl.DateTimeFormat('el-GR', options).format(date);
 }
 
 function daysUntil(value) {
@@ -82,7 +85,12 @@ function renderNavCounts() {
   document.querySelector('#nav-shopping-count').textContent = String(state.shopping.filter((item) => !item.checked).length);
 }
 
+function pendingLabel(count) {
+  return `${count} ${count === 1 ? 'εκκρεμές προϊόν' : 'εκκρεμή προϊόντα'}`;
+}
+
 function setActiveNavigation() {
+  document.body.dataset.view = activeView;
   document.querySelectorAll('[data-view]').forEach((button) => {
     const active = button.dataset.view === activeView;
     button.classList.toggle('is-active', active);
@@ -147,7 +155,7 @@ function renderOverview() {
     <div class="dashboard-grid">
       <section class="panel"><div class="panel-heading"><div><h2>Έλεγξε τις ημερομηνίες</h2><p>Ό,τι λήγει μέσα στις επόμενες 7 ημέρες</p></div><button class="panel-link" type="button" data-view="pantry">Όλο το απόθεμα →</button></div><div class="product-list">${upcoming.length ? upcoming.map(renderMiniProduct).join('') : renderEmpty('Όλα καλά εδώ', 'Δεν έχεις προϊόντα που λήγουν σύντομα.', 'add-item', 'Πρόσθεσε προϊόν', '🌿')}</div></section>
       <div class="dashboard-side"><section class="panel"><div class="panel-heading"><div><h2>Χρειάζονται αναπλήρωση</h2><p>Με βάση το ελάχιστο απόθεμα</p></div></div><div class="product-list">${lowStock.length ? lowStock.map(renderMiniProduct).join('') : `<p class="subtle-empty">${state.items.length ? 'Δεν υπάρχει κάτι που να χρειάζεται αναπλήρωση.' : 'Όταν προσθέσεις προϊόντα, θα τα βλέπεις εδώ.'}</p>`}</div>${lowStock.length ? '<button class="button button-quiet full-width" type="button" data-view="pantry">Δες το απόθεμα</button>' : ''}</section>
-      <section class="panel quick-panel"><div class="panel-heading"><div><h2>Γρήγορες κινήσεις</h2><p>Τα βασικά, χωρίς ψάξιμο</p></div></div><div class="quick-actions"><button class="quick-action" type="button" data-action="add-item"><span class="quick-action-icon">＋</span><span><strong>Πρόσθεσε προϊόν</strong><small>Καταχώρισε κάτι που έφερες σπίτι</small></span><span class="arrow">›</span></button><button class="quick-action" type="button" data-view="shopping"><span class="quick-action-icon">✓</span><span><strong>Άνοιξε τη λίστα</strong><small>${state.shopping.filter((item) => !item.checked).length} εκκρεμή για ψώνια</small></span><span class="arrow">›</span></button></div></section></div>
+      <section class="panel quick-panel"><div class="panel-heading"><div><h2>Γρήγορες κινήσεις</h2><p>Τα βασικά, χωρίς ψάξιμο</p></div></div><div class="quick-actions"><button class="quick-action" type="button" data-action="add-item"><span class="quick-action-icon">＋</span><span><strong>Πρόσθεσε προϊόν</strong><small>Καταχώρισε κάτι που έφερες σπίτι</small></span><span class="arrow">›</span></button><button class="quick-action" type="button" data-view="shopping"><span class="quick-action-icon">✓</span><span><strong>Άνοιξε τη λίστα</strong><small>${pendingLabel(state.shopping.filter((item) => !item.checked).length)} για ψώνια</small></span><span class="arrow">›</span></button></div></section></div>
     </div>`;
 }
 
@@ -155,9 +163,9 @@ function renderPantryList() {
   const list = document.querySelector('#inventory-list');
   const count = document.querySelector('#inventory-count');
   if (!list || !count) return;
-  const q = pantryQuery.trim().toLocaleLowerCase('el-GR');
+  const q = normalizeSearch(pantryQuery.trim());
   const filtered = state.items.filter((item) => {
-    const matchesText = !q || `${item.name} ${item.category} ${item.location}`.toLocaleLowerCase('el-GR').includes(q);
+    const matchesText = !q || normalizeSearch(`${item.name} ${item.category} ${item.location}`).includes(q);
     const matchesCategory = pantryCategory === 'Όλα' || item.category === pantryCategory;
     return matchesText && matchesCategory;
   }).sort((a, b) => a.name.localeCompare(b.name, 'el'));
@@ -181,8 +189,9 @@ function renderShopping() {
   const pending = state.shopping.filter((item) => !item.checked);
   const checked = state.shopping.filter((item) => item.checked);
   return `${renderHeader('Λίστα αγορών', 'Σημείωσε όσα χρειάζεσαι και πάρε τη λίστα μαζί σου.')}
-    <div class="shopping-layout"><section class="panel"><div class="panel-heading"><div><h2>Τι χρειάζεται το σπίτι;</h2><p>${pending.length} εκκρεμή ${pending.length === 1 ? 'προϊόν' : 'προϊόντα'}</p></div>${checked.length ? '<button class="panel-link" type="button" data-action="clear-completed">Καθάρισε τα αγορασμένα</button>' : ''}</div>
-    <form id="shopping-form" class="shopping-add-form"><input class="field-input" name="name" required maxlength="80" placeholder="π.χ. Φέτα" aria-label="Προϊόν για αγορά"><input class="field-input" name="quantity" type="number" min="0.1" step="0.1" value="1" aria-label="Ποσότητα"><select class="field-input unit-select" name="unit" aria-label="Μονάδα"><option>τεμ.</option><option>πακέτα</option><option>κιλά</option><option>λίτρα</option></select><button class="button button-primary" type="submit">＋ Προσθήκη</button></form>
+    <div class="shopping-layout"><section class="panel"><div class="panel-heading"><div><h2>Τι χρειάζεται το σπίτι;</h2><p>${pending.length ? pendingLabel(pending.length) : 'Κανένα εκκρεμές προϊόν'}</p></div>${checked.length ? '<button class="panel-link" type="button" data-action="clear-completed">Καθάρισε τα αγορασμένα</button>' : ''}</div>
+    <form id="shopping-form" class="shopping-add-form" novalidate><input class="field-input" name="name" required maxlength="80" placeholder="π.χ. Φέτα" aria-label="Προϊόν για αγορά"><input class="field-input" name="quantity" type="number" min="0.1" max="${MAX_QUANTITY}" step="0.1" value="1" aria-label="Ποσότητα"><select class="field-input unit-select" name="unit" aria-label="Μονάδα"><option>τεμ.</option><option>πακέτα</option><option>κιλά</option><option>γραμμάρια</option><option>λίτρα</option></select><button class="button button-primary" type="submit">＋ Προσθήκη</button></form>
+    <p class="form-error" id="shopping-error" role="alert" hidden></p>
     <div class="shopping-list">${state.shopping.length ? [...pending, ...checked].map(renderShoppingRow).join('') : renderEmpty('Η λίστα είναι άδεια', 'Πρόσθεσε όσα χρειάζεσαι πριν πας για ψώνια.', 'focus-shopping', 'Γράψε το πρώτο προϊόν', '🛒')}</div></section>
     <aside class="panel shopping-summary"><span class="stat-icon">🛍️</span><h2>Μικρή υπενθύμιση</h2><p>Κράτησε τη λίστα απλή και πρόσθεσε μόνο ό,τι χρειάζεσαι.</p><div class="shopping-summary-list"><div class="summary-line"><span>Εκκρεμούν</span><strong>${pending.length}</strong></div><div class="summary-line"><span>Στο καλάθι</span><strong>${checked.length}</strong></div><div class="summary-line"><span>Στη συσκευή</span><strong>Ιδιωτικά</strong></div></div></aside></div>`;
 }
@@ -206,10 +215,15 @@ function renderApp() {
 }
 
 function navigate(view) {
-  if (!['overview', 'pantry', 'shopping', 'settings'].includes(view)) return;
+  if (!VIEWS.includes(view)) return;
   activeView = view;
+  if (location.hash !== `#${view}`) history.replaceState(null, '', `#${view}`);
   pantryQuery = view === 'pantry' ? pantryQuery : '';
-  renderApp();
+  window.addEventListener('hashchange', () => navigate(location.hash.slice(1)));
+
+state.items = state.items.map((item) => ({ ...item, unit: normalizeUnit(item.unit) }));
+state.shopping = state.shopping.map((item) => ({ ...item, unit: normalizeUnit(item.unit) }));
+renderApp();
   viewRoot.focus({ preventScroll: true });
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
@@ -223,12 +237,18 @@ function openItemDialog(id = '') {
   itemForm.elements.category.value = existing?.category || 'Άλλο';
   itemForm.elements.location.value = existing?.location || '';
   itemForm.elements.quantity.value = existing?.quantity ?? 1;
-  itemForm.elements.unit.value = existing?.unit || 'τεμ.';
+  itemForm.elements.unit.value = normalizeUnit(existing?.unit);
+  updateNameCounter();
   itemForm.elements.minimum.value = existing?.minimum ?? 0;
   itemForm.elements.expiry.value = existing?.expiry || '';
   document.querySelector('#dialog-title').textContent = existing ? 'Επεξεργασία προϊόντος' : 'Νέο προϊόν';
   itemDialog.showModal();
   requestAnimationFrame(() => document.querySelector('#item-name').focus());
+}
+
+function updateNameCounter() {
+  const input = document.querySelector('#item-name');
+  document.querySelector('#item-name-count').textContent = `${input.value.length}/${input.maxLength}`;
 }
 
 function showConfirm(message, action, title = 'Να συνεχίσω;') {
@@ -283,7 +303,8 @@ function handleAction(button) {
   else if (action === 'adjust-quantity') {
     const item = state.items.find((entry) => entry.id === id);
     if (!item) return;
-    const nextQuantity = Math.max(0, Number(item.quantity) + Number(button.dataset.delta));
+    const nextQuantity = Math.min(MAX_QUANTITY, Math.max(0, Number(item.quantity) + Number(button.dataset.delta)));
+    if (nextQuantity === Number(item.quantity) && Number(button.dataset.delta) > 0) { showToast(`Η μέγιστη ποσότητα είναι ${MAX_QUANTITY}.`); return; }
     state.items = state.items.map((entry) => entry.id === id ? { ...entry, quantity: nextQuantity, updatedAt: new Date().toISOString() } : entry);
     persist(); renderApp();
   } else if (action === 'delete-item') {
@@ -353,6 +374,7 @@ document.addEventListener('change', (event) => {
 });
 
 document.addEventListener('input', (event) => {
+  if (event.target.id === 'item-name') updateNameCounter();
   if (event.target.id === 'pantry-search') {
     const caret = event.target.selectionStart;
     pantryQuery = event.target.value;
@@ -389,7 +411,12 @@ document.addEventListener('submit', (event) => {
     try {
       state.shopping.push(createShoppingItem({ name: formData.get('name'), quantity: formData.get('quantity'), unit: formData.get('unit') }));
       if (persist()) { renderApp(); showToast('Προστέθηκε στη λίστα αγορών.'); document.querySelector('#shopping-form input[name="name"]')?.focus(); }
-    } catch (error) { showToast(error.message || 'Έλεγξε τα στοιχεία.'); }
+      return;
+    } catch (error) {
+      const message = document.querySelector('#shopping-error');
+      message.textContent = error.message || 'Έλεγξε τα στοιχεία.';
+      message.hidden = false;
+    }
   }
 });
 

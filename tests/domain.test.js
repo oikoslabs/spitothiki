@@ -54,3 +54,19 @@ test('toggles one shopping item immutably and leaves other rows unchanged', () =
   assert.deepEqual(next.map((item) => item.checked), [true, false]);
   assert.deepEqual(items.map((item) => item.checked), [false, false]);
 });
+
+test('normalizes Greek search text ignoring accents, case and final sigma', async () => {
+  const { normalizeSearch } = await import('../src/domain.js');
+  assert.ok(normalizeSearch('Γάλα').includes(normalizeSearch('γαλα')));
+  assert.ok(normalizeSearch('Ψωμί').includes(normalizeSearch('ΨΩΜΙ')));
+  assert.equal(normalizeSearch('Φακές'), normalizeSearch('ΦΑΚΕΣ'));
+});
+
+test('caps quantities and normalizes legacy units', async () => {
+  const { MAX_QUANTITY, normalizeUnit } = await import('../src/domain.js');
+  assert.throws(() => createPantryItem({ name: 'Γάλα', quantity: MAX_QUANTITY + 1 }), /ποσότητα/i);
+  assert.throws(() => createShoppingItem({ name: 'Γάλα', quantity: 1e20 }), /ποσότητα/i);
+  assert.throws(() => createShoppingItem({ name: 'Γάλα', quantity: 0 }), /ποσότητα/i);
+  assert.equal(createPantryItem({ name: 'Αυγά', quantity: 6, unit: 'τεμάχια' }).unit, 'τεμ.');
+  assert.equal(normalizeUnit('γραμμάρια'), 'γραμμάρια');
+});
