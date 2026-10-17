@@ -65,6 +65,24 @@ const steps = [
     await nav('pantry');
     return open && value.includes('Γάλα') && wa.startsWith('https://wa.me/?text=');
   }],
+  ['manifest and service worker are active', async () => {
+    const manifest = await page.$eval('link[rel=manifest]', (el) => el.href);
+    const res = await page.evaluate(async (href) => (await fetch(href)).json(), manifest);
+    await page.evaluate(() => navigator.serviceWorker.ready);
+    await page.reload({ waitUntil: 'networkidle0' });
+    const controlled = await page.evaluate(() => Boolean(navigator.serviceWorker.controller));
+    return res.short_name === 'Σπιτοθήκη' && controlled;
+  }],
+  ['app works offline', async () => {
+    const before = errors.length;
+    await page.setOfflineMode(true);
+    await page.reload({ waitUntil: 'domcontentloaded' }); await wait(600);
+    const ok = (await count('.nav-item')) === 4 && (await count('.inventory-card')) === 2;
+    await page.setOfflineMode(false);
+    errors.splice(before);
+    await page.reload({ waitUntil: 'networkidle0' });
+    return ok;
+  }],
   ['reload keeps screen and data', async () => {
     await page.reload({ waitUntil: 'networkidle0' }); await wait();
     return (await page.$eval('.nav-item.is-active', (el) => el.dataset.view)) === 'pantry' && (await count('.inventory-card')) === 2;
