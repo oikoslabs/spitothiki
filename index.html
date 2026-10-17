@@ -55,6 +55,12 @@
       <label class="field-label" for="item-name">Όνομα προϊόντος <span aria-hidden="true">*</span></label>
       <input class="field-input" id="item-name" name="name" required maxlength="80" placeholder="π.χ. Γάλα, ρύζι, ελαιόλαδο" aria-describedby="item-name-count">
       <p class="field-hint field-counter" id="item-name-count" aria-live="polite">0/80</p>
+      <div class="barcode-row">
+        <button class="button button-quiet" type="button" data-action="scan-barcode"><span aria-hidden="true">📷</span> Σάρωση</button>
+        <input class="field-input" id="item-barcode" name="barcode" inputmode="numeric" autocomplete="off" maxlength="14" placeholder="ή γράψε τον barcode" aria-label="Barcode">
+        <button class="button button-quiet" type="button" data-action="lookup-barcode">Αναζήτηση</button>
+      </div>
+      <p class="field-hint" id="barcode-status" role="status"></p>
       <div class="field-row">
         <div><label class="field-label" for="item-category">Κατηγορία</label><select class="field-input" id="item-category" name="category"><option value="Γαλακτοκομικά">🥛 Γαλακτοκομικά</option><option value="Φρούτα & λαχανικά">🥬 Φρούτα & λαχανικά</option><option value="Κρέας & ψάρι">🍗 Κρέας & ψάρι</option><option value="Ξηρά τρόφιμα">🌾 Ξηρά τρόφιμα</option><option value="Κατεψυγμένα">🧊 Κατεψυγμένα</option><option value="Ροφήματα">☕ Ροφήματα</option><option value="Καθαριότητα">🧽 Καθαριότητα</option><option value="Άλλο">🧺 Άλλο</option></select></div>
         <div><label class="field-label" for="item-location">Πού βρίσκεται;</label><select class="field-input" id="item-location" name="location"><option value="">Δεν ορίστηκε</option><option>Ντουλάπι</option><option>Ψυγείο</option><option>Κατάψυξη</option><option>Μπάνιο</option><option>Άλλο</option></select></div>
@@ -76,6 +82,12 @@
 
   <dialog id="confirm-dialog" class="confirm-dialog" aria-labelledby="confirm-title">
     <form method="dialog"><div class="dialog-heading"><div><p class="eyebrow">ΕΠΙΒΕΒΑΙΩΣΗ</p><h2 id="confirm-title">Να συνεχίσω;</h2></div></div><p id="confirm-message" class="confirm-message"></p><div class="dialog-actions"><button class="button button-quiet" value="cancel">Όχι, πίσω</button><button class="button button-danger" id="confirm-accept" value="confirm">Ναι, συνέχισε</button></div></form>
+  </dialog>
+
+  <dialog id="scan-dialog" class="confirm-dialog" aria-labelledby="scan-title">
+    <div class="dialog-heading"><div><p class="eyebrow">BARCODE</p><h2 id="scan-title">Σάρωση προϊόντος</h2></div><button class="icon-button" type="button" data-action="close-scan" aria-label="Κλείσιμο">×</button></div>
+    <video id="scan-video" class="scan-video" playsinline muted></video>
+    <p class="field-hint" id="scan-status" role="status">Στόχευσε τον barcode με την κάμερα.</p>
   </dialog>
 
   <dialog id="share-dialog" class="confirm-dialog" aria-labelledby="share-title">

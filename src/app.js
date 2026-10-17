@@ -1,4 +1,5 @@
 import { MAX_QUANTITY, createPantryItem, createShoppingItem, expiringWithin, expiryStatus, expiryWarning, normalizeSearch, normalizeUnit, pantrySummary, receiveShoppingItem, returnShoppingItem, shoppingListText, syncShoppingWithItem, toggleShoppingItem } from './domain.js';
+import { lookupBarcode, normalizeBarcode, startScanner } from './barcode.js';
 import { loadState, parseBackup, saveState } from './storage.js';
 
 const viewRoot = document.querySelector('#view-content');
@@ -240,6 +241,8 @@ function openItemDialog(id = '') {
   updateExpiryWarning();
   itemForm.elements.minimum.value = existing?.minimum ?? 0;
   itemForm.elements.expiry.value = existing?.expiry || '';
+  itemForm.elements.barcode.value = existing?.barcode || '';
+  document.querySelector('#barcode-status').textContent = '';
   document.querySelector('#dialog-title').textContent = existing ? 'Επεξεργασία προϊόντος' : 'Νέο προϊόν';
   itemDialog.showModal();
   requestAnimationFrame(() => document.querySelector('#item-name').focus());
@@ -275,6 +278,62 @@ async function copyShareText() {
   try { await navigator.clipboard.writeText(field.value); }
   catch { field.select(); document.execCommand('copy'); }
   showToast('Η λίστα αντιγράφηκε.');
+}
+
+let stopScanner = null;
+
+async function fillFromBarcode(code) {
+  const status = document.querySelector('#barcode-status');
+  const barcode = normalizeBarcode(code);
+  itemForm.elements.barcode.value = barcode || String(code || '');
+  if (!barcode) { status.textContent = 'Ο κωδικός δεν είναι έγκυρος barcode.'; return; }
+  const editingId = itemForm.elements.id.value;
+  const known = state.items.find((item) => item.barcode === barcode && item.id !== editingId);
+  if (known) {
+    itemForm.elements.name.value = itemForm.elements.name.value || known.name;
+    itemForm.elements.category.value = known.category || itemForm.elements.category.value;
+    updateNameCounter();
+    status.textContent = `Υπάρχει ήδη στο απόθεμα ως «${known.name}».`;
+    return;
+  }
+  status.textContent = 'Αναζήτηση στο Open Food Facts…';
+  try {
+    const product = await lookupBarcode(barcode);
+    if (!product) { status.textContent = 'Δεν βρέθηκε το προϊόν. Γράψε το όνομα και θα το θυμάμαι για αυτόν τον barcode.'; return; }
+    if (!itemForm.elements.name.value.trim() || !editingId) itemForm.elements.name.value = product.name;
+    if (product.category) itemForm.elements.category.value = product.category;
+    updateNameCounter();
+    status.textContent = `Βρέθηκε: ${product.name}. Έλεγξε τα στοιχεία πριν την αποθήκευση.`;
+  } catch (error) {
+    status.textContent = navigator.onLine === false ? 'Χωρίς σύνδεση: η αναζήτηση δεν είναι διαθέσιμη.' : (error.message || 'Η αναζήτηση απέτυχε.');
+  }
+}
+
+async function openScanner() {
+  const dialog = document.querySelector('#scan-dialog');
+  const status = document.querySelector('#scan-status');
+  status.textContent = 'Άνοιγμα κάμερας…';
+  dialog.showModal();
+  try {
+    stopScanner = await startScanner(document.querySelector('#scan-video'), (code) => {
+      stopScanner = null;
+      dialog.close();
+      fillFromBarcode(code);
+    });
+    if (dialog.open) status.textContent = 'Στόχευσε τον barcode με την κάμερα.';
+    else closeScanner();
+  } catch (error) {
+    status.textContent = error?.name === 'NotAllowedError' ? 'Δεν δόθηκε άδεια για την κάμερα. Μπορείς να γράψεις τον barcode με το χέρι.'
+      : error?.name === 'NotFoundError' ? 'Δεν βρέθηκε κάμερα. Μπορείς να γράψεις τον barcode με το χέρι.'
+      : (error.message || 'Η σάρωση δεν είναι διαθέσιμη.');
+  }
+}
+
+function closeScanner() {
+  stopScanner?.();
+  stopScanner = null;
+  const dialog = document.querySelector('#scan-dialog');
+  if (dialog.open) dialog.close();
 }
 
 const NOTIFY_KEY = 'spitothiki:notifications';
@@ -438,7 +497,10 @@ function handleAction(button) {
   } else if (action === 'remove-shopping') {
     state.shopping = state.shopping.filter((entry) => entry.id !== id);
     persist(); renderApp(); showToast('Το προϊόν αφαιρέθηκε από τη λίστα.');
-  } else if (action === 'enable-notifications') enableNotifications();
+  } else if (action === 'scan-barcode') openScanner();
+  else if (action === 'close-scan') closeScanner();
+  else if (action === 'lookup-barcode') fillFromBarcode(itemForm.elements.barcode.value);
+  else if (action === 'enable-notifications') enableNotifications();
   else if (action === 'disable-notifications') { saveNotifySettings({ enabled: false }); renderApp(); showToast('Οι ειδοποιήσεις απενεργοποιήθηκαν.'); }
   else if (action === 'set-theme') setTheme(button.dataset.theme);
   else if (action === 'share-shopping') shareShoppingList();
@@ -520,7 +582,8 @@ document.addEventListener('submit', (event) => {
         id: current?.id,
         createdAt: current?.createdAt,
         name: formData.get('name'), quantity: formData.get('quantity'), unit: formData.get('unit'),
-        minimum: formData.get('minimum'), category: formData.get('category'), location: formData.get('location'), expiry: formData.get('expiry')
+        minimum: formData.get('minimum'), category: formData.get('category'), location: formData.get('location'), expiry: formData.get('expiry'),
+        barcode: normalizeBarcode(formData.get('barcode'))
       });
       if (current) state.shopping = syncShoppingWithItem(state.shopping, current, item);
       state.items = current ? state.items.map((entry) => entry.id === current.id ? item : entry) : [item, ...state.items];
@@ -545,6 +608,11 @@ document.addEventListener('submit', (event) => {
       message.hidden = false;
     }
   }
+});
+
+document.querySelector('#scan-dialog').addEventListener('close', () => { stopScanner?.(); stopScanner = null; });
+itemForm.elements.barcode.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') { event.preventDefault(); fillFromBarcode(event.target.value); }
 });
 
 confirmDialog.addEventListener('close', () => {
