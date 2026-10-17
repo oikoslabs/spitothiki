@@ -1,0 +1,36 @@
+# To enable: copy this file to .github/workflows/firebase-hosting.yml (needs a token with the "workflow" scope).
+name: Test and deploy to Firebase Hosting
+
+# Runs on pushes to main once the FIREBASE_SERVICE_ACCOUNT_SPITOTHIKI secret exists;
+# without it the deploy step is skipped (tests still run). Can also be started by hand.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-deploy:
+    runs-on: ubuntu-latest
+    env:
+      HAS_FIREBASE_SECRET: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SPITOTHIKI != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run tests
+        run: npm test
+      - name: Deploy to Firebase Hosting (live)
+        if: env.HAS_FIREBASE_SECRET == 'true'
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SPITOTHIKI }}
+          projectId: spitothiki
+          channelId: live
+      - name: Deploy skipped
+        if: env.HAS_FIREBASE_SECRET != 'true'
+        run: echo "FIREBASE_SERVICE_ACCOUNT_SPITOTHIKI secret not set; skipping Firebase deploy."
