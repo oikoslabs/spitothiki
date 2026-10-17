@@ -30,3 +30,6 @@ Then open `http://localhost:4173`.
 ## Deploy
 
 The GitHub Actions workflow runs the tests and publishes the repository root to GitHub Pages on pushes to `main`. Enable **Settings → Pages → Build and deployment → GitHub Actions** once the repository exists.
+
+## Συγχρονισμός (προαιρετικός)
+Δες το [SYNC.md](SYNC.md) για ενεργοποίηση με Firebase. Χωρίς ρύθμιση όλα μένουν στη συσκευή.

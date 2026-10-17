@@ -160,6 +160,12 @@ const steps = [
     if (!(open && playing && stopped)) console.log('  scanner:', { open, status, playing, stopped });
     return open && playing && stopped && status.includes('Στόχευσε');
   }],
+  ['sync card explains it is off without Firebase config', async () => {
+    await nav('settings');
+    const card = await text('#sync-card');
+    await nav('pantry');
+    return card.includes('Ανενεργός') && card.includes('firebase-config.js');
+  }],
   ['reload keeps screen and data', async () => {
     await page.reload({ waitUntil: 'networkidle0' }); await wait();
     return (await page.$eval('.nav-item.is-active', (el) => el.dataset.view)) === 'pantry' && (await count('.inventory-card')) === 3;

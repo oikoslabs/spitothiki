@@ -1,5 +1,6 @@
 import { MAX_QUANTITY, createPantryItem, createShoppingItem, expiringWithin, expiryStatus, expiryWarning, normalizeSearch, normalizeUnit, pantrySummary, receiveShoppingItem, returnShoppingItem, shoppingListText, syncShoppingWithItem, toggleShoppingItem } from './domain.js';
 import { lookupBarcode, normalizeBarcode, startScanner } from './barcode.js';
+import { authProviders, firebaseConfig } from './firebase-config.js';
 import { loadState, parseBackup, saveState } from './storage.js';
 
 const viewRoot = document.querySelector('#view-content');
@@ -74,6 +75,7 @@ function persist() {
   try {
     saveState(state);
     renderNavCounts();
+    sync?.push();
     return true;
   } catch {
     showToast('Δεν ήταν δυνατή η αποθήκευση στη συσκευή.');
@@ -201,6 +203,7 @@ function renderSettings() {
   return `${renderHeader('Ρυθμίσεις', 'Διαχείριση και αντίγραφο ασφαλείας των δεδομένων σου.')}
     <div class="settings-grid"><section class="panel settings-card"><span class="stat-icon">🔒</span><h2>Απόρρητο πρώτα</h2><p>Αυτή η έκδοση αποθηκεύει το απόθεμα και τη λίστα αγορών μόνο στον browser της συσκευής. Δεν υπάρχει λογαριασμός ή συγχρονισμός με cloud.</p><div class="privacy-note">Αν καθαρίσεις τα δεδομένα του browser ή αλλάξεις συσκευή, χρησιμοποίησε αντίγραφο ασφαλείας για να μεταφέρεις τα δεδομένα σου.</div></section>
     <section class="panel settings-card"><span class="stat-icon">◐</span><h2>Εμφάνιση</h2><p>Διάλεξε φωτεινό ή σκούρο θέμα, ή άφησέ το να ακολουθεί τη συσκευή.</p><div class="theme-options" role="group" aria-label="Θέμα">${[['auto', 'Αυτόματο'], ['light', 'Φωτεινό'], ['dark', 'Σκούρο']].map(([value, label]) => `<button type="button" class="filter-chip ${currentTheme() === value ? 'is-active' : ''}" data-action="set-theme" data-theme="${value}" aria-pressed="${currentTheme() === value}">${label}</button>`).join('')}</div></section>
+    ${renderSyncCard()}
     ${renderNotificationCard()}
     <section class="panel settings-card"><span class="stat-icon blue">↗</span><h2>Αντίγραφο ασφαλείας</h2><p>Εξήγαγε ή εισήγαγε ένα αρχείο JSON. Το αρχείο περιέχει τα προϊόντα και τη λίστα αγορών σου.</p><div class="settings-actions"><button class="button button-primary" type="button" data-action="export-backup">⬇ Εξαγωγή αντιγράφου</button><button class="button button-quiet" type="button" data-action="import-backup">⬆ Εισαγωγή αντιγράφου</button></div></section>
     <section class="panel settings-card"><span class="stat-icon amber">✨</span><h2>Δοκιμαστικά δεδομένα</h2><p>Γέμισε την εφαρμογή με ενδεικτικά προϊόντα για να δεις πώς λειτουργεί.</p><div class="settings-actions"><button class="button button-quiet" type="button" data-action="load-demo">Φόρτωση παραδειγμάτων</button></div></section>
@@ -281,6 +284,62 @@ async function copyShareText() {
 }
 
 let stopScanner = null;
+let sync = null;
+let syncStatus = { state: firebaseConfig ? 'loading' : 'disabled' };
+
+const AUTH_ERRORS = {
+  'auth/invalid-credential': 'Λάθος email ή κωδικός.', 'auth/wrong-password': 'Λάθος email ή κωδικός.', 'auth/user-not-found': 'Λάθος email ή κωδικός.',
+  'auth/email-already-in-use': 'Υπάρχει ήδη λογαριασμός με αυτό το email.', 'auth/weak-password': 'Ο κωδικός θέλει τουλάχιστον 6 χαρακτήρες.',
+  'auth/invalid-email': 'Το email δεν είναι σωστό.', 'auth/popup-closed-by-user': 'Η σύνδεση ακυρώθηκε.', 'auth/unauthorized-domain': 'Το domain δεν έχει εγκριθεί στο Firebase (Authorized domains).',
+  'auth/operation-not-allowed': 'Αυτός ο τρόπος σύνδεσης δεν έχει ενεργοποιηθεί στο Firebase.', 'auth/network-request-failed': 'Χωρίς σύνδεση στο internet.',
+  'permission-denied': 'Δεν επιτρέπεται (έλεγξε τον κωδικό πρόσκλησης ή τους κανόνες του Firestore).', 'not-found': 'Δεν βρέθηκε το νοικοκυριό.'
+};
+const authMessage = (error) => AUTH_ERRORS[error?.code] || error?.message || 'Κάτι πήγε στραβά.';
+
+async function startSync() {
+  if (!firebaseConfig) return;
+  try {
+    const { createFirebaseSync } = await import('./sync-firebase.js');
+    sync = await createFirebaseSync({
+      config: firebaseConfig,
+      getState: () => state,
+      setState: (next) => { state = next; try { saveState(state); } catch {} renderApp(); },
+      onStatus: (status) => { syncStatus = status; if (activeView === 'settings') renderApp(); }
+    });
+  } catch {
+    syncStatus = { state: 'error', message: navigator.onLine === false ? 'Χωρίς σύνδεση: ο συγχρονισμός θα ξεκινήσει όταν επιστρέψει το internet.' : 'Δεν φόρτωσε το Firebase.' };
+    if (activeView === 'settings') renderApp();
+  }
+}
+
+function renderSyncCard() {
+  const status = syncStatus;
+  const head = '<section class="panel settings-card sync-card" id="sync-card"><span class="stat-icon blue">⇅</span><h2>Συγχρονισμός συσκευών</h2>';
+  if (status.state === 'disabled') {
+    return `${head}<p>Ανενεργός. Για να μοιράζεσαι το απόθεμα και τη λίστα με άλλες συσκευές ή μέλη του σπιτιού, χρειάζεται ρύθμιση Firebase στο <code>src/firebase-config.js</code>.</p><p class="field-hint">Μέχρι τότε όλα μένουν μόνο σε αυτή τη συσκευή. Μπορείς να μεταφέρεις δεδομένα με το αντίγραφο ασφαλείας.</p></section>`;
+  }
+  if (status.state === 'loading' || status.state === 'connecting') return `${head}<p id="sync-status">Σύνδεση…</p></section>`;
+  if (status.state === 'signed-out' || (status.state === 'error' && !status.user)) {
+    return `${head}<p>Συνδέσου για να συγχρονίζονται το απόθεμα και η λίστα σε όλες τις συσκευές σου. Τα δεδομένα αυτής της συσκευής θα ενωθούν με όσα έχεις ήδη.</p>
+      ${status.message ? `<p class="form-error" id="sync-status">${escapeHtml(status.message)}</p>` : '<p class="field-hint" id="sync-status">Αποσυνδεδεμένος</p>'}
+      ${authProviders.includes('google') ? '<div class="settings-actions"><button class="button button-primary" type="button" data-action="sync-google">Σύνδεση με Google</button></div>' : ''}
+      ${authProviders.includes('password') ? `<form id="sync-email-form" class="sync-email-form" novalidate><input class="field-input" name="email" type="email" autocomplete="email" placeholder="Email" aria-label="Email" required><input class="field-input" name="password" type="password" autocomplete="current-password" placeholder="Κωδικός" aria-label="Κωδικός" minlength="6" required>
+        <div class="settings-actions"><button class="button button-quiet" type="submit" name="mode" value="signin">Σύνδεση</button><button class="button button-quiet" type="submit" name="mode" value="signup">Νέος λογαριασμός</button><button class="text-button" type="submit" name="mode" value="reset">Ξέχασα τον κωδικό</button></div></form>` : ''}</section>`;
+  }
+  const who = status.user?.email || status.user?.name || 'Συνδεδεμένος';
+  const shared = status.householdId && status.user && status.householdId !== status.user.uid;
+  const line = status.state === 'error' ? `<p class="form-error" id="sync-status">${escapeHtml(status.message || 'Σφάλμα συγχρονισμού')}</p>`
+    : `<p class="field-hint" id="sync-status">${status.offline ? 'Εκτός σύνδεσης: οι αλλαγές θα σταλούν μόλις επιστρέψει το internet.' : 'Συγχρονισμένο ✓'}</p>`;
+  return `${head}<p>Συνδεδεμένος ως <strong>${escapeHtml(who)}</strong>${shared ? ' · κοινό νοικοκυριό' : ''}.</p>${line}
+    <div class="settings-actions"><button class="button button-quiet" type="button" data-action="sync-invite">Πρόσκληση μέλους</button>${shared ? '<button class="button button-quiet" type="button" data-action="sync-leave">Αποχώρηση από νοικοκυριό</button>' : ''}<button class="button button-quiet" type="button" data-action="sync-signout">Αποσύνδεση</button></div>
+    <form id="sync-join-form" class="sync-join-form" novalidate><input class="field-input" name="invite" placeholder="Κωδικός πρόσκλησης" aria-label="Κωδικός πρόσκλησης" autocomplete="off"><button class="button button-quiet" type="submit">Συμμετοχή</button></form>
+    <p class="field-hint">Με τη συμμετοχή σε άλλο νοικοκυριό, τα προϊόντα αυτής της συσκευής προστίθενται στο κοινό απόθεμα.</p></section>`;
+}
+
+async function syncAction(fn, success) {
+  try { const result = await fn(); if (success) showToast(typeof success === 'function' ? success(result) : success); }
+  catch (error) { showToast(authMessage(error)); }
+}
 
 async function fillFromBarcode(code) {
   const status = document.querySelector('#barcode-status');
@@ -497,7 +556,15 @@ function handleAction(button) {
   } else if (action === 'remove-shopping') {
     state.shopping = state.shopping.filter((entry) => entry.id !== id);
     persist(); renderApp(); showToast('Το προϊόν αφαιρέθηκε από τη λίστα.');
-  } else if (action === 'scan-barcode') openScanner();
+  } else if (action === 'sync-google') syncAction(() => sync.signInWithGoogle());
+  else if (action === 'sync-signout') syncAction(() => sync.signOut(), 'Αποσυνδέθηκες. Τα δεδομένα μένουν σε αυτή τη συσκευή.');
+  else if (action === 'sync-invite') syncAction(async () => {
+    const code = await sync.createInvite();
+    try { await navigator.clipboard.writeText(code); } catch {}
+    showConfirm(`Δώσε αυτόν τον κωδικό στο άλλο μέλος (αντιγράφηκε): ${code}`, null, 'Κωδικός πρόσκλησης');
+  });
+  else if (action === 'sync-leave') showConfirm('Θα επιστρέψεις στο δικό σου νοικοκυριό. Τα κοινά προϊόντα θα μείνουν στο κοινό νοικοκυριό.', () => syncAction(() => sync.leaveHousehold(), 'Αποχώρησες από το νοικοκυριό.'), 'Αποχώρηση;');
+  else if (action === 'scan-barcode') openScanner();
   else if (action === 'close-scan') closeScanner();
   else if (action === 'lookup-barcode') fillFromBarcode(itemForm.elements.barcode.value);
   else if (action === 'enable-notifications') enableNotifications();
@@ -523,7 +590,7 @@ function handleAction(button) {
     if (state.items.length || state.shopping.length) showConfirm('Τα τωρινά δεδομένα θα αντικατασταθούν από δοκιμαστικά προϊόντα.', loadDemo, 'Φόρτωση παραδειγμάτων;');
     else loadDemo();
   } else if (action === 'clear-data') {
-    showConfirm('Θα διαγραφούν όλα τα προϊόντα και η λίστα αγορών από αυτή τη συσκευή. Φρόντισε να έχεις αντίγραφο αν τα χρειάζεσαι.', () => {
+    showConfirm(`Θα διαγραφούν όλα τα προϊόντα και η λίστα αγορών από αυτή τη συσκευή.${syncStatus.user ? ' Επειδή είσαι συνδεδεμένος, θα διαγραφούν και από τις συγχρονισμένες συσκευές.' : ''} Φρόντισε να έχεις αντίγραφο αν τα χρειάζεσαι.`, () => {
       state = { items: [], shopping: [] }; persist(); renderApp(); showToast('Τα δεδομένα διαγράφηκαν.');
     }, 'Διαγραφή όλων των δεδομένων;');
   }
@@ -595,6 +662,25 @@ document.addEventListener('submit', (event) => {
     }
   }
 
+  if (event.target.id === 'sync-email-form') {
+    event.preventDefault();
+    const email = String(event.target.elements.email.value || '').trim();
+    const password = String(event.target.elements.password.value || '');
+    const mode = event.submitter?.value || 'signin';
+    if (!email) { showToast('Γράψε το email σου.'); return; }
+    if (mode === 'reset') { syncAction(() => sync.resetPassword(email), 'Σου στείλαμε email για νέο κωδικό.'); return; }
+    if (password.length < 6) { showToast('Ο κωδικός θέλει τουλάχιστον 6 χαρακτήρες.'); return; }
+    syncAction(() => mode === 'signup' ? sync.signUpWithEmail(email, password) : sync.signInWithEmail(email, password));
+    return;
+  }
+  if (event.target.id === 'sync-join-form') {
+    event.preventDefault();
+    const invite = String(event.target.elements.invite.value || '').trim();
+    if (!invite) { showToast('Γράψε τον κωδικό πρόσκλησης.'); return; }
+    syncAction(() => sync.joinHousehold(invite), 'Μπήκες στο κοινό νοικοκυριό.');
+    return;
+  }
+
   if (event.target.id === 'shopping-form') {
     event.preventDefault();
     const formData = new FormData(event.target);
@@ -634,3 +720,5 @@ if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.
 
 checkExpiryNotifications();
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkExpiryNotifications(); });
+
+startSync();
