@@ -125,3 +125,14 @@ test('ticking a bought row without a link matches by name or creates a pantry it
   assert.equal(otherUnit.items, items);
   assert.equal(otherUnit.row.checked, true);
 });
+
+test('formats only pending shopping rows as shareable text', async () => {
+  const { shoppingListText } = await import('../src/domain.js');
+  assert.equal(shoppingListText([]), '');
+  const text = shoppingListText([
+    { name: 'Γάλα', quantity: 2, unit: 'λίτρα', checked: false },
+    { name: 'Ψωμί', quantity: 1, unit: 'τεμάχια', checked: false },
+    { name: 'Φέτα', quantity: 1, unit: 'κιλά', checked: true }
+  ]);
+  assert.equal(text, '🛒 Λίστα αγορών (Σπιτοθήκη)\n• Γάλα — 2 λίτρα\n• Ψωμί — 1 τεμ.');
+});

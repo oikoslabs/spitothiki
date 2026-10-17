@@ -74,6 +74,12 @@
     <form method="dialog"><div class="dialog-heading"><div><p class="eyebrow">ΕΠΙΒΕΒΑΙΩΣΗ</p><h2 id="confirm-title">Να συνεχίσω;</h2></div></div><p id="confirm-message" class="confirm-message"></p><div class="dialog-actions"><button class="button button-quiet" value="cancel">Όχι, πίσω</button><button class="button button-danger" id="confirm-accept" value="confirm">Ναι, συνέχισε</button></div></form>
   </dialog>
 
+  <dialog id="share-dialog" class="confirm-dialog" aria-labelledby="share-title">
+    <div class="dialog-heading"><div><p class="eyebrow">ΛΙΣΤΑ ΑΓΟΡΩΝ</p><h2 id="share-title">Κοινοποίηση λίστας</h2></div><button class="icon-button" type="button" data-action="close-share" aria-label="Κλείσιμο">×</button></div>
+    <textarea id="share-text" class="field-input share-text" rows="7" readonly aria-label="Κείμενο λίστας"></textarea>
+    <div class="dialog-actions share-actions"><button class="button button-primary" type="button" data-action="copy-share">Αντιγραφή</button><a class="button button-quiet" id="share-whatsapp" target="_blank" rel="noopener">WhatsApp</a><a class="button button-quiet" id="share-viber" rel="noopener">Viber</a></div>
+  </dialog>
+
   <input id="backup-file" type="file" accept="application/json,.json" hidden>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script type="module" src="src/app.js"></script>

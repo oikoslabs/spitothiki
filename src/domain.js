@@ -162,3 +162,9 @@ export function returnShoppingItem(items = [], row, now = new Date().toISOString
     message: `Αφαιρέθηκαν ${pantryAdded} ${target.unit} «${target.name}» από το απόθεμα.`
   };
 }
+
+export function shoppingListText(shopping = []) {
+  const pending = shopping.filter((row) => !row.checked);
+  if (!pending.length) return '';
+  return ['🛒 Λίστα αγορών (Σπιτοθήκη)', ...pending.map((row) => `• ${row.name} — ${row.quantity} ${normalizeUnit(row.unit)}`)].join('\n');
+}
