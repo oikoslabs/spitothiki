@@ -214,6 +214,17 @@ const EN = {
   'Σπατάλη τροφίμων': 'Food waste', 'φορά που πετάχτηκε κάτι': 'time something was thrown away', 'φορές που πετάχτηκε κάτι': 'times something was thrown away',
   'Πετιούνται πιο συχνά': 'Thrown away most often', 'Τίποτα αυτόν τον μήνα. Όταν πετάς κάτι, πάτα 🗑 στο απόθεμα για να το καταγράψεις.': 'Nothing this month. When you throw something away, tap 🗑 in the pantry to log it.',
   'ΣΠΑΤΑΛΗ ΤΡΟΦΙΜΩΝ': 'FOOD WASTE', 'Πετάχτηκε': 'Thrown away', 'Ποσότητα που πετάχτηκε': 'Quantity thrown away', 'Λόγος': 'Reason', 'Καταγραφή': 'Log it',
+  // What do I cook?
+  'Τι να μαγειρέψω;': 'What do I cook?', 'Ιδέες με ό,τι λήγει πρώτο': 'Ideas using what expires first', 'Μαγείρεμα': 'Cook',
+  'Όλα τα υλικά είναι ήδη στη λίστα.': 'All ingredients are already on the list.', 'Μπήκαν στη λίστα: {names}': 'Added to the list: {names}',
+  'Από TheMealDB (στα αγγλικά)': 'From TheMealDB', 'Συνταγή της Σπιτοθήκης': 'Spitothiki recipe', 'χρησιμοποιεί ό,τι λήγει σύντομα': 'uses what expires soon',
+  'Έχεις ({count})': 'You have ({count})', 'Λείπουν ({count})': 'Missing ({count})', 'Τα έχεις όλα!': 'You have everything!', 'Πώς γίνεται': 'How to make it',
+  '＋ Τα υπόλοιπα στη λίστα': '＋ Add missing to list', 'Συνταγή ↗': 'Recipe ↗',
+  'Ψάχνω κι άλλες ιδέες στο TheMealDB…': 'Looking for more ideas on TheMealDB…', 'Χωρίς σύνδεση: δείχνω μόνο τις συνταγές της εφαρμογής.': 'Offline: showing only the app’s recipes.',
+  'Το TheMealDB δεν απάντησε. Δείχνω τις συνταγές της εφαρμογής.': 'TheMealDB did not respond. Showing the app’s recipes.', 'Το TheMealDB δεν βρήκε κάτι ταιριαστό.': 'TheMealDB found nothing that fits.',
+  'Ιδέες με ό,τι έχεις στο σπίτι, πρώτα όσα λήγουν σύντομα.': 'Ideas from what you have at home, soon-to-expire first.', 'Λήγουν σύντομα: {names}': 'Expiring soon: {names}',
+  'Δεν βρήκα συνταγές': 'No recipes found', 'Πρόσθεσε στο απόθεμα βασικά υλικά (π.χ. αυγά, ντομάτες, ρύζι) για να δεις ιδέες.': 'Add basic ingredients to the pantry (e.g. eggs, tomatoes, rice) to see ideas.',
+  'Περισσότερες ιδέες από TheMealDB': 'More ideas from TheMealDB', 'Ξανά': 'Retry',
   // Domain / storage errors
   'Χρειάζεται όνομα προϊόντος.': 'A product name is required.', 'Η ποσότητα πρέπει να είναι αριθμός μηδέν ή μεγαλύτερος.': 'Quantity must be a number zero or greater.',
   'Η ποσότητα δεν μπορεί να ξεπερνά τα 99999.': 'Quantity cannot exceed 99999.', 'Η ελάχιστη ποσότητα πρέπει να είναι μηδέν ή μεγαλύτερη.': 'Minimum quantity must be zero or greater.',

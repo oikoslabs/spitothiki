@@ -396,3 +396,22 @@ body[data-screen="pantry"] .topbar .button-add { display: none; }
   .shopping-add-form .voice-button { grid-row: 4; }
   .bar-row { grid-template-columns: minmax(0,110px) minmax(0,1fr) auto; }
 }
+
+/* What do I cook? */
+.recipe-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; margin-bottom: 18px; }
+.recipe-card { display: flex; flex-direction: column; gap: 6px; }
+.recipe-head { display: flex; gap: 12px; align-items: center; }
+.recipe-thumb { width: 56px; height: 56px; border-radius: 12px; object-fit: cover; }
+.recipe-name { margin: 0; font-size: 16px; }
+.recipe-urgent { color: #a35d00; }
+.recipe-label { margin: 6px 0 2px; font-size: 12px; font-weight: 700; color: var(--muted); }
+.recipe-label.ok { color: var(--green-dark); }
+.ingredient-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.ingredient-chip { padding: 3px 9px; border-radius: 999px; font-size: 12px; background: var(--green-soft); }
+.ingredient-chip.urgent { background: #fdecc8; }
+.ingredient-chip.need { background: transparent; border: 1px dashed var(--line); }
+.recipe-steps summary { cursor: pointer; font-size: 13px; font-weight: 600; }
+.recipe-steps p { font-size: 13px; }
+.recipe-card .settings-actions { margin-top: auto; padding-top: 6px; }
+.section-title { margin: 8px 0 10px; font-size: 16px; }
+@media (max-width: 760px) { .primary-nav { grid-template-columns: repeat(6,minmax(0,1fr)); } .recipe-grid { grid-template-columns: 1fr; } }

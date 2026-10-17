@@ -2,6 +2,7 @@ import { MAX_QUANTITY, createPantryItem, createShoppingItem, expiringWithin, exp
 import { lookupBarcode, normalizeBarcode, startScanner } from './barcode.js';
 import { authProviders, firebaseConfig } from './firebase-config.js';
 import { loadState, parseBackup, saveState } from './storage.js';
+import { fetchMealDbSuggestions, ingredientName, pantryIngredients, suggestBuiltin } from './recipes.js';
 import { CATEGORIES, WASTE_REASONS, applyWaste, createStore, createWaste, groupByStore, monthKey, monthlySpending, moveCategory, purchaseFor, shiftMonth, storeOrder, wasteStats } from './features.js';
 import { RECURRING_INTERVALS, applyRecurring, createRecurring, dueFromSnapshot, expirySnapshot, parseVoiceItems } from './features.js';
 import { getLang, locale, setLang, t, translateDom, untranslatedGreek } from './i18n.js';
@@ -14,7 +15,7 @@ const backupFile = document.querySelector('#backup-file');
 const toast = document.querySelector('#toast');
 
 let state = loadState();
-const VIEWS = ['overview', 'pantry', 'shopping', 'insights', 'settings'];
+const VIEWS = ['overview', 'pantry', 'shopping', 'cook', 'insights', 'settings'];
 let activeView = VIEWS.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'overview';
 let pantryQuery = '';
 let pantryCategory = 'Όλα';
@@ -163,7 +164,7 @@ function renderOverview() {
     <div class="dashboard-grid">
       <section class="panel"><div class="panel-heading"><div><h2>Έλεγξε τις ημερομηνίες</h2><p>Ό,τι λήγει μέσα στις επόμενες 7 ημέρες</p></div><button class="panel-link" type="button" data-view="pantry">Όλο το απόθεμα →</button></div><div class="product-list">${upcoming.length ? upcoming.map(renderMiniProduct).join('') : renderEmpty('Όλα καλά εδώ', 'Δεν έχεις προϊόντα που λήγουν σύντομα.', 'add-item', 'Πρόσθεσε προϊόν', '🌿')}</div></section>
       <div class="dashboard-side"><section class="panel"><div class="panel-heading"><div><h2>Χρειάζονται αναπλήρωση</h2><p>Με βάση το ελάχιστο απόθεμα</p></div></div><div class="product-list">${lowStock.length ? lowStock.map(renderMiniProduct).join('') : `<p class="subtle-empty">${state.items.length ? 'Δεν υπάρχει κάτι που να χρειάζεται αναπλήρωση.' : 'Όταν προσθέσεις προϊόντα, θα τα βλέπεις εδώ.'}</p>`}</div>${lowStock.length ? '<button class="button button-quiet full-width" type="button" data-view="pantry">Δες το απόθεμα</button>' : ''}</section>
-      <section class="panel quick-panel"><div class="panel-heading"><div><h2>Γρήγορες κινήσεις</h2><p>Τα βασικά, χωρίς ψάξιμο</p></div></div><div class="quick-actions"><button class="quick-action" type="button" data-action="add-item"><span class="quick-action-icon">＋</span><span><strong>Πρόσθεσε προϊόν</strong><small>Καταχώρισε κάτι που έφερες σπίτι</small></span><span class="arrow">›</span></button><button class="quick-action" type="button" data-view="shopping"><span class="quick-action-icon">✓</span><span><strong>Άνοιξε τη λίστα</strong><small>${t('{pending} για ψώνια', { pending: pendingLabel(state.shopping.filter((item) => !item.checked).length) })}</small></span><span class="arrow">›</span></button></div></section></div>
+      <section class="panel quick-panel"><div class="panel-heading"><div><h2>Γρήγορες κινήσεις</h2><p>Τα βασικά, χωρίς ψάξιμο</p></div></div><div class="quick-actions"><button class="quick-action" type="button" data-action="add-item"><span class="quick-action-icon">＋</span><span><strong>Πρόσθεσε προϊόν</strong><small>Καταχώρισε κάτι που έφερες σπίτι</small></span><span class="arrow">›</span></button><button class="quick-action" type="button" data-view="cook"><span class="quick-action-icon">🍳</span><span><strong>Τι να μαγειρέψω;</strong><small>Ιδέες με ό,τι λήγει πρώτο</small></span><span class="arrow">›</span></button><button class="quick-action" type="button" data-view="shopping"><span class="quick-action-icon">✓</span><span><strong>Άνοιξε τη λίστα</strong><small>${t('{pending} για ψώνια', { pending: pendingLabel(state.shopping.filter((item) => !item.checked).length) })}</small></span><span class="arrow">›</span></button></div></section></div>
     </div>`;
 }
 
@@ -257,6 +258,7 @@ function renderApp() {
   else if (activeView === 'pantry') viewRoot.innerHTML = renderPantry();
   else if (activeView === 'shopping') viewRoot.innerHTML = renderShopping();
   else if (activeView === 'insights') viewRoot.innerHTML = renderInsights();
+  else if (activeView === 'cook') { viewRoot.innerHTML = renderCook(); loadOnlineRecipes(); }
   else viewRoot.innerHTML = renderSettings();
   if (activeView === 'pantry') renderPantryList();
   translateDom(viewRoot);
@@ -656,6 +658,67 @@ function startVoiceAdd(button) {
   try { recognition.start(); } catch { recognition = null; button.classList.remove('is-listening'); }
 }
 
+// ---------- What do I cook? ----------
+let onlineRecipes = { key: '', state: 'idle', list: [] };
+let shownRecipes = [];
+
+const recipeKey = () => Object.entries(pantryIngredients(state.items, localDateKey())).map(([id, entry]) => `${id}:${entry.urgency}`).sort().join(',');
+
+function loadOnlineRecipes() {
+  const key = recipeKey();
+  if (!key || onlineRecipes.key === key || navigator.onLine === false) return;
+  onlineRecipes = { key, state: 'loading', list: [] };
+  fetchMealDbSuggestions(state.items, localDateKey())
+    .then((list) => { if (onlineRecipes.key === key) onlineRecipes = { key, state: 'done', list: list.filter((r) => r.matched.length).slice(0, 4) }; })
+    .catch(() => { if (onlineRecipes.key === key) onlineRecipes = { key, state: 'error', list: [] }; })
+    .finally(() => { if (activeView === 'cook') { viewRoot.innerHTML = renderCook(); translateDom(viewRoot); } });
+}
+
+function missingNames(recipe) {
+  const lang = getLang();
+  return [...recipe.missing.map((id) => ingredientName(id, lang)), ...(recipe.missingRaw || [])];
+}
+
+function addMissingToList(recipeId) {
+  const recipe = shownRecipes.find((entry) => entry.id === recipeId);
+  if (!recipe) return;
+  const pendingNames = new Set(state.shopping.filter((row) => !row.checked).map((row) => normalizeSearch(row.name).trim()));
+  const names = missingNames(recipe).filter((name) => !pendingNames.has(normalizeSearch(name).trim()));
+  if (!names.length) { showToast('Όλα τα υλικά είναι ήδη στη λίστα.'); return; }
+  for (const name of names) state.shopping.push(createShoppingItem({ name: name.charAt(0).toLocaleUpperCase() + name.slice(1) }));
+  if (persist()) { renderApp(); showToast(t('Μπήκαν στη λίστα: {names}', { names: names.join(', ') })); }
+}
+
+function renderRecipeCard(recipe, pantry) {
+  const lang = getLang();
+  const chip = (id, kind) => {
+    const urgent = kind === 'have' && pantry[id]?.urgency >= 1;
+    return `<span class="ingredient-chip ${kind}${urgent ? ' urgent' : ''}">${kind === 'have' ? (urgent ? '◷' : '✓') : '+'} ${escapeHtml(ingredientName(id, lang))}</span>`;
+  };
+  const missingCount = recipe.missing.length + (recipe.missingRaw || []).length;
+  return `<article class="panel recipe-card" data-recipe="${escapeHtml(recipe.id)}"><div class="recipe-head">${recipe.thumb ? `<img class="recipe-thumb" src="${escapeHtml(recipe.thumb)}/preview" alt="" loading="lazy">` : '<span class="stat-icon">🍲</span>'}<div><h3 class="recipe-name" data-no-i18n lang="${recipe.source === 'mealdb' ? 'en' : lang}">${escapeHtml(recipe.name[lang] || recipe.name.el)}</h3>
+    <p class="field-hint">${recipe.source === 'mealdb' ? escapeHtml(t('Από TheMealDB (στα αγγλικά)')) : escapeHtml(t('Συνταγή της Σπιτοθήκης'))}${recipe.urgent.length ? ` · <strong class="recipe-urgent">${escapeHtml(t('χρησιμοποιεί ό,τι λήγει σύντομα'))}</strong>` : ''}</p></div></div>
+    <p class="recipe-label">${escapeHtml(t('Έχεις ({count})', { count: recipe.matched.length }))}</p><div class="ingredient-chips">${recipe.matched.map((id) => chip(id, 'have')).join('')}</div>
+    ${missingCount ? `<p class="recipe-label">${escapeHtml(t('Λείπουν ({count})', { count: missingCount }))}</p><div class="ingredient-chips" data-no-i18n>${recipe.missing.map((id) => chip(id, 'need')).join('')}${(recipe.missingRaw || []).map((name) => `<span class="ingredient-chip need" lang="en">+ ${escapeHtml(name)}</span>`).join('')}</div>` : `<p class="recipe-label ok">${escapeHtml(t('Τα έχεις όλα!'))}</p>`}
+    ${recipe.steps ? `<details class="recipe-steps"><summary>${escapeHtml(t('Πώς γίνεται'))}</summary><p>${escapeHtml(recipe.steps[lang] || recipe.steps.el)}</p></details>` : ''}
+    <div class="settings-actions">${missingCount ? `<button class="button button-primary" type="button" data-action="add-missing" data-recipe="${escapeHtml(recipe.id)}">${escapeHtml(t('＋ Τα υπόλοιπα στη λίστα'))}</button>` : ''}${recipe.url ? `<a class="button button-quiet" href="${escapeHtml(recipe.url)}" target="_blank" rel="noopener">${escapeHtml(t('Συνταγή ↗'))}</a>` : ''}</div></article>`;
+}
+
+function renderCook() {
+  const today = localDateKey();
+  const pantry = pantryIngredients(state.items, today);
+  const builtin = suggestBuiltin(state.items, today);
+  const online = onlineRecipes.key === recipeKey() ? onlineRecipes : { state: navigator.onLine === false ? 'offline' : 'loading', list: [] };
+  shownRecipes = [...builtin, ...online.list];
+  const urgentNames = state.items.filter((item) => pantry[Object.keys(pantry).find((id) => pantry[id].items.includes(item))]?.urgency >= 1).map((item) => item.name);
+  const onlineStatus = { loading: 'Ψάχνω κι άλλες ιδέες στο TheMealDB…', offline: 'Χωρίς σύνδεση: δείχνω μόνο τις συνταγές της εφαρμογής.', error: 'Το TheMealDB δεν απάντησε. Δείχνω τις συνταγές της εφαρμογής.', done: online.list.length ? '' : 'Το TheMealDB δεν βρήκε κάτι ταιριαστό.' }[online.state] || '';
+  return `${renderHeader('Τι να μαγειρέψω;', 'Ιδέες με ό,τι έχεις στο σπίτι, πρώτα όσα λήγουν σύντομα.')}
+    ${urgentNames.length ? `<div class="alert-banner" role="status">◷ ${escapeHtml(t('Λήγουν σύντομα: {names}', { names: urgentNames.join(', ') }))}</div>` : ''}
+    ${builtin.length || online.list.length ? `<div class="recipe-grid" id="recipe-list">${builtin.map((recipe) => renderRecipeCard(recipe, pantry)).join('')}</div>` : renderEmpty('Δεν βρήκα συνταγές', 'Πρόσθεσε στο απόθεμα βασικά υλικά (π.χ. αυγά, ντομάτες, ρύζι) για να δεις ιδέες.', 'add-item', 'Προσθήκη προϊόντος', '🍳')}
+    ${online.list.length ? `<h2 class="section-title">Περισσότερες ιδέες από TheMealDB</h2><div class="recipe-grid" id="recipe-online">${online.list.map((recipe) => renderRecipeCard(recipe, pantry)).join('')}</div>` : ''}
+    ${onlineStatus ? `<p class="field-hint" id="recipe-online-status">${escapeHtml(t(onlineStatus))}${online.state === 'error' ? ` <button class="text-button" type="button" data-action="retry-recipes">${escapeHtml(t('Ξανά'))}</button>` : ''}</p>` : ''}`;
+}
+
 // ---------- Food waste ----------
 const WASTE_LABELS = { expired: 'Έληξε', spoiled: 'Χάλασε', leftover: 'Περίσσεψε', other: 'Άλλος λόγος' };
 
@@ -789,6 +852,8 @@ function handleAction(button) {
   else if (action === 'waste-item') openWasteDialog(id);
   else if (action === 'close-waste') document.querySelector('#waste-dialog').close();
   else if (action === 'insights-month') { insightsMonth = shiftMonth(insightsMonth, Number(button.dataset.delta)); renderApp(); }
+  else if (action === 'add-missing') addMissingToList(button.dataset.recipe);
+  else if (action === 'retry-recipes') { onlineRecipes = { key: '', state: 'idle', list: [] }; renderApp(); }
   else if (action === 'voice-add') startVoiceAdd(button);
   else if (action === 'remove-recurring') { state.recurring = (state.recurring || []).filter((rule) => rule.id !== id); persist(); renderApp(); showToast('Το επαναλαμβανόμενο αφαιρέθηκε.'); }
   else if (action === 'set-lang') changeLanguage(button.dataset.lang);

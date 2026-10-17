@@ -21,6 +21,18 @@ await page.evaluateOnNewDocument((lang) => {
   if (window.ServiceWorkerRegistration) ServiceWorkerRegistration.prototype.showNotification = (title, o) => { window.__notifications.push({ title, body: o?.body }); return Promise.resolve(); };
 }, lang);
 const errors = [];
+// TheMealDB fixtures, so the test does not depend on the live API.
+await page.setRequestInterception(true);
+page.on('request', (request) => {
+  const u = request.url();
+  if (u.startsWith('https://www.themealdb.com/api/')) {
+    const body = u.includes('filter.php') ? { meals: [{ idMeal: '777', strMeal: 'Shakshuka', strMealThumb: 'https://www.themealdb.com/images/x.jpg' }] }
+      : { meals: [{ idMeal: '777', strMeal: 'Shakshuka', strMealThumb: 'https://www.themealdb.com/images/x.jpg', strIngredient1: 'Eggs', strIngredient2: 'Tomatoes', strIngredient3: 'Cumin', strIngredient4: 'olive oil', strIngredient5: '' }] };
+    return request.respond({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(body) });
+  }
+  if (u.startsWith('https://www.themealdb.com/images/')) return request.respond({ status: 200, contentType: 'image/gif', body: Buffer.from('R0lGODlhAQABAAAAACw=', 'base64') });
+  return request.continue();
+});
 page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
 page.on('response', (r) => { if (r.status() >= 400 && !r.url().endsWith('favicon.ico')) errors.push(`http ${r.status()} ${r.url()}`); });
 const wait = (ms = 300) => new Promise((r) => setTimeout(r, ms));
@@ -191,7 +203,41 @@ await check('insights: monthly spending per category and waste stats', async () 
   return /3[.,]85/.test(total) && bars.length === 2 && bars[0].includes(L('Καθαριότητα', 'Cleaning')) && waste === '1' && month.length > 3 && /0[.,]00/.test(prevTotal);
 });
 
-for (const view of ['shopping', 'settings', 'insights', 'pantry']) await check(`no Greek UI left on ${view} (${lang})`, async () => { await nav(view); const left = await greekLeft(); if (left.length) console.log('  left:', left); return !left.length; });
+await check('what do I cook: soon-to-expire first, add missing to list, TheMealDB ideas', async () => {
+  await page.evaluate(() => {
+    const st = JSON.parse(localStorage.getItem('spitothiki:v1'));
+    const d = new Date(); d.setDate(d.getDate() + 1);
+    const soon = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    st.items = [
+      { id: 'c1', name: 'Αυγά', quantity: 6, unit: 'τεμ.', minimum: 0, category: 'Γαλακτοκομικά', location: '', expiry: soon },
+      { id: 'c2', name: 'Ντομάτες', quantity: 4, unit: 'τεμ.', minimum: 0, category: 'Φρούτα & λαχανικά', location: '', expiry: '' }];
+    st.shopping = [];
+    localStorage.setItem('spitothiki:v1', JSON.stringify(st));
+  });
+  await page.reload({ waitUntil: 'networkidle0' });
+  await nav('cook'); await wait(1200);
+  const first = await page.$eval('#recipe-list .recipe-card', (e) => ({ id: e.dataset.recipe, text: e.textContent }));
+  const online = await page.$$eval('#recipe-online .recipe-card', (els) => els.map((e) => e.textContent));
+  await shot('cook');
+  await tap('#recipe-list .recipe-card [data-action="add-missing"]'); await wait();
+  const s = await stored();
+  const names = s.shopping.map((r) => r.name);
+  await tap('#recipe-online .recipe-card [data-action="add-missing"]'); await wait();
+  const names2 = (await stored()).shopping.map((r) => r.name);
+  if (first.id !== 'strapatsada' || !online.length) console.log('  cook:', first, online, names, names2);
+  return first.id === 'strapatsada' && first.text.includes(L('Στραπατσάδα', 'Strapatsada')) && first.text.includes('◷')
+    && names.includes(L('Φέτα', 'Feta')) && online.length === 1 && online[0].includes('Shakshuka') && names2.includes('Cumin');
+});
+await check('what do I cook works offline with built-in recipes', async () => {
+  await page.setOfflineMode(true);
+  await page.evaluate(() => window.dispatchEvent(new Event('offline')));
+  await nav('overview'); await nav('cook'); await wait();
+  const cards = (await page.$$('#recipe-list .recipe-card')).length;
+  await page.setOfflineMode(false);
+  return cards >= 1;
+});
+
+for (const view of ['shopping', 'settings', 'insights', 'pantry', 'cook']) await check(`no Greek UI left on ${view} (${lang})`, async () => { await nav(view); const left = await greekLeft(); if (left.length) console.log('  left:', left); return !left.length; });
 
 console.log(`features ${width} ${lang}: ${errors.length ? 'FAILED ' + JSON.stringify(errors) : 'passed'}`);
 await browser.close();
