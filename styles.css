@@ -194,6 +194,9 @@ body[data-screen="pantry"] .topbar .button-add { display: none; }
 .barcode-row { display: grid; grid-template-columns: auto minmax(0,1fr) auto; gap: 8px; margin-top: 10px; }
 .barcode-row .button { min-height: 43px; padding-inline: 12px; }
 .scan-video { width: 100%; aspect-ratio: 4 / 3; margin-top: 12px; border-radius: 14px; background: #000; object-fit: cover; }
+.sync-email-form, .sync-join-form { display: grid; gap: 8px; margin-top: 12px; }
+.sync-join-form { grid-template-columns: minmax(0,1fr) auto; }
+.sync-card code { font-size: 12px; }
 .notify-days { max-width: 120px; }
 .theme-options { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
 .form-error { margin: 12px 0 0; color: var(--red); font-size: 12px; }

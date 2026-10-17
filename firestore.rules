@@ -1,0 +1,42 @@
+rules_version = '2';
+// Security rules for Σπιτοθήκη sync. Paste into Firebase console → Firestore → Rules.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function household(hid) { return get(/databases/$(database)/documents/households/$(hid)).data; }
+    function isMember(hid) { return signedIn() && request.auth.uid in household(hid).members; }
+
+    // Each user remembers which household they use.
+    match /users/{uid} {
+      allow read, write: if signedIn() && request.auth.uid == uid;
+    }
+
+    match /households/{hid} {
+      allow read: if signedIn() && request.auth.uid in resource.data.members;
+      // Everyone starts with a personal household whose id is their uid.
+      allow create: if signedIn() && hid == request.auth.uid
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.members == [request.auth.uid];
+      allow update: if signedIn() && (
+        // Members can update the household (e.g. leave it) but not change its owner.
+        (request.auth.uid in resource.data.members && request.resource.data.ownerUid == resource.data.ownerUid)
+        // Non-members can only add themselves, with a valid invite code.
+        || (!(request.auth.uid in resource.data.members)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members', 'lastJoinCode'])
+          && request.resource.data.members.hasAll(resource.data.members)
+          && request.resource.data.members.removeAll(resource.data.members) == [request.auth.uid]
+          && exists(/databases/$(database)/documents/households/$(hid)/invites/$(request.resource.data.lastJoinCode)))
+      );
+      allow delete: if signedIn() && resource.data.ownerUid == request.auth.uid;
+
+      // Products and shopping-list rows, one document each.
+      match /records/{recordId} {
+        allow read, write: if isMember(hid);
+      }
+      // Invite codes created by members; their existence is what lets someone join.
+      match /invites/{code} {
+        allow read, create, delete: if isMember(hid);
+      }
+    }
+  }
+}
