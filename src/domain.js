@@ -168,3 +168,14 @@ export function shoppingListText(shopping = []) {
   if (!pending.length) return '';
   return ['🛒 Λίστα αγορών (Σπιτοθήκη)', ...pending.map((row) => `• ${row.name} — ${row.quantity} ${normalizeUnit(row.unit)}`)].join('\n');
 }
+
+// Items whose expiry is between today and `days` days from now (inclusive), soonest first.
+export function expiringWithin(items = [], today = new Date().toISOString().slice(0, 10), days = 3) {
+  const base = utcDay(today);
+  if (base === null) return [];
+  return items
+    .map((item) => ({ item, due: utcDay(item.expiry) }))
+    .filter(({ due }) => due !== null && due >= base && (due - base) / 86_400_000 <= days)
+    .sort((a, b) => a.due - b.due)
+    .map(({ item }) => item);
+}

@@ -136,3 +136,13 @@ test('formats only pending shopping rows as shareable text', async () => {
   ]);
   assert.equal(text, '🛒 Λίστα αγορών (Σπιτοθήκη)\n• Γάλα — 2 λίτρα\n• Ψωμί — 1 τεμ.');
 });
+
+test('lists items expiring within N days, soonest first', async () => {
+  const { expiringWithin } = await import('../src/domain.js');
+  const items = [
+    { name: 'A', expiry: '2026-10-20' }, { name: 'B', expiry: '2026-10-17' }, { name: 'C', expiry: '2026-10-21' },
+    { name: 'D', expiry: '2026-10-16' }, { name: 'E', expiry: '' }
+  ];
+  assert.deepEqual(expiringWithin(items, '2026-10-17', 3).map((i) => i.name), ['B', 'A']);
+  assert.deepEqual(expiringWithin(items, '2026-10-17', 0).map((i) => i.name), ['B']);
+});
