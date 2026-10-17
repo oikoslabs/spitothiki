@@ -465,3 +465,7 @@ window.addEventListener('hashchange', () => navigate(location.hash.slice(1)));
 state.items = state.items.map((item) => ({ ...item, unit: normalizeUnit(item.unit) }));
 state.shopping = state.shopping.map((item) => ({ ...item, unit: normalizeUnit(item.unit) }));
 renderApp();
+
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
+}
