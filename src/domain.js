@@ -1,4 +1,15 @@
 const DEFAULT_UNIT = 'τεμ.';
+export const MAX_QUANTITY = 99999;
+const UNIT_ALIASES = { 'τεμάχια': 'τεμ.' };
+
+export function normalizeUnit(unit) {
+  const value = String(unit || DEFAULT_UNIT).trim() || DEFAULT_UNIT;
+  return UNIT_ALIASES[value] || value;
+}
+
+export function normalizeSearch(value) {
+  return String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/ς/g, 'σ');
+}
 
 function makeId() {
   if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
@@ -13,17 +24,19 @@ export function createPantryItem(input = {}, now = new Date().toISOString()) {
   if (!Number.isFinite(quantity) || quantity < 0) {
     throw new Error('Η ποσότητα πρέπει να είναι αριθμός μηδέν ή μεγαλύτερος.');
   }
+  if (quantity > MAX_QUANTITY) throw new Error(`Η ποσότητα δεν μπορεί να ξεπερνά τα ${MAX_QUANTITY}.`);
 
   const minimum = Number(input.minimum ?? 0);
   if (!Number.isFinite(minimum) || minimum < 0) {
     throw new Error('Η ελάχιστη ποσότητα πρέπει να είναι μηδέν ή μεγαλύτερη.');
   }
+  if (minimum > MAX_QUANTITY) throw new Error(`Η ελάχιστη ποσότητα δεν μπορεί να ξεπερνά τα ${MAX_QUANTITY}.`);
 
   return {
     id: String(input.id || makeId()),
     name,
     quantity,
-    unit: String(input.unit || DEFAULT_UNIT).trim() || DEFAULT_UNIT,
+    unit: normalizeUnit(input.unit),
     minimum,
     category: String(input.category || 'Άλλο').trim() || 'Άλλο',
     expiry: String(input.expiry || ''),
@@ -69,11 +82,12 @@ export function createShoppingItem(input = {}, now = new Date().toISOString()) {
   if (!name) throw new Error('Χρειάζεται όνομα προϊόντος.');
   const quantity = Number(input.quantity ?? 1);
   if (!Number.isFinite(quantity) || quantity <= 0) throw new Error('Η ποσότητα πρέπει να είναι μεγαλύτερη από μηδέν.');
+  if (quantity > MAX_QUANTITY) throw new Error(`Η ποσότητα δεν μπορεί να ξεπερνά τα ${MAX_QUANTITY}.`);
   return {
     id: String(input.id || makeId()),
     name,
     quantity,
-    unit: String(input.unit || DEFAULT_UNIT).trim() || DEFAULT_UNIT,
+    unit: normalizeUnit(input.unit),
     checked: false,
     createdAt: now
   };
