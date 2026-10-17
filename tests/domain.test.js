@@ -70,3 +70,29 @@ test('caps quantities and normalizes legacy units', async () => {
   assert.equal(createPantryItem({ name: 'Αυγά', quantity: 6, unit: 'τεμάχια' }).unit, 'τεμ.');
   assert.equal(normalizeUnit('γραμμάρια'), 'γραμμάρια');
 });
+
+test('warns about implausible expiry dates without blocking', async () => {
+  const { expiryWarning } = await import('../src/domain.js');
+  assert.match(expiryWarning('2020-01-01', '2026-10-17'), /ένα χρόνο/);
+  assert.match(expiryWarning('2040-01-01', '2026-10-17'), /10 χρόνια/);
+  assert.equal(expiryWarning('2026-12-01', '2026-10-17'), '');
+  assert.equal(expiryWarning('', '2026-10-17'), '');
+  assert.equal(createPantryItem({ name: 'Μέλι', quantity: 1, expiry: '2020-01-01' }).expiry, '2020-01-01');
+});
+
+test('syncs renamed items to linked shopping rows and legacy rows by old name', async () => {
+  const { syncShoppingWithItem } = await import('../src/domain.js');
+  const previous = { id: 'i1', name: 'Γάλα', unit: 'λίτρα' };
+  const next = { id: 'i1', name: 'Γάλα light', unit: 'πακέτα' };
+  const rows = [
+    { id: 's1', itemId: 'i1', name: 'Γάλα', unit: 'λίτρα', checked: true },
+    { id: 's2', name: 'γάλα', unit: 'λίτρα', checked: false },
+    { id: 's3', name: 'Ψωμί', unit: 'τεμ.', checked: false },
+    { id: 's4', itemId: 'i2', name: 'Γάλα', unit: 'λίτρα', checked: false }
+  ];
+  const out = syncShoppingWithItem(rows, previous, next);
+  assert.deepEqual(out.map((r) => [r.name, r.unit, r.itemId]), [
+    ['Γάλα light', 'πακέτα', 'i1'], ['Γάλα light', 'πακέτα', 'i1'], ['Ψωμί', 'τεμ.', undefined], ['Γάλα', 'λίτρα', 'i2']
+  ]);
+  assert.equal(createShoppingItem({ name: 'Γάλα', itemId: 'i1' }).itemId, 'i1');
+});
