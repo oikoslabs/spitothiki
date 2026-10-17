@@ -2,7 +2,14 @@
 // To enable: paste the config from Firebase console → Project settings → Your apps → Web app.
 // These values are not secrets (they identify the project); access is protected by the
 // Firestore security rules in firestore.rules.
-export const firebaseConfig = null;
+export const firebaseConfig = {
+  apiKey: 'AIzaSyCd_5meAdVullE6KmEvMYWGI9CTyyqGoGc',
+  authDomain: 'spitothiki.firebaseapp.com',
+  projectId: 'spitothiki',
+  storageBucket: 'spitothiki.firebasestorage.app',
+  messagingSenderId: '621742059103',
+  appId: '1:621742059103:web:81dca087f13b6ca01275ea'
+};
 // Example:
 // export const firebaseConfig = {
 //   apiKey: 'AIza...',
