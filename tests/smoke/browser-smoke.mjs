@@ -54,6 +54,17 @@ const steps = [
     await nav('pantry');
     return (await page.$$eval('.inventory-card', (els) => els.map((el) => el.textContent))).some((t) => t.includes('Γάλα') && t.includes('1 λίτρα'));
   }],
+  ['share list falls back to copy / WhatsApp / Viber dialog', async () => {
+    await nav('shopping');
+    await page.evaluate(() => { Object.defineProperty(navigator, 'share', { value: undefined, configurable: true }); });
+    await page.click('[data-action="share-shopping"]'); await wait();
+    const open = await page.$eval('#share-dialog', (d) => d.open);
+    const value = await page.$eval('#share-text', (el) => el.value);
+    const wa = await page.$eval('#share-whatsapp', (el) => el.href);
+    await page.click('[data-action="close-share"]'); await wait();
+    await nav('pantry');
+    return open && value.includes('Γάλα') && wa.startsWith('https://wa.me/?text=');
+  }],
   ['reload keeps screen and data', async () => {
     await page.reload({ waitUntil: 'networkidle0' }); await wait();
     return (await page.$eval('.nav-item.is-active', (el) => el.dataset.view)) === 'pantry' && (await count('.inventory-card')) === 2;

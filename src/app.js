@@ -1,4 +1,4 @@
-import { MAX_QUANTITY, createPantryItem, createShoppingItem, expiryStatus, expiryWarning, normalizeSearch, normalizeUnit, pantrySummary, receiveShoppingItem, returnShoppingItem, syncShoppingWithItem, toggleShoppingItem } from './domain.js';
+import { MAX_QUANTITY, createPantryItem, createShoppingItem, expiryStatus, expiryWarning, normalizeSearch, normalizeUnit, pantrySummary, receiveShoppingItem, returnShoppingItem, shoppingListText, syncShoppingWithItem, toggleShoppingItem } from './domain.js';
 import { loadState, parseBackup, saveState } from './storage.js';
 
 const viewRoot = document.querySelector('#view-content');
@@ -189,7 +189,7 @@ function renderShopping() {
   const pending = state.shopping.filter((item) => !item.checked);
   const checked = state.shopping.filter((item) => item.checked);
   return `${renderHeader('Λίστα αγορών', 'Σημείωσε όσα χρειάζεσαι και πάρε τη λίστα μαζί σου.')}
-    <div class="shopping-layout"><section class="panel"><div class="panel-heading"><div><h2>Τι χρειάζεται το σπίτι;</h2><p>${pending.length ? pendingLabel(pending.length) : 'Κανένα εκκρεμές προϊόν'}</p></div>${checked.length ? '<button class="panel-link" type="button" data-action="clear-completed">Καθάρισε τα αγορασμένα</button>' : ''}</div>
+    <div class="shopping-layout"><section class="panel"><div class="panel-heading"><div><h2>Τι χρειάζεται το σπίτι;</h2><p>${pending.length ? pendingLabel(pending.length) : 'Κανένα εκκρεμές προϊόν'}</p></div><div class="panel-links">${pending.length ? '<button class="panel-link" type="button" data-action="share-shopping">↗ Κοινοποίηση</button>' : ''}${checked.length ? '<button class="panel-link" type="button" data-action="clear-completed">Καθάρισε τα αγορασμένα</button>' : ''}</div></div>
     <form id="shopping-form" class="shopping-add-form" novalidate><input class="field-input" name="name" required maxlength="80" placeholder="π.χ. Φέτα" aria-label="Προϊόν για αγορά"><input class="field-input" name="quantity" type="number" min="0.1" max="${MAX_QUANTITY}" step="0.1" value="1" aria-label="Ποσότητα"><select class="field-input unit-select" name="unit" aria-label="Μονάδα"><option>τεμ.</option><option>πακέτα</option><option>κιλά</option><option>γραμμάρια</option><option>λίτρα</option></select><button class="button button-primary" type="submit">＋ Προσθήκη</button></form>
     <p class="form-error" id="shopping-error" role="alert" hidden></p>
     <div class="shopping-list">${state.shopping.length ? [...pending, ...checked].map(renderShoppingRow).join('') : renderEmpty('Η λίστα είναι άδεια', 'Πρόσθεσε όσα χρειάζεσαι πριν πας για ψώνια.', 'focus-shopping', 'Γράψε το πρώτο προϊόν', '🛒')}</div></section>
@@ -252,6 +252,27 @@ function updateExpiryWarning() {
   const warning = document.querySelector('#expiry-warning');
   warning.textContent = expiryWarning(itemForm.elements.expiry.value, localDateKey());
   warning.hidden = !warning.textContent;
+}
+
+async function shareShoppingList() {
+  const text = shoppingListText(state.shopping);
+  if (!text) { showToast('Η λίστα δεν έχει εκκρεμή προϊόντα.'); return; }
+  if (navigator.share) {
+    try { await navigator.share({ title: 'Λίστα αγορών', text }); return; }
+    catch (error) { if (error?.name === 'AbortError') return; }
+  }
+  const dialog = document.querySelector('#share-dialog');
+  document.querySelector('#share-text').value = text;
+  document.querySelector('#share-whatsapp').href = `https://wa.me/?text=${encodeURIComponent(text)}`;
+  document.querySelector('#share-viber').href = `viber://forward?text=${encodeURIComponent(text)}`;
+  dialog.showModal();
+}
+
+async function copyShareText() {
+  const field = document.querySelector('#share-text');
+  try { await navigator.clipboard.writeText(field.value); }
+  catch { field.select(); document.execCommand('copy'); }
+  showToast('Η λίστα αντιγράφηκε.');
 }
 
 function showConfirm(message, action, title = 'Να συνεχίσω;') {
@@ -332,7 +353,10 @@ function handleAction(button) {
   } else if (action === 'remove-shopping') {
     state.shopping = state.shopping.filter((entry) => entry.id !== id);
     persist(); renderApp(); showToast('Το προϊόν αφαιρέθηκε από τη λίστα.');
-  } else if (action === 'clear-completed') {
+  } else if (action === 'share-shopping') shareShoppingList();
+  else if (action === 'copy-share') copyShareText();
+  else if (action === 'close-share') document.querySelector('#share-dialog').close();
+  else if (action === 'clear-completed') {
     state.shopping = state.shopping.filter((entry) => !entry.checked);
     persist(); renderApp(); showToast('Η λίστα καθαρίστηκε.');
   } else if (action === 'filter-category') {
