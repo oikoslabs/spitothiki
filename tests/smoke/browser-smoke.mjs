@@ -98,7 +98,7 @@ const steps = [
     const before = errors.length;
     await page.setOfflineMode(true);
     await page.reload({ waitUntil: 'domcontentloaded' }); await wait(600);
-    const ok = (await count('.nav-item')) === 4 && (await count('.inventory-card')) >= 2;
+    const ok = (await count('.nav-item')) >= 4 && (await count('.inventory-card')) >= 2;
     await page.setOfflineMode(false);
     errors.splice(before);
     await page.reload({ waitUntil: 'networkidle0' });
