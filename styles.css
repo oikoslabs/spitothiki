@@ -349,3 +349,16 @@ body[data-screen="pantry"] .topbar .button-add { display: none; }
 
 /* Language toggle (ΕΛ/EN) */
 .lang-toggle { min-height: 40px; min-width: 44px; padding: 0 10px; font-size: 12px; font-weight: 700; letter-spacing: .04em; }
+
+/* Recurring items & voice add */
+.recurring-panel { margin-top: 18px; }
+.recurring-form { grid-template-columns: minmax(0,1fr) 80px 110px 150px auto; }
+.recurring-list { display: grid; gap: 8px; margin-top: 12px; }
+.recurring-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; }
+.voice-button { min-width: 44px; padding: 0 10px; font-size: 18px; }
+.voice-button.is-listening { background: var(--red-soft); animation: pulse 1s infinite alternate; }
+@keyframes pulse { from { transform: scale(1); } to { transform: scale(1.08); } }
+@media (max-width: 760px) { .recurring-form { grid-template-columns: 1fr 1fr; } .recurring-form input[name=name] { grid-column: 1 / -1; } }
+.shopping-add-form:has(.voice-button) { grid-template-columns: minmax(0,1fr) 80px 105px auto auto; }
+@media (max-width: 760px) { .shopping-add-form:has(.voice-button) { grid-template-columns: minmax(0,1fr) 74px; } }
+@media (max-width: 760px) { .shopping-add-form .voice-button { grid-column: 1 / -1; grid-row: 3; } .recurring-form button, .recurring-form .unit-select { grid-column: auto; grid-row: auto; } }

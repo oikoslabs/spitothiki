@@ -104,3 +104,12 @@ test('edits made while sync was off are uploaded on the next start', async () =>
   assert.equal(backend.docs.get('items:x').data.quantity, 4);
   assert.equal(a.state.items[0].quantity, 4);
 });
+
+test('new record kinds sync between devices', async () => {
+  const { applyRemote, diffStates } = await import('../src/sync-core.js');
+  const changes = diffStates({ items: [], shopping: [] }, { items: [], shopping: [], recurring: [{ id: 'r1', name: 'Γάλα' }], waste: [{ id: 'w1' }] });
+  assert.deepEqual(changes.map((c) => c.kind).sort(), ['recurring', 'waste']);
+  const result = applyRemote({ items: [], shopping: [] }, {}, changes.map((c) => ({ ...c, ts: 5 })));
+  assert.deepEqual(result.state.recurring, [{ id: 'r1', name: 'Γάλα' }]);
+  assert.deepEqual(result.state.waste, [{ id: 'w1' }]);
+});

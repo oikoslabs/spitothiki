@@ -3,7 +3,16 @@
 // Conflict rule: last writer wins per record, by the client timestamp `ts`.
 // Deletions are kept as tombstones (`deleted: true`) so they reach other devices.
 
-const KINDS = ['items', 'shopping'];
+import { DATA_KINDS } from './storage.js';
+
+const KINDS = DATA_KINDS;
+
+// Copies the record lists of a state; optional kinds only when present (keeps old states unchanged).
+function lists(state) {
+  const out = { items: [...(state?.items || [])], shopping: [...(state?.shopping || [])] };
+  for (const kind of KINDS.slice(2)) if (Array.isArray(state?.[kind])) out[kind] = [...state[kind]];
+  return out;
+}
 
 export function recordKey(kind, id) {
   return `${kind}:${id}`;
@@ -32,7 +41,7 @@ export function diffStates(previous, next) {
 
 // Applies remote docs that are newer than what this device knows; returns { state, times, changed }.
 export function applyRemote(state, times, docs) {
-  const next = { items: [...(state.items || [])], shopping: [...(state.shopping || [])] };
+  const next = lists(state);
   const nextTimes = { ...times };
   let changed = false;
   for (const doc of docs) {
@@ -40,7 +49,7 @@ export function applyRemote(state, times, docs) {
     const key = recordKey(doc.kind, doc.id);
     if (Number(doc.ts) <= Number(nextTimes[key] || 0)) continue;
     nextTimes[key] = Number(doc.ts);
-    const list = next[doc.kind];
+    const list = next[doc.kind] || (next[doc.kind] = []);
     const position = list.findIndex((record) => record.id === doc.id);
     if (doc.deleted) {
       if (position >= 0) { list.splice(position, 1); changed = true; }
@@ -89,10 +98,10 @@ export class SyncEngine {
       const base = this.snapshot || { items: [], shopping: [] };
       const baseline = { items: [], shopping: [] };
       for (const kind of KINDS) {
-        for (const record of result.state[kind]) {
+        for (const record of result.state[kind] || []) {
           const doc = remote.get(recordKey(kind, record.id));
-          if (doc) { if (!doc.deleted && doc.data) baseline[kind].push({ ...doc.data, id: doc.id }); }
-          else { const old = base[kind].find((b) => b.id === record.id); if (old) baseline[kind].push(old); }
+          if (doc) { if (!doc.deleted && doc.data) (baseline[kind] || (baseline[kind] = [])).push({ ...doc.data, id: doc.id }); }
+          else { const old = (base[kind] || []).find((b) => b.id === record.id); if (old) (baseline[kind] || (baseline[kind] = [])).push(old); }
         }
       }
       this.snapshot = baseline;
@@ -117,7 +126,7 @@ export class SyncEngine {
     const ts = this.now();
     const docs = changes.map((change) => ({ ...change, ts }));
     for (const doc of docs) this.times[recordKey(doc.kind, doc.id)] = ts;
-    this.snapshot = JSON.parse(JSON.stringify({ items: current.items, shopping: current.shopping }));
+    this.snapshot = JSON.parse(JSON.stringify(lists(current)));
     this.persistMeta();
     return this.backend.write(docs);
   }
