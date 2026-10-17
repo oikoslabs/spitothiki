@@ -1,4 +1,4 @@
-import { MAX_QUANTITY, createPantryItem, createShoppingItem, expiryStatus, normalizeSearch, normalizeUnit, pantrySummary, toggleShoppingItem } from './domain.js';
+import { MAX_QUANTITY, createPantryItem, createShoppingItem, expiryStatus, expiryWarning, normalizeSearch, normalizeUnit, pantrySummary, syncShoppingWithItem, toggleShoppingItem } from './domain.js';
 import { loadState, parseBackup, saveState } from './storage.js';
 
 const viewRoot = document.querySelector('#view-content');
@@ -239,6 +239,7 @@ function openItemDialog(id = '') {
   itemForm.elements.quantity.value = existing?.quantity ?? 1;
   itemForm.elements.unit.value = normalizeUnit(existing?.unit);
   updateNameCounter();
+  updateExpiryWarning();
   itemForm.elements.minimum.value = existing?.minimum ?? 0;
   itemForm.elements.expiry.value = existing?.expiry || '';
   document.querySelector('#dialog-title').textContent = existing ? 'Επεξεργασία προϊόντος' : 'Νέο προϊόν';
@@ -251,6 +252,12 @@ function updateNameCounter() {
   document.querySelector('#item-name-count').textContent = `${input.value.length}/${input.maxLength}`;
 }
 
+function updateExpiryWarning() {
+  const warning = document.querySelector('#expiry-warning');
+  warning.textContent = expiryWarning(itemForm.elements.expiry.value, localDateKey());
+  warning.hidden = !warning.textContent;
+}
+
 function showConfirm(message, action, title = 'Να συνεχίσω;') {
   confirmAction = action;
   document.querySelector('#confirm-title').textContent = title;
@@ -259,11 +266,12 @@ function showConfirm(message, action, title = 'Να συνεχίσω;') {
 }
 
 function addItemToShopping(item) {
-  const existing = state.shopping.find((row) => !row.checked && row.name.toLocaleLowerCase('el-GR') === item.name.toLocaleLowerCase('el-GR'));
+  const existing = state.shopping.find((row) => !row.checked && (row.itemId ? row.itemId === item.id : row.name.toLocaleLowerCase('el-GR') === item.name.toLocaleLowerCase('el-GR')));
   if (existing) {
     existing.quantity = Number(existing.quantity) + Math.max(1, Number(item.minimum) - Number(item.quantity));
+    existing.itemId = item.id;
   } else {
-    state.shopping.push(createShoppingItem({ name: item.name, quantity: Math.max(1, Math.ceil(Number(item.minimum) - Number(item.quantity))), unit: item.unit }));
+    state.shopping.push(createShoppingItem({ itemId: item.id, name: item.name, quantity: Math.max(1, Math.ceil(Number(item.minimum) - Number(item.quantity))), unit: item.unit }));
   }
   persist();
   showToast(`Το ${item.name} προστέθηκε στη λίστα.`);
@@ -375,6 +383,7 @@ document.addEventListener('change', (event) => {
 
 document.addEventListener('input', (event) => {
   if (event.target.id === 'item-name') updateNameCounter();
+  if (event.target.id === 'item-expiry') updateExpiryWarning();
   if (event.target.id === 'pantry-search') {
     const caret = event.target.selectionStart;
     pantryQuery = event.target.value;
@@ -396,6 +405,7 @@ document.addEventListener('submit', (event) => {
         name: formData.get('name'), quantity: formData.get('quantity'), unit: formData.get('unit'),
         minimum: formData.get('minimum'), category: formData.get('category'), location: formData.get('location'), expiry: formData.get('expiry')
       });
+      if (current) state.shopping = syncShoppingWithItem(state.shopping, current, item);
       state.items = current ? state.items.map((entry) => entry.id === current.id ? item : entry) : [item, ...state.items];
       if (persist()) { itemDialog.close(); renderApp(); showToast(current ? 'Οι αλλαγές αποθηκεύτηκαν.' : 'Το προϊόν προστέθηκε.'); }
     } catch (error) {

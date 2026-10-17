@@ -88,6 +88,7 @@ export function createShoppingItem(input = {}, now = new Date().toISOString()) {
     name,
     quantity,
     unit: normalizeUnit(input.unit),
+    ...(input.itemId ? { itemId: String(input.itemId) } : {}),
     checked: false,
     createdAt: now
   };
@@ -95,4 +96,24 @@ export function createShoppingItem(input = {}, now = new Date().toISOString()) {
 
 export function toggleShoppingItem(items = [], id) {
   return items.map((item) => item.id === id ? { ...item, checked: !item.checked } : item);
+}
+
+export function expiryWarning(expiry, today = new Date().toISOString().slice(0, 10)) {
+  const due = utcDay(expiry);
+  const base = utcDay(today);
+  if (due === null || base === null) return '';
+  const days = Math.round((due - base) / 86_400_000);
+  if (days < -365) return 'Η ημερομηνία λήξης είναι πάνω από ένα χρόνο πριν. Βεβαιώσου ότι είναι σωστή.';
+  if (days > 3650) return 'Η ημερομηνία λήξης είναι πάνω από 10 χρόνια μετά. Βεβαιώσου ότι είναι σωστή.';
+  return '';
+}
+
+export function syncShoppingWithItem(shopping = [], previous, next) {
+  if (!previous || !next) return shopping;
+  const oldName = String(previous.name).toLocaleLowerCase('el-GR');
+  return shopping.map((row) => {
+    const linked = row.itemId ? row.itemId === next.id : !row.checked && String(row.name).toLocaleLowerCase('el-GR') === oldName;
+    if (!linked) return row;
+    return { ...row, itemId: next.id, name: next.name, unit: next.unit };
+  });
 }
