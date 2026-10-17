@@ -6,6 +6,7 @@
   <meta name="theme-color" content="#f5f6f0">
   <meta name="description" content="Οργάνωσε τα τρόφιμα του σπιτιού, τις ημερομηνίες λήξης και τη λίστα αγορών σου.">
   <title>Σπιτοθήκη — Το σπίτι σε τάξη</title>
+  <script>try { const l = localStorage.getItem('spitothiki:lang') || ((navigator.language || '').toLowerCase().startsWith('en') ? 'en' : 'el'); document.documentElement.lang = l === 'en' ? 'en' : 'el'; } catch {}</script>
   <script>try { const t = localStorage.getItem('spitothiki:theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch {}</script>
   <link rel="stylesheet" href="styles.css">
   <link rel="manifest" href="manifest.webmanifest">
@@ -41,6 +42,7 @@
       <header class="topbar">
         <div class="mobile-brand"><span class="brand-mark" aria-hidden="true">⌂</span><strong>Σπιτοθήκη</strong></div>
         <div class="topbar-note"><span class="status-dot" aria-hidden="true"></span><span>Μόνο στη συσκευή σου</span></div>
+        <button class="button button-quiet lang-toggle" id="lang-toggle" type="button" data-action="toggle-lang" data-no-i18n aria-label="Αλλαγή σε English" title="Αλλαγή σε English">EN</button>
         <button class="button button-primary button-add" type="button" data-action="add-item"><span aria-hidden="true">＋</span> Προσθήκη προϊόντος</button>
       </header>
       <div id="view-content" class="view-content" tabindex="-1"></div>
@@ -63,11 +65,11 @@
       <p class="field-hint" id="barcode-status" role="status"></p>
       <div class="field-row">
         <div><label class="field-label" for="item-category">Κατηγορία</label><select class="field-input" id="item-category" name="category"><option value="Γαλακτοκομικά">🥛 Γαλακτοκομικά</option><option value="Φρούτα & λαχανικά">🥬 Φρούτα & λαχανικά</option><option value="Κρέας & ψάρι">🍗 Κρέας & ψάρι</option><option value="Ξηρά τρόφιμα">🌾 Ξηρά τρόφιμα</option><option value="Κατεψυγμένα">🧊 Κατεψυγμένα</option><option value="Ροφήματα">☕ Ροφήματα</option><option value="Καθαριότητα">🧽 Καθαριότητα</option><option value="Άλλο">🧺 Άλλο</option></select></div>
-        <div><label class="field-label" for="item-location">Πού βρίσκεται;</label><select class="field-input" id="item-location" name="location"><option value="">Δεν ορίστηκε</option><option>Ντουλάπι</option><option>Ψυγείο</option><option>Κατάψυξη</option><option>Μπάνιο</option><option>Άλλο</option></select></div>
+        <div><label class="field-label" for="item-location">Πού βρίσκεται;</label><select class="field-input" id="item-location" name="location"><option value="">Δεν ορίστηκε</option><option value="Ντουλάπι">Ντουλάπι</option><option value="Ψυγείο">Ψυγείο</option><option value="Κατάψυξη">Κατάψυξη</option><option value="Μπάνιο">Μπάνιο</option><option value="Άλλο">Άλλο</option></select></div>
       </div>
       <div class="field-row field-row-three">
         <div><label class="field-label" for="item-quantity">Ποσότητα</label><input class="field-input" id="item-quantity" name="quantity" type="number" min="0" max="99999" step="0.1" value="1" inputmode="decimal" required></div>
-        <div><label class="field-label" for="item-unit">Μονάδα</label><select class="field-input" id="item-unit" name="unit"><option>τεμ.</option><option>πακέτα</option><option>κιλά</option><option>γραμμάρια</option><option>λίτρα</option></select></div>
+        <div><label class="field-label" for="item-unit">Μονάδα</label><select class="field-input" id="item-unit" name="unit"><option value="τεμ.">τεμ.</option><option value="πακέτα">πακέτα</option><option value="κιλά">κιλά</option><option value="γραμμάρια">γραμμάρια</option><option value="λίτρα">λίτρα</option></select></div>
         <div><label class="field-label" for="item-minimum">Υπενθύμιση κάτω από</label><input class="field-input" id="item-minimum" name="minimum" type="number" min="0" max="99999" step="0.1" value="0" inputmode="decimal"></div>
       </div>
       <div class="field-row">

@@ -346,3 +346,6 @@ body[data-screen="pantry"] .topbar .button-add { display: none; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; }
 }
+
+/* Language toggle (ΕΛ/EN) */
+.lang-toggle { min-height: 40px; min-width: 44px; padding: 0 10px; font-size: 12px; font-weight: 700; letter-spacing: .04em; }
