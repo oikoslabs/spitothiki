@@ -16,6 +16,8 @@ await page.evaluateOnNewDocument(() => {
   if (window.ServiceWorkerRegistration) ServiceWorkerRegistration.prototype.showNotification = record;
 });
 await page.setViewport({ width, height: 900 });
+// Pin a Greek browser so the default language is predictable (the app picks English for en* browsers).
+await page.evaluateOnNewDocument(() => { Object.defineProperty(navigator, 'language', { get: () => 'el-GR' }); Object.defineProperty(navigator, 'languages', { get: () => ['el-GR', 'el'] }); });
 const errors = [];
 page.on('console', (m) => { if (m.type() === 'error' && !m.text().includes('404')) errors.push(`console: ${m.text()}`); });
 page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
