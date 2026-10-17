@@ -1,0 +1,7 @@
+node_modules/
+.env
+.env.*
+*-backup-*.json
+*.local
+.DS_Store
+Thumbs.db

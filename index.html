@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="el">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f6f0">
+  <meta name="description" content="Οργάνωσε τα τρόφιμα του σπιτιού, τις ημερομηνίες λήξης και τη λίστα αγορών σου.">
+  <title>Σπιτοθήκη — Το σπίτι σε τάξη</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Μετάβαση στο περιεχόμενο</a>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="Κύρια πλοήγηση">
+      <a class="brand" href="#home" data-view="overview" aria-label="Σπιτοθήκη — αρχική">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 36 36" fill="none"><path d="M7 15.5 18 7l11 8.5v13a1.5 1.5 0 0 1-1.5 1.5h-19A1.5 1.5 0 0 1 7 28.5v-13Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M14 30V20h8v10M13 13h.01M18 12h.01M23 13h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </span>
+        <span><strong>Σπιτοθήκη</strong><small>Το σπίτι σε τάξη</small></span>
+      </a>
+
+      <nav class="primary-nav">
+        <p class="nav-label">Ο ΧΩΡΟΣ ΜΟΥ</p>
+        <button class="nav-item is-active" type="button" data-view="overview" aria-current="page"><span class="nav-icon" aria-hidden="true">⌂</span><span>Επισκόπηση</span></button>
+        <button class="nav-item" type="button" data-view="pantry"><span class="nav-icon" aria-hidden="true">▦</span><span>Το απόθεμά μου</span><span class="nav-count" id="nav-pantry-count">0</span></button>
+        <button class="nav-item" type="button" data-view="shopping"><span class="nav-icon" aria-hidden="true">✓</span><span>Λίστα αγορών</span><span class="nav-count" id="nav-shopping-count">0</span></button>
+        <button class="nav-item" type="button" data-view="settings"><span class="nav-icon" aria-hidden="true">⚙</span><span>Ρυθμίσεις</span></button>
+      </nav>
+
+      <div class="sidebar-bottom">
+        <div class="privacy-card"><span class="privacy-icon" aria-hidden="true">🔒</span><div><strong>Τα δεδομένα σου μένουν εδώ</strong><p>Αποθηκεύονται μόνο σε αυτή τη συσκευή.</p></div></div>
+        <span class="version-label">ΠΡΩΤΗ ΕΚΔΟΣΗ · 0.1</span>
+      </div>
+    </aside>
+
+    <main id="main-content" class="main-content">
+      <header class="topbar">
+        <div class="mobile-brand"><span class="brand-mark" aria-hidden="true">⌂</span><strong>Σπιτοθήκη</strong></div>
+        <div class="topbar-note"><span class="status-dot" aria-hidden="true"></span><span>Μόνο στη συσκευή σου</span></div>
+        <button class="button button-primary button-add" type="button" data-action="add-item"><span aria-hidden="true">＋</span> Προσθήκη προϊόντος</button>
+      </header>
+      <div id="view-content" class="view-content" tabindex="-1"></div>
+      <footer class="app-footer"><span>Απλά, για το σπίτι.</span><button type="button" class="text-button" data-view="settings">Αντίγραφο ασφαλείας & απόρρητο</button></footer>
+    </main>
+  </div>
+
+  <dialog id="item-dialog" class="item-dialog" aria-labelledby="dialog-title">
+    <form id="item-form" method="dialog">
+      <div class="dialog-heading"><div><p class="eyebrow">ΤΟ ΑΠΟΘΕΜΑ ΜΟΥ</p><h2 id="dialog-title">Νέο προϊόν</h2></div><button class="icon-button" type="button" data-action="close-dialog" aria-label="Κλείσιμο">×</button></div>
+      <input type="hidden" name="id">
+      <label class="field-label" for="item-name">Όνομα προϊόντος <span aria-hidden="true">*</span></label>
+      <input class="field-input" id="item-name" name="name" required maxlength="80" placeholder="π.χ. Γάλα, ρύζι, ελαιόλαδο">
+      <div class="field-row">
+        <div><label class="field-label" for="item-category">Κατηγορία</label><select class="field-input" id="item-category" name="category"><option>Γαλακτοκομικά</option><option>Φρούτα & λαχανικά</option><option>Κρέας & ψάρι</option><option>Ξηρά τρόφιμα</option><option>Κατεψυγμένα</option><option>Ροφήματα</option><option>Καθαριότητα</option><option>Άλλο</option></select></div>
+        <div><label class="field-label" for="item-location">Πού βρίσκεται;</label><select class="field-input" id="item-location" name="location"><option value="">Δεν ορίστηκε</option><option>Ντουλάπι</option><option>Ψυγείο</option><option>Κατάψυξη</option><option>Μπάνιο</option><option>Άλλο</option></select></div>
+      </div>
+      <div class="field-row field-row-three">
+        <div><label class="field-label" for="item-quantity">Ποσότητα</label><input class="field-input" id="item-quantity" name="quantity" type="number" min="0" step="0.1" value="1" inputmode="decimal" required></div>
+        <div><label class="field-label" for="item-unit">Μονάδα</label><select class="field-input" id="item-unit" name="unit"><option>τεμ.</option><option>πακέτα</option><option>κιλά</option><option>γραμμάρια</option><option>λίτρα</option><option>τεμάχια</option></select></div>
+        <div><label class="field-label" for="item-minimum">Υπενθύμιση κάτω από</label><input class="field-input" id="item-minimum" name="minimum" type="number" min="0" step="0.1" value="0" inputmode="decimal"></div>
+      </div>
+      <div class="field-row">
+        <div><label class="field-label" for="item-expiry">Ημερομηνία λήξης</label><input class="field-input" id="item-expiry" name="expiry" type="date"></div>
+        <p class="field-hint">Προαιρετικά. Θα σου δείξουμε τι πλησιάζει στη λήξη.</p>
+      </div>
+      <p class="form-error" id="form-error" role="alert" hidden></p>
+      <div class="dialog-actions"><button class="button button-quiet" type="button" data-action="close-dialog">Άκυρο</button><button class="button button-primary" type="submit">Αποθήκευση προϊόντος</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="confirm-dialog" class="confirm-dialog" aria-labelledby="confirm-title">
+    <form method="dialog"><div class="dialog-heading"><div><p class="eyebrow">ΕΠΙΒΕΒΑΙΩΣΗ</p><h2 id="confirm-title">Να συνεχίσω;</h2></div></div><p id="confirm-message" class="confirm-message"></p><div class="dialog-actions"><button class="button button-quiet" value="cancel">Όχι, πίσω</button><button class="button button-danger" id="confirm-accept" value="confirm">Ναι, συνέχισε</button></div></form>
+  </dialog>
+
+  <input id="backup-file" type="file" accept="application/json,.json" hidden>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script type="module" src="src/app.js"></script>
+</body>
+</html>
