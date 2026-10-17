@@ -29,6 +29,7 @@
         <button class="nav-item is-active" type="button" data-view="overview" aria-current="page"><span class="nav-icon" aria-hidden="true">⌂</span><span>Επισκόπηση</span></button>
         <button class="nav-item" type="button" data-view="pantry"><span class="nav-icon" aria-hidden="true">▦</span><span>Το απόθεμά μου</span><span class="nav-count" id="nav-pantry-count">0</span></button>
         <button class="nav-item" type="button" data-view="shopping"><span class="nav-icon" aria-hidden="true">✓</span><span>Λίστα αγορών</span><span class="nav-count" id="nav-shopping-count">0</span></button>
+        <button class="nav-item" type="button" data-view="insights"><span class="nav-icon" aria-hidden="true">◔</span><span>Στατιστικά</span></button>
         <button class="nav-item" type="button" data-view="settings"><span class="nav-icon" aria-hidden="true">⚙</span><span>Ρυθμίσεις</span></button>
       </nav>
 
@@ -96,6 +97,16 @@
     <div class="dialog-heading"><div><p class="eyebrow">ΛΙΣΤΑ ΑΓΟΡΩΝ</p><h2 id="share-title">Κοινοποίηση λίστας</h2></div><button class="icon-button" type="button" data-action="close-share" aria-label="Κλείσιμο">×</button></div>
     <textarea id="share-text" class="field-input share-text" rows="7" readonly aria-label="Κείμενο λίστας"></textarea>
     <div class="dialog-actions share-actions"><button class="button button-primary" type="button" data-action="copy-share">Αντιγραφή</button><a class="button button-quiet" id="share-whatsapp" target="_blank" rel="noopener">WhatsApp</a><a class="button button-quiet" id="share-viber" rel="noopener">Viber</a></div>
+  </dialog>
+
+  <dialog id="waste-dialog" class="confirm-dialog" aria-labelledby="waste-title">
+    <form id="waste-form" method="dialog" novalidate><div class="dialog-heading"><div><p class="eyebrow">ΣΠΑΤΑΛΗ ΤΡΟΦΙΜΩΝ</p><h2 id="waste-title">Πετάχτηκε</h2></div><button class="icon-button" type="button" data-action="close-waste" aria-label="Κλείσιμο">×</button></div>
+      <p class="confirm-message product-name" id="waste-name"></p>
+      <input type="hidden" name="itemId">
+      <div class="field-row"><div><label class="field-label" for="waste-quantity">Ποσότητα που πετάχτηκε</label><input class="field-input" id="waste-quantity" name="quantity" type="number" min="0.1" step="0.1" inputmode="decimal"></div>
+      <div><label class="field-label" for="waste-reason">Λόγος</label><select class="field-input" id="waste-reason" name="reason"></select></div></div>
+      <p class="form-error" id="waste-error" role="alert" hidden></p>
+      <div class="dialog-actions"><button class="button button-quiet" type="button" data-action="close-waste">Άκυρο</button><button class="button button-danger" type="submit">Καταγραφή</button></div></form>
   </dialog>
 
   <input id="backup-file" type="file" accept="application/json,.json" hidden>

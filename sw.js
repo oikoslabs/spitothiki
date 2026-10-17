@@ -2,7 +2,7 @@
 // Strategy: network-first for everything from this site (HTML, JS, CSS, manifest), so a new
 // deploy shows up on the next load; the cache is only used when the network is unavailable.
 // Bump CACHE_VERSION when the list of shell files changes; old caches are deleted on activate.
-const CACHE_VERSION = 'v7';
+const CACHE_VERSION = 'v8';
 const CACHE = `spitothiki-${CACHE_VERSION}`;
 const DATA_CACHE = 'spitothiki-data'; // written by the app: expiry snapshot for background checks
 const SHELL = [

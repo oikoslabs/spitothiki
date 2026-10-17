@@ -32,7 +32,7 @@ async function check(name, fn) {
   catch (e) { console.log(`FAIL ${name}: ${e.message}`); errors.push(`${name}: ${e.message}`); }
 }
 const shot = async (name) => { if (shots) await page.screenshot({ path: `${shots}/feature-${name}-${lang}${width < 700 ? '-phone' : ''}.png`, fullPage: true }); };
-const greekLeft = async () => en ? (await page.evaluate(() => window.__i18n.untranslatedGreek())).filter((s) => !/Γάλα|Ψωμί|Αυγά|Μήλα|Ρύζι|Γιαούρτι|Ελαιόλαδο|Ντομάτες|Φέτα|Κοτόπουλο|Πατάτες/.test(s)) : [];
+const greekLeft = async () => en ? (await page.evaluate(() => window.__i18n.untranslatedGreek())).filter((s) => !/Γάλα|Ψωμί|Αυγά|Μήλα|Ρύζι|Γιαούρτι|Ελαιόλαδο|Ντομάτες|Φέτα|Κοτόπουλο|Πατάτες|Χαρτί/.test(s)) : [];
 
 await page.goto(url, { waitUntil: 'networkidle0' });
 await page.evaluate(() => localStorage.clear());
@@ -106,7 +106,92 @@ await check('service worker background check function runs without error', async
 });
 await shot('notifications');
 
-for (const view of ['shopping', 'settings']) await check(`no Greek UI left on ${view} (${lang})`, async () => { await nav(view); const left = await greekLeft(); if (left.length) console.log('  left:', left); return !left.length; });
+await check('stores: create store, reorder aisles, list sorted by walking order', async () => {
+  await page.evaluate(() => {
+    const st = JSON.parse(localStorage.getItem('spitothiki:v1'));
+    st.shopping = [
+      { id: 's-a', name: 'Χαρτί κουζίνας', quantity: 1, unit: 'τεμ.', checked: false, category: 'Καθαριότητα', createdAt: 'x' },
+      { id: 's-b', name: 'Μήλα', quantity: 1, unit: 'κιλά', checked: false, category: 'Φρούτα & λαχανικά', createdAt: 'x' },
+      { id: 's-c', name: 'Γάλα', quantity: 1, unit: 'λίτρα', checked: false, createdAt: 'x' }];
+    st.items = [{ id: 'i-g', name: 'Γάλα', quantity: 0, unit: 'λίτρα', minimum: 1, category: 'Γαλακτοκομικά', location: '', expiry: '' }];
+    localStorage.setItem('spitothiki:v1', JSON.stringify(st));
+  });
+  await page.reload({ waitUntil: 'networkidle0' });
+  await nav('shopping');
+  await tap('[data-action="toggle-stores"]'); await wait();
+  await page.type('#store-form input[name=name]', 'Lidl');
+  await tap('#store-form button[type=submit]'); await wait();
+  // Move Cleaning up to the top: it starts 7th of 8.
+  for (let i = 0; i < 6; i++) { await tap('[data-action="aisle-up"][data-category="Καθαριότητα"]'); await wait(150); }
+  const order = await page.$$eval('.shopping-row-name', (els) => els.map((e) => e.textContent));
+  const headings = await page.$$eval('.aisle-heading', (els) => els.map((e) => e.textContent));
+  const s = await stored();
+  await shot('stores');
+  await tap('.store-bar [data-action="set-store"][data-store=""]'); await wait();
+  const plain = await page.$$eval('.shopping-row-name', (els) => els.map((e) => e.textContent));
+  await tap('.store-bar [data-action="set-store"]:not([data-store=""])'); await wait();
+  return s.stores?.[0]?.name === 'Lidl' && s.stores[0].order[0] === 'Καθαριότητα'
+    && JSON.stringify(order) === JSON.stringify(['Χαρτί κουζίνας', 'Μήλα', 'Γάλα']) && headings.length === 3 && headings[0].includes(L('Διάδρομος 1', 'Aisle 1'))
+    && JSON.stringify(plain) === JSON.stringify(['Χαρτί κουζίνας', 'Μήλα', 'Γάλα']) === true;
+});
+
+await check('price when ticking bought, removed on untick', async () => {
+  await tap('.shopping-row:not(.checked) .shopping-check'); await wait();
+  const input = '.shopping-row.checked .price-input';
+  await page.$eval(input, (el) => el.scrollIntoView({ block: 'center' }));
+  await page.type(input, '2.35'); await page.keyboard.press('Tab'); await wait();
+  const s = await stored();
+  const purchase = s.purchases?.[0];
+  return s.purchases?.length === 1 && purchase.price === 2.35 && purchase.category === 'Καθαριότητα' && purchase.storeId === s.stores[0].id;
+});
+await check('second priced purchase + untick removes its price', async () => {
+  await tap('.shopping-row:not(.checked) .shopping-check'); await wait();
+  await page.type('.shopping-row.checked:not(:has(.price-input[value="2.35"])) .price-input', '1.5'); await page.keyboard.press('Tab'); await wait();
+  await tap('.shopping-row:not(.checked) .shopping-check'); await wait();
+  await page.type('.shopping-row.checked:has(.price-input[value=""]) .price-input', '4'); await page.keyboard.press('Tab'); await wait();
+  const three = (await stored()).purchases.length;
+  const gala = (await stored()).shopping.find((r) => r.name === 'Γάλα');
+  await tap(`.shopping-check[data-id="${gala.id}"]`); await wait();
+  const s = await stored();
+  return three === 3 && s.purchases.length === 2 && !s.purchases.some((p) => p.rowId === gala.id);
+});
+
+await check('waste: throw away from pantry with reason', async () => {
+  await page.evaluate(() => {
+    const st = JSON.parse(localStorage.getItem('spitothiki:v1'));
+    st.items.push({ id: 'w-1', name: 'Γιαούρτι', quantity: 3, unit: 'τεμ.', minimum: 0, category: 'Γαλακτοκομικά', location: '', expiry: '2020-01-01' });
+    localStorage.setItem('spitothiki:v1', JSON.stringify(st));
+  });
+  await page.reload({ waitUntil: 'networkidle0' });
+  await nav('pantry');
+  await tap('[data-action="waste-item"][data-id="w-1"]'); await wait();
+  const open = await page.$eval('#waste-dialog', (d) => d.open);
+  const reason = await page.$eval('#waste-reason', (e) => e.value);
+  const reasonText = await page.$eval('#waste-reason option[value="spoiled"]', (e) => e.textContent);
+  const dialogGreek = await greekLeft();
+  await page.click('#waste-quantity', { clickCount: 3 }); await page.type('#waste-quantity', '2');
+  await page.select('#waste-reason', 'spoiled');
+  await shot('waste');
+  await page.click('#waste-form button[type=submit]'); await wait();
+  const s = await stored();
+  return open && reason === 'expired' && reasonText === L('Χάλασε', 'Went bad') && !dialogGreek.length && s.waste?.length === 1 && s.waste[0].reason === 'spoiled'
+    && s.items.find((i) => i.id === 'w-1')?.quantity === 1 && !(await page.$eval('#waste-dialog', (d) => d.open));
+});
+
+await check('insights: monthly spending per category and waste stats', async () => {
+  await nav('insights');
+  const total = await page.$eval('#spending-total', (e) => e.textContent);
+  const bars = await page.$$eval('#spending-card .bar-row', (els) => els.map((e) => e.textContent));
+  const waste = await page.$eval('#waste-total', (e) => e.textContent);
+  const month = await page.$eval('#insights-month', (e) => e.textContent);
+  await shot('insights');
+  await tap('[data-action="insights-month"][data-delta="-1"]'); await wait();
+  const prevTotal = await page.$eval('#spending-total', (e) => e.textContent);
+  await tap('[data-action="insights-month"][data-delta="1"]'); await wait();
+  return /3[.,]85/.test(total) && bars.length === 2 && bars[0].includes(L('Καθαριότητα', 'Cleaning')) && waste === '1' && month.length > 3 && /0[.,]00/.test(prevTotal);
+});
+
+for (const view of ['shopping', 'settings', 'insights', 'pantry']) await check(`no Greek UI left on ${view} (${lang})`, async () => { await nav(view); const left = await greekLeft(); if (left.length) console.log('  left:', left); return !left.length; });
 
 console.log(`features ${width} ${lang}: ${errors.length ? 'FAILED ' + JSON.stringify(errors) : 'passed'}`);
 await browser.close();

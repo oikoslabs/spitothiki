@@ -2,6 +2,7 @@ import { MAX_QUANTITY, createPantryItem, createShoppingItem, expiringWithin, exp
 import { lookupBarcode, normalizeBarcode, startScanner } from './barcode.js';
 import { authProviders, firebaseConfig } from './firebase-config.js';
 import { loadState, parseBackup, saveState } from './storage.js';
+import { CATEGORIES, WASTE_REASONS, applyWaste, createStore, createWaste, groupByStore, monthKey, monthlySpending, moveCategory, purchaseFor, shiftMonth, storeOrder, wasteStats } from './features.js';
 import { RECURRING_INTERVALS, applyRecurring, createRecurring, dueFromSnapshot, expirySnapshot, parseVoiceItems } from './features.js';
 import { getLang, locale, setLang, t, translateDom, untranslatedGreek } from './i18n.js';
 
@@ -13,7 +14,7 @@ const backupFile = document.querySelector('#backup-file');
 const toast = document.querySelector('#toast');
 
 let state = loadState();
-const VIEWS = ['overview', 'pantry', 'shopping', 'settings'];
+const VIEWS = ['overview', 'pantry', 'shopping', 'insights', 'settings'];
 let activeView = VIEWS.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'overview';
 let pantryQuery = '';
 let pantryCategory = 'Όλα';
@@ -140,6 +141,7 @@ function renderInventoryCard(item) {
       <button class="icon-button" type="button" data-action="adjust-quantity" data-id="${escapeHtml(item.id)}" data-delta="-1" aria-label="${escapeHtml(t('Μείωση ποσότητας για {name}', { name: item.name }))}">−</button>
       <button class="icon-button" type="button" data-action="adjust-quantity" data-id="${escapeHtml(item.id)}" data-delta="1" aria-label="${escapeHtml(t('Αύξηση ποσότητας για {name}', { name: item.name }))}">＋</button>
       <button class="icon-button" type="button" data-action="edit-item" data-id="${escapeHtml(item.id)}" aria-label="${escapeHtml(t('Επεξεργασία {name}', { name: item.name }))}">✎</button>
+      <button class="icon-button" type="button" data-action="waste-item" data-id="${escapeHtml(item.id)}" aria-label="${escapeHtml(t('Πετάχτηκε: {name}', { name: item.name }))}" title="${escapeHtml(t('Πετάχτηκε: {name}', { name: item.name }))}">🗑</button>
       <button class="icon-button danger" type="button" data-action="delete-item" data-id="${escapeHtml(item.id)}" aria-label="${escapeHtml(t('Διαγραφή {name}', { name: item.name }))}">×</button>
       <button class="button button-quiet small-action" type="button" data-action="add-to-shopping" data-id="${escapeHtml(item.id)}">Στη λίστα</button>
     </div>
@@ -190,7 +192,37 @@ function renderPantry() {
 }
 
 function renderShoppingRow(item) {
-  return `<div class="shopping-row ${item.checked ? 'checked' : ''}"><input class="shopping-check" type="checkbox" data-action="toggle-shopping" data-id="${escapeHtml(item.id)}" ${item.checked ? 'checked' : ''} aria-label="${escapeHtml(t(item.checked ? 'Ολοκληρώθηκε: {name}' : 'Σημείωση ως αγορασμένο: {name}', { name: item.name }))}"><div><strong class="shopping-row-name">${escapeHtml(item.name)}</strong><div class="shopping-row-detail">${escapeHtml(item.quantity)} ${escapeHtml(t(item.unit))}</div></div><span class="shopping-state">${item.checked ? (item.pantryAdded ? 'Μπήκε στο απόθεμα' : 'Μπήκε στο καλάθι') : ''}</span><button class="icon-button danger" type="button" data-action="remove-shopping" data-id="${escapeHtml(item.id)}" aria-label="${escapeHtml(t('Αφαίρεση {name} από τη λίστα', { name: item.name }))}">×</button></div>`;
+  return `<div class="shopping-row ${item.checked ? 'checked has-price' : ''}"><input class="shopping-check" type="checkbox" data-action="toggle-shopping" data-id="${escapeHtml(item.id)}" ${item.checked ? 'checked' : ''} aria-label="${escapeHtml(t(item.checked ? 'Ολοκληρώθηκε: {name}' : 'Σημείωση ως αγορασμένο: {name}', { name: item.name }))}"><div><strong class="shopping-row-name">${escapeHtml(item.name)}</strong><div class="shopping-row-detail">${escapeHtml(item.quantity)} ${escapeHtml(t(item.unit))}</div></div><span class="shopping-state">${item.checked ? (item.pantryAdded ? 'Μπήκε στο απόθεμα' : 'Μπήκε στο καλάθι') : ''}</span>${item.checked ? renderPriceField(item) : ''}<button class="icon-button danger" type="button" data-action="remove-shopping" data-id="${escapeHtml(item.id)}" aria-label="${escapeHtml(t('Αφαίρεση {name} από τη λίστα', { name: item.name }))}">×</button></div>`;
+}
+
+function renderPriceField(row) {
+  const purchase = (state.purchases || []).find((p) => p.id === `pur-${row.id}`);
+  const label = t('Τιμή για {name}', { name: row.name });
+  return `<label class="price-field" title="${escapeHtml(label)}"><span aria-hidden="true">€</span><input class="field-input price-input" type="number" inputmode="decimal" min="0" max="100000" step="0.01" data-id="${escapeHtml(row.id)}" value="${purchase ? escapeHtml(purchase.price) : ''}" placeholder="Τιμή" aria-label="${escapeHtml(label)}"></label>`;
+}
+
+const STORE_KEY = 'spitothiki:store';
+let storesOpen = false;
+const activeStore = () => { let id = ''; try { id = localStorage.getItem(STORE_KEY) || ''; } catch {} return (state.stores || []).find((store) => store.id === id) || null; };
+const categoryLabel = (category) => `${CATEGORY_ICONS[category] || '🧺'} ${t(category)}`;
+
+function renderStoreBar() {
+  const current = activeStore();
+  const stores = state.stores || [];
+  const chip = (id, label, active) => `<button type="button" class="filter-chip ${active ? 'is-active' : ''}" data-action="set-store" data-store="${escapeHtml(id)}" aria-pressed="${active}">${escapeHtml(label)}</button>`;
+  const bar = `<div class="store-bar" role="group" aria-label="Σειρά λίστας ανά κατάστημα">${chip('', 'Χωρίς κατάστημα', !current)}${stores.map((store) => chip(store.id, store.name, current?.id === store.id)).join('')}<button type="button" class="panel-link" data-action="toggle-stores" aria-expanded="${storesOpen}">⚙ Καταστήματα</button></div>`;
+  if (!storesOpen) return bar;
+  const order = current ? storeOrder(current.order) : [];
+  return `${bar}<div class="store-manager" id="store-manager"><form id="store-form" class="store-form" novalidate><input class="field-input" name="name" maxlength="40" placeholder="π.χ. Σουπερμάρκετ της γειτονιάς" aria-label="Όνομα καταστήματος"><button class="button button-quiet" type="submit">＋ Νέο κατάστημα</button></form>
+    ${current ? `<p class="field-hint">${escapeHtml(t('Σειρά διαδρόμων στο «{name}»: βάλε τις κατηγορίες με τη σειρά που περπατάς.', { name: current.name }))}</p><ol class="aisle-list">${order.map((category, index) => `<li class="aisle-row"><span class="aisle-number">${index + 1}</span><span class="aisle-name">${escapeHtml(categoryLabel(category))}</span><button class="icon-button" type="button" data-action="aisle-up" data-category="${escapeHtml(category)}" ${index === 0 ? 'disabled' : ''} aria-label="${escapeHtml(t('Πιο νωρίς: {name}', { name: t(category) }))}">↑</button><button class="icon-button" type="button" data-action="aisle-down" data-category="${escapeHtml(category)}" ${index === order.length - 1 ? 'disabled' : ''} aria-label="${escapeHtml(t('Πιο αργά: {name}', { name: t(category) }))}">↓</button></li>`).join('')}</ol>
+    <div class="settings-actions"><button class="button button-quiet" type="button" data-action="delete-store">${escapeHtml(t('Διαγραφή καταστήματος «{name}»', { name: current.name }))}</button></div>` : '<p class="field-hint">Διάλεξε ή φτιάξε ένα κατάστημα για να ορίσεις τη σειρά των διαδρόμων.</p>'}</div>`;
+}
+
+function renderShoppingRows(pending, checked) {
+  const store = activeStore();
+  if (!store) return [...pending, ...checked].map(renderShoppingRow).join('');
+  const groups = groupByStore(pending, store, state.items);
+  return `${groups.map((group) => `<div class="aisle-heading"><span>${escapeHtml(t('Διάδρομος {n}', { n: group.aisle }))}</span> ${escapeHtml(categoryLabel(group.category))}</div>${group.rows.map(renderShoppingRow).join('')}`).join('')}${checked.length ? `<div class="aisle-heading">${escapeHtml(t('Στο καλάθι'))}</div>${checked.map(renderShoppingRow).join('')}` : ''}`;
 }
 
 function renderShopping() {
@@ -198,9 +230,10 @@ function renderShopping() {
   const checked = state.shopping.filter((item) => item.checked);
   return `${renderHeader('Λίστα αγορών', 'Σημείωσε όσα χρειάζεσαι και πάρε τη λίστα μαζί σου.')}
     <div class="shopping-layout"><section class="panel"><div class="panel-heading"><div><h2>Τι χρειάζεται το σπίτι;</h2><p>${pending.length ? pendingLabel(pending.length) : 'Κανένα εκκρεμές προϊόν'}</p></div><div class="panel-links">${pending.length ? '<button class="panel-link" type="button" data-action="share-shopping">↗ Κοινοποίηση</button>' : ''}${checked.length ? '<button class="panel-link" type="button" data-action="clear-completed">Καθάρισε τα αγορασμένα</button>' : ''}</div></div>
-    <form id="shopping-form" class="shopping-add-form" novalidate><input class="field-input" name="name" required maxlength="80" placeholder="π.χ. Φέτα" aria-label="Προϊόν για αγορά"><input class="field-input" name="quantity" type="number" min="0.1" max="${MAX_QUANTITY}" step="0.1" value="1" aria-label="Ποσότητα"><select class="field-input unit-select" name="unit" aria-label="Μονάδα">${unitOptions()}</select><button class="button button-primary" type="submit">＋ Προσθήκη</button>${SpeechRecognitionApi ? '<button class="button button-quiet voice-button" type="button" data-action="voice-add" aria-label="Προσθήκη με φωνή" title="Προσθήκη με φωνή">🎤</button>' : ''}</form>
+    <form id="shopping-form" class="shopping-add-form shopping-main-form" novalidate><input class="field-input" name="name" required maxlength="80" placeholder="π.χ. Φέτα" aria-label="Προϊόν για αγορά"><input class="field-input" name="quantity" type="number" min="0.1" max="${MAX_QUANTITY}" step="0.1" value="1" aria-label="Ποσότητα"><select class="field-input unit-select" name="unit" aria-label="Μονάδα">${unitOptions()}</select><select class="field-input category-select" name="category" aria-label="Κατηγορία"><option value="">Κατηγορία: αυτόματα</option>${CATEGORIES.map((category) => `<option value="${escapeHtml(category)}">${escapeHtml(categoryLabel(category))}</option>`).join('')}</select><button class="button button-primary" type="submit">＋ Προσθήκη</button>${SpeechRecognitionApi ? '<button class="button button-quiet voice-button" type="button" data-action="voice-add" aria-label="Προσθήκη με φωνή" title="Προσθήκη με φωνή">🎤</button>' : ''}</form>
     <p class="form-error" id="shopping-error" role="alert" hidden></p>
-    <div class="shopping-list">${state.shopping.length ? [...pending, ...checked].map(renderShoppingRow).join('') : renderEmpty('Η λίστα είναι άδεια', 'Πρόσθεσε όσα χρειάζεσαι πριν πας για ψώνια.', 'focus-shopping', 'Γράψε το πρώτο προϊόν', '🛒')}</div></section>
+    ${renderStoreBar()}
+    <div class="shopping-list">${state.shopping.length ? renderShoppingRows(pending, checked) : renderEmpty('Η λίστα είναι άδεια', 'Πρόσθεσε όσα χρειάζεσαι πριν πας για ψώνια.', 'focus-shopping', 'Γράψε το πρώτο προϊόν', '🛒')}</div></section>
     <aside class="panel shopping-summary"><span class="stat-icon">🛍️</span><h2>Μικρή υπενθύμιση</h2><p>Κράτησε τη λίστα απλή και πρόσθεσε μόνο ό,τι χρειάζεσαι.</p><div class="shopping-summary-list"><div class="summary-line"><span>Εκκρεμούν</span><strong>${pending.length}</strong></div><div class="summary-line"><span>Στο καλάθι</span><strong>${checked.length}</strong></div><div class="summary-line"><span>Στη συσκευή</span><strong>Ιδιωτικά</strong></div></div></aside></div>
     ${renderRecurringPanel()}`;
 }
@@ -223,6 +256,7 @@ function renderApp() {
   if (activeView === 'overview') viewRoot.innerHTML = renderOverview();
   else if (activeView === 'pantry') viewRoot.innerHTML = renderPantry();
   else if (activeView === 'shopping') viewRoot.innerHTML = renderShopping();
+  else if (activeView === 'insights') viewRoot.innerHTML = renderInsights();
   else viewRoot.innerHTML = renderSettings();
   if (activeView === 'pantry') renderPantryList();
   translateDom(viewRoot);
@@ -622,6 +656,53 @@ function startVoiceAdd(button) {
   try { recognition.start(); } catch { recognition = null; button.classList.remove('is-listening'); }
 }
 
+// ---------- Food waste ----------
+const WASTE_LABELS = { expired: 'Έληξε', spoiled: 'Χάλασε', leftover: 'Περίσσεψε', other: 'Άλλος λόγος' };
+
+function openWasteDialog(id) {
+  const item = state.items.find((entry) => entry.id === id);
+  if (!item) return;
+  const dialog = document.querySelector('#waste-dialog');
+  const form = document.querySelector('#waste-form');
+  form.elements.itemId.value = item.id;
+  form.elements.quantity.value = item.quantity > 0 ? item.quantity : 1;
+  form.elements.quantity.max = String(Math.max(Number(item.quantity), 1));
+  form.elements.reason.innerHTML = WASTE_REASONS.map((reason) => `<option value="${reason}">${escapeHtml(t(WASTE_LABELS[reason]))}</option>`).join('');
+  form.elements.reason.value = expiryStatus(item.expiry, localDateKey()) === 'expired' ? 'expired' : 'spoiled';
+  document.querySelector('#waste-name').textContent = `${item.name} · ${item.quantity} ${t(item.unit)}`;
+  document.querySelector('#waste-error').hidden = true;
+  dialog.showModal();
+}
+
+// ---------- Insights: spending & waste ----------
+let insightsMonth = monthKey(localDateKey());
+const money = (value) => new Intl.NumberFormat(locale(), { style: 'currency', currency: 'EUR' }).format(value || 0);
+const monthLabel = (month) => new Intl.DateTimeFormat(locale(), { month: 'long', year: 'numeric' }).format(new Date(`${month}-15T12:00:00`));
+
+function renderBars(rows, format) {
+  const max = Math.max(...rows.map((row) => row.value), 1);
+  return `<div class="bar-list">${rows.map((row) => `<div class="bar-row"><span class="bar-label">${escapeHtml(row.label)}</span><span class="bar-track"><span class="bar-fill" style="width:${Math.max(3, Math.round((row.value / max) * 100))}%"></span></span><strong class="bar-value">${escapeHtml(format(row.value))}</strong></div>`).join('')}</div>`;
+}
+
+function renderInsights() {
+  const spending = monthlySpending(state.purchases || [], insightsMonth);
+  const previous = monthlySpending(state.purchases || [], shiftMonth(insightsMonth, -1));
+  const waste = wasteStats(state.waste || [], insightsMonth);
+  const isCurrent = insightsMonth >= monthKey(localDateKey());
+  return `${renderHeader('Στατιστικά', 'Πόσα ξοδεύεις και τι πετιέται, ανά μήνα.')}
+    <div class="month-switch" role="group" aria-label="Μήνας"><button class="icon-button" type="button" data-action="insights-month" data-delta="-1" aria-label="Προηγούμενος μήνας">‹</button><strong id="insights-month" data-no-i18n>${escapeHtml(monthLabel(insightsMonth))}</strong><button class="icon-button" type="button" data-action="insights-month" data-delta="1" aria-label="Επόμενος μήνας" ${isCurrent ? 'disabled' : ''}>›</button></div>
+    <div class="settings-grid insights-grid">
+    <section class="panel settings-card" id="spending-card"><span class="stat-icon blue">€</span><h2>Έξοδα</h2>
+      <p class="big-number" id="spending-total">${escapeHtml(money(spending.total))}</p>
+      <p class="field-hint">${escapeHtml(t('{count} αγορές με τιμή · προηγούμενος μήνας: {prev}', { count: spending.count, prev: money(previous.total) }))}</p>
+      ${spending.byCategory.length ? renderBars(spending.byCategory.map((row) => ({ label: categoryLabel(row.category), value: row.total })), money) : '<p class="subtle-empty">Όταν τσεκάρεις κάτι ως αγορασμένο, γράψε την τιμή του (€) στη λίστα αγορών για να βλέπεις εδώ τα έξοδα.</p>'}</section>
+    <section class="panel settings-card" id="waste-card"><span class="stat-icon amber">🗑</span><h2>Σπατάλη τροφίμων</h2>
+      <p class="big-number" id="waste-total">${waste.count}</p>
+      <p class="field-hint">${escapeHtml(t(waste.count === 1 ? 'φορά που πετάχτηκε κάτι' : 'φορές που πετάχτηκε κάτι'))}</p>
+      ${waste.count ? `${renderBars(WASTE_REASONS.filter((reason) => waste.byReason[reason]).map((reason) => ({ label: t(WASTE_LABELS[reason]), value: waste.byReason[reason] })), String)}
+      <h3 class="insights-subtitle">Πετιούνται πιο συχνά</h3><ul class="waste-top">${waste.top.map((entry) => `<li><span class="product-name">${escapeHtml(entry.name)}</span><strong>× ${entry.count}</strong></li>`).join('')}</ul>` : '<p class="subtle-empty">Τίποτα αυτόν τον μήνα. Όταν πετάς κάτι, πάτα 🗑 στο απόθεμα για να το καταγράψεις.</p>'}</section></div>`;
+}
+
 function makeDemoItems() {
   const today = localDateKey();
   const addDays = (amount) => { const date = new Date(`${today}T12:00:00`); date.setDate(date.getDate() + amount); return localDateKey(date); };
@@ -674,6 +755,7 @@ function handleAction(button) {
     const row = state.shopping.find((entry) => entry.id === id);
     if (!row) return;
     const result = row.checked ? returnShoppingItem(state.items, row) : receiveShoppingItem(state.items, row);
+    if (row.checked) state.purchases = (state.purchases || []).filter((p) => p.id !== `pur-${row.id}`);
     state.items = result.items;
     state.shopping = toggleShoppingItem(state.shopping, id).map((entry) => entry.id === id ? result.row : entry);
     persist(); renderApp();
@@ -695,6 +777,18 @@ function handleAction(button) {
   else if (action === 'enable-notifications') enableNotifications();
   else if (action === 'disable-notifications') { saveNotifySettings({ enabled: false }); updateBackgroundCheck(); renderApp(); showToast('Οι ειδοποιήσεις απενεργοποιήθηκαν.'); }
   else if (action === 'set-theme') setTheme(button.dataset.theme);
+  else if (action === 'set-store') { try { if (button.dataset.store) localStorage.setItem(STORE_KEY, button.dataset.store); else localStorage.removeItem(STORE_KEY); } catch {} renderApp(); }
+  else if (action === 'toggle-stores') { storesOpen = !storesOpen; renderApp(); }
+  else if (action === 'aisle-up' || action === 'aisle-down') {
+    const store = activeStore();
+    if (store) { state.stores = state.stores.map((entry) => entry.id === store.id ? moveCategory(entry, button.dataset.category, action === 'aisle-up' ? -1 : 1) : entry); persist(); renderApp(); }
+  } else if (action === 'delete-store') {
+    const store = activeStore();
+    if (store) showConfirm(t('Θα διαγραφεί το κατάστημα «{name}». Η λίστα δεν αλλάζει.', { name: store.name }), () => { state.stores = state.stores.filter((entry) => entry.id !== store.id); try { localStorage.removeItem(STORE_KEY); } catch {} persist(); renderApp(); }, 'Διαγραφή καταστήματος;');
+  }
+  else if (action === 'waste-item') openWasteDialog(id);
+  else if (action === 'close-waste') document.querySelector('#waste-dialog').close();
+  else if (action === 'insights-month') { insightsMonth = shiftMonth(insightsMonth, Number(button.dataset.delta)); renderApp(); }
   else if (action === 'voice-add') startVoiceAdd(button);
   else if (action === 'remove-recurring') { state.recurring = (state.recurring || []).filter((rule) => rule.id !== id); persist(); renderApp(); showToast('Το επαναλαμβανόμενο αφαιρέθηκε.'); }
   else if (action === 'set-lang') changeLanguage(button.dataset.lang);
@@ -733,6 +827,19 @@ document.addEventListener('click', (event) => {
 });
 
 document.addEventListener('change', (event) => {
+  if (event.target.classList?.contains('price-input')) {
+    const row = state.shopping.find((entry) => entry.id === event.target.dataset.id);
+    if (!row) return;
+    const value = event.target.value.trim();
+    state.purchases = (state.purchases || []).filter((p) => p.id !== `pur-${row.id}`);
+    if (value !== '') {
+      try { state.purchases.push(purchaseFor(row, value, { items: state.items, date: localDateKey(), storeId: activeStore()?.id || '' })); }
+      catch (error) { showToast(error.message); return; }
+    }
+    persist();
+    showToast(value === '' ? 'Η τιμή αφαιρέθηκε.' : t('Η τιμή αποθηκεύτηκε: {price}', { price: money(Number(value.replace(',', '.'))) }));
+    return;
+  }
   const checkbox = event.target.closest('[data-action="toggle-shopping"]');
   if (checkbox) handleAction(checkbox);
   if (event.target === backupFile && backupFile.files?.[0]) {
@@ -810,6 +917,29 @@ document.addEventListener('submit', (event) => {
     return;
   }
 
+  if (event.target.id === 'store-form') {
+    event.preventDefault();
+    try {
+      const store = createStore({ name: event.target.elements.name.value });
+      state.stores = [...(state.stores || []), store];
+      try { localStorage.setItem(STORE_KEY, store.id); } catch {}
+      persist(); renderApp(); showToast(t('Το κατάστημα «{name}» προστέθηκε.', { name: store.name }));
+    } catch (error) { showToast(error.message); }
+    return;
+  }
+  if (event.target.id === 'waste-form') {
+    event.preventDefault();
+    const item = state.items.find((entry) => entry.id === event.target.elements.itemId.value);
+    if (!item) return;
+    try {
+      const record = createWaste(item, { quantity: event.target.elements.quantity.value, reason: event.target.elements.reason.value }, localDateKey());
+      state.waste = [...(state.waste || []), record];
+      state.items = applyWaste(state.items, record);
+      if (persist()) { document.querySelector('#waste-dialog').close(); renderApp(); showToast(t('Καταγράφηκε ως σπατάλη: {name}.', { name: item.name })); }
+    } catch (error) { const message = document.querySelector('#waste-error'); message.textContent = t(error.message); message.hidden = false; }
+    return;
+  }
+
   if (event.target.id === 'recurring-form') {
     event.preventDefault();
     const formData = new FormData(event.target);
@@ -831,7 +961,8 @@ document.addEventListener('submit', (event) => {
     event.preventDefault();
     const formData = new FormData(event.target);
     try {
-      state.shopping.push(createShoppingItem({ name: formData.get('name'), quantity: formData.get('quantity'), unit: formData.get('unit') }));
+      const category = String(formData.get('category') || '');
+      state.shopping.push({ ...createShoppingItem({ name: formData.get('name'), quantity: formData.get('quantity'), unit: formData.get('unit') }), ...(CATEGORIES.includes(category) ? { category } : {}) });
       if (persist()) { renderApp(); showToast('Προστέθηκε στη λίστα αγορών.'); document.querySelector('#shopping-form input[name="name"]')?.focus(); }
       return;
     } catch (error) {
