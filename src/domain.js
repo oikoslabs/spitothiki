@@ -117,3 +117,48 @@ export function syncShoppingWithItem(shopping = [], previous, next) {
     return { ...row, itemId: next.id, name: next.name, unit: next.unit };
   });
 }
+
+function sameName(a, b) {
+  return normalizeSearch(String(a).trim()) === normalizeSearch(String(b).trim());
+}
+
+// Called when a shopping row is ticked as bought: adds its quantity to the pantry.
+// Returns new items, the updated row (remembering what was added, so unticking can undo it) and a toast message.
+export function receiveShoppingItem(items = [], row, now = new Date().toISOString()) {
+  const unit = normalizeUnit(row.unit);
+  const quantity = Number(row.quantity) || 0;
+  let target = row.itemId ? items.find((item) => item.id === row.itemId) : null;
+  if (!target) target = items.find((item) => sameName(item.name, row.name) && normalizeUnit(item.unit) === unit);
+  if (target && normalizeUnit(target.unit) !== unit) {
+    return { items, row: { ...row, checked: true }, message: `Το «${target.name}» έχει άλλη μονάδα (${target.unit}), οπότε το απόθεμα δεν άλλαξε.` };
+  }
+  if (target) {
+    const next = Math.min(MAX_QUANTITY, Number(target.quantity) + quantity);
+    const added = next - Number(target.quantity);
+    return {
+      items: items.map((item) => item.id === target.id ? { ...item, quantity: next, updatedAt: now } : item),
+      row: { ...row, checked: true, itemId: target.id, pantryAdded: added },
+      message: `Προστέθηκαν ${added} ${unit} «${target.name}» στο απόθεμα.`
+    };
+  }
+  const created = createPantryItem({ name: row.name, quantity: Math.min(MAX_QUANTITY, quantity), unit }, now);
+  return {
+    items: [created, ...items],
+    row: { ...row, checked: true, itemId: created.id, pantryAdded: created.quantity },
+    message: `Το «${created.name}» μπήκε στο απόθεμα.`
+  };
+}
+
+// Called when a bought row is unticked: removes what receiveShoppingItem added.
+export function returnShoppingItem(items = [], row, now = new Date().toISOString()) {
+  const { pantryAdded, ...rest } = row;
+  const cleared = { ...rest, checked: false };
+  if (!pantryAdded || !row.itemId) return { items, row: cleared, message: '' };
+  const target = items.find((item) => item.id === row.itemId);
+  if (!target) return { items, row: cleared, message: '' };
+  return {
+    items: items.map((item) => item.id === target.id ? { ...item, quantity: Math.max(0, Number(item.quantity) - pantryAdded), updatedAt: now } : item),
+    row: cleared,
+    message: `Αφαιρέθηκαν ${pantryAdded} ${target.unit} «${target.name}» από το απόθεμα.`
+  };
+}
