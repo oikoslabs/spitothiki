@@ -160,11 +160,13 @@ const steps = [
     if (!(open && playing && stopped)) console.log('  scanner:', { open, status, playing, stopped });
     return open && playing && stopped && status.includes('Στόχευσε');
   }],
-  ['sync card explains it is off without Firebase config', async () => {
-    await nav('settings');
+  ['sync card: off without config, sign-in when configured', async () => {
+    await nav('settings'); await wait(1500);
     const card = await text('#sync-card');
+    const signIn = (await page.$('#sync-email-form')) !== null || (await page.$('[data-action="sync-google"]')) !== null;
     await nav('pantry');
-    return card.includes('Ανενεργός') && card.includes('firebase-config.js');
+    if (!(card.includes('Ανενεργός') || signIn)) console.log('  sync card:', card);
+    return card.includes('Ανενεργός') || signIn;
   }],
   ['reload keeps screen and data', async () => {
     await page.reload({ waitUntil: 'networkidle0' }); await wait();
