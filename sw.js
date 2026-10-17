@@ -2,11 +2,11 @@
 // Strategy: network-first for everything from this site (HTML, JS, CSS, manifest), so a new
 // deploy shows up on the next load; the cache is only used when the network is unavailable.
 // Bump CACHE_VERSION when the list of shell files changes; old caches are deleted on activate.
-const CACHE_VERSION = 'v3';
+const CACHE_VERSION = 'v4';
 const CACHE = `spitothiki-${CACHE_VERSION}`;
 const SHELL = [
   './', './index.html', './styles.css', './manifest.webmanifest',
-  './src/app.js', './src/domain.js', './src/storage.js',
+  './src/app.js', './src/domain.js', './src/storage.js', './src/barcode.js',
   './icons/icon-192.png', './icons/icon-512.png', './icons/icon.svg'
 ];
 

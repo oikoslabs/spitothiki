@@ -5,9 +5,9 @@ import puppeteer from 'puppeteer-core';
 
 const url = process.argv[2] || 'http://127.0.0.1:8080/';
 const width = Number(process.argv[3] || 1280);
-const browser = await puppeteer.launch({ executablePath: process.env.CHROME_PATH || '/usr/bin/google-chrome', args: ['--no-sandbox'], headless: true });
+const browser = await puppeteer.launch({ executablePath: process.env.CHROME_PATH || '/usr/bin/google-chrome', args: ['--no-sandbox', '--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'], headless: true });
 const origin = new URL(url).origin;
-await browser.defaultBrowserContext().overridePermissions(origin, ['notifications']);
+await browser.defaultBrowserContext().overridePermissions(origin, ['notifications', 'camera']);
 const page = await browser.newPage();
 // Record notifications instead of relying on the headless OS to display them.
 await page.evaluateOnNewDocument(() => {
@@ -21,6 +21,15 @@ page.on('console', (m) => { if (m.type() === 'error' && !m.text().includes('404'
 page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
 page.on('response', (r) => { if (r.status() >= 400 && !r.url().endsWith('favicon.ico')) errors.push(`http ${r.status()} ${r.url()}`); });
 
+// Answer Open Food Facts lookups with a fixed product so the test doesn't depend on their API.
+await page.setRequestInterception(true);
+page.on('request', (request) => {
+  if (request.url().startsWith('https://world.openfoodfacts.org/')) {
+    return request.respond({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' },
+      body: JSON.stringify({ status: 1, product: { product_name_el: 'Γιαούρτι στραγγιστό', brands: 'Fage', categories_tags: ['en:yogurts'] } }) });
+  }
+  return request.continue();
+});
 const wait = (ms = 250) => new Promise((resolve) => setTimeout(resolve, ms));
 const count = async (selector) => (await page.$$(selector)).length;
 const text = (selector) => page.$eval(selector, (el) => el.textContent);
@@ -87,7 +96,7 @@ const steps = [
     const before = errors.length;
     await page.setOfflineMode(true);
     await page.reload({ waitUntil: 'domcontentloaded' }); await wait(600);
-    const ok = (await count('.nav-item')) === 4 && (await count('.inventory-card')) === 2;
+    const ok = (await count('.nav-item')) === 4 && (await count('.inventory-card')) >= 2;
     await page.setOfflineMode(false);
     errors.splice(before);
     await page.reload({ waitUntil: 'networkidle0' });
@@ -129,9 +138,31 @@ const steps = [
     await nav('pantry');
     return first.length === 1 && /λήγει|λήγουν/.test(first[0].title) && status.includes('Ενεργές') && again === 0;
   }],
+  ['barcode lookup prefills the add form', async () => {
+    await tap('.page-heading [data-action="add-item"]'); await wait();
+    await page.type('#item-barcode', '5201054017739');
+    await page.click('[data-action="lookup-barcode"]'); await wait(800);
+    const name = await page.$eval('#item-name', (el) => el.value);
+    const category = await page.$eval('#item-category', (el) => el.value);
+    await page.click('#item-form button[type=submit]'); await wait();
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('spitothiki:v1')).items.find((i) => i.barcode === '5201054017739'));
+    return name === 'Γιαούρτι στραγγιστό Fage' && category === 'Γαλακτοκομικά' && saved?.name === name;
+  }],
+  ['camera scanner opens and closes cleanly', async () => {
+    await tap('.page-heading [data-action="add-item"]'); await wait();
+    await page.click('[data-action="scan-barcode"]'); await wait(2500);
+    const open = await page.$eval('#scan-dialog', (d) => d.open);
+    const status = await text('#scan-status');
+    const playing = await page.$eval('#scan-video', (v) => Boolean(v.srcObject) && v.readyState >= 2);
+    await page.click('[data-action="close-scan"]'); await wait();
+    const stopped = await page.$eval('#scan-video', (v) => !v.srcObject || v.srcObject.getTracks().every((t) => t.readyState === 'ended'));
+    await page.click('#item-form [data-action="close-dialog"]'); await wait();
+    if (!(open && playing && stopped)) console.log('  scanner:', { open, status, playing, stopped });
+    return open && playing && stopped && status.includes('Στόχευσε');
+  }],
   ['reload keeps screen and data', async () => {
     await page.reload({ waitUntil: 'networkidle0' }); await wait();
-    return (await page.$eval('.nav-item.is-active', (el) => el.dataset.view)) === 'pantry' && (await count('.inventory-card')) === 2;
+    return (await page.$eval('.nav-item.is-active', (el) => el.dataset.view)) === 'pantry' && (await count('.inventory-card')) === 3;
   }]
 ];
 

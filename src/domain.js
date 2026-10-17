@@ -41,6 +41,7 @@ export function createPantryItem(input = {}, now = new Date().toISOString()) {
     category: String(input.category || 'Άλλο').trim() || 'Άλλο',
     expiry: String(input.expiry || ''),
     location: String(input.location || '').trim(),
+    ...(input.barcode ? { barcode: String(input.barcode).replace(/\D/g, '') } : {}),
     createdAt: String(input.createdAt || now),
     updatedAt: now
   };

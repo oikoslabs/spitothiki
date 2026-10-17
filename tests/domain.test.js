@@ -146,3 +146,8 @@ test('lists items expiring within N days, soonest first', async () => {
   assert.deepEqual(expiringWithin(items, '2026-10-17', 3).map((i) => i.name), ['B', 'A']);
   assert.deepEqual(expiringWithin(items, '2026-10-17', 0).map((i) => i.name), ['B']);
 });
+
+test('keeps an optional barcode on pantry items', () => {
+  assert.equal(createPantryItem({ name: 'Γάλα', quantity: 1, barcode: '520-1004000014' }).barcode, '5201004000014');
+  assert.equal('barcode' in createPantryItem({ name: 'Γάλα', quantity: 1 }), false);
+});
