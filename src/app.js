@@ -90,7 +90,7 @@ function pendingLabel(count) {
 }
 
 function setActiveNavigation() {
-  document.body.dataset.view = activeView;
+  document.body.dataset.screen = activeView;
   document.querySelectorAll('[data-view]').forEach((button) => {
     const active = button.dataset.view === activeView;
     button.classList.toggle('is-active', active);
