@@ -6,7 +6,15 @@ import puppeteer from 'puppeteer-core';
 const url = process.argv[2] || 'http://127.0.0.1:8080/';
 const width = Number(process.argv[3] || 1280);
 const browser = await puppeteer.launch({ executablePath: process.env.CHROME_PATH || '/usr/bin/google-chrome', args: ['--no-sandbox'], headless: true });
+const origin = new URL(url).origin;
+await browser.defaultBrowserContext().overridePermissions(origin, ['notifications']);
 const page = await browser.newPage();
+// Record notifications instead of relying on the headless OS to display them.
+await page.evaluateOnNewDocument(() => {
+  window.__notifications = [];
+  const record = (title, options) => { window.__notifications.push({ title, body: options?.body }); return Promise.resolve(); };
+  if (window.ServiceWorkerRegistration) ServiceWorkerRegistration.prototype.showNotification = record;
+});
 await page.setViewport({ width, height: 900 });
 const errors = [];
 page.on('console', (m) => { if (m.type() === 'error' && !m.text().includes('404')) errors.push(`console: ${m.text()}`); });
@@ -16,6 +24,8 @@ page.on('response', (r) => { if (r.status() >= 400 && !r.url().endsWith('favicon
 const wait = (ms = 250) => new Promise((resolve) => setTimeout(resolve, ms));
 const count = async (selector) => (await page.$$(selector)).length;
 const text = (selector) => page.$eval(selector, (el) => el.textContent);
+// Scroll to the middle first so the fixed mobile bottom navigation doesn't cover the target.
+async function tap(selector) { await page.$eval(selector, (el) => el.scrollIntoView({ block: 'center', behavior: 'instant' })); await wait(400); await page.click(selector); }
 async function nav(view) { await page.click(`.nav-item[data-view="${view}"]`); await wait(); }
 async function check(name, fn) {
   try { const ok = await fn(); console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}`); if (!ok) errors.push(`assert: ${name}`); }
@@ -90,17 +100,34 @@ const steps = [
   }],
   ['dark mode toggle persists', async () => {
     await nav('settings');
-    await page.click('[data-action="set-theme"][data-theme="dark"]'); await wait();
+    await tap('[data-action="set-theme"][data-theme="dark"]'); await wait();
     const dark = await page.evaluate(() => document.documentElement.dataset.theme === 'dark' && getComputedStyle(document.body).backgroundColor !== 'rgb(245, 246, 240)');
     await page.reload({ waitUntil: 'networkidle0' });
     const kept = await page.evaluate(() => document.documentElement.dataset.theme === 'dark');
-    await page.click('[data-action="set-theme"][data-theme="auto"]'); await wait();
+    await tap('[data-action="set-theme"][data-theme="auto"]'); await wait();
     const auto = await page.evaluate(() => !document.documentElement.dataset.theme);
     await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: 'dark' }]); await wait();
     const system = await page.evaluate(() => getComputedStyle(document.body).backgroundColor === 'rgb(18, 26, 22)');
     await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: 'light' }]);
     await nav('pantry');
     return dark && kept && auto && system;
+  }],
+  ['expiry notifications from settings', async () => {
+    await page.evaluate(() => {
+      const state = JSON.parse(localStorage.getItem('spitothiki:v1'));
+      const d = new Date(); d.setDate(d.getDate() + 2);
+      state.items[0].expiry = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      localStorage.setItem('spitothiki:v1', JSON.stringify(state));
+    });
+    await page.reload({ waitUntil: 'networkidle0' });
+    await nav('settings');
+    await tap('[data-action="enable-notifications"]'); await wait(600);
+    const first = await page.evaluate(() => window.__notifications);
+    const status = await text('#notify-status');
+    await page.reload({ waitUntil: 'networkidle0' }); await wait(400);
+    const again = await page.evaluate(() => window.__notifications.length);
+    await nav('pantry');
+    return first.length === 1 && /λήγει|λήγουν/.test(first[0].title) && status.includes('Ενεργές') && again === 0;
   }],
   ['reload keeps screen and data', async () => {
     await page.reload({ waitUntil: 'networkidle0' }); await wait();

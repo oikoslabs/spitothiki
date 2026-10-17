@@ -1,4 +1,4 @@
-import { MAX_QUANTITY, createPantryItem, createShoppingItem, expiryStatus, expiryWarning, normalizeSearch, normalizeUnit, pantrySummary, receiveShoppingItem, returnShoppingItem, shoppingListText, syncShoppingWithItem, toggleShoppingItem } from './domain.js';
+import { MAX_QUANTITY, createPantryItem, createShoppingItem, expiringWithin, expiryStatus, expiryWarning, normalizeSearch, normalizeUnit, pantrySummary, receiveShoppingItem, returnShoppingItem, shoppingListText, syncShoppingWithItem, toggleShoppingItem } from './domain.js';
 import { loadState, parseBackup, saveState } from './storage.js';
 
 const viewRoot = document.querySelector('#view-content');
@@ -200,6 +200,7 @@ function renderSettings() {
   return `${renderHeader('Ρυθμίσεις', 'Διαχείριση και αντίγραφο ασφαλείας των δεδομένων σου.')}
     <div class="settings-grid"><section class="panel settings-card"><span class="stat-icon">🔒</span><h2>Απόρρητο πρώτα</h2><p>Αυτή η έκδοση αποθηκεύει το απόθεμα και τη λίστα αγορών μόνο στον browser της συσκευής. Δεν υπάρχει λογαριασμός ή συγχρονισμός με cloud.</p><div class="privacy-note">Αν καθαρίσεις τα δεδομένα του browser ή αλλάξεις συσκευή, χρησιμοποίησε αντίγραφο ασφαλείας για να μεταφέρεις τα δεδομένα σου.</div></section>
     <section class="panel settings-card"><span class="stat-icon">◐</span><h2>Εμφάνιση</h2><p>Διάλεξε φωτεινό ή σκούρο θέμα, ή άφησέ το να ακολουθεί τη συσκευή.</p><div class="theme-options" role="group" aria-label="Θέμα">${[['auto', 'Αυτόματο'], ['light', 'Φωτεινό'], ['dark', 'Σκούρο']].map(([value, label]) => `<button type="button" class="filter-chip ${currentTheme() === value ? 'is-active' : ''}" data-action="set-theme" data-theme="${value}" aria-pressed="${currentTheme() === value}">${label}</button>`).join('')}</div></section>
+    ${renderNotificationCard()}
     <section class="panel settings-card"><span class="stat-icon blue">↗</span><h2>Αντίγραφο ασφαλείας</h2><p>Εξήγαγε ή εισήγαγε ένα αρχείο JSON. Το αρχείο περιέχει τα προϊόντα και τη λίστα αγορών σου.</p><div class="settings-actions"><button class="button button-primary" type="button" data-action="export-backup">⬇ Εξαγωγή αντιγράφου</button><button class="button button-quiet" type="button" data-action="import-backup">⬆ Εισαγωγή αντιγράφου</button></div></section>
     <section class="panel settings-card"><span class="stat-icon amber">✨</span><h2>Δοκιμαστικά δεδομένα</h2><p>Γέμισε την εφαρμογή με ενδεικτικά προϊόντα για να δεις πώς λειτουργεί.</p><div class="settings-actions"><button class="button button-quiet" type="button" data-action="load-demo">Φόρτωση παραδειγμάτων</button></div></section>
     <section class="panel settings-card danger-zone"><span class="stat-icon" style="background:var(--red-soft)">⌫</span><h2>Καθαρισμός δεδομένων</h2><p>Διέγραψε όλα τα προϊόντα και τις λίστες από αυτή τη συσκευή.</p><div class="settings-actions"><button class="button button-danger" type="button" data-action="clear-data">Διαγραφή όλων</button></div></section></div>`;
@@ -274,6 +275,70 @@ async function copyShareText() {
   try { await navigator.clipboard.writeText(field.value); }
   catch { field.select(); document.execCommand('copy'); }
   showToast('Η λίστα αντιγράφηκε.');
+}
+
+const NOTIFY_KEY = 'spitothiki:notifications';
+
+function notifySettings() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(NOTIFY_KEY) || '{}');
+    return { enabled: Boolean(saved.enabled), days: Number.isInteger(saved.days) && saved.days >= 0 && saved.days <= 30 ? saved.days : 3, lastNotified: String(saved.lastNotified || '') };
+  } catch { return { enabled: false, days: 3, lastNotified: '' }; }
+}
+
+function saveNotifySettings(changes) {
+  try { localStorage.setItem(NOTIFY_KEY, JSON.stringify({ ...notifySettings(), ...changes })); } catch {}
+}
+
+function notificationsSupported() {
+  return 'Notification' in window;
+}
+
+async function showNotification(title, body) {
+  const options = { body, icon: 'icons/icon-192.png', badge: 'icons/icon-192.png', tag: 'spitothiki-expiry', lang: 'el' };
+  const registration = await navigator.serviceWorker?.getRegistration?.().catch(() => null);
+  if (registration?.showNotification) return registration.showNotification(title, options);
+  return new Notification(title, options);
+}
+
+// Checks expiries when the app opens or comes back to the foreground; notifies at most once per day.
+async function checkExpiryNotifications() {
+  const settings = notifySettings();
+  if (!settings.enabled || !notificationsSupported() || Notification.permission !== 'granted') return;
+  const today = localDateKey();
+  if (settings.lastNotified === today) return;
+  const due = expiringWithin(state.items, today, settings.days);
+  if (!due.length) return;
+  const names = due.slice(0, 3).map((item) => `${item.name} (${expiryLabel(item.expiry).toLocaleLowerCase('el-GR')})`).join(', ');
+  const more = due.length > 3 ? ` και ${due.length - 3} ακόμη` : '';
+  try {
+    await showNotification(due.length === 1 ? '1 προϊόν λήγει σύντομα' : `${due.length} προϊόντα λήγουν σύντομα`, `${names}${more}.`);
+    saveNotifySettings({ lastNotified: today });
+  } catch {}
+}
+
+async function enableNotifications() {
+  if (!notificationsSupported()) { showToast('Ο browser δεν υποστηρίζει ειδοποιήσεις.'); return; }
+  const permission = Notification.permission === 'granted' ? 'granted' : await Notification.requestPermission();
+  if (permission !== 'granted') { showToast('Οι ειδοποιήσεις δεν επιτράπηκαν. Μπορείς να τις ενεργοποιήσεις από τις ρυθμίσεις του browser.'); renderApp(); return; }
+  saveNotifySettings({ enabled: true, lastNotified: '' });
+  renderApp();
+  showToast('Οι ειδοποιήσεις ενεργοποιήθηκαν.');
+  checkExpiryNotifications();
+}
+
+function renderNotificationCard() {
+  const settings = notifySettings();
+  const permission = notificationsSupported() ? Notification.permission : 'unsupported';
+  const active = settings.enabled && permission === 'granted';
+  const status = permission === 'unsupported' ? 'Ο browser δεν υποστηρίζει ειδοποιήσεις.'
+    : permission === 'denied' ? 'Οι ειδοποιήσεις είναι μπλοκαρισμένες στις ρυθμίσεις του browser.'
+    : active ? 'Ενεργές' : 'Ανενεργές';
+  return `<section class="panel settings-card"><span class="stat-icon amber">🔔</span><h2>Ειδοποιήσεις λήξης</h2><p>Όταν ανοίγεις την εφαρμογή, σου θυμίζουμε (μία φορά τη μέρα) ό,τι λήγει μέσα στις επόμενες ημέρες.</p>
+    <p class="field-hint" id="notify-status">Κατάσταση: ${escapeHtml(status)}</p>
+    <label class="field-label" for="notify-days">Ειδοποίηση για λήξη μέσα σε (ημέρες)</label><input class="field-input notify-days" id="notify-days" type="number" min="0" max="30" step="1" value="${settings.days}" inputmode="numeric">
+    <div class="settings-actions">${active ? '<button class="button button-quiet" type="button" data-action="disable-notifications">Απενεργοποίηση</button>' : `<button class="button button-primary" type="button" data-action="enable-notifications" ${permission === 'unsupported' || permission === 'denied' ? 'disabled' : ''}>Ενεργοποίηση ειδοποιήσεων</button>`}</div>
+    <p class="field-hint">Οι ειδοποιήσεις εμφανίζονται όταν ανοίγεις την εφαρμογή ή επιστρέφεις σε αυτή. Ειδοποιήσεις με την εφαρμογή κλειστή χρειάζονται server (push), που αυτή η έκδοση δεν έχει.</p></section>`;
 }
 
 const THEME_KEY = 'spitothiki:theme';
@@ -373,7 +438,9 @@ function handleAction(button) {
   } else if (action === 'remove-shopping') {
     state.shopping = state.shopping.filter((entry) => entry.id !== id);
     persist(); renderApp(); showToast('Το προϊόν αφαιρέθηκε από τη λίστα.');
-  } else if (action === 'set-theme') setTheme(button.dataset.theme);
+  } else if (action === 'enable-notifications') enableNotifications();
+  else if (action === 'disable-notifications') { saveNotifySettings({ enabled: false }); renderApp(); showToast('Οι ειδοποιήσεις απενεργοποιήθηκαν.'); }
+  else if (action === 'set-theme') setTheme(button.dataset.theme);
   else if (action === 'share-shopping') shareShoppingList();
   else if (action === 'copy-share') copyShareText();
   else if (action === 'close-share') document.querySelector('#share-dialog').close();
@@ -428,6 +495,10 @@ document.addEventListener('change', (event) => {
 });
 
 document.addEventListener('input', (event) => {
+  if (event.target.id === 'notify-days') {
+    const days = Math.round(Number(event.target.value));
+    if (Number.isFinite(days) && days >= 0 && days <= 30) saveNotifySettings({ days, lastNotified: '' });
+  }
   if (event.target.id === 'item-name') updateNameCounter();
   if (event.target.id === 'item-expiry') updateExpiryWarning();
   if (event.target.id === 'pantry-search') {
@@ -492,3 +563,6 @@ renderApp();
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
   window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
 }
+
+checkExpiryNotifications();
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkExpiryNotifications(); });

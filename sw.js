@@ -2,7 +2,7 @@
 // Strategy: network-first for everything from this site (HTML, JS, CSS, manifest), so a new
 // deploy shows up on the next load; the cache is only used when the network is unavailable.
 // Bump CACHE_VERSION when the list of shell files changes; old caches are deleted on activate.
-const CACHE_VERSION = 'v2';
+const CACHE_VERSION = 'v3';
 const CACHE = `spitothiki-${CACHE_VERSION}`;
 const SHELL = [
   './', './index.html', './styles.css', './manifest.webmanifest',
@@ -39,5 +39,16 @@ self.addEventListener('fetch', (event) => {
       if (request.mode === 'navigate') return (await caches.match('./index.html')) || Response.error();
       return Response.error();
     }
+  })());
+});
+
+// Clicking an expiry notification focuses the app (or opens it) on the pantry screen.
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  event.waitUntil((async () => {
+    const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    const existing = windows.find((client) => client.url.startsWith(self.registration.scope));
+    if (existing) { await existing.focus(); return existing.navigate(`${self.registration.scope}#pantry`).catch(() => {}); }
+    return self.clients.openWindow(`${self.registration.scope}#pantry`);
   })());
 });
