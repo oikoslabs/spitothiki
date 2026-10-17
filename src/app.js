@@ -1,4 +1,4 @@
-import { MAX_QUANTITY, createPantryItem, createShoppingItem, expiryStatus, expiryWarning, normalizeSearch, normalizeUnit, pantrySummary, syncShoppingWithItem, toggleShoppingItem } from './domain.js';
+import { MAX_QUANTITY, createPantryItem, createShoppingItem, expiryStatus, expiryWarning, normalizeSearch, normalizeUnit, pantrySummary, receiveShoppingItem, returnShoppingItem, syncShoppingWithItem, toggleShoppingItem } from './domain.js';
 import { loadState, parseBackup, saveState } from './storage.js';
 
 const viewRoot = document.querySelector('#view-content');
@@ -182,7 +182,7 @@ function renderPantry() {
 }
 
 function renderShoppingRow(item) {
-  return `<div class="shopping-row ${item.checked ? 'checked' : ''}"><input class="shopping-check" type="checkbox" data-action="toggle-shopping" data-id="${escapeHtml(item.id)}" ${item.checked ? 'checked' : ''} aria-label="${item.checked ? 'Ολοκληρώθηκε' : 'Σημείωση ως αγορασμένο'}: ${escapeHtml(item.name)}"><div><strong class="shopping-row-name">${escapeHtml(item.name)}</strong><div class="shopping-row-detail">${escapeHtml(item.quantity)} ${escapeHtml(item.unit)}</div></div><span class="shopping-state">${item.checked ? 'Μπήκε στο καλάθι' : ''}</span><button class="icon-button danger" type="button" data-action="remove-shopping" data-id="${escapeHtml(item.id)}" aria-label="Αφαίρεση ${escapeHtml(item.name)} από τη λίστα">×</button></div>`;
+  return `<div class="shopping-row ${item.checked ? 'checked' : ''}"><input class="shopping-check" type="checkbox" data-action="toggle-shopping" data-id="${escapeHtml(item.id)}" ${item.checked ? 'checked' : ''} aria-label="${item.checked ? 'Ολοκληρώθηκε' : 'Σημείωση ως αγορασμένο'}: ${escapeHtml(item.name)}"><div><strong class="shopping-row-name">${escapeHtml(item.name)}</strong><div class="shopping-row-detail">${escapeHtml(item.quantity)} ${escapeHtml(item.unit)}</div></div><span class="shopping-state">${item.checked ? (item.pantryAdded ? 'Μπήκε στο απόθεμα' : 'Μπήκε στο καλάθι') : ''}</span><button class="icon-button danger" type="button" data-action="remove-shopping" data-id="${escapeHtml(item.id)}" aria-label="Αφαίρεση ${escapeHtml(item.name)} από τη λίστα">×</button></div>`;
 }
 
 function renderShopping() {
@@ -219,11 +219,7 @@ function navigate(view) {
   activeView = view;
   if (location.hash !== `#${view}`) history.replaceState(null, '', `#${view}`);
   pantryQuery = view === 'pantry' ? pantryQuery : '';
-  window.addEventListener('hashchange', () => navigate(location.hash.slice(1)));
-
-state.items = state.items.map((item) => ({ ...item, unit: normalizeUnit(item.unit) }));
-state.shopping = state.shopping.map((item) => ({ ...item, unit: normalizeUnit(item.unit) }));
-renderApp();
+  renderApp();
   viewRoot.focus({ preventScroll: true });
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
@@ -326,8 +322,13 @@ function handleAction(button) {
     const item = state.items.find((entry) => entry.id === id);
     if (item) addItemToShopping(item);
   } else if (action === 'toggle-shopping') {
-    state.shopping = toggleShoppingItem(state.shopping, id);
+    const row = state.shopping.find((entry) => entry.id === id);
+    if (!row) return;
+    const result = row.checked ? returnShoppingItem(state.items, row) : receiveShoppingItem(state.items, row);
+    state.items = result.items;
+    state.shopping = toggleShoppingItem(state.shopping, id).map((entry) => entry.id === id ? result.row : entry);
     persist(); renderApp();
+    if (result.message) showToast(result.message);
   } else if (action === 'remove-shopping') {
     state.shopping = state.shopping.filter((entry) => entry.id !== id);
     persist(); renderApp(); showToast('Το προϊόν αφαιρέθηκε από τη λίστα.');
@@ -435,4 +436,8 @@ confirmDialog.addEventListener('close', () => {
   confirmAction = null;
 });
 
+window.addEventListener('hashchange', () => navigate(location.hash.slice(1)));
+
+state.items = state.items.map((item) => ({ ...item, unit: normalizeUnit(item.unit) }));
+state.shopping = state.shopping.map((item) => ({ ...item, unit: normalizeUnit(item.unit) }));
 renderApp();

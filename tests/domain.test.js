@@ -96,3 +96,32 @@ test('syncs renamed items to linked shopping rows and legacy rows by old name', 
   ]);
   assert.equal(createShoppingItem({ name: 'Γάλα', itemId: 'i1' }).itemId, 'i1');
 });
+
+test('ticking a bought row adds to the linked pantry item and unticking undoes it', async () => {
+  const { receiveShoppingItem, returnShoppingItem } = await import('../src/domain.js');
+  const items = [{ id: 'i1', name: 'Γάλα', quantity: 1, unit: 'λίτρα' }];
+  const row = { id: 's1', itemId: 'i1', name: 'Γάλα', quantity: 2, unit: 'λίτρα', checked: false };
+  const got = receiveShoppingItem(items, row);
+  assert.equal(got.items[0].quantity, 3);
+  assert.equal(got.row.pantryAdded, 2);
+  assert.equal(got.row.checked, true);
+  const back = returnShoppingItem(got.items, got.row);
+  assert.equal(back.items[0].quantity, 1);
+  assert.equal(back.row.pantryAdded, undefined);
+  assert.equal(back.row.checked, false);
+});
+
+test('ticking a bought row without a link matches by name or creates a pantry item', async () => {
+  const { receiveShoppingItem } = await import('../src/domain.js');
+  const items = [{ id: 'i1', name: 'Ψωμί', quantity: 0, unit: 'τεμ.' }];
+  const byName = receiveShoppingItem(items, { id: 's1', name: 'ψωμι', quantity: 1, unit: 'τεμάχια' });
+  assert.equal(byName.items[0].quantity, 1);
+  assert.equal(byName.row.itemId, 'i1');
+  const created = receiveShoppingItem(items, { id: 's2', name: 'Φέτα', quantity: 0.5, unit: 'κιλά' });
+  assert.equal(created.items.length, 2);
+  assert.equal(created.items[0].name, 'Φέτα');
+  assert.equal(created.row.itemId, created.items[0].id);
+  const otherUnit = receiveShoppingItem(items, { id: 's3', itemId: 'i1', name: 'Ψωμί', quantity: 1, unit: 'κιλά' });
+  assert.equal(otherUnit.items, items);
+  assert.equal(otherUnit.row.checked, true);
+});
