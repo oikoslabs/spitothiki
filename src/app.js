@@ -2,6 +2,7 @@ import { MAX_QUANTITY, createPantryItem, createShoppingItem, expiringWithin, exp
 import { lookupBarcode, normalizeBarcode, startScanner } from './barcode.js';
 import { authProviders, firebaseConfig } from './firebase-config.js';
 import { loadState, parseBackup, saveState } from './storage.js';
+import { RECURRING_INTERVALS, applyRecurring, createRecurring, dueFromSnapshot, expirySnapshot, parseVoiceItems } from './features.js';
 import { getLang, locale, setLang, t, translateDom, untranslatedGreek } from './i18n.js';
 
 const viewRoot = document.querySelector('#view-content');
@@ -77,6 +78,7 @@ function persist() {
     saveState(state);
     renderNavCounts();
     sync?.push();
+    scheduleBackgroundSnapshot();
     return true;
   } catch {
     showToast('Δεν ήταν δυνατή η αποθήκευση στη συσκευή.');
@@ -196,10 +198,11 @@ function renderShopping() {
   const checked = state.shopping.filter((item) => item.checked);
   return `${renderHeader('Λίστα αγορών', 'Σημείωσε όσα χρειάζεσαι και πάρε τη λίστα μαζί σου.')}
     <div class="shopping-layout"><section class="panel"><div class="panel-heading"><div><h2>Τι χρειάζεται το σπίτι;</h2><p>${pending.length ? pendingLabel(pending.length) : 'Κανένα εκκρεμές προϊόν'}</p></div><div class="panel-links">${pending.length ? '<button class="panel-link" type="button" data-action="share-shopping">↗ Κοινοποίηση</button>' : ''}${checked.length ? '<button class="panel-link" type="button" data-action="clear-completed">Καθάρισε τα αγορασμένα</button>' : ''}</div></div>
-    <form id="shopping-form" class="shopping-add-form" novalidate><input class="field-input" name="name" required maxlength="80" placeholder="π.χ. Φέτα" aria-label="Προϊόν για αγορά"><input class="field-input" name="quantity" type="number" min="0.1" max="${MAX_QUANTITY}" step="0.1" value="1" aria-label="Ποσότητα"><select class="field-input unit-select" name="unit" aria-label="Μονάδα"><option value="τεμ.">τεμ.</option><option value="πακέτα">πακέτα</option><option value="κιλά">κιλά</option><option value="γραμμάρια">γραμμάρια</option><option value="λίτρα">λίτρα</option></select><button class="button button-primary" type="submit">＋ Προσθήκη</button></form>
+    <form id="shopping-form" class="shopping-add-form" novalidate><input class="field-input" name="name" required maxlength="80" placeholder="π.χ. Φέτα" aria-label="Προϊόν για αγορά"><input class="field-input" name="quantity" type="number" min="0.1" max="${MAX_QUANTITY}" step="0.1" value="1" aria-label="Ποσότητα"><select class="field-input unit-select" name="unit" aria-label="Μονάδα">${unitOptions()}</select><button class="button button-primary" type="submit">＋ Προσθήκη</button>${SpeechRecognitionApi ? '<button class="button button-quiet voice-button" type="button" data-action="voice-add" aria-label="Προσθήκη με φωνή" title="Προσθήκη με φωνή">🎤</button>' : ''}</form>
     <p class="form-error" id="shopping-error" role="alert" hidden></p>
     <div class="shopping-list">${state.shopping.length ? [...pending, ...checked].map(renderShoppingRow).join('') : renderEmpty('Η λίστα είναι άδεια', 'Πρόσθεσε όσα χρειάζεσαι πριν πας για ψώνια.', 'focus-shopping', 'Γράψε το πρώτο προϊόν', '🛒')}</div></section>
-    <aside class="panel shopping-summary"><span class="stat-icon">🛍️</span><h2>Μικρή υπενθύμιση</h2><p>Κράτησε τη λίστα απλή και πρόσθεσε μόνο ό,τι χρειάζεσαι.</p><div class="shopping-summary-list"><div class="summary-line"><span>Εκκρεμούν</span><strong>${pending.length}</strong></div><div class="summary-line"><span>Στο καλάθι</span><strong>${checked.length}</strong></div><div class="summary-line"><span>Στη συσκευή</span><strong>Ιδιωτικά</strong></div></div></aside></div>`;
+    <aside class="panel shopping-summary"><span class="stat-icon">🛍️</span><h2>Μικρή υπενθύμιση</h2><p>Κράτησε τη λίστα απλή και πρόσθεσε μόνο ό,τι χρειάζεσαι.</p><div class="shopping-summary-list"><div class="summary-line"><span>Εκκρεμούν</span><strong>${pending.length}</strong></div><div class="summary-line"><span>Στο καλάθι</span><strong>${checked.length}</strong></div><div class="summary-line"><span>Στη συσκευή</span><strong>Ιδιωτικά</strong></div></div></aside></div>
+    ${renderRecurringPanel()}`;
 }
 
 function renderSettings() {
@@ -401,6 +404,46 @@ function closeScanner() {
 }
 
 const NOTIFY_KEY = 'spitothiki:notifications';
+// Shared with sw.js: the service worker reads this snapshot for periodic background checks.
+const DATA_CACHE = 'spitothiki-data';
+const SNAPSHOT_URL = './__expiry.json';
+const PERIODIC_TAG = 'spitothiki-expiry';
+const backgroundSyncSupported = () => typeof ServiceWorkerRegistration !== 'undefined' && 'periodicSync' in ServiceWorkerRegistration.prototype;
+
+async function readBackgroundSnapshot() {
+  try { const res = await (await caches.open(DATA_CACHE)).match(SNAPSHOT_URL); return res ? await res.json() : null; } catch { return null; }
+}
+
+async function writeBackgroundSnapshot() {
+  if (!('caches' in window)) return;
+  const settings = notifySettings();
+  try {
+    const cache = await caches.open(DATA_CACHE);
+    if (!settings.enabled) { await cache.delete(SNAPSHOT_URL); return; }
+    const snapshot = expirySnapshot(state.items, { days: settings.days, lang: getLang(), lastNotified: settings.lastNotified,
+      titleOne: t('1 προϊόν λήγει σύντομα'), titleMany: t('{count} προϊόντα λήγουν σύντομα', { count: '{count}' }), more: t(' και {count} ακόμη', { count: '{count}' }) });
+    await cache.put(SNAPSHOT_URL, new Response(JSON.stringify(snapshot), { headers: { 'content-type': 'application/json' } }));
+  } catch {}
+}
+
+// Periodic Background Sync (Chromium, installed app only): lets the service worker check expiries about once a day.
+async function updateBackgroundCheck() {
+  await writeBackgroundSnapshot();
+  const registration = await navigator.serviceWorker?.getRegistration?.().catch(() => null);
+  if (!registration?.periodicSync) return;
+  try {
+    if (notifySettings().enabled) {
+      const permission = await navigator.permissions?.query({ name: 'periodic-background-sync' }).catch(() => null);
+      if (!permission || permission.state === 'granted') await registration.periodicSync.register(PERIODIC_TAG, { minInterval: 12 * 60 * 60 * 1000 });
+    } else await registration.periodicSync.unregister(PERIODIC_TAG);
+  } catch {}
+}
+
+let snapshotTimer;
+function scheduleBackgroundSnapshot() {
+  clearTimeout(snapshotTimer);
+  snapshotTimer = setTimeout(() => { if (notifySettings().enabled) writeBackgroundSnapshot(); }, 500);
+}
 
 function notifySettings() {
   try {
@@ -430,6 +473,8 @@ async function checkExpiryNotifications() {
   if (!settings.enabled || !notificationsSupported() || Notification.permission !== 'granted') return;
   const today = localDateKey();
   if (settings.lastNotified === today) return;
+  const swSnapshot = await readBackgroundSnapshot();
+  if (swSnapshot?.lastNotified === today) { saveNotifySettings({ lastNotified: today }); return; }
   const due = expiringWithin(state.items, today, settings.days);
   if (!due.length) return;
   const names = due.slice(0, 3).map((item) => `${item.name} (${expiryLabel(item.expiry).toLocaleLowerCase(locale())})`).join(', ');
@@ -437,6 +482,7 @@ async function checkExpiryNotifications() {
   try {
     await showNotification(due.length === 1 ? t('1 προϊόν λήγει σύντομα') : t('{count} προϊόντα λήγουν σύντομα', { count: due.length }), `${names}${more}.`);
     saveNotifySettings({ lastNotified: today });
+    await writeBackgroundSnapshot();
   } catch {}
 }
 
@@ -445,6 +491,7 @@ async function enableNotifications() {
   const permission = Notification.permission === 'granted' ? 'granted' : await Notification.requestPermission();
   if (permission !== 'granted') { showToast('Οι ειδοποιήσεις δεν επιτράπηκαν. Μπορείς να τις ενεργοποιήσεις από τις ρυθμίσεις του browser.'); renderApp(); return; }
   saveNotifySettings({ enabled: true, lastNotified: '' });
+  updateBackgroundCheck();
   renderApp();
   showToast('Οι ειδοποιήσεις ενεργοποιήθηκαν.');
   checkExpiryNotifications();
@@ -461,7 +508,8 @@ function renderNotificationCard() {
     <p class="field-hint" id="notify-status">${escapeHtml(t('Κατάσταση: {status}', { status: t(status) }))}</p>
     <label class="field-label" for="notify-days">Ειδοποίηση για λήξη μέσα σε (ημέρες)</label><input class="field-input notify-days" id="notify-days" type="number" min="0" max="30" step="1" value="${settings.days}" inputmode="numeric">
     <div class="settings-actions">${active ? '<button class="button button-quiet" type="button" data-action="disable-notifications">Απενεργοποίηση</button>' : `<button class="button button-primary" type="button" data-action="enable-notifications" ${permission === 'unsupported' || permission === 'denied' ? 'disabled' : ''}>Ενεργοποίηση ειδοποιήσεων</button>`}</div>
-    <p class="field-hint">Οι ειδοποιήσεις εμφανίζονται όταν ανοίγεις την εφαρμογή ή επιστρέφεις σε αυτή. Ειδοποιήσεις με την εφαρμογή κλειστή χρειάζονται server (push), που αυτή η έκδοση δεν έχει.</p></section>`;
+    <p class="field-hint" id="notify-background">${backgroundSyncSupported() ? 'Έλεγχος στο παρασκήνιο: διαθέσιμος. Με την εφαρμογή εγκατεστημένη, ο browser ελέγχει περίπου μία φορά τη μέρα, όποτε κρίνει.' : 'Έλεγχος στο παρασκήνιο: δεν υποστηρίζεται από αυτόν τον browser. Ο έλεγχος γίνεται όταν ανοίγεις την εφαρμογή.'}</p>
+    <p class="field-hint">Ειδοποιήσεις push με την εφαρμογή εντελώς κλειστή θα χρειάζονταν server (Cloud Functions), που αυτή η έκδοση δεν έχει.</p></section>`;
 }
 
 function renderLanguageCard() {
@@ -524,6 +572,54 @@ function addItemToShopping(item) {
   }
   persist();
   showToast(t('Το {name} προστέθηκε στη λίστα.', { name: item.name }));
+}
+
+// ---------- Recurring items ----------
+const INTERVAL_LABELS = { 7: 'Κάθε εβδομάδα', 14: 'Κάθε 2 εβδομάδες', 30: 'Κάθε μήνα' };
+const intervalLabel = (days) => INTERVAL_LABELS[days] ? t(INTERVAL_LABELS[days]) : t('Κάθε {days} ημέρες', { days });
+const UNITS = ['τεμ.', 'πακέτα', 'κιλά', 'γραμμάρια', 'λίτρα'];
+const unitOptions = (selected = 'τεμ.') => UNITS.map((unit) => `<option value="${unit}" ${unit === selected ? 'selected' : ''}>${escapeHtml(t(unit))}</option>`).join('');
+
+function runRecurring() {
+  const result = applyRecurring(state.recurring || [], state.shopping, localDateKey());
+  if (!result.changed) return;
+  state.recurring = result.recurring;
+  state.shopping = result.shopping;
+  persist(); renderApp();
+  if (result.added.length) showToast(t('Μπήκαν στη λίστα (επαναλαμβανόμενα): {names}', { names: result.added.map((row) => row.name).join(', ') }));
+}
+
+function renderRecurringPanel() {
+  const rules = [...(state.recurring || [])].sort((a, b) => String(a.nextDue).localeCompare(String(b.nextDue)));
+  return `<section class="panel recurring-panel" id="recurring-panel"><div class="panel-heading"><div><h2>Επαναλαμβανόμενα</h2><p>Μπαίνουν μόνα τους στη λίστα όταν έρθει η ώρα.</p></div></div>
+    <form id="recurring-form" class="shopping-add-form recurring-form" novalidate><input class="field-input" name="name" required maxlength="80" placeholder="π.χ. Γάλα" aria-label="Επαναλαμβανόμενο προϊόν"><input class="field-input" name="quantity" type="number" min="0.1" max="${MAX_QUANTITY}" step="0.1" value="1" aria-label="Ποσότητα"><select class="field-input unit-select" name="unit" aria-label="Μονάδα">${unitOptions()}</select><select class="field-input" name="everyDays" aria-label="Κάθε πότε">${RECURRING_INTERVALS.map((days) => `<option value="${days}">${escapeHtml(intervalLabel(days))}</option>`).join('')}</select><button class="button button-quiet" type="submit">＋ Προσθήκη</button></form>
+    <p class="form-error" id="recurring-error" role="alert" hidden></p>
+    <div class="recurring-list">${rules.length ? rules.map((rule) => `<div class="recurring-row"><div><strong class="product-name">${escapeHtml(rule.name)}</strong><div class="shopping-row-detail">${escapeHtml(rule.quantity)} ${escapeHtml(t(rule.unit))} · ${escapeHtml(intervalLabel(rule.everyDays))} · ${escapeHtml(t('Επόμενη: {date}', { date: formatDate(rule.nextDue) }))}</div></div><button class="icon-button danger" type="button" data-action="remove-recurring" data-id="${escapeHtml(rule.id)}" aria-label="${escapeHtml(t('Διαγραφή {name}', { name: rule.name }))}">×</button></div>`).join('') : '<p class="subtle-empty">Π.χ. γάλα κάθε εβδομάδα ή απορρυπαντικό κάθε μήνα.</p>'}</div></section>`;
+}
+
+// ---------- Voice add (Web Speech API) ----------
+const SpeechRecognitionApi = window.SpeechRecognition || window.webkitSpeechRecognition;
+let recognition = null;
+
+function startVoiceAdd(button) {
+  if (!SpeechRecognitionApi) { showToast('Η φωνητική προσθήκη δεν υποστηρίζεται σε αυτόν τον browser.'); return; }
+  if (recognition) { recognition.stop(); return; }
+  recognition = new SpeechRecognitionApi();
+  recognition.lang = getLang() === 'en' ? 'en-US' : 'el-GR';
+  recognition.interimResults = false;
+  recognition.maxAlternatives = 1;
+  button.classList.add('is-listening');
+  showToast('Σε ακούω… πες π.χ. «ψωμί και αυγά».');
+  recognition.onresult = (event) => {
+    const transcript = Array.from(event.results || []).map((result) => result[0]?.transcript || '').join(' ');
+    const parsed = parseVoiceItems(transcript);
+    if (!parsed.length) { showToast('Δεν κατάλαβα κάποιο προϊόν. Δοκίμασε ξανά.'); return; }
+    for (const entry of parsed) state.shopping.push(createShoppingItem({ name: entry.name, quantity: entry.quantity }));
+    if (persist()) { renderApp(); showToast(t('Προστέθηκαν: {names}', { names: parsed.map((entry) => entry.name).join(', ') })); }
+  };
+  recognition.onerror = (event) => { showToast(event?.error === 'not-allowed' ? 'Δεν δόθηκε άδεια για το μικρόφωνο.' : 'Η φωνητική προσθήκη απέτυχε. Δοκίμασε ξανά.'); };
+  recognition.onend = () => { recognition = null; document.querySelector('[data-action="voice-add"]')?.classList.remove('is-listening'); };
+  try { recognition.start(); } catch { recognition = null; button.classList.remove('is-listening'); }
 }
 
 function makeDemoItems() {
@@ -597,8 +693,10 @@ function handleAction(button) {
   else if (action === 'close-scan') closeScanner();
   else if (action === 'lookup-barcode') fillFromBarcode(itemForm.elements.barcode.value);
   else if (action === 'enable-notifications') enableNotifications();
-  else if (action === 'disable-notifications') { saveNotifySettings({ enabled: false }); renderApp(); showToast('Οι ειδοποιήσεις απενεργοποιήθηκαν.'); }
+  else if (action === 'disable-notifications') { saveNotifySettings({ enabled: false }); updateBackgroundCheck(); renderApp(); showToast('Οι ειδοποιήσεις απενεργοποιήθηκαν.'); }
   else if (action === 'set-theme') setTheme(button.dataset.theme);
+  else if (action === 'voice-add') startVoiceAdd(button);
+  else if (action === 'remove-recurring') { state.recurring = (state.recurring || []).filter((rule) => rule.id !== id); persist(); renderApp(); showToast('Το επαναλαμβανόμενο αφαιρέθηκε.'); }
   else if (action === 'set-lang') changeLanguage(button.dataset.lang);
   else if (action === 'toggle-lang') changeLanguage(getLang() === 'en' ? 'el' : 'en');
   else if (action === 'share-shopping') shareShoppingList();
@@ -617,12 +715,12 @@ function handleAction(button) {
   } else if (action === 'export-backup') downloadBackup();
   else if (action === 'import-backup') backupFile.click();
   else if (action === 'load-demo') {
-    const loadDemo = () => { state = { items: makeDemoItems(), shopping: [] }; persist(); renderApp(); showToast('Τα παραδείγματα φορτώθηκαν.'); };
+    const loadDemo = () => { state = { ...state, items: makeDemoItems(), shopping: [] }; persist(); renderApp(); showToast('Τα παραδείγματα φορτώθηκαν.'); };
     if (state.items.length || state.shopping.length) showConfirm('Τα τωρινά δεδομένα θα αντικατασταθούν από δοκιμαστικά προϊόντα.', loadDemo, 'Φόρτωση παραδειγμάτων;');
     else loadDemo();
   } else if (action === 'clear-data') {
     showConfirm(`${t('Θα διαγραφούν όλα τα προϊόντα και η λίστα αγορών από αυτή τη συσκευή.')}${syncStatus.user ? t(' Επειδή είσαι συνδεδεμένος, θα διαγραφούν και από τις συγχρονισμένες συσκευές.') : ''}${t(' Φρόντισε να έχεις αντίγραφο αν τα χρειάζεσαι.')}`, () => {
-      state = { items: [], shopping: [] }; persist(); renderApp(); showToast('Τα δεδομένα διαγράφηκαν.');
+      state = { items: [], shopping: [], recurring: [], stores: [], purchases: [], waste: [] }; persist(); renderApp(); showToast('Τα δεδομένα διαγράφηκαν.');
     }, 'Διαγραφή όλων των δεδομένων;');
   }
 }
@@ -644,7 +742,7 @@ document.addEventListener('change', (event) => {
       try {
         const imported = parseBackup(reader.result);
         showConfirm(t('Το αντίγραφο περιέχει {items} προϊόντα και {shopping} είδη στη λίστα. Θα αντικαταστήσει τα τωρινά δεδομένα.', { items: imported.items.length, shopping: imported.shopping.length }), () => {
-          state = imported; persist(); renderApp(); showToast('Το αντίγραφο εισήχθη.');
+          state = { ...state, ...imported }; persist(); renderApp(); showToast('Το αντίγραφο εισήχθη.');
         }, 'Εισαγωγή αντιγράφου;');
       } catch (error) { showToast(error.message || 'Δεν ήταν δυνατή η εισαγωγή.'); }
       backupFile.value = '';
@@ -657,7 +755,7 @@ document.addEventListener('change', (event) => {
 document.addEventListener('input', (event) => {
   if (event.target.id === 'notify-days') {
     const days = Math.round(Number(event.target.value));
-    if (Number.isFinite(days) && days >= 0 && days <= 30) saveNotifySettings({ days, lastNotified: '' });
+    if (Number.isFinite(days) && days >= 0 && days <= 30) { saveNotifySettings({ days, lastNotified: '' }); scheduleBackgroundSnapshot(); }
   }
   if (event.target.id === 'item-name') updateNameCounter();
   if (event.target.id === 'item-expiry') updateExpiryWarning();
@@ -712,6 +810,23 @@ document.addEventListener('submit', (event) => {
     return;
   }
 
+  if (event.target.id === 'recurring-form') {
+    event.preventDefault();
+    const formData = new FormData(event.target);
+    try {
+      const rule = createRecurring({ name: formData.get('name'), quantity: formData.get('quantity'), unit: formData.get('unit'), everyDays: formData.get('everyDays') }, localDateKey());
+      state.recurring = [...(state.recurring || []), rule];
+      persist();
+      showToast(t('Το «{name}» θα μπαίνει στη λίστα: {every}.', { name: rule.name, every: intervalLabel(rule.everyDays).toLocaleLowerCase(locale()) }));
+      runRecurring(); renderApp();
+    } catch (error) {
+      const message = document.querySelector('#recurring-error');
+      message.textContent = t(error.message || 'Έλεγξε τα στοιχεία.');
+      message.hidden = false;
+    }
+    return;
+  }
+
   if (event.target.id === 'shopping-form') {
     event.preventDefault();
     const formData = new FormData(event.target);
@@ -750,7 +865,14 @@ if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.
   window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
 }
 
-checkExpiryNotifications();
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkExpiryNotifications(); });
+function runDailyChecks() {
+  runRecurring();
+  checkExpiryNotifications();
+}
+runDailyChecks();
+updateBackgroundCheck();
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') runDailyChecks(); });
+// While the app stays open (e.g. a tablet in the kitchen), re-check every hour so a new day is noticed.
+setInterval(runDailyChecks, 60 * 60 * 1000);
 
 startSync();

@@ -2,11 +2,12 @@
 // Strategy: network-first for everything from this site (HTML, JS, CSS, manifest), so a new
 // deploy shows up on the next load; the cache is only used when the network is unavailable.
 // Bump CACHE_VERSION when the list of shell files changes; old caches are deleted on activate.
-const CACHE_VERSION = 'v6';
+const CACHE_VERSION = 'v7';
 const CACHE = `spitothiki-${CACHE_VERSION}`;
+const DATA_CACHE = 'spitothiki-data'; // written by the app: expiry snapshot for background checks
 const SHELL = [
   './', './index.html', './styles.css', './manifest.webmanifest',
-  './src/app.js', './src/i18n.js', './src/domain.js', './src/storage.js', './src/barcode.js', './src/firebase-config.js', './src/sync-core.js', './src/sync-firebase.js',
+  './src/app.js', './src/i18n.js', './src/features.js', './src/domain.js', './src/storage.js', './src/barcode.js', './src/firebase-config.js', './src/sync-core.js', './src/sync-firebase.js',
   './icons/icon-192.png', './icons/icon-512.png', './icons/icon.svg'
 ];
 
@@ -16,7 +17,7 @@ self.addEventListener('install', (event) => {
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(caches.keys()
-    .then((keys) => Promise.all(keys.filter((key) => key.startsWith('spitothiki-') && key !== CACHE).map((key) => caches.delete(key))))
+    .then((keys) => Promise.all(keys.filter((key) => key.startsWith('spitothiki-') && key !== CACHE && key !== DATA_CACHE).map((key) => caches.delete(key))))
     .then(() => self.clients.claim()));
 });
 
@@ -52,3 +53,26 @@ self.addEventListener('notificationclick', (event) => {
     return self.clients.openWindow(`${self.registration.scope}#pantry`);
   })());
 });
+
+// Periodic Background Sync (Chromium, installed app): daily-ish expiry check without opening the app.
+// Reads the snapshot the app keeps in the data cache; notifies at most once per day (shared with the app).
+function todayKey() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+function addDaysKey(key, days) { const [y, m, d] = key.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10); }
+async function backgroundExpiryCheck() {
+  const cache = await caches.open(DATA_CACHE);
+  const res = await cache.match('./__expiry.json');
+  if (!res) return;
+  const snap = await res.json();
+  const today = todayKey();
+  if (snap.lastNotified === today) return;
+  const limit = addDaysKey(today, Number(snap.days ?? 3));
+  const due = (snap.items || []).filter((i) => i.expiry >= today && i.expiry <= limit).sort((a, b) => a.expiry.localeCompare(b.expiry));
+  if (!due.length) return;
+  const title = due.length === 1 ? snap.titleOne : String(snap.titleMany).replace('{count}', due.length);
+  const more = due.length > 3 ? String(snap.more).replace('{count}', due.length - 3) : '';
+  await self.registration.showNotification(title, { body: `${due.slice(0, 3).map((i) => i.name).join(', ')}${more}.`, tag: 'spitothiki-expiry', icon: 'icons/icon-192.png', badge: 'icons/icon-192.png', lang: snap.lang || 'el' });
+  snap.lastNotified = today;
+  await cache.put('./__expiry.json', new Response(JSON.stringify(snap), { headers: { 'content-type': 'application/json' } }));
+}
+self.addEventListener('periodicsync', (event) => { if (event.tag === 'spitothiki-expiry') event.waitUntil(backgroundExpiryCheck()); });
+self.addEventListener('message', (event) => { if (event.data === 'spitothiki-expiry-check') event.waitUntil?.(backgroundExpiryCheck()); });

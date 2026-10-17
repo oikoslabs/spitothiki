@@ -30,3 +30,12 @@ test('imports only backups with valid item and shopping arrays', () => {
   assert.throws(() => parseBackup('{broken'), /αρχείο/i);
   assert.throws(() => parseBackup(JSON.stringify({ items: {}, shopping: [] })), /μορφή/i);
 });
+
+test('extra record lists (recurring, stores, purchases, waste) round-trip and old saves stay valid', () => {
+  const storage = memoryStorage();
+  const state = { items: [], shopping: [], recurring: [{ id: 'r1' }], stores: [{ id: 'st1' }], purchases: [{ id: 'p1' }], waste: [{ id: 'w1' }] };
+  saveState(state, storage);
+  assert.deepEqual(loadState(storage), state);
+  assert.deepEqual(parseBackup(JSON.stringify({ items: [], shopping: [] })), { items: [], shopping: [] });
+  assert.deepEqual(parseBackup(JSON.stringify(state)), state);
+});
