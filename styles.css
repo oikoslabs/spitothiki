@@ -39,7 +39,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .brand small { display: block; margin-top: 5px; color: var(--muted); font-size: 11px; }
 .nav-label, .eyebrow { margin: 0 0 12px 10px; color: #98a39b; font-size: 10px; font-weight: 700; letter-spacing: .12em; }
 .primary-nav { display: grid; gap: 6px; }
-.nav-item { width: 100%; display: flex; align-items: center; gap: 12px; min-height: 47px; padding: 0 12px; border: 0; border-radius: 12px; background: transparent; color: #64736a; text-align: left; cursor: pointer; transition: background .18s, color .18s, transform .18s; }
+.nav-item { position: relative; width: 100%; display: flex; align-items: center; gap: 12px; min-height: 47px; padding: 0 12px; border: 0; border-radius: 12px; background: transparent; color: #64736a; text-align: left; cursor: pointer; transition: background .18s, color .18s, transform .18s; }
 .nav-item:hover { background: #f1f5ef; color: var(--ink); }
 .nav-item.is-active { background: var(--green-soft); color: var(--green-dark); font-weight: 700; }
 .nav-icon { display: grid; place-items: center; width: 23px; font-size: 19px; line-height: 1; }
@@ -201,7 +201,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .primary-nav { grid-template-columns: repeat(4,minmax(0,1fr)); gap: 3px; }
   .nav-item { min-height: 55px; flex-direction: column; justify-content: center; gap: 3px; padding: 4px 3px; border-radius: 10px; font-size: 9px; }
   .nav-icon { width: auto; font-size: 18px; }
-  .nav-count { position: absolute; min-width: 17px; margin: -27px 0 0 27px; padding: 1px 4px; font-size: 9px; }
+  .nav-count { position: absolute; top: 4px; right: calc(50% - 25px); min-width: 17px; margin: 0; padding: 1px 4px; font-size: 9px; }
   .main-content { padding: 0 16px calc(89px + env(safe-area-inset-bottom)); }
   .topbar { min-height: 65px; justify-content: flex-end; gap: 9px; }
   .mobile-brand { display: flex; }
