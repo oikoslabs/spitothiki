@@ -105,6 +105,11 @@
     <div id="receipt-body"></div>
   </dialog>
 
+  <dialog id="meal-dialog" class="item-dialog meal-dialog" aria-labelledby="meal-title">
+    <div class="dialog-heading"><div><p class="eyebrow" id="meal-when" data-no-i18n></p><h2 id="meal-title">Γεύμα</h2></div><button class="icon-button" type="button" data-action="close-meal" aria-label="Κλείσιμο">×</button></div>
+    <div id="meal-body"></div>
+  </dialog>
+
   <dialog id="waste-dialog" class="confirm-dialog" aria-labelledby="waste-title">
     <form id="waste-form" method="dialog" novalidate><div class="dialog-heading"><div><p class="eyebrow">ΣΠΑΤΑΛΗ ΤΡΟΦΙΜΩΝ</p><h2 id="waste-title">Πετάχτηκε</h2></div><button class="icon-button" type="button" data-action="close-waste" aria-label="Κλείσιμο">×</button></div>
       <p class="confirm-message product-name" id="waste-name"></p>

@@ -6,6 +6,8 @@ import { fetchReceipt, receiptId } from './receipt.js';
 import { fetchMealDbSuggestions, ingredientName, pantryIngredients, suggestBuiltin } from './recipes.js';
 import { CATEGORIES, WASTE_REASONS, applyWaste, createStore, createWaste, groupByStore, monthKey, monthlySpending, moveCategory, purchaseFor, shiftMonth, storeOrder, wasteStats } from './features.js';
 import { RECURRING_INTERVALS, applyRecurring, createRecurring, dueFromSnapshot, expirySnapshot, parseVoiceItems } from './features.js';
+import { MEAL_SLOTS, copyPreviousWeek, createMeal, recipeFromMealDb, shiftDays, weekDays, weekShoppingNeeds, weekStart } from './mealplan.js';
+import { BUILTIN_RECIPES } from './recipes.js';
 import { getLang, locale, setLang, t, translateDom, untranslatedGreek } from './i18n.js';
 
 const viewRoot = document.querySelector('#view-content');
@@ -858,7 +860,88 @@ function renderRecipeCard(recipe, pantry) {
     <div class="settings-actions">${missingCount ? `<button class="button button-primary" type="button" data-action="add-missing" data-recipe="${escapeHtml(recipe.id)}">${escapeHtml(t('＋ Τα υπόλοιπα στη λίστα'))}</button>` : ''}${recipe.url ? `<a class="button button-quiet" href="${escapeHtml(recipe.url)}" target="_blank" rel="noopener">${escapeHtml(t('Συνταγή ↗'))}</a>` : ''}</div></article>`;
 }
 
+let cookTab = 'ideas';
+const cookTabs = () => `<div class="segmented cook-tabs" role="tablist"><button type="button" role="tab" class="filter-chip${cookTab === 'ideas' ? ' is-active' : ''}" aria-selected="${cookTab === 'ideas'}" data-action="cook-tab" data-tab="ideas">💡 Ιδέες</button><button type="button" role="tab" class="filter-chip${cookTab === 'plan' ? ' is-active' : ''}" aria-selected="${cookTab === 'plan'}" data-action="cook-tab" data-tab="plan" id="tab-plan">📅 Πρόγραμμα εβδομάδας</button></div>`;
+
+// ---------- Weekly meal plan ----------
+const SLOT_LABELS = { breakfast: 'Πρωινό', lunch: 'Μεσημεριανό', dinner: 'Βραδινό' };
+let planWeek = weekStart(localDateKey());
+let mealEdit = null; // { date, slot, results, state }
+const mealTitle = (meal) => meal.title?.[getLang()] || meal.title?.el || '';
+const dayLabel = (key, style = 'long') => new Intl.DateTimeFormat(locale(), { weekday: style, day: 'numeric', month: 'short' }).format(new Date(`${key}T12:00:00`));
+
+function renderPlan() {
+  const days = weekDays(planWeek);
+  const meals = state.meals || [];
+  const byId = new Map(meals.map((meal) => [meal.id, meal]));
+  const today = localDateKey();
+  const range = `${dayLabel(days[0], undefined)} – ${dayLabel(days[6], undefined)}`;
+  const count = meals.filter((meal) => meal.date >= days[0] && meal.date <= days[6]).length;
+  const cell = (date, slot) => {
+    const meal = byId.get(`meal-${date}-${slot}`);
+    return `<button type="button" class="plan-cell${meal ? ' has-meal' : ''}" data-action="plan-meal" data-date="${date}" data-slot="${slot}" aria-label="${escapeHtml(`${dayLabel(date)} · ${t(SLOT_LABELS[slot])}${meal ? `: ${mealTitle(meal)}` : ''}`)}" data-no-i18n><span class="plan-slot">${escapeHtml(t(SLOT_LABELS[slot]))}</span>${meal ? `<span class="plan-meal" ${meal.source === 'mealdb' ? 'lang="en"' : ''}>${escapeHtml(mealTitle(meal))}</span>` : '<span class="plan-add">＋</span>'}</button>`;
+  };
+  return `<div class="month-switch" role="group" aria-label="Εβδομάδα"><button class="icon-button" type="button" data-action="plan-week" data-delta="-7" aria-label="Προηγούμενη εβδομάδα">‹</button><strong id="plan-range" data-no-i18n>${escapeHtml(range)}</strong><button class="icon-button" type="button" data-action="plan-week" data-delta="7" aria-label="Επόμενη εβδομάδα">›</button>${planWeek !== weekStart(today) ? `<button class="text-button" type="button" data-action="plan-week" data-delta="0">Αυτή η εβδομάδα</button>` : ''}</div>
+    <div class="settings-actions plan-actions"><button class="button button-primary" type="button" data-action="plan-shopping" ${count ? '' : 'disabled'}>🛒 Ό,τι λείπει στη λίστα</button><button class="button button-quiet" type="button" data-action="plan-copy">📋 Αντιγραφή προηγούμενης εβδομάδας</button></div>
+    <div class="plan-grid" id="plan-grid">${days.map((date) => `<section class="plan-day${date === today ? ' is-today' : ''}" data-day="${date}"><h3 class="plan-day-name" data-no-i18n>${escapeHtml(dayLabel(date))}</h3>${MEAL_SLOTS.map((slot) => cell(date, slot)).join('')}</section>`).join('')}</div>
+    <p class="field-hint">${escapeHtml(t('{count} γεύματα αυτή την εβδομάδα. Η λίστα αφαιρεί ό,τι έχεις ήδη στο απόθεμα ή στη λίστα.', { count }))}</p>`;
+}
+
+function openMealDialog(date, slot) {
+  mealEdit = { date, slot, results: [], state: 'idle', query: '' };
+  document.querySelector('#meal-when').textContent = `${dayLabel(date)} · ${t(SLOT_LABELS[slot])}`;
+  renderMealDialog();
+  document.querySelector('#meal-dialog').showModal();
+}
+
+function renderMealDialog() {
+  const body = document.querySelector('#meal-body');
+  if (!body || !mealEdit) return;
+  const lang = getLang();
+  const current = (state.meals || []).find((meal) => meal.id === `meal-${mealEdit.date}-${mealEdit.slot}`);
+  const pantry = pantryIngredients(state.items, localDateKey());
+  const builtin = suggestBuiltin(state.items, localDateKey(), 50);
+  const order = [...builtin, ...BUILTIN_RECIPES.filter((recipe) => !builtin.some((entry) => entry.id === recipe.id))];
+  const status = { loading: 'Αναζήτηση…', error: 'Το TheMealDB δεν απάντησε. Δοκίμασε ξανά.', empty: 'Δεν βρέθηκαν συνταγές.' }[mealEdit.state];
+  body.innerHTML = `${current ? `<p class="field-hint" id="meal-current">${escapeHtml(t('Τώρα: {name}', { name: mealTitle(current) }))} <button class="text-button" type="button" data-action="plan-clear">Αφαίρεση</button></p>` : ''}
+    <form id="meal-text-form" class="store-form" novalidate><input class="field-input" name="text" maxlength="80" placeholder="Γράψε ελεύθερα, π.χ. Φακές με ρύζι" aria-label="Γεύμα" value="${current?.source === 'text' ? escapeHtml(mealTitle(current)) : ''}"><button class="button button-primary" type="submit">Αποθήκευση</button></form>
+    <h3 class="insights-subtitle">Συνταγές της Σπιτοθήκης</h3>
+    <div class="meal-options" id="meal-builtin">${order.map((recipe) => `<button type="button" class="meal-option" data-action="plan-pick" data-recipe="${escapeHtml(recipe.id)}" data-no-i18n><span>${escapeHtml(recipe.name[lang] || recipe.name.el)}</span>${(recipe.matched || []).length ? `<small>${escapeHtml(t('έχεις {have}/{all}', { have: recipe.matched.length, all: recipe.matched.length + recipe.missing.length }))}</small>` : ''}</button>`).join('')}</div>
+    <h3 class="insights-subtitle">Αναζήτηση στο TheMealDB</h3>
+    <form id="meal-search-form" class="store-form" novalidate><input class="field-input" name="q" maxlength="60" placeholder="π.χ. chicken, pasta, soup" aria-label="Αναζήτηση συνταγής" value="${escapeHtml(mealEdit.query)}" lang="en"><button class="button button-quiet" type="submit">Αναζήτηση</button></form>
+    ${status ? `<p class="field-hint" id="meal-search-status">${escapeHtml(t(status))}</p>` : ''}
+    ${mealEdit.results.length ? `<div class="meal-options" id="meal-results">${mealEdit.results.map((recipe) => `<button type="button" class="meal-option" data-action="plan-pick" data-recipe="${escapeHtml(recipe.id)}" data-no-i18n lang="en"><span>${escapeHtml(recipe.name.en)}</span><small>${escapeHtml(t('έχεις {have}/{all}', { have: recipe.ingredients.filter((id) => pantry[id]).length, all: recipe.ingredients.length + recipe.extra.length }))}</small></button>`).join('')}</div>` : ''}`;
+  translateDom(body);
+}
+
+async function searchMeals(query) {
+  mealEdit = { ...mealEdit, query, state: 'loading', results: [] };
+  renderMealDialog();
+  try {
+    const res = await fetch(`https://www.themealdb.com/api/json/v1/1/search.php?s=${encodeURIComponent(query)}`);
+    if (!res.ok) throw new Error('TheMealDB');
+    const results = ((await res.json()).meals || []).slice(0, 12).map(recipeFromMealDb);
+    mealEdit = { ...mealEdit, results, state: results.length ? 'done' : 'empty' };
+  } catch { mealEdit = { ...mealEdit, state: 'error' }; }
+  renderMealDialog();
+}
+
+function saveMeal(entry) {
+  state.meals = [...(state.meals || []).filter((meal) => meal.id !== entry.id), entry];
+  if (!persist()) return;
+  document.querySelector('#meal-dialog').close();
+  renderApp();
+}
+
+function planToShopping() {
+  const needs = weekShoppingNeeds(state.meals || [], planWeek, { items: state.items, shopping: state.shopping, today: localDateKey(), lang: getLang() });
+  if (!needs.length) { showToast('Έχεις ό,τι χρειάζεται η εβδομάδα (ή είναι ήδη στη λίστα).'); return; }
+  for (const need of needs) state.shopping.push(createShoppingItem({ name: need.name.charAt(0).toLocaleUpperCase() + need.name.slice(1), quantity: need.count }));
+  if (persist()) { renderApp(); showToast(t('Μπήκαν στη λίστα: {names}', { names: needs.map((need) => need.name).join(', ') })); }
+}
+
 function renderCook() {
+  if (cookTab === 'plan') return `${renderHeader('Πρόγραμμα γευμάτων', 'Σχεδίασε την εβδομάδα και πάρε έτοιμη τη λίστα αγορών.')}${cookTabs()}${renderPlan()}`;
   const today = localDateKey();
   const pantry = pantryIngredients(state.items, today);
   const builtin = suggestBuiltin(state.items, today);
@@ -866,7 +949,7 @@ function renderCook() {
   shownRecipes = [...builtin, ...online.list];
   const urgentNames = state.items.filter((item) => pantry[Object.keys(pantry).find((id) => pantry[id].items.includes(item))]?.urgency >= 1).map((item) => item.name);
   const onlineStatus = { loading: 'Ψάχνω κι άλλες ιδέες στο TheMealDB…', offline: 'Χωρίς σύνδεση: δείχνω μόνο τις συνταγές της εφαρμογής.', error: 'Το TheMealDB δεν απάντησε. Δείχνω τις συνταγές της εφαρμογής.', done: online.list.length ? '' : 'Το TheMealDB δεν βρήκε κάτι ταιριαστό.' }[online.state] || '';
-  return `${renderHeader('Τι να μαγειρέψω;', 'Ιδέες με ό,τι έχεις στο σπίτι, πρώτα όσα λήγουν σύντομα.')}
+  return `${renderHeader('Τι να μαγειρέψω;', 'Ιδέες με ό,τι έχεις στο σπίτι, πρώτα όσα λήγουν σύντομα.')}${cookTabs()}
     ${urgentNames.length ? `<div class="alert-banner" role="status">◷ ${escapeHtml(t('Λήγουν σύντομα: {names}', { names: urgentNames.join(', ') }))}</div>` : ''}
     ${builtin.length || online.list.length ? `<div class="recipe-grid" id="recipe-list">${builtin.map((recipe) => renderRecipeCard(recipe, pantry)).join('')}</div>` : renderEmpty('Δεν βρήκα συνταγές', 'Πρόσθεσε στο απόθεμα βασικά υλικά (π.χ. αυγά, ντομάτες, ρύζι) για να δεις ιδέες.', 'add-item', 'Προσθήκη προϊόντος', '🍳')}
     ${online.list.length ? `<h2 class="section-title">Περισσότερες ιδέες από TheMealDB</h2><div class="recipe-grid" id="recipe-online">${online.list.map((recipe) => renderRecipeCard(recipe, pantry)).join('')}</div>` : ''}
@@ -958,7 +1041,24 @@ function handleAction(button) {
     if (nextQuantity === Number(item.quantity) && Number(button.dataset.delta) > 0) { showToast(t('Η μέγιστη ποσότητα είναι {max}.', { max: MAX_QUANTITY })); return; }
     state.items = state.items.map((entry) => entry.id === id ? { ...entry, quantity: nextQuantity, updatedAt: new Date().toISOString() } : entry);
     persist(); renderApp();
-  } else if (action === 'open-receipt') openReceiptDialog();
+  } else if (action === 'cook-tab') { cookTab = button.dataset.tab; renderApp(); }
+  else if (action === 'plan-week') { planWeek = Number(button.dataset.delta) ? shiftDays(planWeek, Number(button.dataset.delta)) : weekStart(localDateKey()); renderApp(); }
+  else if (action === 'plan-meal') openMealDialog(button.dataset.date, button.dataset.slot);
+  else if (action === 'close-meal') document.querySelector('#meal-dialog').close();
+  else if (action === 'plan-pick') {
+    const recipeIdValue = button.dataset.recipe;
+    const recipe = BUILTIN_RECIPES.find((entry) => entry.id === recipeIdValue) || mealEdit?.results.find((entry) => entry.id === recipeIdValue);
+    if (recipe) saveMeal(createMeal({ date: mealEdit.date, slot: mealEdit.slot, recipe: { source: 'builtin', ...recipe } }));
+  } else if (action === 'plan-clear') {
+    state.meals = (state.meals || []).filter((meal) => meal.id !== `meal-${mealEdit.date}-${mealEdit.slot}`);
+    if (persist()) { document.querySelector('#meal-dialog').close(); renderApp(); }
+  } else if (action === 'plan-copy') {
+    const { meals, copied } = copyPreviousWeek(state.meals || [], planWeek);
+    if (!copied) { showToast('Δεν υπάρχει κάτι να αντιγραφεί (ή οι θέσεις είναι ήδη γεμάτες).'); return; }
+    state.meals = meals;
+    if (persist()) { renderApp(); showToast(t('Αντιγράφηκαν {count} γεύματα.', { count: copied })); }
+  } else if (action === 'plan-shopping') planToShopping();
+  else if (action === 'open-receipt') openReceiptDialog();
   else if (action === 'close-receipt') document.querySelector('#receipt-dialog').close();
   else if (action === 'receipt-scan') openScanner({ qr: true, onCode: (code) => loadReceipt(code) });
   else if (action === 'receipt-reset') { receiptState = { step: 'start' }; renderReceipt(); }
@@ -1037,7 +1137,7 @@ function handleAction(button) {
     else loadDemo();
   } else if (action === 'clear-data') {
     showConfirm(`${t('Θα διαγραφούν όλα τα προϊόντα και η λίστα αγορών από αυτή τη συσκευή.')}${syncStatus.user ? t(' Επειδή είσαι συνδεδεμένος, θα διαγραφούν και από τις συγχρονισμένες συσκευές.') : ''}${t(' Φρόντισε να έχεις αντίγραφο αν τα χρειάζεσαι.')}`, () => {
-      state = { items: [], shopping: [], recurring: [], stores: [], purchases: [], waste: [], receipts: [] }; persist(); renderApp(); showToast('Τα δεδομένα διαγράφηκαν.');
+      state = { items: [], shopping: [], recurring: [], stores: [], purchases: [], waste: [], receipts: [], meals: [] }; persist(); renderApp(); showToast('Τα δεδομένα διαγράφηκαν.');
     }, 'Διαγραφή όλων των δεδομένων;');
   }
 }
@@ -1141,6 +1241,18 @@ document.addEventListener('submit', (event) => {
     return;
   }
 
+  if (event.target.id === 'meal-text-form') {
+    event.preventDefault();
+    try { saveMeal(createMeal({ date: mealEdit.date, slot: mealEdit.slot, text: event.target.elements.text.value })); }
+    catch (error) { showToast(error.message); }
+    return;
+  }
+  if (event.target.id === 'meal-search-form') {
+    event.preventDefault();
+    const query = event.target.elements.q.value.trim();
+    if (query) searchMeals(query);
+    return;
+  }
   if (event.target.id === 'receipt-link-form') {
     event.preventDefault();
     loadReceipt(event.target.elements.link.value);

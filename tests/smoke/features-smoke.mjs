@@ -53,7 +53,7 @@ async function check(name, fn) {
   catch (e) { console.log(`FAIL ${name}: ${e.message}`); errors.push(`${name}: ${e.message}`); }
 }
 const shot = async (name) => { if (shots) await page.screenshot({ path: `${shots}/feature-${name}-${lang}${width < 700 ? '-phone' : ''}.png`, fullPage: true }); };
-const greekLeft = async () => en ? (await page.evaluate(() => window.__i18n.untranslatedGreek())).filter((s) => !/Γάλα|Ψωμί|Αυγά|Μήλα|Ρύζι|Γιαούρτι|Ελαιόλαδο|Ντομάτες|Φέτα|Κοτόπουλο|Πατάτες|Χαρτί|Πεκορίνο|ΔΟΚΙΜΑΣΤΙΚΟ|ΧΑΣΙΩΤΗ|Χουρμαδες|Κασιους|Καρυδοψιχα|(aria-label|title)=(Import: |Decrease quantity of |Increase quantity of |Edit |Thrown away: |Delete )/.test(s)) : [];
+const greekLeft = async () => en ? (await page.evaluate(() => window.__i18n.untranslatedGreek())).filter((s) => !/Γάλα|Ψωμί|Αυγά|Μήλα|Ρύζι|Γιαούρτι|Ελαιόλαδο|Ντομάτες|Φέτα|Κοτόπουλο|Πατάτες|Χαρτί|Πεκορίνο|ΔΟΚΙΜΑΣΤΙΚΟ|ΧΑΣΙΩΤΗ|Φακές με ρύζι|Χουρμαδες|Κασιους|Καρυδοψιχα|(aria-label|title)=(Import: |Decrease quantity of |Increase quantity of |Edit |Thrown away: |Delete )/.test(s)) : [];
 
 await page.goto(url, { waitUntil: 'networkidle0' });
 await page.evaluate(() => localStorage.clear());
@@ -336,6 +336,44 @@ await check('scan receipt: http link rejected, proxy setting validated', async (
   await tap('#proxy-form button[type=submit]'); await wait();
   const saved = await page.evaluate(() => localStorage.getItem('spitothiki:receiptProxy'));
   return /https/.test(err) && saved === 'https://proxy.example.workers.dev';
+});
+
+await check('meal plan: pick built-in, free text and TheMealDB, week list, copy week', async () => {
+  await page.evaluate(() => {
+    const st = JSON.parse(localStorage.getItem('spitothiki:v1'));
+    st.items = [{ id: 'eggs1', name: 'Αυγά', quantity: 6, unit: 'τεμ.', minimum: 0, category: 'Γαλακτοκομικά', location: '', expiry: '' }];
+    st.shopping = []; st.meals = [];
+    localStorage.setItem('spitothiki:v1', JSON.stringify(st));
+  });
+  await page.reload({ waitUntil: 'networkidle0' });
+  await nav('cook');
+  await tap('#tab-plan'); await wait();
+  const cells = (await page.$$('#plan-grid .plan-cell')).length;
+  const days = await page.$$eval('#plan-grid .plan-day', (els) => els.map((e) => e.dataset.day));
+  await tap(`[data-action="plan-meal"][data-date="${days[0]}"][data-slot="breakfast"]`); await wait();
+  await shot('mealplan-dialog');
+  await tap('#meal-builtin [data-recipe="omelette"]'); await wait();
+  await tap(`[data-action="plan-meal"][data-date="${days[0]}"][data-slot="lunch"]`); await wait();
+  await page.type('#meal-text-form input[name=text]', 'Φακές με ρύζι');
+  await tap('#meal-text-form button[type=submit]'); await wait();
+  await tap(`[data-action="plan-meal"][data-date="${days[1]}"][data-slot="dinner"]`); await wait();
+  await page.type('#meal-search-form input[name=q]', 'shakshuka');
+  await tap('#meal-search-form button[type=submit]'); await wait(800);
+  await tap('#meal-results [data-recipe="mealdb-777"]'); await wait();
+  const left = await greekLeft();
+  await shot('mealplan-week');
+  const s1 = await stored();
+  await tap('[data-action="plan-shopping"]'); await wait();
+  const names = (await stored()).shopping.map((r) => r.name.toLowerCase());
+  await tap('[data-action="plan-week"][data-delta="7"]'); await wait();
+  await tap('[data-action="plan-copy"]'); await wait();
+  const s2 = await stored();
+  await tap('[data-action="plan-week"][data-delta="0"]'); await wait();
+  const ok = cells === 21 && s1.meals.length === 3 && !left.length
+    && names.some((n) => /τυρί|cheese/.test(n)) && names.some((n) => /φακ|lentil/.test(n)) && names.some((n) => /ρύζι|rice/.test(n)) && names.includes('cumin') && !names.some((n) => /αυγ|egg/.test(n))
+    && s2.meals.length === 6 && s2.meals.some((m) => m.recipeId === 'mealdb-777' && m.date > days[6]);
+  if (!ok) console.log('  plan:', { cells, meals: s1.meals.length, names, after: s2.meals.length, left });
+  return ok;
 });
 
 for (const view of ['shopping', 'settings', 'insights', 'pantry', 'cook']) await check(`no Greek UI left on ${view} (${lang})`, async () => { await nav(view); const left = await greekLeft(); if (left.length) console.log('  left:', left); return !left.length; });

@@ -436,3 +436,21 @@ body[data-screen="pantry"] .topbar .button-add { display: none; }
 .receipt-photo-actions { flex-wrap: wrap; }
 .receipt-line.is-doubtful { background: #fff4d6; outline: 2px solid #e0a800; border-radius: 10px; }
 .doubtful-hint { color: #8a5a00; }
+.cook-tabs { display: flex; gap: 8px; margin: 0 0 16px; flex-wrap: wrap; }
+.filter-chip.is-active { background: var(--green-soft); color: var(--green-dark); border-color: transparent; }
+.plan-actions { margin: 0 0 14px; flex-wrap: wrap; }
+.plan-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 10px; margin-bottom: 12px; }
+.plan-day { display: grid; gap: 8px; align-content: start; background: var(--card, #fff); border: 1px solid #e3e9df; border-radius: 14px; padding: 10px; }
+.plan-day.is-today { border-color: var(--green, #2f6b4f); box-shadow: 0 0 0 2px var(--green-soft, #e3f0e8); }
+.plan-day-name { margin: 0; font-size: 12px; text-transform: capitalize; }
+.plan-cell { display: grid; gap: 2px; text-align: left; min-height: 58px; padding: 7px 8px; border: 1px dashed #d5ddd0; border-radius: 10px; background: transparent; color: inherit; cursor: pointer; font: inherit; }
+.plan-cell.has-meal { border-style: solid; background: var(--green-soft, #eef6f0); }
+.plan-slot { font-size: 10px; color: #7b897f; text-transform: uppercase; letter-spacing: .03em; }
+.plan-meal { font-size: 12px; font-weight: 700; overflow-wrap: anywhere; }
+.plan-add { font-size: 16px; color: #9aa79e; }
+.meal-options { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; margin-bottom: 12px; }
+.meal-option { display: grid; gap: 2px; text-align: left; padding: 9px 11px; border: 1px solid #e3e9df; border-radius: 10px; background: transparent; color: inherit; cursor: pointer; font: inherit; }
+.meal-option small { color: #7b897f; }
+.meal-option:hover, .plan-cell:hover { border-color: var(--green, #2f6b4f); }
+@media (max-width: 1020px) { .plan-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 760px) { .plan-grid { grid-template-columns: 1fr; } .plan-day { grid-template-columns: repeat(3, minmax(0, 1fr)); } .plan-day-name { grid-column: 1 / -1; } }
