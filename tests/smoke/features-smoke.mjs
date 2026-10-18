@@ -53,7 +53,7 @@ async function check(name, fn) {
   catch (e) { console.log(`FAIL ${name}: ${e.message}`); errors.push(`${name}: ${e.message}`); }
 }
 const shot = async (name) => { if (shots) await page.screenshot({ path: `${shots}/feature-${name}-${lang}${width < 700 ? '-phone' : ''}.png`, fullPage: true }); };
-const greekLeft = async () => en ? (await page.evaluate(() => window.__i18n.untranslatedGreek())).filter((s) => !/Γάλα|Ψωμί|Αυγά|Μήλα|Ρύζι|Γιαούρτι|Ελαιόλαδο|Ντομάτες|Φέτα|Κοτόπουλο|Πατάτες|Χαρτί|Πεκορίνο|ΔΟΚΙΜΑΣΤΙΚΟ|(aria-label|title)=(Import: |Decrease quantity of |Increase quantity of |Edit |Thrown away: |Delete )/.test(s)) : [];
+const greekLeft = async () => en ? (await page.evaluate(() => window.__i18n.untranslatedGreek())).filter((s) => !/Γάλα|Ψωμί|Αυγά|Μήλα|Ρύζι|Γιαούρτι|Ελαιόλαδο|Ντομάτες|Φέτα|Κοτόπουλο|Πατάτες|Χαρτί|Πεκορίνο|ΔΟΚΙΜΑΣΤΙΚΟ|ΧΑΣΙΩΤΗ|Χουρμαδες|Κασιους|Καρυδοψιχα|(aria-label|title)=(Import: |Decrease quantity of |Increase quantity of |Edit |Thrown away: |Delete )/.test(s)) : [];
 
 await page.goto(url, { waitUntil: 'networkidle0' });
 await page.evaluate(() => localStorage.clear());
@@ -290,10 +290,40 @@ await check('scan receipt: AADE summary link records only the total', async () =
   await page.type('#receipt-link-form input[name=link]', 'https://mydatapi.aade.gr/TimologioQR/QRInfo?issuerVat=999999999&issueDate=12/10/2026&mark=4001&totalGrossValue=12.30');
   await page.click('#receipt-link-form button[type=submit]'); await wait(600);
   const note = await page.$('#receipt-aade-note');
+  const offersPhoto = await page.$('#receipt-aade-note ~ .receipt-photo-actions #receipt-photo-camera');
   await page.click('#receipt-review-form button[type=submit]'); await wait();
   const s = await stored();
   const p = s.purchases.find((x) => x.price === 12.3);
-  return note !== null && p?.date === '2026-10-12' && s.receipts.length === 2;
+  return note !== null && offersPhoto !== null && p?.date === '2026-10-12' && s.receipts.length === 2;
+});
+await check('receipt photo: mocked OCR -> review with flagged line, import, duplicate refused', async () => {
+  const ocrText = fixture('receipt-photo-ocr.txt');
+  await page.evaluate((text) => { window.__spitoOcrMock = async () => ({ text, confidence: 91 }); }, ocrText);
+  const icon = new URL('../../icons/icon-192.png', import.meta.url).pathname;
+  await tap('[data-action="open-receipt"]'); await wait();
+  const startLeft = await greekLeft();
+  await (await page.$('#receipt-photo-file')).uploadFile(icon);
+  await page.waitForSelector('#receipt-lines', { timeout: 15000 });
+  const lines = (await page.$$('#receipt-lines .receipt-line')).length;
+  const flagged = (await page.$$('#receipt-lines .receipt-line.is-doubtful')).length;
+  const store = await page.$eval('#receipt-store', (e) => e.textContent);
+  const note = await page.$eval('#receipt-photo-note', (e) => e.textContent);
+  const left = [...startLeft, ...(await greekLeft())];
+  await shot('receipt-photo-review');
+  await page.click('[data-line="2"] [name=price]', { clickCount: 3 }); await page.type('[data-line="2"] [name=price]', '5.79');
+  await page.click('#receipt-review-form button[type=submit]'); await wait();
+  const s = await stored();
+  const mine = s.purchases.filter((p) => p.storeName === 'ΧΑΣΙΩΤΗ');
+  await tap('[data-action="open-receipt"]'); await wait();
+  await (await page.$('#receipt-photo-camera')).uploadFile(icon);
+  await page.waitForSelector('#receipt-lines', { timeout: 15000 });
+  const dup = await page.$('#receipt-duplicate');
+  await page.click('[data-action="close-receipt"]'); await wait();
+  await page.evaluate(() => { delete window.__spitoOcrMock; });
+  if (left.length || lines !== 3 || flagged !== 1) console.log('  photo:', { lines, flagged, store, note, left });
+  return lines === 3 && flagged === 1 && store === 'ΧΑΣΙΩΤΗ' && note.length > 10 && !left.length && dup !== null
+    && mine.length === 3 && mine.every((p) => p.date === '2026-10-17') && Math.abs(mine.reduce((t, p) => t + p.price, 0) - 16) < 0.001
+    && s.items.some((i) => i.name === 'Καρυδοψιχα ελληνικη' && i.unit === 'κιλά' && i.category === 'Ξηρά τρόφιμα');
 });
 await check('scan receipt: http link rejected, proxy setting validated', async () => {
   await tap('[data-action="open-receipt"]'); await wait();

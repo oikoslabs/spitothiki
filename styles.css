@@ -431,3 +431,8 @@ body[data-screen="pantry"] .topbar .button-add { display: none; }
   .receipt-line .receipt-qty { grid-column: 2; } .receipt-line .receipt-unit { grid-column: 3; }
   .receipt-line .receipt-price { grid-column: 2; } .receipt-line .receipt-category { grid-column: 3; }
 }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.file-button { position: relative; cursor: pointer; }
+.receipt-photo-actions { flex-wrap: wrap; }
+.receipt-line.is-doubtful { background: #fff4d6; outline: 2px solid #e0a800; border-radius: 10px; }
+.doubtful-hint { color: #8a5a00; }

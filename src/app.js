@@ -672,6 +672,33 @@ const DEFAULT_PROXY = 'https://spitothiki-receipt-proxy.cornerstore553.workers.d
 const storedProxy = () => { try { return localStorage.getItem(PROXY_KEY) || ''; } catch { return ''; } };
 const receiptProxy = () => storedProxy() || DEFAULT_PROXY;
 let receiptState = { step: 'start' };
+const photoButtons = () => `<div class="settings-actions receipt-photo-actions"><label class="button button-quiet file-button"><span>📸 Φωτογραφία απόδειξης</span><input type="file" accept="image/*" capture="environment" class="visually-hidden" data-receipt-photo id="receipt-photo-camera"></label><label class="button button-quiet file-button"><span>🖼️ Από τη συλλογή</span><input type="file" accept="image/*" class="visually-hidden" data-receipt-photo id="receipt-photo-file"></label></div>`;
+
+async function loadReceiptPhoto(file) {
+  if (!file) return;
+  receiptState = { step: 'loading', photo: true, progress: '' };
+  renderReceipt();
+  try {
+    const { ocrReceipt } = await import('./receipt-photo.js');
+    const result = await ocrReceipt(file, {
+      recognizeImpl: window.__spitoOcrMock,
+      onProgress: (m) => {
+        const el = document.querySelector('#receipt-loading');
+        if (!el) return;
+        el.textContent = m.status === 'recognizing text' ? t('Αναγνώριση κειμένου… {pct}%', { pct: Math.round((m.progress || 0) * 100) })
+          : m.status === 'orientation' ? t('Αναγνώριση κειμένου… (περιστροφή {angle}°)', { angle: m.angle }) : t('Φόρτωση αναγνώρισης κειμένου (μόνο την πρώτη φορά)…');
+      }
+    });
+    const receipt = result.parsed;
+    if (!receipt.lines.length && !receipt.total) throw new Error('Δεν βρέθηκαν είδη στη φωτογραφία. Δοκίμασε πιο καθαρή, ίσια λήψη με καλό φως.');
+    const id = await receiptId(receipt, `photo:${receipt.issuerName}`);
+    const duplicate = (state.receipts || []).find((entry) => entry.id === id);
+    receiptState = { step: 'review', receipt, id, duplicate, photo: true };
+  } catch (error) {
+    receiptState = { step: 'start', error: t(error.message || 'Η αναγνώριση απέτυχε.') };
+  }
+  renderReceipt();
+}
 
 function openReceiptDialog() {
   receiptState = { step: 'start' };
@@ -697,6 +724,7 @@ function renderReceiptStart() {
   const { link = '', error = '', cors = false } = receiptState;
   return `<p class="field-hint">Σκάναρε το QR code της ηλεκτρονικής απόδειξης ή επικόλλησε τον σύνδεσμό του. Θα δεις τα είδη πριν μπουν οπουδήποτε.</p>
     <div class="settings-actions"><button class="button button-primary" type="button" data-action="receipt-scan">📷 Σάρωση QR</button></div>
+    <p class="field-hint">Χωρίς QR παρόχου (π.χ. ταμειακή με QR της ΑΑΔΕ); Βγάλε φωτογραφία την απόδειξη και θα διαβαστούν τα είδη στη συσκευή σου.</p>${photoButtons()}
     <form id="receipt-link-form" class="store-form" novalidate><input class="field-input" name="link" type="url" inputmode="url" value="${escapeHtml(link)}" placeholder="https://… (σύνδεσμος απόδειξης)" aria-label="Σύνδεσμος απόδειξης" autocomplete="off"><button class="button button-quiet" type="submit">Άνοιγμα</button></form>
     ${error ? `<p class="form-error" id="receipt-error" role="alert">${escapeHtml(error)}</p>` : ''}
     ${cors && !receiptProxy() ? '<p class="field-hint">Μπορείς να ορίσεις proxy αποδείξεων στις Ρυθμίσεις για παρόχους που μπλοκάρουν την απευθείας πρόσβαση.</p>' : ''}`;
@@ -708,15 +736,17 @@ function renderReceiptReview() {
   const head = `<div class="receipt-summary"><div><strong class="product-name" id="receipt-store">${escapeHtml(store)}</strong><span class="field-hint">${escapeHtml(receipt.date ? formatDate(receipt.date) : '')}${receipt.lines.length ? ` · ${escapeHtml(t('{count} είδη', { count: receipt.lines.length }))}` : ''}</span></div><strong class="big-number" id="receipt-total">${escapeHtml(money(receipt.total))}</strong></div>`;
   const dup = duplicate ? `<p class="alert-banner" id="receipt-duplicate" role="status">${escapeHtml(t('Αυτή η απόδειξη έχει ήδη εισαχθεί ({date}).', { date: formatDate(String(duplicate.importedAt || '').slice(0, 10)) }))}</p>` : '';
   if (!receipt.lines.length) {
-    return `${head}${dup}<p class="field-hint" id="receipt-aade-note">Αυτός ο σύνδεσμος της ΑΑΔΕ δείχνει μόνο το σύνολο, όχι τα είδη. Μπορείς να καταγράψεις το ποσό ως έξοδο. Για τα είδη, σκάναρε το QR του παρόχου (συνήθως στο κάτω μέρος της απόδειξης).</p>
+    return `${head}${dup}<p class="field-hint" id="receipt-aade-note">Οι αποδείξεις με QR της ΑΑΔΕ (ταμειακές) δεν περιέχουν τα είδη στο QR, μόνο το σύνολο. Για να περάσουν τα είδη, βγάλε φωτογραφία την απόδειξη — ή κατέγραψε μόνο το ποσό ως έξοδο.</p>${photoButtons()}
       <form id="receipt-review-form" novalidate><input type="hidden" name="mode" value="total"><div class="dialog-actions"><button class="button button-quiet" type="button" data-action="receipt-reset">Πίσω</button><button class="button button-primary" type="submit" ${duplicate ? 'disabled' : ''}>Καταγραφή εξόδου</button></div></form>`;
   }
-  const rows = receipt.lines.map((line, index) => `<div class="receipt-line" data-line="${index}"><input class="shopping-check" type="checkbox" name="use" checked aria-label="${escapeHtml(t('Εισαγωγή: {name}', { name: line.name }))}">
+  const rows = receipt.lines.map((line, index) => `<div class="receipt-line${line.doubtful ? ' is-doubtful' : ''}" data-line="${index}"${line.doubtful ? ` title="${escapeHtml(t('Έλεγξε αυτή τη γραμμή: ποσότητα × τιμή δεν ταιριάζει με το ποσό.'))}"` : ''}><input class="shopping-check" type="checkbox" name="use" checked aria-label="${escapeHtml(t('Εισαγωγή: {name}', { name: line.name }))}">
     <input class="field-input receipt-name" name="name" value="${escapeHtml(line.name)}" maxlength="80" aria-label="Όνομα προϊόντος">
     <input class="field-input receipt-qty" name="quantity" type="number" min="0" step="0.001" value="${escapeHtml(line.quantity)}" aria-label="Ποσότητα"><select class="field-input receipt-unit" name="unit" aria-label="Μονάδα">${unitOptions(line.unit)}</select>
     <input class="field-input receipt-price" name="price" type="number" min="0" step="0.01" value="${escapeHtml(line.price.toFixed(2))}" aria-label="Τιμή">
     <select class="field-input receipt-category" name="category" aria-label="Κατηγορία">${CATEGORIES.map((category) => `<option value="${escapeHtml(category)}" ${category === line.category ? 'selected' : ''}>${escapeHtml(categoryLabel(category))}</option>`).join('')}</select></div>`).join('');
-  return `${head}${dup}<form id="receipt-review-form" novalidate><input type="hidden" name="mode" value="lines">
+  const doubtful = receipt.lines.filter((line) => line.doubtful).length;
+  const photoNote = receiptState.photo ? `<p class="field-hint" id="receipt-photo-note">${escapeHtml(t('Διαβάστηκε από φωτογραφία — έλεγξε ονόματα και ποσά πριν την εισαγωγή.'))}${doubtful ? ` <strong class="doubtful-hint">${escapeHtml(t('{count} γραμμές θέλουν έλεγχο (σημειωμένες).', { count: doubtful }))}</strong>` : ''}${receipt.totalMismatch ? ` ${escapeHtml(t('Το άθροισμα των ειδών ({sum}) διαφέρει από το σύνολο.', { sum: money(receipt.linesTotal) }))}` : ''}</p>` : '';
+  return `${head}${dup}${photoNote}<form id="receipt-review-form" novalidate><input type="hidden" name="mode" value="lines">
     <div class="receipt-lines" id="receipt-lines">${rows}</div>
     <label class="check-row"><input type="checkbox" name="toPantry" checked> <span>Πρόσθεσε στο απόθεμα (ενώνεται με ίδια προϊόντα)</span></label>
     <label class="check-row"><input type="checkbox" name="toSpending" checked> <span>Κατέγραψε τα έξοδα στα Στατιστικά</span></label>
@@ -726,7 +756,7 @@ function renderReceiptReview() {
 function renderReceipt() {
   const body = document.querySelector('#receipt-body');
   if (!body) return;
-  body.innerHTML = receiptState.step === 'loading' ? `<p class="field-hint" id="receipt-loading" role="status">${escapeHtml(t('Φόρτωση απόδειξης…'))}</p>`
+  body.innerHTML = receiptState.step === 'loading' ? `<p class="field-hint" id="receipt-loading" role="status">${escapeHtml(t(receiptState.photo ? 'Φόρτωση αναγνώρισης κειμένου (μόνο την πρώτη φορά)…' : 'Φόρτωση απόδειξης…'))}</p>`
     : receiptState.step === 'review' ? renderReceiptReview() : renderReceiptStart();
   translateDom(body);
 }
@@ -1020,6 +1050,7 @@ document.addEventListener('click', (event) => {
 });
 
 document.addEventListener('change', (event) => {
+  if (event.target.matches?.('[data-receipt-photo]')) { loadReceiptPhoto(event.target.files?.[0]); return; }
   if (event.target.classList?.contains('price-input')) {
     const row = state.shopping.find((entry) => entry.id === event.target.dataset.id);
     if (!row) return;

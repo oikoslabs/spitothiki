@@ -62,7 +62,7 @@ const CATEGORY_WORDS = [
   ['Κατεψυγμένα', ['κατεψ', 'frozen', 'αρακα', 'παγωτ']],
   ['Ροφήματα', ['καφε', 'τσαι', 'χυμο', 'νερο', 'μπυρ', 'κρασι', 'αναψυκτ', 'cola', 'coffee', 'juice', 'σοδα']],
   ['Καθαριότητα', ['απορρυπ', 'σαπουν', 'χαρτι', 'χαρτοπετσ', 'καθαρισ', 'λευκαντ', 'σφουγγ', 'σακουλ', 'μαλακτ', 'οδοντ', 'σαμπουαν']],
-  ['Ξηρά τρόφιμα', ['αλευρ', 'ρυζι', 'μακαρον', 'ζυμαρικ', 'ψωμι', 'αρτοσ', 'αρτ/σ', 'φρυγαν', 'ζαχαρ', 'αλατι', 'λαδι', 'ελαιολ', 'φακ', 'φασολ', 'ρεβιθ', 'δημητρ', 'μπισκοτ', 'κρακερ', 'μελι', 'σοκολατ', 'ελιε', 'κονσερ']]
+  ['Ξηρά τρόφιμα', ['καρυδ', 'κασιου', 'αμυγδαλ', 'φιστικ', 'φουντουκ', 'χουρμα', 'σταφιδ', 'ξηροι καρπ', 'αλευρ', 'ρυζι', 'μακαρον', 'ζυμαρικ', 'ψωμι', 'αρτοσ', 'αρτ/σ', 'φρυγαν', 'ζαχαρ', 'αλατι', 'λαδι', 'ελαιολ', 'φακ', 'φασολ', 'ρεβιθ', 'δημητρ', 'μπισκοτ', 'κρακερ', 'μελι', 'σοκολατ', 'ελιε', 'κονσερ']]
 ];
 
 export function guessCategory(name) {
@@ -81,7 +81,7 @@ export function tidyName(name) {
   return lower.charAt(0).toLocaleUpperCase('el-GR') + lower.slice(1);
 }
 
-function makeLine({ name, quantity, unit, price }) {
+export function makeLine({ name, quantity, unit, price }) {
   const qty = quantity > 0 ? quantity : 1;
   return { name: tidyName(name), rawName: String(name || '').trim(), quantity: Math.round(qty * 1000) / 1000, unit, price: round2(price), category: guessCategory(name) };
 }
@@ -133,7 +133,7 @@ export function classifyReceiptUrl(input) {
   let url;
   try { url = new URL(String(input || '').trim()); } catch { return { kind: 'invalid' }; }
   if (url.protocol !== 'https:') return { kind: 'insecure' };
-  if (/(^|\.)aade\.gr$/i.test(url.hostname)) return { kind: 'aade', url: url.href };
+  if (/(^|\.)aade\.gr$/i.test(url.hostname) || /tameiakes/i.test(url.hostname)) return { kind: 'aade', url: url.href };
   // Provider page: strip a trailing slash and any known format suffix, keep the receipt key.
   const base = url.href.replace(/[?#].*$/, '').replace(/\/+$/, '').replace(/\/(myDATA|EN16931|pdf|xml)$/i, '');
   return { kind: 'provider', url: base, host: url.hostname };
