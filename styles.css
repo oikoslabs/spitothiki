@@ -498,3 +498,9 @@ body[data-screen="pantry"] .topbar .button-add { display: none; }
 .trip-list small { width: 100%; color: #6b7a70; }
 .receipt-trip p { margin: 0 0 6px; }
 @media (max-width: 760px) { .cart-line { grid-template-columns: minmax(0, 1fr) auto auto; } .cart-line .qty-stepper.small { grid-column: 1; grid-row: 2; } }
+.vm-settings { margin: 10px 0; }
+.vm-settings summary { cursor: pointer; font-weight: 700; }
+.vm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 6px 10px; }
+.vm-row { display: flex; align-items: center; gap: 6px; }
+.vm-row span { font-weight: 700; min-width: 32px; }
+.code-info { background: #eef5f0; border-radius: 10px; padding: 6px 10px; }

@@ -25,7 +25,7 @@ export function addCartItem(trip, input, now = new Date().toISOString()) {
   const name = String(input.name || '').trim().slice(0, 80);
   if (!name) throw new Error('Γράψε όνομα προϊόντος.');
   const same = trip.items.find((item) => (input.barcode && item.barcode === input.barcode) || (input.shoppingId && item.shoppingId === input.shoppingId) || (!input.barcode && !item.barcode && norm(item.name) === norm(name)));
-  const items = same && unit === 'τεμ.' && same.unit === 'τεμ.'
+  const items = !input.noMerge && same && unit === 'τεμ.' && same.unit === 'τεμ.'
     ? trip.items.map((item) => (item === same ? { ...item, qty: round3(item.qty + qty), price: price || item.price, shoppingId: item.shoppingId || input.shoppingId || '' } : item))
     : [...trip.items, { key: rid('ci'), barcode: input.barcode || '', name, unit, qty, price, category: input.category || 'Άλλο', shoppingId: input.shoppingId || '' }];
   return withTotal({ ...trip, items }, now);

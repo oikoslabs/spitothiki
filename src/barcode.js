@@ -1,3 +1,4 @@
+import { interpretCode } from './gs1.js';
 // Barcode scanning (camera) and product lookup through the Open Food Facts API.
 const ZXING_URL = 'https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/umd/zxing-browser.min.js';
 const ZXING_SRI = 'sha384-ylLhng89kD62+PVK1cjm4rAYg69zDlGrbbSfAE2Eb8Xqf8RoAQCMcRoUXZh7pAPC';
@@ -64,7 +65,9 @@ export async function startScanner(video, onCode, { qr = false } = {}) {
   if (!navigator.mediaDevices?.getUserMedia) throw new Error('Η κάμερα δεν είναι διαθέσιμη σε αυτόν τον browser.');
   let formats = [];
   if ('BarcodeDetector' in globalThis) formats = await globalThis.BarcodeDetector.getSupportedFormats().catch(() => []);
-  const wanted = formats.filter((f) => (qr === 'any' ? /qr_code|data_matrix|pdf417|aztec|ean|upc|code_128|code_39|itf|codabar/.test(f) : qr ? f === 'qr_code' : /ean|upc|code_128|code_39|itf/.test(f)));
+  const wanted = formats.filter((f) => (qr === 'any' ? /qr_code|data_matrix|pdf417|aztec|ean|upc|code_128|code_39|itf|codabar/.test(f) : qr ? f === 'qr_code' : /ean|upc|code_128|code_39|itf|data_matrix|qr_code/.test(f)));
+  // Product mode also reads GS1 DataMatrix / GS1 QR / Digital Link; other QR codes are ignored.
+  const accept = (value) => qr || interpretCode(value).barcode;
   if (wanted.length) {
     const detector = new globalThis.BarcodeDetector({ formats: wanted });
     const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
@@ -76,7 +79,7 @@ export async function startScanner(video, onCode, { qr = false } = {}) {
       if (stopped) return;
       try {
         const [found] = await detector.detect(video);
-        if (found?.rawValue) { stop(); onCode(found.rawValue); return; }
+        if (found?.rawValue && accept(found.rawValue)) { stop(); onCode(found.rawValue); return; }
       } catch {}
       setTimeout(tick, 250);
     };
@@ -87,7 +90,7 @@ export async function startScanner(video, onCode, { qr = false } = {}) {
   const reader = new ZXing.BrowserMultiFormatReader();
   let controls;
   controls = await reader.decodeFromConstraints({ video: { facingMode: 'environment' }, audio: false }, video, (result) => {
-    if (result) { controls?.stop(); onCode(result.getText()); }
+    if (result && accept(result.getText())) { controls?.stop(); onCode(result.getText()); }
   });
   return () => controls?.stop();
 }

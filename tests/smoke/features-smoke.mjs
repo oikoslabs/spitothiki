@@ -21,7 +21,7 @@ await page.evaluateOnNewDocument((lang) => {
   window.__speech = lang === 'en' ? 'bread and 2 eggs' : 'ψωμί και 2 αυγά';
   window.SpeechRecognition = class { start() { setTimeout(() => { this.onresult?.({ results: [[{ transcript: window.__speech }]] }); this.onend?.(); }, 50); } stop() { this.onend?.(); } };
   // Fake QR detector: "sees" the receipt link on the (fake) camera.
-  window.BarcodeDetector = class { static async getSupportedFormats() { return ['qr_code', 'ean_13']; } constructor(o) { this.formats = o.formats; } async detect() { if (!this.formats.includes('qr_code')) { const code = window.__fakeBarcode; window.__fakeBarcode = ''; return code ? [{ rawValue: code }] : []; } return [{ rawValue: window.__fakeCode || 'https://test-shop.epsilonnet.gr/fd/abc123:1' }]; } };
+  window.BarcodeDetector = class { static async getSupportedFormats() { return ['qr_code', 'ean_13', 'data_matrix', 'pdf417']; } constructor(o) { this.formats = o.formats; } async detect() { const product = this.formats.includes('data_matrix') && !this.formats.includes('pdf417'); if (product || !this.formats.includes('qr_code')) { const code = window.__fakeBarcode; window.__fakeBarcode = ''; return code ? [{ rawValue: code }] : []; } return [{ rawValue: window.__fakeCode || 'https://test-shop.epsilonnet.gr/fd/abc123:1' }]; } };
   window.__notifications = [];
   if (window.ServiceWorkerRegistration) ServiceWorkerRegistration.prototype.showNotification = (title, o) => { window.__notifications.push({ title, body: o?.body }); return Promise.resolve(); };
 }, lang);
@@ -32,7 +32,7 @@ page.on('request', (request) => {
   const u = request.url();
   if (u.startsWith('https://world.openfoodfacts.org/api/v2/product/')) {
     const found = u.includes('/5209999999999.json');
-    return request.respond({ status: found ? 200 : 404, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(found ? { status: 1, product: { product_name: 'Φέτα Δοκιμής 400g', categories_tags: ['en:cheeses'] } } : { status: 0 }) });
+    return request.respond({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(found ? { status: 1, product: { product_name: 'Φέτα Δοκιμής 400g', categories_tags: ['en:cheeses'] } } : { status: 0 }) });
   }
   if (u.startsWith(RECEIPT)) {
     const body = u.endsWith('/myDATA') ? fixture('receipt-mydata.xml') : u.endsWith('/EN16931') ? fixture('receipt-ubl.xml') : '<html></html>';
@@ -556,6 +556,59 @@ await check('cart: start trip, scan with remembered price, OFF lookup, weighed i
     && s.prices.some((p) => p.barcode === '5209999999999' && p.price === 4.5) && s.prices.find((p) => p.barcode === '5201111111111').price === 1.89
     && linkBanner !== null && pantryUnchecked && !s2.purchases.some((p) => p.tripId === trip.id) && s2.purchases.some((p) => p.storeName === 'ΧΑΣΙΩΤΗ') && s2.trips[0].receiptTotal === 16 && /16/.test(recent);
   if (!ok) console.log('  cart:', { scan1, scan2, keyed, over: !!over, remaining1, total, left, trip: trip?.status, shopping: s.shopping.map((r) => r.checked), tripPurchases: s.purchases.filter((p) => p.tripId === trip?.id).length, milk: s.items.find((i) => i.id === 'milk')?.quantity, prices: s.prices.length, link: !!linkBanner, pantryUnchecked, after: s2.purchases.length, rt: s2.trips[0]?.receiptTotal, recent });
+  return ok;
+});
+
+await check('scan: variable-measure EAN (weight→price switch per store), GS1 DataMatrix weight in cart, GS1 expiry on pantry add', async () => {
+  await page.evaluate(() => {
+    const st = JSON.parse(localStorage.getItem('spitothiki:v1'));
+    Object.assign(st, { stores: [{ id: 'st1', name: 'Χασιώτη', order: [], updatedAt: '2026-10-01T00:00:00Z' }], trips: [],
+      prices: [{ id: 'price-st1-2101234', product: '2101234', barcode: '2101234', name: 'Φέτα βαρελίσια', storeId: 'st1', storeName: 'Χασιώτη', price: 9.8, unit: 'κιλά', date: '2026-10-01', updatedAt: '2026-10-01T00:00:00Z' }] });
+    localStorage.setItem('spitothiki:v1', JSON.stringify(st));
+    localStorage.setItem('spitothiki:store', 'st1');
+  });
+  await page.reload({ waitUntil: 'networkidle0' });
+  await nav('shopping'); await tap('#open-cart'); await wait();
+  await page.select('#cart-store', 'st1');
+  await tap('#cart-start-form button[type=submit]'); await wait();
+  const dialogOpen = () => page.waitForFunction(() => document.querySelector('#cart-item-dialog').open, { timeout: 8000 });
+  const form = () => page.evaluate(() => { const f = document.querySelector('#cart-item-form'); return { name: f.elements.name.value, unit: f.elements.unit.value, qty: f.elements.qty.value, price: f.elements.price.value, info: document.querySelector('#cart-code-info').hidden ? '' : document.querySelector('#cart-code-info').textContent }; });
+  await page.evaluate(() => { window.__fakeBarcode = '2101234005477'; });
+  await tap('[data-action="cart-scan"]'); await dialogOpen(); await wait(300);
+  const vmWeight = await form();
+  await shot('scan-vm');
+  await tap('[data-action="vm-switch"]'); await wait(500); await dialogOpen();
+  const vmPrice = await form();
+  await tap('#cart-item-save'); await wait(900);
+  await page.evaluate(() => { window.__fakeBarcode = ']d2010520100402140317261231\u001d3103000750'; }); await wait(1200);
+  await dialogOpen(); await wait(300);
+  const dm = await form();
+  await page.type('#cart-item-name', 'Κιμάς');
+  for (const key of ['8', ',', '9', '0']) await page.click(`.keypad-key[data-key="${key}"]`);
+  await tap('#cart-item-save'); await wait(900);
+  await tap('[data-action="close-scan"]'); await wait();
+  const s = await stored();
+  const lines = s.trips[0].items.map((i) => ({ b: i.barcode, u: i.unit, q: i.qty, p: i.price }));
+  // Pantry add with GS1 Digital Link: expiry month-end.
+  await nav('pantry');
+  await tap('.page-heading [data-action="add-item"]'); await wait();
+  await page.evaluate(() => { window.__fakeBarcode = 'https://id.gs1.org/01/05201004021403/10/L42?17=261100'; });
+  await page.click('[data-action="scan-barcode"]'); await wait(2000);
+  const pantry = await page.evaluate(() => ({ expiry: document.querySelector('#item-expiry').value, barcode: document.querySelector('#item-form').elements.barcode.value, status: document.querySelector('#barcode-status').textContent }));
+  await shot('scan-gs1-pantry');
+  await page.click('#item-form [data-action="close-dialog"]'); await wait();
+  await nav('shopping');
+  if (!(await page.$('#store-manager'))) { await tap('[data-action="toggle-stores"]'); await wait(); }
+  await page.evaluate(() => { document.querySelector('#vm-settings').open = true; });
+  const setting = await page.$eval('.vm-mode[data-prefix="21"]', (e) => e.value);
+  await shot('scan-vm-settings');
+  const left = await greekLeft();
+  const ok = vmWeight.unit === 'κιλά' && vmWeight.qty === '0.547' && vmWeight.price === '9,80' && vmWeight.name === 'Φέτα βαρελίσια' && vmWeight.info.length > 5
+    && vmPrice.unit === 'τεμ.' && vmPrice.price === '5,47' && s.stores[0].vm?.['21'] === 'price'
+    && dm.unit === 'κιλά' && dm.qty === '0.75' && /2026|Dec|Δεκ/.test(dm.info)
+    && lines.some((l) => l.b === '2101234' && l.u === 'τεμ.' && l.p === 5.47) && lines.some((l) => l.b === '5201004021403' && l.q === 0.75 && l.p === 8.9)
+    && pantry.expiry === '2026-11-30' && pantry.barcode === '5201004021403' && /L42/.test(pantry.status) && setting === 'price' && !left.length;
+  if (!ok) console.log('  scan:', { vmWeight, vmPrice, vm: s.stores[0].vm, dm, lines, pantry, setting, left });
   return ok;
 });
 

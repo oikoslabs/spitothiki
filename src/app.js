@@ -11,6 +11,7 @@ import { BUILTIN_RECIPES } from './recipes.js';
 import { BILL_ICONS, BILL_PERIODS, BILL_TYPES, billStats, billsDue, createBill, guessBillType, parseBillCode, payBill, unpayBill } from './bills.js';
 import { findDuplicateBill, readBillFile } from './bill-pdf.js';
 import { addCartItem, budgetState, createTrip, finishTrip, lastPrice, lineTotal, remainingShopping, removeCartItem, tripForReceipt, updateCartItem } from './cart.js';
+import { VM_MODES, interpretCode } from './gs1.js';
 import { getLang, locale, setLang, t, translateDom, untranslatedGreek } from './i18n.js';
 
 const viewRoot = document.querySelector('#view-content');
@@ -229,6 +230,7 @@ function renderStoreBar() {
   const order = current ? storeOrder(current.order) : [];
   return `${bar}<div class="store-manager" id="store-manager"><form id="store-form" class="store-form" novalidate><input class="field-input" name="name" maxlength="40" placeholder="π.χ. Σουπερμάρκετ της γειτονιάς" aria-label="Όνομα καταστήματος"><button class="button button-quiet" type="submit">＋ Νέο κατάστημα</button></form>
     ${current ? `<p class="field-hint">${escapeHtml(t('Σειρά διαδρόμων στο «{name}»: βάλε τις κατηγορίες με τη σειρά που περπατάς.', { name: current.name }))}</p><ol class="aisle-list">${order.map((category, index) => `<li class="aisle-row"><span class="aisle-number">${index + 1}</span><span class="aisle-name">${escapeHtml(categoryLabel(category))}</span><button class="icon-button" type="button" data-action="aisle-up" data-category="${escapeHtml(category)}" ${index === 0 ? 'disabled' : ''} aria-label="${escapeHtml(t('Πιο νωρίς: {name}', { name: t(category) }))}">↑</button><button class="icon-button" type="button" data-action="aisle-down" data-category="${escapeHtml(category)}" ${index === order.length - 1 ? 'disabled' : ''} aria-label="${escapeHtml(t('Πιο αργά: {name}', { name: t(category) }))}">↓</button></li>`).join('')}</ol>
+    <details class="vm-settings" id="vm-settings"><summary>${escapeHtml(t('Barcode ζυγιζόμενων (20–29)'))}</summary><p class="field-hint">${escapeHtml(t('Οι ζυγαριές του καταστήματος τυπώνουν τιμή ή βάρος μέσα στον barcode. «Αυτόματα»: 25–29 βάρος (GS1 Ελλάδας), 20–24 με βάση τη λογική και ό,τι θυμάμαι.'))}</p><div class="vm-grid">${['20','21','22','23','24','25','26','27','28','29'].map((prefix) => `<label class="vm-row"><span data-no-i18n>${prefix}…</span><select class="field-input vm-mode" data-prefix="${prefix}" aria-label="${escapeHtml(t('Πρόθεμα {prefix}', { prefix }))}">${VM_MODES.map((mode) => `<option value="${mode}" ${(current.vm?.[prefix] || 'auto') === mode ? 'selected' : ''}>${escapeHtml(t({ auto: 'Αυτόματα', price: 'Τιμή', weight: 'Βάρος' }[mode]))}</option>`).join('')}</select></label>`).join('')}</div></details>
     <div class="settings-actions"><button class="button button-quiet" type="button" data-action="delete-store">${escapeHtml(t('Διαγραφή καταστήματος «{name}»', { name: current.name }))}</button></div>` : '<p class="field-hint">Διάλεξε ή φτιάξε ένα κατάστημα για να ορίσεις τη σειρά των διαδρόμων.</p>'}</div>`;
 }
 
@@ -403,9 +405,24 @@ async function syncAction(fn, success) {
   catch (error) { showToast(authMessage(error)); }
 }
 
+function codeInfo(code, store = activeStore()) {
+  const memoryUnit = (id) => (state.prices || []).filter((p) => p.barcode === id).sort((a, b) => (Number(b.storeId === store?.id) - Number(a.storeId === store?.id)) || String(b.date).localeCompare(String(a.date)))[0]?.unit || '';
+  return interpretCode(code, { vmMode: (prefix) => store?.vm?.[prefix] || 'auto', memoryUnit });
+}
+const kgText = (kg) => kg.toLocaleString(locale(), { maximumFractionDigits: 3 });
+
 async function fillFromBarcode(code) {
   const status = document.querySelector('#barcode-status');
-  const barcode = normalizeBarcode(code);
+  const info = codeInfo(code);
+  const barcode = info.barcode;
+  const gs1Note = [];
+  if (info.kind === 'gs1') {
+    const date = info.expiry || info.bestBefore;
+    if (date && !itemForm.elements.expiry.value) { itemForm.elements.expiry.value = date; gs1Note.push(t('Λήξη από τον κωδικό: {date}', { date: formatDate(date) })); }
+    if (info.batch) gs1Note.push(t('Παρτίδα {batch}', { batch: info.batch }));
+  }
+  if (info.weightKg) gs1Note.push(t('Βάρος {kg} κιλά', { kg: kgText(info.weightKg) }));
+  const withNote = (text) => [text, ...gs1Note].filter(Boolean).join(' · ');
   itemForm.elements.barcode.value = barcode || String(code || '');
   if (!barcode) { status.textContent = t('Ο κωδικός δεν είναι έγκυρος barcode.'); return; }
   const editingId = itemForm.elements.id.value;
@@ -414,17 +431,18 @@ async function fillFromBarcode(code) {
     itemForm.elements.name.value = itemForm.elements.name.value || known.name;
     itemForm.elements.category.value = known.category || itemForm.elements.category.value;
     updateNameCounter();
-    status.textContent = t('Υπάρχει ήδη στο απόθεμα ως «{name}».', { name: known.name });
+    status.textContent = withNote(t('Υπάρχει ήδη στο απόθεμα ως «{name}».', { name: known.name }));
     return;
   }
+  if (info.kind === 'vm') { status.textContent = withNote(t('Ζυγιζόμενο προϊόν καταστήματος (κωδικός {plu}). Γράψε το όνομα.', { plu: info.plu })); return; }
   status.textContent = t('Αναζήτηση στο Open Food Facts…');
   try {
     const product = await lookupBarcode(barcode);
-    if (!product) { status.textContent = t('Δεν βρέθηκε το προϊόν. Γράψε το όνομα και θα το θυμάμαι για αυτόν τον barcode.'); return; }
+    if (!product) { status.textContent = withNote(t('Δεν βρέθηκε το προϊόν. Γράψε το όνομα και θα το θυμάμαι για αυτόν τον barcode.')); return; }
     if (!itemForm.elements.name.value.trim() || !editingId) itemForm.elements.name.value = product.name;
     if (product.category) itemForm.elements.category.value = product.category;
     updateNameCounter();
-    status.textContent = t('Βρέθηκε: {name}. Έλεγξε τα στοιχεία πριν την αποθήκευση.', { name: product.name });
+    status.textContent = withNote(t('Βρέθηκε: {name}. Έλεγξε τα στοιχεία πριν την αποθήκευση.', { name: product.name }));
   } catch (error) {
     status.textContent = t(navigator.onLine === false ? 'Χωρίς σύνδεση: η αναζήτηση δεν είναι διαθέσιμη.' : t(error.message || 'Η αναζήτηση απέτυχε.'));
   }
@@ -1046,8 +1064,18 @@ function openCartItem(prefill = {}) {
   form.elements.qty.value = String(data.qty ?? (data.unit === 'κιλά' ? '' : 1));
   const memory = existing ? null : lastPrice(state.prices || [], trip, { barcode: data.barcode, name: data.name || '' });
   const price = existing?.price ?? memory?.price;
-  form.elements.price.value = price ? String(price.toFixed(2)).replace('.', ',') : '';
-  if (memory && !existing && !data.unit) form.elements.unit.value = memory.unit === 'κιλά' ? 'κιλά' : 'τεμ.';
+  form.elements.raw.value = data.raw || '';
+  form.elements.fixed.value = data.fixed || '';
+  const priceValue = data.price ?? price;
+  form.elements.price.value = priceValue ? String(priceValue.toFixed(2)).replace('.', ',') : '';
+  const info = data.info;
+  const note = document.querySelector('#cart-code-info');
+  note.hidden = !info || info.kind === 'plain';
+  if (info && info.kind !== 'plain') {
+    const other = info.mode === 'weight' ? 'price' : 'weight';
+    note.innerHTML = `${escapeHtml(cartCodeNote(info))}${info.prefix && info.mode ? ` <button class="panel-link" type="button" data-action="vm-switch" data-prefix="${info.prefix}" data-mode="${other}">${escapeHtml(t(other === 'price' ? 'Είναι τιμή, όχι βάρος' : 'Είναι βάρος, όχι τιμή'))}</button>` : ''}`;
+  }
+  if (memory && !existing && !data.unit && !data.fixed) form.elements.unit.value = memory.unit === 'κιλά' ? 'κιλά' : 'τεμ.';
   document.querySelector('#cart-price-hint').textContent = memory ? (memory.sameStore ? t('Τελευταία τιμή εδώ: {price} ({date})', { price: money(memory.price), date: formatDate(memory.date) }) : t('Τελευταία τιμή σε {store}: {price}', { store: memory.store || t('άλλο κατάστημα'), price: money(memory.price) })) : '';
   document.querySelector('#cart-item-lookup').textContent = data.lookup || '';
   document.querySelector('#cart-item-error').hidden = true;
@@ -1064,26 +1092,43 @@ function updateCartQtyLabel() {
   form.elements.qty.step = kg ? '0.005' : '1';
 }
 
+function cartCodeNote(info) {
+  if (info.kind === 'plain') return '';
+  const parts = [];
+  if (info.kind === 'vm' || info.plu) parts.push(t('Ζυγιζόμενο (πρόθεμα {prefix}, κωδικός {plu})', { prefix: info.prefix, plu: info.plu }));
+  if (info.price != null && info.mode !== 'weight') parts.push(t('Τιμή από τον κωδικό: {price}', { price: money(info.price) }));
+  if (info.weightKg) parts.push(t('Βάρος από τον κωδικό: {kg} κιλά', { kg: kgText(info.weightKg) }));
+  if (info.expiry || info.bestBefore) parts.push(t('Λήξη {date}', { date: formatDate(info.expiry || info.bestBefore) }));
+  if (info.batch) parts.push(t('Παρτίδα {batch}', { batch: info.batch }));
+  return parts.join(' · ');
+}
+
 async function cartBarcode(code) {
-  const barcode = normalizeBarcode(code) || String(code || '').trim();
   const trip = activeTrip();
+  const store = (state.stores || []).find((entry) => entry.id === trip?.storeId) || null;
+  const info = codeInfo(code, store);
+  const barcode = info.barcode || normalizeBarcode(code);
   if (!trip || !barcode) return;
+  const embedded = info.price != null || info.weightKg != null;
   const inCart = trip.items.find((item) => item.barcode === barcode);
-  if (inCart && inCart.unit === 'τεμ.') {
+  if (!embedded && inCart && inCart.unit === 'τεμ.') {
     if (saveTrip(updateCartItem(trip, inCart.key, { qty: inCart.qty + 1 }))) { renderApp(); showToast(t('+1 {name}', { name: inCart.name })); }
     if (cartScanning) setTimeout(() => startCartScan(), 600);
     return;
   }
+  const weight = info.weightKg != null;
+  const prefill = { barcode, raw: String(code), fixed: embedded ? '1' : '', info, ...(weight ? { unit: 'κιλά', qty: info.weightKg } : info.price != null ? { unit: 'τεμ.', qty: 1, price: info.price } : {}) };
   const known = state.items.find((item) => item.barcode === barcode) || (state.prices || []).find((p) => p.barcode === barcode);
-  if (known) { openCartItem({ barcode, name: known.name, category: known.category, lookup: t('Γνωστό προϊόν') }); return; }
-  openCartItem({ barcode, name: '', lookup: t('Αναζήτηση στο Open Food Facts…') });
+  if (known) { openCartItem({ ...prefill, name: known.name, category: known.category, lookup: t('Γνωστό προϊόν') }); return; }
+  if (info.kind === 'vm') { openCartItem({ ...prefill, name: '', lookup: t('Ζυγιζόμενο προϊόν καταστήματος: γράψε το όνομα μία φορά, θα το θυμάμαι.') }); return; }
+  openCartItem({ ...prefill, name: '', lookup: t('Αναζήτηση στο Open Food Facts…') });
   try {
     const product = navigator.onLine === false ? null : await lookupBarcode(barcode);
     const form = document.querySelector('#cart-item-form');
     if (form.elements.barcode.value !== barcode) return;
     if (product?.name && !form.elements.name.value) { form.elements.name.value = product.name; if (product.category) form.elements.category.value = product.category; }
     document.querySelector('#cart-item-lookup').textContent = product?.name ? t('Βρέθηκε στο Open Food Facts.') : t('Δεν βρέθηκε όνομα. Γράψ’ το εσύ.');
-    if (product?.name) {
+    if (product?.name && info.price == null) {
       const memory = lastPrice(state.prices || [], trip, { barcode, name: product.name });
       if (memory && !form.elements.price.value) form.elements.price.value = String(memory.price.toFixed(2)).replace('.', ',');
     }
@@ -1107,7 +1152,7 @@ function saveCartItem(form) {
   if (!(qty > 0)) { error.textContent = t(unit === 'κιλά' ? 'Γράψε το βάρος σε κιλά.' : 'Η ποσότητα πρέπει να είναι πάνω από 0.'); error.hidden = false; return; }
   const key = form.elements.key.value;
   const next = key ? updateCartItem(trip, key, { name: form.elements.name.value.trim(), unit, qty, price })
-    : addCartItem(trip, { barcode: form.elements.barcode.value, shoppingId: form.elements.shoppingId.value, category: form.elements.category.value, name: form.elements.name.value, unit, qty, price });
+    : addCartItem(trip, { barcode: form.elements.barcode.value, shoppingId: form.elements.shoppingId.value, category: form.elements.category.value, name: form.elements.name.value, unit, qty, price, noMerge: Boolean(form.elements.fixed.value) });
   if (!saveTrip(next)) return;
   document.querySelector('#cart-item-dialog').close();
   renderApp();
@@ -1467,6 +1512,18 @@ function handleAction(button) {
   else if (action === 'disable-notifications') { saveNotifySettings({ enabled: false }); updateBackgroundCheck(); renderApp(); showToast('Οι ειδοποιήσεις απενεργοποιήθηκαν.'); }
   else if (action === 'set-theme') setTheme(button.dataset.theme);
   else if (action === 'set-store') { try { if (button.dataset.store) localStorage.setItem(STORE_KEY, button.dataset.store); else localStorage.removeItem(STORE_KEY); } catch {} renderApp(); }
+  else if (action === 'vm-switch') {
+    const trip = activeTrip();
+    const form = document.querySelector('#cart-item-form');
+    const raw = form.elements.raw.value;
+    if (trip?.storeId) state.stores = state.stores.map((store) => (store.id === trip.storeId ? { ...store, vm: { ...(store.vm || {}), [button.dataset.prefix]: button.dataset.mode }, updatedAt: new Date().toISOString() } : store));
+    persist();
+    document.querySelector('#cart-item-dialog').close();
+    const store = (state.stores || []).find((entry) => entry.id === trip?.storeId);
+    if (!store) { const info = interpretCode(raw, { vmMode: () => button.dataset.mode }); openCartItem({ barcode: info.barcode, raw, fixed: '1', info, name: form.elements.name.value, ...(info.weightKg != null ? { unit: 'κιλά', qty: info.weightKg } : { unit: 'τεμ.', qty: 1, price: info.price }) }); }
+    else { const keepName = form.elements.name.value; cartBarcode(raw).then(() => { const f = document.querySelector('#cart-item-form'); if (!f.elements.name.value) f.elements.name.value = keepName; }); }
+    if (store) showToast(t('Το «{store}» θα διαβάζει το πρόθεμα {prefix} ως {mode}.', { store: store.name, prefix: button.dataset.prefix, mode: t(button.dataset.mode === 'price' ? 'τιμή' : 'βάρος') }));
+  }
   else if (action === 'toggle-stores') { storesOpen = !storesOpen; renderApp(); }
   else if (action === 'aisle-up' || action === 'aisle-down') {
     const store = activeStore();
@@ -1524,6 +1581,11 @@ document.addEventListener('input', (event) => {
 document.addEventListener('change', (event) => {
   if (event.target.id === 'bill-type') event.target.form.dataset.typeTouched = '1';
   if (event.target.id === 'cart-item-unit') updateCartQtyLabel();
+  if (event.target.classList?.contains('vm-mode')) {
+    const current = activeStore();
+    if (current) { const vm = { ...(current.vm || {}) }; if (event.target.value === 'auto') delete vm[event.target.dataset.prefix]; else vm[event.target.dataset.prefix] = event.target.value; state.stores = state.stores.map((store) => (store.id === current.id ? { ...store, vm, updatedAt: new Date().toISOString() } : store)); persist(); showToast(t('Αποθηκεύτηκε.')); }
+    return;
+  }
   if (event.target.matches?.('[data-bill-file]')) { importBillFile(event.target.files?.[0]); event.target.value = ''; return; }
   if (event.target.matches?.('[data-receipt-photo]')) { loadReceiptPhoto(event.target.files?.[0]); return; }
   if (event.target.classList?.contains('price-input')) {

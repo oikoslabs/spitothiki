@@ -133,10 +133,11 @@
   <dialog id="cart-item-dialog" class="item-dialog cart-item-dialog" aria-labelledby="cart-item-title">
     <form id="cart-item-form" novalidate>
       <div class="dialog-heading"><div><p class="eyebrow">ΚΑΛΑΘΙ</p><h2 id="cart-item-title">Προϊόν στο καλάθι</h2></div><button class="icon-button" type="button" data-action="close-cart-item" aria-label="Κλείσιμο">×</button></div>
-      <input type="hidden" name="key"><input type="hidden" name="barcode"><input type="hidden" name="shoppingId"><input type="hidden" name="category">
+      <input type="hidden" name="key"><input type="hidden" name="barcode"><input type="hidden" name="shoppingId"><input type="hidden" name="category"><input type="hidden" name="raw"><input type="hidden" name="fixed">
       <label class="field-label" for="cart-item-name">Όνομα προϊόντος</label>
       <input class="field-input" id="cart-item-name" name="name" maxlength="80" required autocomplete="off">
       <p class="field-hint" id="cart-item-lookup" role="status"></p>
+      <p class="field-hint code-info" id="cart-code-info" hidden></p>
       <div class="field-row">
         <div><label class="field-label" for="cart-item-unit">Τιμή ανά</label><select class="field-input" id="cart-item-unit" name="unit"><option value="τεμ.">τεμ.</option><option value="κιλά">κιλό</option></select></div>
         <div><label class="field-label" for="cart-item-qty" id="cart-qty-label">Ποσότητα</label><div class="qty-stepper"><button class="icon-button" type="button" data-action="cart-qty-step" data-delta="-1" aria-label="Λιγότερα">−</button><input class="field-input" id="cart-item-qty" name="qty" type="number" min="0" max="999" step="0.001" inputmode="decimal" value="1"><button class="icon-button" type="button" data-action="cart-qty-step" data-delta="1" aria-label="Περισσότερα">＋</button></div></div>
