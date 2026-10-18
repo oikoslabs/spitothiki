@@ -60,12 +60,13 @@ function loadZxing() {
 
 // Starts the camera in <video> and calls onCode once with the first barcode found.
 // Uses the native BarcodeDetector where available, otherwise the ZXing library. Returns a stop() function.
-export async function startScanner(video, onCode) {
+export async function startScanner(video, onCode, { qr = false } = {}) {
   if (!navigator.mediaDevices?.getUserMedia) throw new Error('Η κάμερα δεν είναι διαθέσιμη σε αυτόν τον browser.');
   let formats = [];
   if ('BarcodeDetector' in globalThis) formats = await globalThis.BarcodeDetector.getSupportedFormats().catch(() => []);
-  if (formats.length) {
-    const detector = new globalThis.BarcodeDetector({ formats: formats.filter((f) => /ean|upc|code_128|code_39|itf/.test(f)) });
+  const wanted = formats.filter((f) => (qr ? f === 'qr_code' : /ean|upc|code_128|code_39|itf/.test(f)));
+  if (wanted.length) {
+    const detector = new globalThis.BarcodeDetector({ formats: wanted });
     const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
     video.srcObject = stream;
     await video.play();

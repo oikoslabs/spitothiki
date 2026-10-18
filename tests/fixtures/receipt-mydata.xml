@@ -1,0 +1,95 @@
+<InvoicesDoc xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://www.aade.gr/myDATA/invoice/v1.0">
+  <invoice>
+    <uid>TESTUID0000000000000000000000000000000001</uid>
+    <issuer>
+      <vatNumber>999999999</vatNumber>
+      <country>GR</country>
+      <branch>1</branch>
+    </issuer>
+    <invoiceHeader>
+      <series>02</series>
+      <aa>12345</aa>
+      <issueDate>2026-10-10</issueDate>
+      <invoiceType>11.1</invoiceType>
+      <currency>EUR</currency>
+    </invoiceHeader>
+        <invoiceDetails>
+      <lineNumber>1</lineNumber>
+      <itemDescr>ΠΕΚΟΡΙΝΟ ΑΜΦΙΛΟΧΙΑΣ ΓΕΩΡΓΙΟΥ ΕΛΛ</itemDescr>
+      <quantity>0.276</quantity>
+      <measurementUnit>2</measurementUnit>
+      <netValue>4.4</netValue>
+      <vatCategory>2</vatCategory>
+      <vatAmount>0.55</vatAmount>
+    </invoiceDetails>
+    <invoiceDetails>
+      <lineNumber>2</lineNumber>
+      <itemDescr>ΑΡΤ/ΣΜΑ ΠΑΠΑΔ/ΛΟΥ Τ.ΓΕΡΜ.ΣΙΚΑΛΗΣ 500G</itemDescr>
+      <quantity>1</quantity>
+      <measurementUnit>1</measurementUnit>
+      <netValue>1.55</netValue>
+      <vatCategory>2</vatCategory>
+      <vatAmount>0.2</vatAmount>
+    </invoiceDetails>
+    <invoiceDetails>
+      <lineNumber>3</lineNumber>
+      <itemDescr>ΑΓ.ΓΕΩΡΓΙΟΥ ΑΛΕΥΡΙ ΦΑΡΙΝ-ΑΠ 500ΓΡ</itemDescr>
+      <quantity>1</quantity>
+      <measurementUnit>1</measurementUnit>
+      <netValue>0.97</netValue>
+      <vatCategory>2</vatCategory>
+      <vatAmount>0.13</vatAmount>
+    </invoiceDetails>
+    <invoiceDetails>
+      <lineNumber>4</lineNumber>
+      <itemDescr>ΑΝΘΟΤΥΡΟΣ ΣΑΡΡΑ ΕE</itemDescr>
+      <quantity>0.25</quantity>
+      <measurementUnit>2</measurementUnit>
+      <netValue>1.32</netValue>
+      <vatCategory>2</vatCategory>
+      <vatAmount>0.17</vatAmount>
+    </invoiceDetails>
+    <invoiceDetails>
+      <lineNumber>5</lineNumber>
+      <itemDescr>ΓΚΟΥΝΤΑ ΟΛΛΑΝΔΙΑΣ ΦΡΑΤΖΟΛΑ</itemDescr>
+      <quantity>0.636</quantity>
+      <measurementUnit>2</measurementUnit>
+      <netValue>3.15</netValue>
+      <vatCategory>2</vatCategory>
+      <vatAmount>0.41</vatAmount>
+    </invoiceDetails>
+    <invoiceDetails>
+      <lineNumber>6</lineNumber>
+      <itemDescr>ΑΥΓΑ ΤΣΑΟΥΣΗ ΒΙΟΛΟΓΙΚΑ Μ-ΜΕΣΑΙΑ 4Τ</itemDescr>
+      <quantity>1</quantity>
+      <measurementUnit>1</measurementUnit>
+      <netValue>1.89</netValue>
+      <vatCategory>2</vatCategory>
+      <vatAmount>0.25</vatAmount>
+    </invoiceDetails>
+    <invoiceDetails>
+      <lineNumber>7</lineNumber>
+      <itemDescr>ΑΡΑΚΑΣ ΑΙΝΟΣ 1KG</itemDescr>
+      <quantity>1</quantity>
+      <measurementUnit>1</measurementUnit>
+      <netValue>2.3</netValue>
+      <vatCategory>2</vatCategory>
+      <vatAmount>0.3</vatAmount>
+    </invoiceDetails>
+    <invoiceDetails>
+      <lineNumber>8</lineNumber>
+      <itemDescr>ΓΑΛΟΠΟΥΛΑ ΘΡΑΚΗΣ ΓΕΥΣΕΙΣ ΒΡΑΣΤΗ ΕΛΛΑΔΑΣ.</itemDescr>
+      <quantity>0.326</quantity>
+      <measurementUnit>2</measurementUnit>
+      <netValue>2.02</netValue>
+      <vatCategory>2</vatCategory>
+      <vatAmount>0.26</vatAmount>
+    </invoiceDetails>
+    <invoiceSummary>
+      <totalNetValue>17.60</totalNetValue>
+      <totalVatAmount>2.27</totalVatAmount>
+      <totalGrossValue>19.87</totalGrossValue>
+    </invoiceSummary>
+    <downloadingInvoiceUrl>https://example-provider.epsilonnet.gr/fd/test:1</downloadingInvoiceUrl>
+  </invoice>
+</InvoicesDoc>

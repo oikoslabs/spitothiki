@@ -415,3 +415,19 @@ body[data-screen="pantry"] .topbar .button-add { display: none; }
 .recipe-card .settings-actions { margin-top: auto; padding-top: 6px; }
 .section-title { margin: 8px 0 10px; font-size: 16px; }
 @media (max-width: 760px) { .primary-nav { grid-template-columns: repeat(6,minmax(0,1fr)); } .recipe-grid { grid-template-columns: 1fr; } }
+
+/* Scan receipt */
+.receipt-dialog { width: min(820px, calc(100vw - 24px)); }
+.receipt-summary { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 6px 0 10px; }
+.receipt-summary > div { display: grid; gap: 2px; }
+.receipt-lines { display: grid; gap: 6px; max-height: 50vh; overflow: auto; padding-right: 4px; }
+.receipt-line { display: grid; grid-template-columns: 22px minmax(0,1fr) 76px 92px 80px 150px; gap: 6px; align-items: center; }
+.receipt-line .field-input { min-height: 36px; padding: 4px 8px; min-width: 0; }
+.check-row { display: flex; gap: 8px; align-items: center; margin-top: 10px; font-size: 14px; }
+.page-actions { margin: -6px 0 12px; }
+@media (max-width: 760px) {
+  .receipt-line { grid-template-columns: 22px minmax(0,1fr) minmax(0,1fr); padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .receipt-line .receipt-name { grid-column: 2 / -1; }
+  .receipt-line .receipt-qty { grid-column: 2; } .receipt-line .receipt-unit { grid-column: 3; }
+  .receipt-line .receipt-price { grid-column: 2; } .receipt-line .receipt-category { grid-column: 3; }
+}

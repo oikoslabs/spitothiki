@@ -1,6 +1,9 @@
 // Feature smoke test (recurring items, voice add, background expiry check, ...).
 // Usage: node tests/smoke/features-smoke.mjs <url> [width] [el|en] [screenshotDir]
 import puppeteer from 'puppeteer-core';
+import { readFileSync } from 'node:fs';
+const fixture = (name) => readFileSync(new URL(`../fixtures/${name}`, import.meta.url), 'utf8');
+const RECEIPT = 'https://test-shop.epsilonnet.gr/fd/abc123:1';
 
 const url = process.argv[2] || 'http://127.0.0.1:8080/';
 const width = Number(process.argv[3] || 1280);
@@ -8,8 +11,8 @@ const lang = process.argv[4] || 'el';
 const shots = process.argv[5];
 const en = lang === 'en';
 const L = (el, english) => (en ? english : el);
-const browser = await puppeteer.launch({ executablePath: process.env.CHROME_PATH || '/usr/bin/google-chrome', args: ['--no-sandbox'], headless: true });
-await browser.defaultBrowserContext().overridePermissions(new URL(url).origin, ['notifications']);
+const browser = await puppeteer.launch({ executablePath: process.env.CHROME_PATH || '/usr/bin/google-chrome', args: ['--no-sandbox', '--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'], headless: true });
+await browser.defaultBrowserContext().overridePermissions(new URL(url).origin, ['notifications', 'camera']);
 const page = await browser.newPage();
 await page.setViewport({ width, height: 900 });
 await page.evaluateOnNewDocument((lang) => {
@@ -17,6 +20,8 @@ await page.evaluateOnNewDocument((lang) => {
   // Fake speech recognition: "hears" a fixed phrase.
   window.__speech = lang === 'en' ? 'bread and 2 eggs' : 'ψωμί και 2 αυγά';
   window.SpeechRecognition = class { start() { setTimeout(() => { this.onresult?.({ results: [[{ transcript: window.__speech }]] }); this.onend?.(); }, 50); } stop() { this.onend?.(); } };
+  // Fake QR detector: "sees" the receipt link on the (fake) camera.
+  window.BarcodeDetector = class { static async getSupportedFormats() { return ['qr_code', 'ean_13']; } constructor(o) { this.formats = o.formats; } async detect() { return this.formats.includes('qr_code') ? [{ rawValue: 'https://test-shop.epsilonnet.gr/fd/abc123:1' }] : []; } };
   window.__notifications = [];
   if (window.ServiceWorkerRegistration) ServiceWorkerRegistration.prototype.showNotification = (title, o) => { window.__notifications.push({ title, body: o?.body }); return Promise.resolve(); };
 }, lang);
@@ -25,6 +30,10 @@ const errors = [];
 await page.setRequestInterception(true);
 page.on('request', (request) => {
   const u = request.url();
+  if (u.startsWith(RECEIPT)) {
+    const body = u.endsWith('/myDATA') ? fixture('receipt-mydata.xml') : u.endsWith('/EN16931') ? fixture('receipt-ubl.xml') : '<html></html>';
+    return request.respond({ status: 200, contentType: 'application/xml', headers: { 'access-control-allow-origin': '*' }, body });
+  }
   if (u.startsWith('https://www.themealdb.com/api/')) {
     const body = u.includes('filter.php') ? { meals: [{ idMeal: '777', strMeal: 'Shakshuka', strMealThumb: 'https://www.themealdb.com/images/x.jpg' }] }
       : { meals: [{ idMeal: '777', strMeal: 'Shakshuka', strMealThumb: 'https://www.themealdb.com/images/x.jpg', strIngredient1: 'Eggs', strIngredient2: 'Tomatoes', strIngredient3: 'Cumin', strIngredient4: 'olive oil', strIngredient5: '' }] };
@@ -44,7 +53,7 @@ async function check(name, fn) {
   catch (e) { console.log(`FAIL ${name}: ${e.message}`); errors.push(`${name}: ${e.message}`); }
 }
 const shot = async (name) => { if (shots) await page.screenshot({ path: `${shots}/feature-${name}-${lang}${width < 700 ? '-phone' : ''}.png`, fullPage: true }); };
-const greekLeft = async () => en ? (await page.evaluate(() => window.__i18n.untranslatedGreek())).filter((s) => !/Γάλα|Ψωμί|Αυγά|Μήλα|Ρύζι|Γιαούρτι|Ελαιόλαδο|Ντομάτες|Φέτα|Κοτόπουλο|Πατάτες|Χαρτί/.test(s)) : [];
+const greekLeft = async () => en ? (await page.evaluate(() => window.__i18n.untranslatedGreek())).filter((s) => !/Γάλα|Ψωμί|Αυγά|Μήλα|Ρύζι|Γιαούρτι|Ελαιόλαδο|Ντομάτες|Φέτα|Κοτόπουλο|Πατάτες|Χαρτί|Πεκορίνο|ΔΟΚΙΜΑΣΤΙΚΟ|(aria-label|title)=(Import: |Decrease quantity of |Increase quantity of |Edit |Thrown away: |Delete )/.test(s)) : [];
 
 await page.goto(url, { waitUntil: 'networkidle0' });
 await page.evaluate(() => localStorage.clear());
@@ -235,6 +244,68 @@ await check('what do I cook works offline with built-in recipes', async () => {
   const cards = (await page.$$('#recipe-list .recipe-card')).length;
   await page.setOfflineMode(false);
   return cards >= 1;
+});
+
+await check('scan receipt: paste link, review, edit, import to pantry + spending', async () => {
+  await page.evaluate(() => {
+    const st = JSON.parse(localStorage.getItem('spitothiki:v1'));
+    st.items = [{ id: 'egg', name: 'Αυγα τσαουση βιολογικα μ-μεσαια 4τ', quantity: 2, unit: 'τεμ.', minimum: 0, category: 'Γαλακτοκομικά', location: '', expiry: '' }];
+    st.purchases = []; st.receipts = [];
+    localStorage.setItem('spitothiki:v1', JSON.stringify(st));
+  });
+  await page.reload({ waitUntil: 'networkidle0' });
+  await nav('overview');
+  await tap('.quick-action[data-action="open-receipt"]'); await wait();
+  await page.type('#receipt-link-form input[name=link]', `${RECEIPT}/`);
+  await page.click('#receipt-link-form button[type=submit]'); await wait(1200);
+  const lines = (await page.$$('#receipt-lines .receipt-line')).length;
+  const store = await page.$eval('#receipt-store', (e) => e.textContent);
+  const total = await page.$eval('#receipt-total', (e) => e.textContent);
+  const firstUnit = await page.$eval('[data-line="0"] [name=unit]', (e) => e.value);
+  const left = await greekLeft();
+  await shot('receipt-review');
+  await page.click('[data-line="0"] [name=name]', { clickCount: 3 }); await page.type('[data-line="0"] [name=name]', 'Πεκορίνο');
+  await page.click('[data-line="7"] [name=use]');
+  await page.click('#receipt-review-form button[type=submit]'); await wait();
+  const s = await stored();
+  const egg = s.items.find((i) => i.id === 'egg');
+  if (lines !== 8 || left.length) console.log('  receipt:', { lines, store, total, left });
+  return lines === 8 && store === 'ΔΟΚΙΜΑΣΤΙΚΟ ΣΟΥΠΕΡΜΑΡΚΕΤ ΑΕ' && /19[.,]87/.test(total) && firstUnit === 'κιλά' && !left.length
+    && s.items.some((i) => i.name === 'Πεκορίνο' && i.unit === 'κιλά' && i.quantity === 0.276 && i.category === 'Γαλακτοκομικά')
+    && egg.quantity === 3 && s.items.length === 7 && s.purchases.length === 7 && s.purchases.every((p) => p.date === '2026-10-10' && p.storeName)
+    && s.receipts.length === 1 && !(await page.$eval('#receipt-dialog', (d) => d.open));
+});
+await check('scan receipt: same receipt via QR camera is refused as duplicate', async () => {
+  await nav('pantry');
+  await tap('[data-action="open-receipt"]'); await wait();
+  await page.click('[data-action="receipt-scan"]'); await wait(2500);
+  const dup = await page.$('#receipt-duplicate');
+  const disabled = await page.$eval('#receipt-review-form button[type=submit]', (b) => b.disabled);
+  await shot('receipt-duplicate');
+  await page.click('[data-action="close-receipt"]'); await wait();
+  return dup !== null && disabled && (await stored()).receipts.length === 1;
+});
+await check('scan receipt: AADE summary link records only the total', async () => {
+  await tap('[data-action="open-receipt"]'); await wait();
+  await page.type('#receipt-link-form input[name=link]', 'https://mydatapi.aade.gr/TimologioQR/QRInfo?issuerVat=999999999&issueDate=12/10/2026&mark=4001&totalGrossValue=12.30');
+  await page.click('#receipt-link-form button[type=submit]'); await wait(600);
+  const note = await page.$('#receipt-aade-note');
+  await page.click('#receipt-review-form button[type=submit]'); await wait();
+  const s = await stored();
+  const p = s.purchases.find((x) => x.price === 12.3);
+  return note !== null && p?.date === '2026-10-12' && s.receipts.length === 2;
+});
+await check('scan receipt: http link rejected, proxy setting validated', async () => {
+  await tap('[data-action="open-receipt"]'); await wait();
+  await page.type('#receipt-link-form input[name=link]', 'http://test-shop.epsilonnet.gr/fd/x');
+  await page.click('#receipt-link-form button[type=submit]'); await wait(400);
+  const err = await page.$eval('#receipt-error', (e) => e.textContent);
+  await page.click('[data-action="close-receipt"]'); await wait();
+  await nav('settings');
+  await page.type('#proxy-form input[name=proxy]', 'https://proxy.example.workers.dev/');
+  await tap('#proxy-form button[type=submit]'); await wait();
+  const saved = await page.evaluate(() => localStorage.getItem('spitothiki:receiptProxy'));
+  return /https/.test(err) && saved === 'https://proxy.example.workers.dev';
 });
 
 for (const view of ['shopping', 'settings', 'insights', 'pantry', 'cook']) await check(`no Greek UI left on ${view} (${lang})`, async () => { await nav(view); const left = await greekLeft(); if (left.length) console.log('  left:', left); return !left.length; });

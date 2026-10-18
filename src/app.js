@@ -2,6 +2,7 @@ import { MAX_QUANTITY, createPantryItem, createShoppingItem, expiringWithin, exp
 import { lookupBarcode, normalizeBarcode, startScanner } from './barcode.js';
 import { authProviders, firebaseConfig } from './firebase-config.js';
 import { loadState, parseBackup, saveState } from './storage.js';
+import { fetchReceipt, receiptId } from './receipt.js';
 import { fetchMealDbSuggestions, ingredientName, pantryIngredients, suggestBuiltin } from './recipes.js';
 import { CATEGORIES, WASTE_REASONS, applyWaste, createStore, createWaste, groupByStore, monthKey, monthlySpending, moveCategory, purchaseFor, shiftMonth, storeOrder, wasteStats } from './features.js';
 import { RECURRING_INTERVALS, applyRecurring, createRecurring, dueFromSnapshot, expirySnapshot, parseVoiceItems } from './features.js';
@@ -164,7 +165,7 @@ function renderOverview() {
     <div class="dashboard-grid">
       <section class="panel"><div class="panel-heading"><div><h2>Έλεγξε τις ημερομηνίες</h2><p>Ό,τι λήγει μέσα στις επόμενες 7 ημέρες</p></div><button class="panel-link" type="button" data-view="pantry">Όλο το απόθεμα →</button></div><div class="product-list">${upcoming.length ? upcoming.map(renderMiniProduct).join('') : renderEmpty('Όλα καλά εδώ', 'Δεν έχεις προϊόντα που λήγουν σύντομα.', 'add-item', 'Πρόσθεσε προϊόν', '🌿')}</div></section>
       <div class="dashboard-side"><section class="panel"><div class="panel-heading"><div><h2>Χρειάζονται αναπλήρωση</h2><p>Με βάση το ελάχιστο απόθεμα</p></div></div><div class="product-list">${lowStock.length ? lowStock.map(renderMiniProduct).join('') : `<p class="subtle-empty">${state.items.length ? 'Δεν υπάρχει κάτι που να χρειάζεται αναπλήρωση.' : 'Όταν προσθέσεις προϊόντα, θα τα βλέπεις εδώ.'}</p>`}</div>${lowStock.length ? '<button class="button button-quiet full-width" type="button" data-view="pantry">Δες το απόθεμα</button>' : ''}</section>
-      <section class="panel quick-panel"><div class="panel-heading"><div><h2>Γρήγορες κινήσεις</h2><p>Τα βασικά, χωρίς ψάξιμο</p></div></div><div class="quick-actions"><button class="quick-action" type="button" data-action="add-item"><span class="quick-action-icon">＋</span><span><strong>Πρόσθεσε προϊόν</strong><small>Καταχώρισε κάτι που έφερες σπίτι</small></span><span class="arrow">›</span></button><button class="quick-action" type="button" data-view="cook"><span class="quick-action-icon">🍳</span><span><strong>Τι να μαγειρέψω;</strong><small>Ιδέες με ό,τι λήγει πρώτο</small></span><span class="arrow">›</span></button><button class="quick-action" type="button" data-view="shopping"><span class="quick-action-icon">✓</span><span><strong>Άνοιξε τη λίστα</strong><small>${t('{pending} για ψώνια', { pending: pendingLabel(state.shopping.filter((item) => !item.checked).length) })}</small></span><span class="arrow">›</span></button></div></section></div>
+      <section class="panel quick-panel"><div class="panel-heading"><div><h2>Γρήγορες κινήσεις</h2><p>Τα βασικά, χωρίς ψάξιμο</p></div></div><div class="quick-actions"><button class="quick-action" type="button" data-action="add-item"><span class="quick-action-icon">＋</span><span><strong>Πρόσθεσε προϊόν</strong><small>Καταχώρισε κάτι που έφερες σπίτι</small></span><span class="arrow">›</span></button><button class="quick-action" type="button" data-action="open-receipt"><span class="quick-action-icon">🧾</span><span><strong>Σάρωση απόδειξης</strong><small>Τα ψώνια στο απόθεμα με ένα QR</small></span><span class="arrow">›</span></button><button class="quick-action" type="button" data-view="cook"><span class="quick-action-icon">🍳</span><span><strong>Τι να μαγειρέψω;</strong><small>Ιδέες με ό,τι λήγει πρώτο</small></span><span class="arrow">›</span></button><button class="quick-action" type="button" data-view="shopping"><span class="quick-action-icon">✓</span><span><strong>Άνοιξε τη λίστα</strong><small>${t('{pending} για ψώνια', { pending: pendingLabel(state.shopping.filter((item) => !item.checked).length) })}</small></span><span class="arrow">›</span></button></div></section></div>
     </div>`;
 }
 
@@ -184,9 +185,14 @@ function renderPantryList() {
   translateDom(count);
 }
 
+function renderReceiptButton() {
+  return '<button class="button button-quiet" type="button" data-action="open-receipt">🧾 Σάρωση απόδειξης</button>';
+}
+
 function renderPantry() {
   const categories = ['Όλα', ...new Set(state.items.map((item) => item.category || 'Άλλο'))];
   return `${renderHeader('Το απόθεμά μου', 'Όσα έχεις στο σπίτι, οργανωμένα σε ένα σημείο.', 'Προσθήκη προϊόντος')}
+    <div class="settings-actions page-actions">${renderReceiptButton()}</div>
     <section class="panel"><div class="toolbar"><label class="search-wrap"><span aria-hidden="true">⌕</span><input id="pantry-search" class="search-input" type="search" value="${escapeHtml(pantryQuery)}" placeholder="Αναζήτηση προϊόντος ή θέσης" aria-label="Αναζήτηση στο απόθεμα"></label><span class="inventory-count" id="inventory-count">${t('{count} προϊόντα', { count: state.items.length })}</span></div>
     <div class="filter-row" aria-label="Φίλτρο κατηγορίας">${categories.map((category) => `<button type="button" class="filter-chip ${pantryCategory === category ? 'is-active' : ''}" data-action="filter-category" data-category="${escapeHtml(category)}" aria-pressed="${pantryCategory === category}">${category === 'Όλα' ? '' : `<span aria-hidden="true">${CATEGORY_ICONS[category] || '🧺'}</span> `}${escapeHtml(category)}</button>`).join('')}</div>
     <div id="inventory-list" class="inventory-list"></div></section>`;
@@ -244,6 +250,7 @@ function renderSettings() {
     <div class="settings-grid"><section class="panel settings-card"><span class="stat-icon">🔒</span><h2>Απόρρητο πρώτα</h2><p>Το απόθεμα και η λίστα αγορών αποθηκεύονται στη συσκευή σου και η εφαρμογή δουλεύει και χωρίς internet. Αν συνδεθείς, συγχρονίζονται ιδιωτικά μέσω Firebase μόνο με τα μέλη του νοικοκυριού σου. Δεν υπάρχουν διαφημίσεις ούτε παρακολούθηση.</p><div class="privacy-note">Η αναζήτηση barcode στέλνει μόνο τον αριθμό του barcode στο Open Food Facts. Αν δεν έχεις συνδεθεί και καθαρίσεις τα δεδομένα του browser ή αλλάξεις συσκευή, χρησιμοποίησε αντίγραφο ασφαλείας.</div></section>
     <section class="panel settings-card"><span class="stat-icon">◐</span><h2>Εμφάνιση</h2><p>Διάλεξε φωτεινό ή σκούρο θέμα, ή άφησέ το να ακολουθεί τη συσκευή.</p><div class="theme-options" role="group" aria-label="Θέμα">${[['auto', 'Αυτόματο'], ['light', 'Φωτεινό'], ['dark', 'Σκούρο']].map(([value, label]) => `<button type="button" class="filter-chip ${currentTheme() === value ? 'is-active' : ''}" data-action="set-theme" data-theme="${value}" aria-pressed="${currentTheme() === value}">${label}</button>`).join('')}</div></section>
     ${renderLanguageCard()}
+    ${renderReceiptSettingsCard()}
     ${renderSyncCard()}
     ${renderNotificationCard()}
     <section class="panel settings-card"><span class="stat-icon blue">↗</span><h2>Αντίγραφο ασφαλείας</h2><p>Εξήγαγε ή εισήγαγε ένα αρχείο JSON. Το αρχείο περιέχει τα προϊόντα και τη λίστα αγορών σου.</p><div class="settings-actions"><button class="button button-primary" type="button" data-action="export-backup">⬇ Εξαγωγή αντιγράφου</button><button class="button button-quiet" type="button" data-action="import-backup">⬆ Εισαγωγή αντιγράφου</button></div></section>
@@ -412,18 +419,19 @@ async function fillFromBarcode(code) {
   }
 }
 
-async function openScanner() {
+async function openScanner({ onCode = fillFromBarcode, qr = false } = {}) {
   const dialog = document.querySelector('#scan-dialog');
   const status = document.querySelector('#scan-status');
   status.textContent = t('Άνοιγμα κάμερας…');
+  document.querySelector('#scan-title').textContent = t(qr ? 'Σάρωση QR απόδειξης' : 'Σάρωση προϊόντος');
   dialog.showModal();
   try {
     stopScanner = await startScanner(document.querySelector('#scan-video'), (code) => {
       stopScanner = null;
       dialog.close();
-      fillFromBarcode(code);
-    });
-    if (dialog.open) status.textContent = t('Στόχευσε τον barcode με την κάμερα.');
+      onCode(code);
+    }, { qr });
+    if (dialog.open) status.textContent = t(qr ? 'Στόχευσε το QR code της απόδειξης.' : 'Στόχευσε τον barcode με την κάμερα.');
     else closeScanner();
   } catch (error) {
     status.textContent = t(error?.name === 'NotAllowedError' ? 'Δεν δόθηκε άδεια για την κάμερα. Μπορείς να γράψεις τον barcode με το χέρι.'
@@ -658,6 +666,120 @@ function startVoiceAdd(button) {
   try { recognition.start(); } catch { recognition = null; button.classList.remove('is-listening'); }
 }
 
+// ---------- Scan receipt (Greek e-receipts via the QR's provider link) ----------
+const PROXY_KEY = 'spitothiki:receiptProxy';
+const receiptProxy = () => { try { return localStorage.getItem(PROXY_KEY) || ''; } catch { return ''; } };
+let receiptState = { step: 'start' };
+
+function openReceiptDialog() {
+  receiptState = { step: 'start' };
+  renderReceipt();
+  document.querySelector('#receipt-dialog').showModal();
+}
+
+async function loadReceipt(link) {
+  receiptState = { step: 'loading', link: String(link || '').trim() };
+  renderReceipt();
+  try {
+    const receipt = await fetchReceipt(receiptState.link, { proxy: receiptProxy() });
+    const id = await receiptId(receipt, receipt.sourceUrl);
+    const duplicate = (state.receipts || []).find((entry) => entry.id === id);
+    receiptState = { step: 'review', receipt, id, duplicate };
+  } catch (error) {
+    receiptState = { step: 'start', link: receiptState.link, error: t(error.message || 'Η αναζήτηση απέτυχε.'), cors: Boolean(error.cors) };
+  }
+  renderReceipt();
+}
+
+function renderReceiptStart() {
+  const { link = '', error = '', cors = false } = receiptState;
+  return `<p class="field-hint">Σκάναρε το QR code της ηλεκτρονικής απόδειξης ή επικόλλησε τον σύνδεσμό του. Θα δεις τα είδη πριν μπουν οπουδήποτε.</p>
+    <div class="settings-actions"><button class="button button-primary" type="button" data-action="receipt-scan">📷 Σάρωση QR</button></div>
+    <form id="receipt-link-form" class="store-form" novalidate><input class="field-input" name="link" type="url" inputmode="url" value="${escapeHtml(link)}" placeholder="https://… (σύνδεσμος απόδειξης)" aria-label="Σύνδεσμος απόδειξης" autocomplete="off"><button class="button button-quiet" type="submit">Άνοιγμα</button></form>
+    ${error ? `<p class="form-error" id="receipt-error" role="alert">${escapeHtml(error)}</p>` : ''}
+    ${cors && !receiptProxy() ? '<p class="field-hint">Μπορείς να ορίσεις proxy αποδείξεων στις Ρυθμίσεις για παρόχους που μπλοκάρουν την απευθείας πρόσβαση.</p>' : ''}`;
+}
+
+function renderReceiptReview() {
+  const { receipt, duplicate } = receiptState;
+  const store = receipt.issuerName || (receipt.issuerVat ? t('ΑΦΜ {vat}', { vat: receipt.issuerVat }) : t('Άγνωστο κατάστημα'));
+  const head = `<div class="receipt-summary"><div><strong class="product-name" id="receipt-store">${escapeHtml(store)}</strong><span class="field-hint">${escapeHtml(receipt.date ? formatDate(receipt.date) : '')}${receipt.lines.length ? ` · ${escapeHtml(t('{count} είδη', { count: receipt.lines.length }))}` : ''}</span></div><strong class="big-number" id="receipt-total">${escapeHtml(money(receipt.total))}</strong></div>`;
+  const dup = duplicate ? `<p class="alert-banner" id="receipt-duplicate" role="status">${escapeHtml(t('Αυτή η απόδειξη έχει ήδη εισαχθεί ({date}).', { date: formatDate(String(duplicate.importedAt || '').slice(0, 10)) }))}</p>` : '';
+  if (!receipt.lines.length) {
+    return `${head}${dup}<p class="field-hint" id="receipt-aade-note">Αυτός ο σύνδεσμος της ΑΑΔΕ δείχνει μόνο το σύνολο, όχι τα είδη. Μπορείς να καταγράψεις το ποσό ως έξοδο. Για τα είδη, σκάναρε το QR του παρόχου (συνήθως στο κάτω μέρος της απόδειξης).</p>
+      <form id="receipt-review-form" novalidate><input type="hidden" name="mode" value="total"><div class="dialog-actions"><button class="button button-quiet" type="button" data-action="receipt-reset">Πίσω</button><button class="button button-primary" type="submit" ${duplicate ? 'disabled' : ''}>Καταγραφή εξόδου</button></div></form>`;
+  }
+  const rows = receipt.lines.map((line, index) => `<div class="receipt-line" data-line="${index}"><input class="shopping-check" type="checkbox" name="use" checked aria-label="${escapeHtml(t('Εισαγωγή: {name}', { name: line.name }))}">
+    <input class="field-input receipt-name" name="name" value="${escapeHtml(line.name)}" maxlength="80" aria-label="Όνομα προϊόντος">
+    <input class="field-input receipt-qty" name="quantity" type="number" min="0" step="0.001" value="${escapeHtml(line.quantity)}" aria-label="Ποσότητα"><select class="field-input receipt-unit" name="unit" aria-label="Μονάδα">${unitOptions(line.unit)}</select>
+    <input class="field-input receipt-price" name="price" type="number" min="0" step="0.01" value="${escapeHtml(line.price.toFixed(2))}" aria-label="Τιμή">
+    <select class="field-input receipt-category" name="category" aria-label="Κατηγορία">${CATEGORIES.map((category) => `<option value="${escapeHtml(category)}" ${category === line.category ? 'selected' : ''}>${escapeHtml(categoryLabel(category))}</option>`).join('')}</select></div>`).join('');
+  return `${head}${dup}<form id="receipt-review-form" novalidate><input type="hidden" name="mode" value="lines">
+    <div class="receipt-lines" id="receipt-lines">${rows}</div>
+    <label class="check-row"><input type="checkbox" name="toPantry" checked> <span>Πρόσθεσε στο απόθεμα (ενώνεται με ίδια προϊόντα)</span></label>
+    <label class="check-row"><input type="checkbox" name="toSpending" checked> <span>Κατέγραψε τα έξοδα στα Στατιστικά</span></label>
+    <div class="dialog-actions"><button class="button button-quiet" type="button" data-action="receipt-reset">Πίσω</button><button class="button button-primary" type="submit" ${duplicate ? 'disabled' : ''}>Εισαγωγή</button></div></form>`;
+}
+
+function renderReceipt() {
+  const body = document.querySelector('#receipt-body');
+  if (!body) return;
+  body.innerHTML = receiptState.step === 'loading' ? `<p class="field-hint" id="receipt-loading" role="status">${escapeHtml(t('Φόρτωση απόδειξης…'))}</p>`
+    : receiptState.step === 'review' ? renderReceiptReview() : renderReceiptStart();
+  translateDom(body);
+}
+
+function importReceipt(form) {
+  const { receipt, id, duplicate } = receiptState;
+  if (!receipt || duplicate) return;
+  const now = new Date().toISOString();
+  const date = receipt.date || localDateKey();
+  const storeName = receipt.issuerName || '';
+  const knownStore = (state.stores || []).find((store) => storeName && normalizeSearch(store.name).trim() === normalizeSearch(storeName).trim());
+  const extra = { receiptId: id, ...(storeName ? { storeName } : {}), ...(knownStore ? { storeId: knownStore.id } : {}) };
+  state.purchases = [...(state.purchases || [])];
+  let added = 0;
+  let merged = 0;
+  let spent = 0;
+  if (form.elements.mode.value === 'total') {
+    state.purchases.push({ id: `pur-${id}`, rowId: '', name: storeName || t('Απόδειξη'), category: 'Άλλο', price: receipt.total, date, ...extra, updatedAt: now });
+    spent = receipt.total;
+  } else {
+    const toPantry = form.elements.toPantry.checked;
+    const toSpending = form.elements.toSpending.checked;
+    for (const row of form.querySelectorAll('[data-line]')) {
+      const field = (name) => row.querySelector(`[name="${name}"]`);
+      if (!field('use').checked) continue;
+      const name = field('name').value.trim();
+      if (!name) continue;
+      const quantity = Math.max(0, Number(field('quantity').value) || 0);
+      const unit = field('unit').value;
+      const category = field('category').value;
+      const price = Math.max(0, Math.round((Number(field('price').value) || 0) * 100) / 100);
+      if (toPantry) {
+        const existing = state.items.find((item) => normalizeSearch(item.name).trim() === normalizeSearch(name).trim() && normalizeUnit(item.unit) === unit);
+        if (existing) { state.items = state.items.map((item) => item === existing ? { ...item, quantity: Math.min(MAX_QUANTITY, Math.round((Number(item.quantity) + quantity) * 1000) / 1000), updatedAt: now } : item); merged += 1; }
+        else { state.items = [createPantryItem({ name, quantity, unit, category }), ...state.items]; added += 1; }
+      }
+      if (toSpending && price > 0) {
+        state.purchases.push({ id: `pur-${id}-${row.dataset.line}`, rowId: '', name, category, price, date, ...extra, updatedAt: now });
+        spent += price;
+      }
+    }
+  }
+  state.receipts = [...(state.receipts || []), { id, date, total: receipt.total, store: storeName, issuerVat: receipt.issuerVat || '', format: receipt.format, lines: receipt.lines.length, importedAt: now }];
+  if (!persist()) return;
+  document.querySelector('#receipt-dialog').close();
+  renderApp();
+  showToast(t('Απόδειξη: {added} νέα, {merged} ενημερώθηκαν, έξοδα {spent}.', { added, merged, spent: money(Math.round(spent * 100) / 100) }));
+}
+
+function renderReceiptSettingsCard() {
+  return `<section class="panel settings-card" id="receipt-settings"><span class="stat-icon">🧾</span><h2>Σάρωση απόδειξης</h2><p>Οι ηλεκτρονικές αποδείξεις διαβάζονται απευθείας από τον πάροχο. Για παρόχους που δεν το επιτρέπουν, μπορείς να ορίσεις έναν δικό σου proxy (Cloudflare Worker, δες τον φάκελο proxy/).</p>
+    <form id="proxy-form" class="store-form" novalidate><input class="field-input" name="proxy" type="url" value="${escapeHtml(receiptProxy())}" placeholder="https://….workers.dev" aria-label="Διεύθυνση proxy"><button class="button button-quiet" type="submit">Αποθήκευση</button></form>
+    <p class="field-hint">${escapeHtml((state.receipts || []).length ? t('Έχουν εισαχθεί {count} αποδείξεις.', { count: state.receipts.length }) : t('Δεν έχει εισαχθεί καμία απόδειξη ακόμα.'))}</p></section>`;
+}
+
 // ---------- What do I cook? ----------
 let onlineRecipes = { key: '', state: 'idle', list: [] };
 let shownRecipes = [];
@@ -804,7 +926,11 @@ function handleAction(button) {
     if (nextQuantity === Number(item.quantity) && Number(button.dataset.delta) > 0) { showToast(t('Η μέγιστη ποσότητα είναι {max}.', { max: MAX_QUANTITY })); return; }
     state.items = state.items.map((entry) => entry.id === id ? { ...entry, quantity: nextQuantity, updatedAt: new Date().toISOString() } : entry);
     persist(); renderApp();
-  } else if (action === 'delete-item') {
+  } else if (action === 'open-receipt') openReceiptDialog();
+  else if (action === 'close-receipt') document.querySelector('#receipt-dialog').close();
+  else if (action === 'receipt-scan') openScanner({ qr: true, onCode: (code) => loadReceipt(code) });
+  else if (action === 'receipt-reset') { receiptState = { step: 'start' }; renderReceipt(); }
+  else if (action === 'delete-item') {
     const item = state.items.find((entry) => entry.id === id);
     if (!item) return;
     showConfirm(t('Θα αφαιρεθεί το «{name}» από το απόθεμα.', { name: item.name }), () => {
@@ -879,7 +1005,7 @@ function handleAction(button) {
     else loadDemo();
   } else if (action === 'clear-data') {
     showConfirm(`${t('Θα διαγραφούν όλα τα προϊόντα και η λίστα αγορών από αυτή τη συσκευή.')}${syncStatus.user ? t(' Επειδή είσαι συνδεδεμένος, θα διαγραφούν και από τις συγχρονισμένες συσκευές.') : ''}${t(' Φρόντισε να έχεις αντίγραφο αν τα χρειάζεσαι.')}`, () => {
-      state = { items: [], shopping: [], recurring: [], stores: [], purchases: [], waste: [] }; persist(); renderApp(); showToast('Τα δεδομένα διαγράφηκαν.');
+      state = { items: [], shopping: [], recurring: [], stores: [], purchases: [], waste: [], receipts: [] }; persist(); renderApp(); showToast('Τα δεδομένα διαγράφηκαν.');
     }, 'Διαγραφή όλων των δεδομένων;');
   }
 }
@@ -979,6 +1105,26 @@ document.addEventListener('submit', (event) => {
     const invite = String(event.target.elements.invite.value || '').trim();
     if (!invite) { showToast('Γράψε τον κωδικό πρόσκλησης.'); return; }
     syncAction(() => sync.joinHousehold(invite), 'Μπήκες στο κοινό νοικοκυριό.');
+    return;
+  }
+
+  if (event.target.id === 'receipt-link-form') {
+    event.preventDefault();
+    loadReceipt(event.target.elements.link.value);
+    return;
+  }
+  if (event.target.id === 'receipt-review-form') {
+    event.preventDefault();
+    importReceipt(event.target);
+    return;
+  }
+  if (event.target.id === 'proxy-form') {
+    event.preventDefault();
+    const value = event.target.elements.proxy.value.trim();
+    if (value && !/^https:\/\/[^\s/]+/.test(value)) { showToast('Ο σύνδεσμος πρέπει να ξεκινά με https://'); return; }
+    try { if (value) localStorage.setItem(PROXY_KEY, value.replace(/\/+$/, '')); else localStorage.removeItem(PROXY_KEY); } catch {}
+    showToast(value ? 'Ο proxy αποθηκεύτηκε.' : 'Ο proxy αφαιρέθηκε.');
+    renderApp();
     return;
   }
 

@@ -100,6 +100,11 @@
     <div class="dialog-actions share-actions"><button class="button button-primary" type="button" data-action="copy-share">Αντιγραφή</button><a class="button button-quiet" id="share-whatsapp" target="_blank" rel="noopener">WhatsApp</a><a class="button button-quiet" id="share-viber" rel="noopener">Viber</a></div>
   </dialog>
 
+  <dialog id="receipt-dialog" class="item-dialog receipt-dialog" aria-labelledby="receipt-title">
+    <div class="dialog-heading"><div><p class="eyebrow">ΑΠΟΔΕΙΞΗ</p><h2 id="receipt-title">Σάρωση απόδειξης</h2></div><button class="icon-button" type="button" data-action="close-receipt" aria-label="Κλείσιμο">×</button></div>
+    <div id="receipt-body"></div>
+  </dialog>
+
   <dialog id="waste-dialog" class="confirm-dialog" aria-labelledby="waste-title">
     <form id="waste-form" method="dialog" novalidate><div class="dialog-heading"><div><p class="eyebrow">ΣΠΑΤΑΛΗ ΤΡΟΦΙΜΩΝ</p><h2 id="waste-title">Πετάχτηκε</h2></div><button class="icon-button" type="button" data-action="close-waste" aria-label="Κλείσιμο">×</button></div>
       <p class="confirm-message product-name" id="waste-name"></p>
