@@ -8,7 +8,7 @@ import { CATEGORIES, WASTE_REASONS, applyWaste, createStore, createWaste, groupB
 import { RECURRING_INTERVALS, applyRecurring, createRecurring, dueFromSnapshot, expirySnapshot, parseVoiceItems } from './features.js';
 import { MEAL_SLOTS, copyPreviousWeek, createMeal, recipeFromMealDb, shiftDays, weekDays, weekShoppingNeeds, weekStart } from './mealplan.js';
 import { BUILTIN_RECIPES } from './recipes.js';
-import { BILL_ICONS, BILL_PERIODS, BILL_TYPES, billStats, billsDue, createBill, guessBillType, parseBillCode, payBill, unpayBill } from './bills.js';
+import { BILL_ICONS, BILL_PERIODS, BILL_TYPES, billStats, billsDue, createBill, guessBillType, paidHistory, parseBillCode, unpaidBills, payBill, unpayBill } from './bills.js';
 import { findDuplicateBill, readBillFile } from './bill-pdf.js';
 import { addCartItem, budgetState, createTrip, finishTrip, lastPrice, lineTotal, remainingShopping, removeCartItem, tripForReceipt, updateCartItem } from './cart.js';
 import { VM_MODES, interpretCode } from './gs1.js';
@@ -1198,18 +1198,32 @@ function renderBillRow(bill) {
     <button class="icon-button" type="button" data-action="bill-edit" data-id="${escapeHtml(bill.id)}" aria-label="${escapeHtml(t('Επεξεργασία {name}', { name: bill.name }))}">✎</button><button class="icon-button" type="button" data-action="bill-delete" data-id="${escapeHtml(bill.id)}" aria-label="${escapeHtml(t('Διαγραφή {name}', { name: bill.name }))}">🗑️</button></div></article>`;
 }
 
+const billsHistory = { open: false, filter: '', limit: 10 };
+function renderBillsHistory(history) {
+  if (!history.count) return '';
+  const label = t('Ιστορικό πληρωμένων ({count})', { count: history.count });
+  if (!billsHistory.open) return `<section class="panel bills-history" id="bills-history"><button class="history-toggle" type="button" data-action="bills-history-toggle" aria-expanded="false"><span>${escapeHtml(label)}</span><span aria-hidden="true">▸</span></button></section>`;
+  const options = [`<option value="">${escapeHtml(t('Όλοι'))}</option>`,
+    ...history.types.map((type) => `<option value="type:${escapeHtml(type)}" ${billsHistory.filter === `type:${type}` ? 'selected' : ''}>${BILL_ICONS[type] || ''} ${escapeHtml(t(BILL_TYPE_LABELS[type] || 'Άλλο'))}</option>`),
+    ...history.names.map((name) => `<option value="name:${escapeHtml(name)}" data-no-i18n ${billsHistory.filter.toLocaleLowerCase('el-GR') === `name:${name}`.toLocaleLowerCase('el-GR') ? 'selected' : ''}>${escapeHtml(name)}</option>`)];
+  return `<section class="panel bills-history" id="bills-history"><button class="history-toggle" type="button" data-action="bills-history-toggle" aria-expanded="true"><span>${escapeHtml(label)}</span><span aria-hidden="true">▾</span></button>
+    <label class="history-filter"><span>Φίλτρο</span> <select class="field-input" id="bills-history-filter">${options.join('')}</select></label>
+    <div id="bills-paid">${history.groups.length ? history.groups.map((group) => `<div class="history-month"><h3><span data-no-i18n>${escapeHtml(monthLabel(group.month))}</span> <small data-no-i18n>${escapeHtml(money(group.total))}</small></h3><div class="product-list">${group.bills.map(renderBillRow).join('')}</div></div>`).join('') : `<p class="subtle-empty">${escapeHtml(t('Κανένας πληρωμένος με αυτό το φίλτρο.'))}</p>`}</div>
+    ${history.more > 0 ? `<button class="button button-quiet history-more" type="button" data-action="bills-history-more">${escapeHtml(t('Δείξε περισσότερα ({count})', { count: history.more }))}</button>` : ''}</section>`;
+}
+
 function renderBills() {
   const bills = state.bills || [];
   const today = localDateKey();
-  const unpaid = bills.filter((bill) => !bill.paid).sort((a, b) => a.due.localeCompare(b.due));
-  const paid = bills.filter((bill) => bill.paid).sort((a, b) => String(b.paidAt).localeCompare(String(a.paidAt))).slice(0, 12);
+  const unpaid = unpaidBills(bills);
+  const history = paidHistory(bills, { filter: billsHistory.filter, limit: billsHistory.limit });
   const due = billsDue(bills, today);
   const overdue = due.filter((bill) => bill.overdue);
   const toPay = unpaid.reduce((sum, bill) => sum + bill.amount, 0);
   return `<header class="page-heading"><div><p class="eyebrow">ΣΠΙΤΟΘΗΚΗ</p><h1>Λογαριασμοί</h1><p>ΔΕΗ, νερό, ενοίκιο, συνδρομές: τι πληρώνεις και πότε.</p></div><div class="page-actions"><label class="button button-quiet file-button" id="bill-import"><span>📥 Εισαγωγή PDF</span><input type="file" accept="application/pdf,.pdf,image/*" class="visually-hidden" data-bill-file id="bill-file"></label><button class="button button-primary" type="button" data-action="add-bill"><span aria-hidden="true">＋</span>Προσθήκη λογαριασμού</button></div></header>
     ${due.length ? `<div class="alert-banner${overdue.length ? ' is-danger' : ''}" role="status" id="bills-alert">${escapeHtml(overdue.length ? t(overdue.length === 1 ? '1 ληξιπρόθεσμος λογαριασμός · σύνολο {sum}' : '{count} ληξιπρόθεσμοι λογαριασμοί · σύνολο {sum}', { count: overdue.length, sum: money(overdue.reduce((s, b) => s + b.amount, 0)) }) : t(due.length === 1 ? '1 λογαριασμός λήγει σύντομα · σύνολο {sum}' : '{count} λογαριασμοί λήγουν σύντομα · σύνολο {sum}', { count: due.length, sum: money(due.reduce((s, b) => s + b.amount, 0)) }))}</div>` : ''}
     ${bills.length ? `<section class="panel"><div class="panel-heading"><div><h2>Προς πληρωμή</h2><p>${escapeHtml(t('{count} απλήρωτοι · {sum}', { count: unpaid.length, sum: money(toPay) }))}</p></div></div><div class="product-list" id="bills-unpaid">${unpaid.length ? unpaid.map(renderBillRow).join('') : '<p class="subtle-empty">Όλα πληρωμένα! 🎉</p>'}</div></section>
-    ${paid.length ? `<section class="panel"><div class="panel-heading"><div><h2>Πληρωμένοι</h2><p>Οι πιο πρόσφατοι</p></div></div><div class="product-list" id="bills-paid">${paid.map(renderBillRow).join('')}</div></section>` : ''}
+    ${renderBillsHistory(history)}
     <p class="field-hint">${escapeHtml(t('Οι υπενθυμίσεις έρχονται με τις ειδοποιήσεις της εφαρμογής (Ρυθμίσεις). Στατιστικά ανά μήνα και έτος στα Στατιστικά.'))}</p>`
     : renderEmpty('Κανένας λογαριασμός ακόμη', 'Πρόσθεσε ΔΕΗ, νερό, ενοίκιο ή συνδρομές για να θυμάσαι πότε λήγουν.', 'add-bill', 'Προσθήκη λογαριασμού', '📄')}`;
 }
@@ -1524,6 +1538,8 @@ function handleAction(button) {
     else { const keepName = form.elements.name.value; cartBarcode(raw).then(() => { const f = document.querySelector('#cart-item-form'); if (!f.elements.name.value) f.elements.name.value = keepName; }); }
     if (store) showToast(t('Το «{store}» θα διαβάζει το πρόθεμα {prefix} ως {mode}.', { store: store.name, prefix: button.dataset.prefix, mode: t(button.dataset.mode === 'price' ? 'τιμή' : 'βάρος') }));
   }
+  else if (action === 'bills-history-toggle') { billsHistory.open = !billsHistory.open; billsHistory.limit = 10; renderApp(); }
+  else if (action === 'bills-history-more') { billsHistory.limit += 10; renderApp(); }
   else if (action === 'toggle-stores') { storesOpen = !storesOpen; renderApp(); }
   else if (action === 'aisle-up' || action === 'aisle-down') {
     const store = activeStore();
@@ -1581,6 +1597,7 @@ document.addEventListener('input', (event) => {
 document.addEventListener('change', (event) => {
   if (event.target.id === 'bill-type') event.target.form.dataset.typeTouched = '1';
   if (event.target.id === 'cart-item-unit') updateCartQtyLabel();
+  if (event.target.id === 'bills-history-filter') { billsHistory.filter = event.target.value; billsHistory.limit = 10; renderApp(); return; }
   if (event.target.id === 'cart-store') { const row = document.querySelector('#cart-new-store-row'); row.hidden = event.target.value !== '__new'; if (!row.hidden) document.querySelector('#cart-new-store').focus(); }
   if (event.target.classList?.contains('vm-mode')) {
     const current = activeStore();

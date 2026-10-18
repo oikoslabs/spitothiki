@@ -127,3 +127,28 @@ export function parseBillCode(text) {
   if (/^https?:\/\//i.test(raw)) return { kind: 'url', reference: '', url: raw, amount: null, name: '' };
   return { kind: 'text', reference: compact.slice(0, 40), rfValid: false, amount: null, name: '' };
 }
+
+// Unpaid bills, overdue first then by due date (overdue ones are simply the earliest due dates).
+export const unpaidBills = (bills = []) => bills.filter((b) => !b.paid).sort((a, b) => String(a.due).localeCompare(String(b.due)) || String(a.name).localeCompare(String(b.name)));
+
+// Paid history: filter ('' | 'type:<type>' | 'name:<provider>'), newest first, grouped by paid month, paged by limit.
+export function paidHistory(bills = [], { filter = '', limit = 10 } = {}) {
+  const all = bills.filter((b) => b.paid);
+  const [field, ...rest] = String(filter).split(':');
+  const value = rest.join(':');
+  const matches = (b) => !filter || (field === 'type' ? b.type === value : field === 'name' ? String(b.name).trim().toLocaleLowerCase('el-GR') === value.toLocaleLowerCase('el-GR') : true);
+  const when = (b) => String(b.paidAt || b.due || '');
+  const list = all.filter(matches).sort((a, b) => when(b).localeCompare(when(a)) || String(b.due).localeCompare(String(a.due)));
+  const shown = list.slice(0, Math.max(1, limit));
+  const groups = [];
+  for (const bill of shown) {
+    const month = when(bill).slice(0, 7);
+    let group = groups[groups.length - 1];
+    if (!group || group.month !== month) groups.push(group = { month, bills: [], total: 0 });
+    group.bills.push(bill);
+    group.total = Math.round((group.total + Number(bill.amount || 0)) * 100) / 100;
+  }
+  const types = [...new Set(all.map((b) => b.type))].sort();
+  const names = [...new Map(all.map((b) => [String(b.name).trim().toLocaleLowerCase('el-GR'), String(b.name).trim()])).values()].sort((a, b) => a.localeCompare(b, 'el'));
+  return { count: all.length, matched: list.length, shown: shown.length, more: list.length - shown.length, groups, types, names };
+}

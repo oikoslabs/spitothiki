@@ -70,3 +70,21 @@ test('bills: RF references, EPC QR and barcodes', () => {
   assert.equal(parseBillCode('123456789012345678').kind, 'barcode');
   assert.equal(parseBillCode(''), null);
 });
+
+test('bills: unpaid order and paid history grouping, filters, paging', async () => {
+  const { unpaidBills, paidHistory } = await import('../src/bills.js');
+  const mk = (id, name, type, due, paidAt = '', amount = 10) => ({ id, name, type, due, amount, paid: Boolean(paidAt), paidAt });
+  const bills = [mk('u2', 'Νερό', 'water', '2026-11-05'), mk('u1', 'ΔΕΗ', 'electricity', '2026-10-01'), mk('u3', 'Ενοίκιο', 'rent', '2026-10-30'),
+    ...Array.from({ length: 14 }, (_, i) => mk(`p${i}`, i % 2 ? 'ΔΕΗ' : 'Cosmote', i % 2 ? 'electricity' : 'phone', `2026-${String(10 - Math.floor(i / 2)).padStart(2, '0')}-10`, `2026-${String(10 - Math.floor(i / 2)).padStart(2, '0')}-0${(i % 2) + 1}`, 20 + i))];
+  assert.deepEqual(unpaidBills(bills).map((b) => b.id), ['u1', 'u3', 'u2']);
+  const h = paidHistory(bills);
+  assert.equal(h.count, 14); assert.equal(h.shown, 10); assert.equal(h.more, 4);
+  assert.equal(h.groups[0].month, '2026-10'); assert.deepEqual(h.groups[0].bills.map((b) => b.id), ['p1', 'p0']);
+  assert.equal(h.groups[0].total, 41);
+  assert.ok(h.groups.every((g, i, a) => !i || a[i - 1].month > g.month));
+  assert.equal(paidHistory(bills, { limit: 20 }).more, 0);
+  const dei = paidHistory(bills, { filter: 'name:δεη' });
+  assert.equal(dei.matched, 7); assert.ok(dei.groups.flatMap((g) => g.bills).every((b) => b.name === 'ΔΕΗ'));
+  assert.equal(paidHistory(bills, { filter: 'type:phone' }).matched, 7);
+  assert.deepEqual(h.types, ['electricity', 'phone']); assert.deepEqual([...h.names].sort(), ['Cosmote', 'ΔΕΗ']);
+});

@@ -417,7 +417,7 @@ await check('bills: add manually + by scanning EPC QR, overdue alert, pay recurr
   await tap(`[data-action="bill-pay"][data-id="${deiId}"]`); await wait();
   const s = await stored();
   const next = s.bills.find((b) => b.name === 'ΔΕΗ' && !b.paid);
-  const paidRows = (await page.$$('#bills-paid .bill-row')).length;
+  const paidRows = (await page.$$('#bills-paid .bill-row')).length === 0 && /\(1\)/.test(await page.$eval('#bills-history', (e) => e.textContent)) ? 1 : 0;
   await nav('insights');
   const yearTotal = await page.$eval('#bills-year-total', (e) => e.textContent);
   const left2 = await greekLeft();
@@ -426,6 +426,39 @@ await check('bills: add manually + by scanning EPC QR, overdue alert, pay recurr
     && rows === 2 && danger !== null && count === '2' && notes.some((n) => /λογαριασμοί προς πληρωμή|bills to pay/.test(n))
     && next && next.amount === 84.5 && paidRows === 1 && s.bills.length === 3 && /199[.,]40|200[.,]?|\d/.test(yearTotal) && !left1.length && !left2.length;
   if (!ok) console.log('  bills:', { empty: !!empty, guessed, scanned, rows, danger: !!danger, count, notes, next, paidRows, yearTotal, left1, left2 });
+  return ok;
+});
+
+await check('bills: only unpaid by default, collapsed paid history by month with filter, paging, undo', async () => {
+  await page.evaluate(() => {
+    const st = JSON.parse(localStorage.getItem('spitothiki:v1'));
+    const mk = (id, name, type, due, paidAt = '') => ({ id, name, type, due, amount: 20, period: 0, remind: 3, reference: '', paid: Boolean(paidAt), paidAt, updatedAt: '2026-10-01T00:00:00Z' });
+    const paid = Array.from({ length: 14 }, (_, i) => { const m = String(10 - Math.floor(i / 2)).padStart(2, '0'); return mk(`p${i}`, i % 2 ? 'ΔΕΗ' : 'Cosmote', i % 2 ? 'electricity' : 'phone', `2026-${m}-10`, `2026-${m}-0${(i % 2) + 1}`); });
+    st.bills = [mk('u1', 'ΕΥΔΑΠ', 'water', '2026-11-20'), mk('u0', 'ΔΕΗ', 'electricity', '2026-10-01'), ...paid];
+    localStorage.setItem('spitothiki:v1', JSON.stringify(st));
+  });
+  await page.reload({ waitUntil: 'networkidle0' });
+  await nav('bills');
+  const unpaid = await page.$$eval('#bills-unpaid .bill-row', (els) => els.map((e) => e.dataset.bill));
+  const collapsed = (await page.$$('#bills-paid')).length === 0;
+  const label = await page.$eval('#bills-history .history-toggle', (e) => e.textContent);
+  await shot('bills-unpaid');
+  await tap('[data-action="bills-history-toggle"]'); await wait();
+  const shown1 = (await page.$$('#bills-paid .bill-row')).length;
+  const months = await page.$$eval('#bills-paid .history-month > h3', (els) => els.length);
+  await tap('[data-action="bills-history-more"]'); await wait();
+  const shown2 = (await page.$$('#bills-paid .bill-row')).length;
+  const more = await page.$('[data-action="bills-history-more"]');
+  await page.select('#bills-history-filter', 'name:ΔΕΗ'); await wait();
+  const filtered = await page.$$eval('#bills-paid .bill-row .product-name', (els) => els.map((e) => e.textContent));
+  const left = await greekLeft();
+  await shot('bills-history');
+  await tap('#bills-paid [data-action="bill-unpay"][data-id="p1"]'); await wait();
+  const s = await stored();
+  const backInUnpaid = await page.$$eval('#bills-unpaid .bill-row', (els) => els.map((e) => e.dataset.bill));
+  const ok = JSON.stringify(unpaid) === '["u0","u1"]' && collapsed && /\(14\)/.test(label) && shown1 === 10 && months === 5 && shown2 === 14 && !more
+    && filtered.length === 7 && filtered.every((n) => n === 'ΔΕΗ') && !s.bills.find((b) => b.id === 'p1').paid && backInUnpaid.includes('p1') && !left.length;
+  if (!ok) console.log('  bills history:', { unpaid, collapsed, label, shown1, months, shown2, more: !!more, filtered, backInUnpaid, left });
   return ok;
 });
 
