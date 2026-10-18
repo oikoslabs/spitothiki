@@ -468,3 +468,33 @@ body[data-screen="pantry"] .topbar .button-add { display: none; }
 .alert-banner.is-danger { background: #fdecec; color: #9b1c1f; }
 .bill-scan-row { align-items: center; }
 @media (min-width: 761px) { .bill-row { grid-template-columns: auto minmax(0, 1fr) auto auto; } .bill-actions { grid-column: auto; } }
+.cart-entry { margin: -6px 0 14px; }
+.cart-start-form { display: grid; gap: 8px; max-width: 420px; }
+.cart-total-panel { text-align: center; }
+.cart-total { font-size: clamp(40px, 9vw, 64px); font-weight: 800; margin: 0; letter-spacing: -.02em; }
+.cart-total-panel.is-over .cart-total { color: #c62a2f; }
+.cart-total-panel.is-near .cart-total { color: #8a5a00; }
+.budget-track { height: 8px; border-radius: 8px; background: #e7ece4; overflow: hidden; margin: 8px auto; max-width: 420px; }
+.budget-track span { display: block; height: 100%; background: var(--green, #2f6b4f); }
+.cart-total-panel.is-over .budget-track span { background: #e5484d; }
+.cart-total-panel.is-near .budget-track span { background: #e0a800; }
+.cart-actions { justify-content: center; flex-wrap: wrap; }
+.cart-lines { display: grid; gap: 8px; }
+.cart-line { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid #e3e9df; border-radius: 12px; }
+.cart-line-main { display: grid; min-width: 0; }
+.cart-line-main small { color: #6b7a70; }
+.cart-line-total { font-weight: 800; font-size: 15px; }
+.qty-stepper { display: flex; align-items: center; gap: 6px; }
+.qty-stepper .field-input { text-align: center; min-width: 0; }
+.qty-stepper.small .cart-qty { min-width: 22px; text-align: center; font-weight: 700; }
+.cart-remaining { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; }
+.cart-finish { justify-content: space-between; margin: 6px 0 18px; }
+.cart-price-display { font-size: 28px; font-weight: 800; text-align: right; }
+.keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 8px 0; }
+.keypad-key { min-height: 52px; font-size: 22px; font-weight: 700; border: 1px solid #e3e9df; border-radius: 12px; background: #f6f8f4; color: inherit; cursor: pointer; }
+.keypad-key:active { background: var(--green-soft, #e3f0e8); }
+.trip-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+.trip-list li { display: flex; flex-wrap: wrap; gap: 4px 10px; justify-content: space-between; }
+.trip-list small { width: 100%; color: #6b7a70; }
+.receipt-trip p { margin: 0 0 6px; }
+@media (max-width: 760px) { .cart-line { grid-template-columns: minmax(0, 1fr) auto auto; } .cart-line .qty-stepper.small { grid-column: 1; grid-row: 2; } }

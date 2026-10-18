@@ -21,7 +21,7 @@ await page.evaluateOnNewDocument((lang) => {
   window.__speech = lang === 'en' ? 'bread and 2 eggs' : 'ψωμί και 2 αυγά';
   window.SpeechRecognition = class { start() { setTimeout(() => { this.onresult?.({ results: [[{ transcript: window.__speech }]] }); this.onend?.(); }, 50); } stop() { this.onend?.(); } };
   // Fake QR detector: "sees" the receipt link on the (fake) camera.
-  window.BarcodeDetector = class { static async getSupportedFormats() { return ['qr_code', 'ean_13']; } constructor(o) { this.formats = o.formats; } async detect() { return this.formats.includes('qr_code') ? [{ rawValue: window.__fakeCode || 'https://test-shop.epsilonnet.gr/fd/abc123:1' }] : []; } };
+  window.BarcodeDetector = class { static async getSupportedFormats() { return ['qr_code', 'ean_13']; } constructor(o) { this.formats = o.formats; } async detect() { if (!this.formats.includes('qr_code')) { const code = window.__fakeBarcode; window.__fakeBarcode = ''; return code ? [{ rawValue: code }] : []; } return [{ rawValue: window.__fakeCode || 'https://test-shop.epsilonnet.gr/fd/abc123:1' }]; } };
   window.__notifications = [];
   if (window.ServiceWorkerRegistration) ServiceWorkerRegistration.prototype.showNotification = (title, o) => { window.__notifications.push({ title, body: o?.body }); return Promise.resolve(); };
 }, lang);
@@ -30,6 +30,10 @@ const errors = [];
 await page.setRequestInterception(true);
 page.on('request', (request) => {
   const u = request.url();
+  if (u.startsWith('https://world.openfoodfacts.org/api/v2/product/')) {
+    const found = u.includes('/5209999999999.json');
+    return request.respond({ status: found ? 200 : 404, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(found ? { status: 1, product: { product_name: 'Φέτα Δοκιμής 400g', categories_tags: ['en:cheeses'] } } : { status: 0 }) });
+  }
   if (u.startsWith(RECEIPT)) {
     const body = u.endsWith('/myDATA') ? fixture('receipt-mydata.xml') : u.endsWith('/EN16931') ? fixture('receipt-ubl.xml') : '<html></html>';
     return request.respond({ status: 200, contentType: 'application/xml', headers: { 'access-control-allow-origin': '*' }, body });
@@ -53,7 +57,7 @@ async function check(name, fn) {
   catch (e) { console.log(`FAIL ${name}: ${e.message}`); errors.push(`${name}: ${e.message}`); }
 }
 const shot = async (name) => { if (shots) await page.screenshot({ path: `${shots}/feature-${name}-${lang}${width < 700 ? '-phone' : ''}.png`, fullPage: true }); };
-const greekLeft = async () => en ? (await page.evaluate(() => window.__i18n.untranslatedGreek())).filter((s) => !/Γάλα|Ψωμί|Αυγά|Μήλα|Ρύζι|Γιαούρτι|Ελαιόλαδο|Ντομάτες|Φέτα|Κοτόπουλο|Πατάτες|Χαρτί|Πεκορίνο|ΔΟΚΙΜΑΣΤΙΚΟ|ΧΑΣΙΩΤΗ|ΔΕΗ|ΕΥΔΑΠ|Φακές με ρύζι|Χουρμαδες|Κασιους|Καρυδοψιχα|(aria-label|title)=(Import: |Decrease quantity of |Increase quantity of |Edit |Thrown away: |Delete )/.test(s)) : [];
+const greekLeft = async () => en ? (await page.evaluate(() => window.__i18n.untranslatedGreek())).filter((s) => !/Γάλα|Ψωμί|Αυγά|Μήλα|Ρύζι|Γιαούρτι|Ελαιόλαδο|Ντομάτες|Φέτα|Κοτόπουλο|Πατάτες|Χαρτί|Πεκορίνο|ΔΟΚΙΜΑΣΤΙΚΟ|ΧΑΣΙΩΤΗ|Χασιώτη|Φέτα Δοκιμής|Ντομάτες|Ρύζι|ΔΕΗ|ΕΥΔΑΠ|Φακές με ρύζι|Χουρμαδες|Κασιους|Καρυδοψιχα|(aria-label|title)=(Import: |Decrease quantity of |Increase quantity of |Edit |Thrown away: |Delete )/.test(s)) : [];
 
 await page.goto(url, { waitUntil: 'networkidle0' });
 await page.evaluate(() => localStorage.clear());
@@ -475,6 +479,83 @@ await check('bill PDF: text PDF prefills dialog, duplicate refused, scanned PDF 
     && /RF/.test(row) && dupVisible && saveDisabled && eydap.amount === '1031.4' && eydap.due === '2026-11-15'
     && manifest?.method === 'POST' && shared !== 'no-controller' && cosmote.amount === '32.9' && cosmote.open && !cosmote.url.includes('share=') && !leftover && s.bills.length === 2;
   if (!ok) console.log('  billpdf:', { dei, leftDialog, row, dupVisible, saveDisabled, eydap, manifest, shared, cosmote, leftover, n: s.bills.length });
+  return ok;
+});
+
+await check('cart: start trip, scan with remembered price, OFF lookup, weighed item, budget, list, finish, receipt link', async () => {
+  await page.evaluate(() => {
+    const st = JSON.parse(localStorage.getItem('spitothiki:v1'));
+    Object.assign(st, { stores: [{ id: 'st1', name: 'Χασιώτη', order: [], updatedAt: '2026-10-01T00:00:00Z' }], items: [{ id: 'milk', name: 'Γάλα', quantity: 1, unit: 'τεμ.', minimum: 0, category: 'Γαλακτοκομικά', location: '', expiry: '' }],
+      shopping: [{ id: 's1', name: 'Γάλα', quantity: 1, unit: 'τεμ.', checked: false }, { id: 's2', name: 'Ρύζι', quantity: 1, unit: 'πακέτα', checked: false }],
+      prices: [{ id: 'price-st1-5201111111111', product: '5201111111111', barcode: '5201111111111', name: 'Γάλα', storeId: 'st1', storeName: 'Χασιώτη', price: 1.89, unit: 'τεμ.', date: '2026-10-01', updatedAt: '2026-10-01T00:00:00Z' }],
+      trips: [], purchases: [], receipts: [] });
+    localStorage.setItem('spitothiki:v1', JSON.stringify(st));
+  });
+  await page.reload({ waitUntil: 'networkidle0' });
+  await nav('shopping');
+  await tap('#open-cart'); await wait();
+  await page.select('#cart-store', 'st1');
+  await page.type('#cart-budget', '5');
+  await tap('#cart-start-form button[type=submit]'); await wait();
+  const dialogOpen = () => page.waitForFunction(() => document.querySelector('#cart-item-dialog').open, { timeout: 8000 });
+  // 1) Scan a known barcode: name + last price at this store prefilled; continuous scan reopens the camera.
+  await page.evaluate(() => { window.__fakeBarcode = '5201111111111'; });
+  await tap('[data-action="cart-scan"]'); await dialogOpen(); await wait(300);
+  const scan1 = await page.evaluate(() => ({ name: document.querySelector('#cart-item-name').value, price: document.querySelector('#cart-item-price').value, hint: document.querySelector('#cart-price-hint').textContent }));
+  await tap('#cart-item-save'); await wait(900);
+  // 2) Next scan: unknown barcode -> Open Food Facts name, price via keypad.
+  await page.evaluate(() => { window.__fakeBarcode = '5209999999999'; }); await wait(1200);
+  await dialogOpen(); await page.waitForFunction(() => document.querySelector('#cart-item-name').value !== '', { timeout: 8000 });
+  const scan2 = await page.$eval('#cart-item-name', (e) => e.value);
+  for (const key of ['4', ',', '5', '0']) await page.click(`.keypad-key[data-key="${key}"]`);
+  const keyed = await page.$eval('#cart-item-price', (e) => e.value);
+  await shot('cart-keypad');
+  await tap('#cart-item-save'); await wait(900);
+  await tap('[data-action="close-scan"]'); await wait();
+  // 3) Weighed item without barcode.
+  await tap('[data-action="cart-add-manual"]'); await dialogOpen();
+  await page.type('#cart-item-name', 'Ντομάτες');
+  await page.select('#cart-item-unit', 'κιλά');
+  await page.$eval('#cart-item-qty', (e) => { e.value = '1.5'; });
+  for (const key of ['2', ',', '4', '0']) await page.click(`.keypad-key[data-key="${key}"]`);
+  await tap('#cart-item-save'); await wait();
+  const over = await page.$('#cart-budget-warning');
+  const remaining1 = await page.$$eval('#cart-remaining [data-action="cart-from-list"]', (els) => els.length);
+  // 4) From the shopping list + quantity step.
+  await tap('#cart-remaining [data-action="cart-from-list"]'); await dialogOpen();
+  for (const key of ['1', ',', '2', '0']) await page.click(`.keypad-key[data-key="${key}"]`);
+  await tap('#cart-item-save'); await wait();
+  const milkKey = await page.evaluate(() => JSON.parse(localStorage.getItem('spitothiki:v1')).trips[0].items.find((i) => i.name === 'Γάλα').key);
+  await tap(`[data-action="cart-line-step"][data-key="${milkKey}"][data-delta="1"]`); await wait();
+  const total = await page.$eval('#cart-total', (e) => e.textContent);
+  const left = await greekLeft();
+  await shot('cart-trip');
+  await tap('[data-action="cart-finish"]'); await wait();
+  await tap('#confirm-accept'); await wait(600);
+  const s = await stored();
+  const trip = s.trips[0];
+  // 5) Receipt for the same trip: offered to link, replaces the estimate.
+  await page.evaluate(() => { const st = JSON.parse(localStorage.getItem('spitothiki:v1')); st.trips[0].date = '2026-10-17'; localStorage.setItem('spitothiki:v1', JSON.stringify(st)); });
+  await page.reload({ waitUntil: 'networkidle0' });
+  await page.evaluate((text) => { window.__spitoOcrMock = async () => ({ text, confidence: 91 }); }, fixture('receipt-photo-ocr.txt'));
+  await nav('pantry');
+  await tap('[data-action="open-receipt"]'); await wait();
+  await (await page.$('#receipt-photo-file')).uploadFile(new URL('../../icons/icon-192.png', import.meta.url).pathname);
+  await page.waitForSelector('#receipt-lines', { timeout: 15000 });
+  const linkBanner = await page.$('#receipt-trip');
+  const pantryUnchecked = await page.$eval('[name=toPantry]', (e) => !e.checked);
+  await shot('cart-receipt-link');
+  await page.click('#receipt-review-form button[type=submit]'); await wait();
+  await page.evaluate(() => { delete window.__spitoOcrMock; });
+  const s2 = await stored();
+  await nav('shopping'); await tap('#open-cart'); await wait();
+  const recent = await page.$eval('#cart-recent', (e) => e.textContent);
+  await shot('cart-recent');
+  const ok = scan1.name === 'Γάλα' && scan1.price === '1,89' && scan1.hint.length > 5 && scan2 === 'Φέτα Δοκιμής 400g' && keyed === '4,50' && over !== null && remaining1 === 1 && /13[.,]08/.test(total) && !left.length
+    && trip.status === 'done' && s.shopping.every((r) => r.checked) && s.purchases.filter((p) => p.tripId === trip.id).length === 4 && s.items.find((i) => i.id === 'milk').quantity === 3
+    && s.prices.some((p) => p.barcode === '5209999999999' && p.price === 4.5) && s.prices.find((p) => p.barcode === '5201111111111').price === 1.89
+    && linkBanner !== null && pantryUnchecked && !s2.purchases.some((p) => p.tripId === trip.id) && s2.purchases.some((p) => p.storeName === 'ΧΑΣΙΩΤΗ') && s2.trips[0].receiptTotal === 16 && /16/.test(recent);
+  if (!ok) console.log('  cart:', { scan1, scan2, keyed, over: !!over, remaining1, total, left, trip: trip?.status, shopping: s.shopping.map((r) => r.checked), tripPurchases: s.purchases.filter((p) => p.tripId === trip?.id).length, milk: s.items.find((i) => i.id === 'milk')?.quantity, prices: s.prices.length, link: !!linkBanner, pantryUnchecked, after: s2.purchases.length, rt: s2.trips[0]?.receiptTotal, recent });
   return ok;
 });
 

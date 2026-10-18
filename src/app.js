@@ -4,12 +4,13 @@ import { authProviders, firebaseConfig } from './firebase-config.js';
 import { loadState, parseBackup, saveState } from './storage.js';
 import { fetchReceipt, receiptId } from './receipt.js';
 import { fetchMealDbSuggestions, ingredientName, pantryIngredients, suggestBuiltin } from './recipes.js';
-import { CATEGORIES, WASTE_REASONS, applyWaste, createStore, createWaste, groupByStore, monthKey, monthlySpending, moveCategory, purchaseFor, shiftMonth, storeOrder, wasteStats } from './features.js';
+import { CATEGORIES, WASTE_REASONS, applyWaste, createStore, createWaste, groupByStore, monthKey, rowCategory, monthlySpending, moveCategory, purchaseFor, shiftMonth, storeOrder, wasteStats } from './features.js';
 import { RECURRING_INTERVALS, applyRecurring, createRecurring, dueFromSnapshot, expirySnapshot, parseVoiceItems } from './features.js';
 import { MEAL_SLOTS, copyPreviousWeek, createMeal, recipeFromMealDb, shiftDays, weekDays, weekShoppingNeeds, weekStart } from './mealplan.js';
 import { BUILTIN_RECIPES } from './recipes.js';
 import { BILL_ICONS, BILL_PERIODS, BILL_TYPES, billStats, billsDue, createBill, guessBillType, parseBillCode, payBill, unpayBill } from './bills.js';
 import { findDuplicateBill, readBillFile } from './bill-pdf.js';
+import { addCartItem, budgetState, createTrip, finishTrip, lastPrice, lineTotal, remainingShopping, removeCartItem, tripForReceipt, updateCartItem } from './cart.js';
 import { getLang, locale, setLang, t, translateDom, untranslatedGreek } from './i18n.js';
 
 const viewRoot = document.querySelector('#view-content');
@@ -20,7 +21,7 @@ const backupFile = document.querySelector('#backup-file');
 const toast = document.querySelector('#toast');
 
 let state = loadState();
-const VIEWS = ['overview', 'pantry', 'shopping', 'cook', 'bills', 'insights', 'settings'];
+const VIEWS = ['overview', 'pantry', 'shopping', 'cart', 'cook', 'bills', 'insights', 'settings'];
 let activeView = VIEWS.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'overview';
 let pantryQuery = '';
 let pantryCategory = 'Όλα';
@@ -241,7 +242,9 @@ function renderShoppingRows(pending, checked) {
 function renderShopping() {
   const pending = state.shopping.filter((item) => !item.checked);
   const checked = state.shopping.filter((item) => item.checked);
+  const trip = activeTrip();
   return `${renderHeader('Λίστα αγορών', 'Σημείωσε όσα χρειάζεσαι και πάρε τη λίστα μαζί σου.')}
+    <div class="page-actions cart-entry"><button class="button ${trip ? 'button-primary' : 'button-quiet'}" type="button" data-view="cart" id="open-cart">🛒 ${escapeHtml(trip ? t('Συνέχεια καλαθιού · {total}', { total: money(trip.total) }) : t('Καλάθι στο κατάστημα'))}</button></div>
     <div class="shopping-layout"><section class="panel"><div class="panel-heading"><div><h2>Τι χρειάζεται το σπίτι;</h2><p>${pending.length ? pendingLabel(pending.length) : 'Κανένα εκκρεμές προϊόν'}</p></div><div class="panel-links">${pending.length ? '<button class="panel-link" type="button" data-action="share-shopping">↗ Κοινοποίηση</button>' : ''}${checked.length ? '<button class="panel-link" type="button" data-action="clear-completed">Καθάρισε τα αγορασμένα</button>' : ''}</div></div>
     <form id="shopping-form" class="shopping-add-form shopping-main-form" novalidate><input class="field-input" name="name" required maxlength="80" placeholder="π.χ. Φέτα" aria-label="Προϊόν για αγορά"><input class="field-input" name="quantity" type="number" min="0.1" max="${MAX_QUANTITY}" step="0.1" value="1" aria-label="Ποσότητα"><select class="field-input unit-select" name="unit" aria-label="Μονάδα">${unitOptions()}</select><select class="field-input category-select" name="category" aria-label="Κατηγορία"><option value="">Κατηγορία: αυτόματα</option>${CATEGORIES.map((category) => `<option value="${escapeHtml(category)}">${escapeHtml(categoryLabel(category))}</option>`).join('')}</select><button class="button button-primary" type="submit">＋ Προσθήκη</button>${SpeechRecognitionApi ? '<button class="button button-quiet voice-button" type="button" data-action="voice-add" aria-label="Προσθήκη με φωνή" title="Προσθήκη με φωνή">🎤</button>' : ''}</form>
     <p class="form-error" id="shopping-error" role="alert" hidden></p>
@@ -272,6 +275,7 @@ function renderApp() {
   else if (activeView === 'shopping') viewRoot.innerHTML = renderShopping();
   else if (activeView === 'insights') viewRoot.innerHTML = renderInsights();
   else if (activeView === 'bills') viewRoot.innerHTML = renderBills();
+  else if (activeView === 'cart') viewRoot.innerHTML = renderCart();
   else if (activeView === 'cook') { viewRoot.innerHTML = renderCook(); loadOnlineRecipes(); }
   else viewRoot.innerHTML = renderSettings();
   if (activeView === 'pantry') renderPantryList();
@@ -711,7 +715,7 @@ async function loadReceiptPhoto(file) {
     if (!receipt.lines.length && !receipt.total) throw new Error('Δεν βρέθηκαν είδη στη φωτογραφία. Δοκίμασε πιο καθαρή, ίσια λήψη με καλό φως.');
     const id = await receiptId(receipt, `photo:${receipt.issuerName}`);
     const duplicate = (state.receipts || []).find((entry) => entry.id === id);
-    receiptState = { step: 'review', receipt, id, duplicate, photo: true };
+    receiptState = { step: 'review', receipt, id, duplicate, photo: true, trip: tripForReceipt(state.trips || [], receipt) };
   } catch (error) {
     receiptState = { step: 'start', error: t(error.message || 'Η αναγνώριση απέτυχε.') };
   }
@@ -731,7 +735,7 @@ async function loadReceipt(link) {
     const receipt = await fetchReceipt(receiptState.link, { proxy: receiptProxy() });
     const id = await receiptId(receipt, receipt.sourceUrl);
     const duplicate = (state.receipts || []).find((entry) => entry.id === id);
-    receiptState = { step: 'review', receipt, id, duplicate };
+    receiptState = { step: 'review', receipt, id, duplicate, trip: tripForReceipt(state.trips || [], receipt) };
   } catch (error) {
     receiptState = { step: 'start', link: receiptState.link, error: t(error.message || 'Η αναζήτηση απέτυχε.'), cors: Boolean(error.cors) };
   }
@@ -748,13 +752,21 @@ function renderReceiptStart() {
     ${cors && !receiptProxy() ? '<p class="field-hint">Μπορείς να ορίσεις proxy αποδείξεων στις Ρυθμίσεις για παρόχους που μπλοκάρουν την απευθείας πρόσβαση.</p>' : ''}`;
 }
 
+function renderTripLink() {
+  const { trip, receipt, duplicate } = receiptState;
+  if (!trip || duplicate) return '';
+  const diff = Math.round((receipt.total - trip.total) * 100) / 100;
+  return `<div class="alert-banner receipt-trip" id="receipt-trip" role="status"><p>${escapeHtml(t('Ταιριάζει με το καλάθι «{store}» ({date}): εκτίμηση {estimate}, απόδειξη {total} ({diff}).', { store: trip.storeName || t('Καλάθι'), date: formatDate(trip.date), estimate: money(trip.total), total: money(receipt.total), diff: `${diff >= 0 ? '+' : ''}${money(diff)}` }))}</p>
+    <label class="check-row"><input type="checkbox" name="linkTrip" checked form="receipt-review-form"> <span>${escapeHtml(t('Σύνδεση με το καλάθι: τα έξοδα της απόδειξης αντικαθιστούν την εκτίμηση (χωρίς διπλή καταμέτρηση)'))}</span></label></div>`;
+}
+
 function renderReceiptReview() {
   const { receipt, duplicate } = receiptState;
   const store = receipt.issuerName || (receipt.issuerVat ? t('ΑΦΜ {vat}', { vat: receipt.issuerVat }) : t('Άγνωστο κατάστημα'));
   const head = `<div class="receipt-summary"><div><strong class="product-name" id="receipt-store">${escapeHtml(store)}</strong><span class="field-hint">${escapeHtml(receipt.date ? formatDate(receipt.date) : '')}${receipt.lines.length ? ` · ${escapeHtml(t('{count} είδη', { count: receipt.lines.length }))}` : ''}</span></div><strong class="big-number" id="receipt-total">${escapeHtml(money(receipt.total))}</strong></div>`;
   const dup = duplicate ? `<p class="alert-banner" id="receipt-duplicate" role="status">${escapeHtml(t('Αυτή η απόδειξη έχει ήδη εισαχθεί ({date}).', { date: formatDate(String(duplicate.importedAt || '').slice(0, 10)) }))}</p>` : '';
   if (!receipt.lines.length) {
-    return `${head}${dup}<p class="field-hint" id="receipt-aade-note">Οι αποδείξεις με QR της ΑΑΔΕ (ταμειακές) δεν περιέχουν τα είδη στο QR, μόνο το σύνολο. Για να περάσουν τα είδη, βγάλε φωτογραφία την απόδειξη — ή κατέγραψε μόνο το ποσό ως έξοδο.</p>${photoButtons()}
+    return `${head}${dup}${renderTripLink()}<p class="field-hint" id="receipt-aade-note">Οι αποδείξεις με QR της ΑΑΔΕ (ταμειακές) δεν περιέχουν τα είδη στο QR, μόνο το σύνολο. Για να περάσουν τα είδη, βγάλε φωτογραφία την απόδειξη — ή κατέγραψε μόνο το ποσό ως έξοδο.</p>${photoButtons()}
       <form id="receipt-review-form" novalidate><input type="hidden" name="mode" value="total"><div class="dialog-actions"><button class="button button-quiet" type="button" data-action="receipt-reset">Πίσω</button><button class="button button-primary" type="submit" ${duplicate ? 'disabled' : ''}>Καταγραφή εξόδου</button></div></form>`;
   }
   const rows = receipt.lines.map((line, index) => `<div class="receipt-line${line.doubtful ? ' is-doubtful' : ''}" data-line="${index}"${line.doubtful ? ` title="${escapeHtml(t('Έλεγξε αυτή τη γραμμή: ποσότητα × τιμή δεν ταιριάζει με το ποσό.'))}"` : ''}><input class="shopping-check" type="checkbox" name="use" checked aria-label="${escapeHtml(t('Εισαγωγή: {name}', { name: line.name }))}">
@@ -764,9 +776,9 @@ function renderReceiptReview() {
     <select class="field-input receipt-category" name="category" aria-label="Κατηγορία">${CATEGORIES.map((category) => `<option value="${escapeHtml(category)}" ${category === line.category ? 'selected' : ''}>${escapeHtml(categoryLabel(category))}</option>`).join('')}</select></div>`).join('');
   const doubtful = receipt.lines.filter((line) => line.doubtful).length;
   const photoNote = receiptState.photo ? `<p class="field-hint" id="receipt-photo-note">${escapeHtml(t('Διαβάστηκε από φωτογραφία — έλεγξε ονόματα και ποσά πριν την εισαγωγή.'))}${doubtful ? ` <strong class="doubtful-hint">${escapeHtml(t('{count} γραμμές θέλουν έλεγχο (σημειωμένες).', { count: doubtful }))}</strong>` : ''}${receipt.totalMismatch ? ` ${escapeHtml(t('Το άθροισμα των ειδών ({sum}) διαφέρει από το σύνολο.', { sum: money(receipt.linesTotal) }))}` : ''}</p>` : '';
-  return `${head}${dup}${photoNote}<form id="receipt-review-form" novalidate><input type="hidden" name="mode" value="lines">
+  return `${head}${dup}${renderTripLink()}${photoNote}<form id="receipt-review-form" novalidate><input type="hidden" name="mode" value="lines">
     <div class="receipt-lines" id="receipt-lines">${rows}</div>
-    <label class="check-row"><input type="checkbox" name="toPantry" checked> <span>Πρόσθεσε στο απόθεμα (ενώνεται με ίδια προϊόντα)</span></label>
+    <label class="check-row"><input type="checkbox" name="toPantry" ${receiptState.trip && !duplicate ? '' : 'checked'}> <span>Πρόσθεσε στο απόθεμα (ενώνεται με ίδια προϊόντα)</span></label>${receiptState.trip && !duplicate ? `<p class="field-hint">${escapeHtml(t('Τα προϊόντα του καλαθιού έχουν ήδη μπει στο απόθεμα.'))}</p>` : ''}
     <label class="check-row"><input type="checkbox" name="toSpending" checked> <span>Κατέγραψε τα έξοδα στα Στατιστικά</span></label>
     <div class="dialog-actions"><button class="button button-quiet" type="button" data-action="receipt-reset">Πίσω</button><button class="button button-primary" type="submit" ${duplicate ? 'disabled' : ''}>Εισαγωγή</button></div></form>`;
 }
@@ -816,6 +828,11 @@ function importReceipt(form) {
         spent += price;
       }
     }
+  }
+  const linkTrip = receiptState.trip && form.elements.linkTrip?.checked ? receiptState.trip : null;
+  if (linkTrip) {
+    state.purchases = state.purchases.filter((purchase) => purchase.tripId !== linkTrip.id);
+    state.trips = (state.trips || []).map((trip) => (trip.id === linkTrip.id ? { ...trip, receiptId: id, receiptTotal: receipt.total, updatedAt: now } : trip));
   }
   state.receipts = [...(state.receipts || []), { id, date, total: receipt.total, store: storeName, issuerVat: receipt.issuerVat || '', format: receipt.format, lines: receipt.lines.length, importedAt: now }];
   if (!persist()) return;
@@ -970,6 +987,145 @@ function renderCook() {
     ${builtin.length || online.list.length ? `<div class="recipe-grid" id="recipe-list">${builtin.map((recipe) => renderRecipeCard(recipe, pantry)).join('')}</div>` : renderEmpty('Δεν βρήκα συνταγές', 'Πρόσθεσε στο απόθεμα βασικά υλικά (π.χ. αυγά, ντομάτες, ρύζι) για να δεις ιδέες.', 'add-item', 'Προσθήκη προϊόντος', '🍳')}
     ${online.list.length ? `<h2 class="section-title">Περισσότερες ιδέες από TheMealDB</h2><div class="recipe-grid" id="recipe-online">${online.list.map((recipe) => renderRecipeCard(recipe, pantry)).join('')}</div>` : ''}
     ${onlineStatus ? `<p class="field-hint" id="recipe-online-status">${escapeHtml(t(onlineStatus))}${online.state === 'error' ? ` <button class="text-button" type="button" data-action="retry-recipes">${escapeHtml(t('Ξανά'))}</button>` : ''}</p>` : ''}`;
+}
+
+// ---------- In-store cart ----------
+const activeTrip = () => (state.trips || []).find((trip) => trip.status === 'active') || null;
+let cartScanning = false;
+
+function saveTrip(trip) {
+  state.trips = [...(state.trips || []).filter((entry) => entry.id !== trip.id), trip];
+  return persist();
+}
+
+function renderCart() {
+  const trip = activeTrip();
+  if (!trip) {
+    const stores = state.stores || [];
+    const recent = (state.trips || []).filter((entry) => entry.status === 'done').sort((a, b) => String(b.finishedAt).localeCompare(String(a.finishedAt))).slice(0, 5);
+    return `${renderHeader('Καλάθι', 'Σκάναρε ό,τι βάζεις στο καρότσι και δες το σύνολο πριν το ταμείο.')}
+      <section class="panel settings-card" id="cart-start"><span class="stat-icon">🛒</span><h2>Νέα ψώνια</h2>
+        <form id="cart-start-form" class="cart-start-form" novalidate>
+          <label class="field-label" for="cart-store">Κατάστημα</label>
+          <select class="field-input" id="cart-store" name="store"><option value="">${escapeHtml(t('Άλλο / χωρίς κατάστημα'))}</option>${stores.map((store) => `<option value="${escapeHtml(store.id)}" data-no-i18n>${escapeHtml(store.name)}</option>`).join('')}</select>
+          <input class="field-input" name="storeName" maxlength="40" placeholder="Όνομα καταστήματος (προαιρετικά)" aria-label="Όνομα καταστήματος">
+          <label class="field-label" for="cart-budget">Προϋπολογισμός (€, προαιρετικά)</label>
+          <input class="field-input" id="cart-budget" name="budget" type="number" min="0" step="1" inputmode="decimal" placeholder="π.χ. 50">
+          <button class="button button-primary" type="submit">Ξεκίνα</button>
+        </form></section>
+      ${recent.length ? `<section class="panel"><div class="panel-heading"><div><h2>Πρόσφατα καλάθια</h2><p>Εκτίμηση και απόδειξη</p></div></div><ul class="trip-list" id="cart-recent">${recent.map((entry) => `<li><span data-no-i18n>${escapeHtml(entry.storeName || t('Κατάστημα'))} · ${escapeHtml(formatDate(entry.date))}</span><strong>${escapeHtml(money(entry.total))}</strong>${entry.receiptTotal != null ? `<small>${escapeHtml(t('απόδειξη {total} ({diff})', { total: money(entry.receiptTotal), diff: `${entry.receiptTotal - entry.total >= 0 ? '+' : ''}${money(entry.receiptTotal - entry.total)}` }))}</small>` : ''}</li>`).join('')}</ul></section>` : ''}`;
+  }
+  const remaining = remainingShopping(state.shopping, trip);
+  const budget = budgetState(trip);
+  const left = trip.budget ? trip.budget - trip.total : 0;
+  return `<header class="page-heading"><div><p class="eyebrow">ΚΑΛΑΘΙ</p><h1 data-no-i18n>${escapeHtml(trip.storeName || t('Καλάθι'))}</h1><p>${escapeHtml(t('{count} προϊόντα στο καλάθι', { count: trip.items.length }))}</p></div></header>
+    <section class="panel cart-total-panel is-${budget}"><p class="eyebrow">Σύνολο</p><p class="cart-total" id="cart-total">${escapeHtml(money(trip.total))}</p>
+      ${trip.budget ? `<div class="budget-track"><span style="width:${Math.min(100, Math.round((trip.total / trip.budget) * 100))}%"></span></div><p class="field-hint" id="cart-budget-state">${escapeHtml(budget === 'over' ? t('Ξεπέρασες τον προϋπολογισμό κατά {amount}!', { amount: money(-left) }) : t('Απομένουν {amount} από {budget}', { amount: money(left), budget: money(trip.budget) }))}</p>` : ''}
+      ${budget === 'over' ? `<p class="alert-banner is-danger" id="cart-budget-warning" role="alert">${escapeHtml(t('Πάνω από τον προϋπολογισμό'))}</p>` : ''}
+      <div class="settings-actions cart-actions"><button class="button button-primary" type="button" data-action="cart-scan">📷 Σάρωση</button><button class="button button-quiet" type="button" data-action="cart-add-manual">＋ Χωρίς barcode</button></div></section>
+    <section class="panel"><div class="panel-heading"><div><h2>Στο καλάθι</h2></div></div><div class="cart-lines" id="cart-lines">${trip.items.length ? trip.items.map((item) => `<div class="cart-line" data-key="${escapeHtml(item.key)}"><div class="cart-line-main"><strong class="product-name" data-no-i18n>${escapeHtml(item.name)}</strong><small>${escapeHtml(item.unit === 'κιλά' ? t('{qty} κιλά × {price}/κιλό', { qty: String(item.qty).replace('.', ','), price: money(item.price) }) : t('{qty} × {price}', { qty: item.qty, price: money(item.price) }))}</small></div>
+      ${item.unit === 'κιλά' ? '' : `<div class="qty-stepper small"><button class="icon-button" type="button" data-action="cart-line-step" data-key="${escapeHtml(item.key)}" data-delta="-1" aria-label="${escapeHtml(t('Λιγότερα {name}', { name: item.name }))}">−</button><span class="cart-qty">${item.qty}</span><button class="icon-button" type="button" data-action="cart-line-step" data-key="${escapeHtml(item.key)}" data-delta="1" aria-label="${escapeHtml(t('Περισσότερα {name}', { name: item.name }))}">＋</button></div>`}
+      <button class="text-button cart-line-total" type="button" data-action="cart-edit" data-key="${escapeHtml(item.key)}" aria-label="${escapeHtml(t('Επεξεργασία {name}', { name: item.name }))}">${escapeHtml(money(lineTotal(item)))}</button><button class="icon-button" type="button" data-action="cart-remove" data-key="${escapeHtml(item.key)}" aria-label="${escapeHtml(t('Διαγραφή {name}', { name: item.name }))}">×</button></div>`).join('') : '<p class="subtle-empty">Σκάναρε το πρώτο προϊόν ή διάλεξε από τη λίστα.</p>'}</div></section>
+    ${remaining.length ? `<section class="panel"><div class="panel-heading"><div><h2>Από τη λίστα (λείπουν)</h2><p>${escapeHtml(t('{count} ακόμη', { count: remaining.length }))}</p></div></div><div class="cart-remaining" id="cart-remaining">${remaining.map((row) => `<button type="button" class="meal-option" data-action="cart-from-list" data-id="${escapeHtml(row.id)}"><span data-no-i18n>${escapeHtml(row.name)}</span><small>＋ ${escapeHtml(t('στο καλάθι'))}</small></button>`).join('')}</div></section>` : ''}
+    <div class="settings-actions cart-finish"><button class="button button-quiet" type="button" data-action="cart-cancel">Ακύρωση καλαθιού</button><button class="button button-primary" type="button" data-action="cart-finish" ${trip.items.length ? '' : 'disabled'}>✓ Τέλος ψωνίσματος</button></div>`;
+}
+
+function openCartItem(prefill = {}) {
+  const trip = activeTrip();
+  if (!trip) return;
+  const form = document.querySelector('#cart-item-form');
+  form.reset();
+  const existing = prefill.key ? trip.items.find((item) => item.key === prefill.key) : null;
+  const data = { ...existing, ...prefill };
+  form.elements.key.value = existing?.key || '';
+  form.elements.barcode.value = data.barcode || '';
+  form.elements.shoppingId.value = data.shoppingId || '';
+  form.elements.category.value = data.category || 'Άλλο';
+  form.elements.name.value = data.name || '';
+  form.elements.unit.value = data.unit === 'κιλά' ? 'κιλά' : 'τεμ.';
+  form.elements.qty.value = String(data.qty ?? (data.unit === 'κιλά' ? '' : 1));
+  const memory = existing ? null : lastPrice(state.prices || [], trip, { barcode: data.barcode, name: data.name || '' });
+  const price = existing?.price ?? memory?.price;
+  form.elements.price.value = price ? String(price.toFixed(2)).replace('.', ',') : '';
+  if (memory && !existing && !data.unit) form.elements.unit.value = memory.unit === 'κιλά' ? 'κιλά' : 'τεμ.';
+  document.querySelector('#cart-price-hint').textContent = memory ? (memory.sameStore ? t('Τελευταία τιμή εδώ: {price} ({date})', { price: money(memory.price), date: formatDate(memory.date) }) : t('Τελευταία τιμή σε {store}: {price}', { store: memory.store || t('άλλο κατάστημα'), price: money(memory.price) })) : '';
+  document.querySelector('#cart-item-lookup').textContent = data.lookup || '';
+  document.querySelector('#cart-item-error').hidden = true;
+  document.querySelector('#cart-item-title').textContent = t(existing ? 'Επεξεργασία' : 'Προϊόν στο καλάθι');
+  updateCartQtyLabel();
+  document.querySelector('#cart-item-dialog').showModal();
+  (data.name ? form.elements.price : form.elements.name).focus();
+}
+
+function updateCartQtyLabel() {
+  const form = document.querySelector('#cart-item-form');
+  const kg = form.elements.unit.value === 'κιλά';
+  document.querySelector('#cart-qty-label').textContent = t(kg ? 'Βάρος (κιλά)' : 'Ποσότητα');
+  form.elements.qty.step = kg ? '0.005' : '1';
+}
+
+async function cartBarcode(code) {
+  const barcode = normalizeBarcode(code) || String(code || '').trim();
+  const trip = activeTrip();
+  if (!trip || !barcode) return;
+  const inCart = trip.items.find((item) => item.barcode === barcode);
+  if (inCart && inCart.unit === 'τεμ.') {
+    if (saveTrip(updateCartItem(trip, inCart.key, { qty: inCart.qty + 1 }))) { renderApp(); showToast(t('+1 {name}', { name: inCart.name })); }
+    if (cartScanning) setTimeout(() => startCartScan(), 600);
+    return;
+  }
+  const known = state.items.find((item) => item.barcode === barcode) || (state.prices || []).find((p) => p.barcode === barcode);
+  if (known) { openCartItem({ barcode, name: known.name, category: known.category, lookup: t('Γνωστό προϊόν') }); return; }
+  openCartItem({ barcode, name: '', lookup: t('Αναζήτηση στο Open Food Facts…') });
+  try {
+    const product = navigator.onLine === false ? null : await lookupBarcode(barcode);
+    const form = document.querySelector('#cart-item-form');
+    if (form.elements.barcode.value !== barcode) return;
+    if (product?.name && !form.elements.name.value) { form.elements.name.value = product.name; if (product.category) form.elements.category.value = product.category; }
+    document.querySelector('#cart-item-lookup').textContent = product?.name ? t('Βρέθηκε στο Open Food Facts.') : t('Δεν βρέθηκε όνομα. Γράψ’ το εσύ.');
+    if (product?.name) {
+      const memory = lastPrice(state.prices || [], trip, { barcode, name: product.name });
+      if (memory && !form.elements.price.value) form.elements.price.value = String(memory.price.toFixed(2)).replace('.', ',');
+    }
+  } catch { document.querySelector('#cart-item-lookup').textContent = t('Χωρίς σύνδεση: γράψε το όνομα.'); }
+}
+
+function startCartScan() {
+  cartScanning = true;
+  openScanner({ onCode: cartBarcode });
+}
+
+function saveCartItem(form) {
+  const trip = activeTrip();
+  if (!trip) return;
+  const error = document.querySelector('#cart-item-error');
+  const price = Number(String(form.elements.price.value).replace(/\s/g, '').replace(',', '.'));
+  const qty = Number(String(form.elements.qty.value).replace(',', '.'));
+  const unit = form.elements.unit.value;
+  if (!form.elements.name.value.trim()) { error.textContent = t('Γράψε όνομα προϊόντος.'); error.hidden = false; return; }
+  if (!Number.isFinite(price) || price < 0 || price > 10000) { error.textContent = t('Γράψε μια έγκυρη τιμή.'); error.hidden = false; return; }
+  if (!(qty > 0)) { error.textContent = t(unit === 'κιλά' ? 'Γράψε το βάρος σε κιλά.' : 'Η ποσότητα πρέπει να είναι πάνω από 0.'); error.hidden = false; return; }
+  const key = form.elements.key.value;
+  const next = key ? updateCartItem(trip, key, { name: form.elements.name.value.trim(), unit, qty, price })
+    : addCartItem(trip, { barcode: form.elements.barcode.value, shoppingId: form.elements.shoppingId.value, category: form.elements.category.value, name: form.elements.name.value, unit, qty, price });
+  if (!saveTrip(next)) return;
+  document.querySelector('#cart-item-dialog').close();
+  renderApp();
+  if (cartScanning && !key && form.elements.barcode.value) setTimeout(() => startCartScan(), 400);
+}
+
+function finishCart() {
+  const trip = activeTrip();
+  if (!trip) return;
+  showConfirm(t('Σύνολο {total}. Θα σημειωθούν ως αγορασμένα όσα είναι στη λίστα, θα μπουν στο απόθεμα και θα καταγραφούν τα έξοδα.', { total: money(trip.total) }), () => {
+    const out = finishTrip(state, trip);
+    state.items = out.items; state.shopping = out.shopping; state.purchases = out.purchases; state.prices = out.prices;
+    state.trips = [...(state.trips || []).filter((entry) => entry.id !== trip.id), out.trip];
+    if (!persist()) return;
+    cartScanning = false;
+    navigate('shopping');
+    showToast(t('Τέλος! {total} · {bought} από τη λίστα. Αν σκανάρεις την απόδειξη, θα συνδεθεί με αυτό το καλάθι.', { total: money(out.trip.total), bought: out.bought }));
+  }, 'Τέλος ψωνίσματος;');
 }
 
 // ---------- Household bills ----------
@@ -1216,6 +1372,26 @@ function handleAction(button) {
     if (nextQuantity === Number(item.quantity) && Number(button.dataset.delta) > 0) { showToast(t('Η μέγιστη ποσότητα είναι {max}.', { max: MAX_QUANTITY })); return; }
     state.items = state.items.map((entry) => entry.id === id ? { ...entry, quantity: nextQuantity, updatedAt: new Date().toISOString() } : entry);
     persist(); renderApp();
+  } else if (action === 'cart-scan') startCartScan();
+  else if (action === 'cart-add-manual') { cartScanning = false; openCartItem({}); }
+  else if (action === 'close-cart-item') { cartScanning = false; document.querySelector('#cart-item-dialog').close(); }
+  else if (action === 'cart-from-list') { const row = state.shopping.find((entry) => entry.id === id); if (row) { cartScanning = false; openCartItem({ name: row.name, shoppingId: row.id, qty: normalizeUnit(row.unit) === 'κιλά' ? row.quantity : Math.max(1, Math.round(row.quantity)), unit: normalizeUnit(row.unit) === 'κιλά' ? 'κιλά' : 'τεμ.', category: rowCategory(row, state.items) }); } }
+  else if (action === 'cart-edit') { cartScanning = false; openCartItem({ key: button.dataset.key }); }
+  else if (action === 'cart-remove') { const trip = activeTrip(); if (trip && saveTrip(removeCartItem(trip, button.dataset.key))) renderApp(); }
+  else if (action === 'cart-line-step') { const trip = activeTrip(); const item = trip?.items.find((entry) => entry.key === button.dataset.key); if (item && saveTrip(updateCartItem(trip, item.key, { qty: item.qty + Number(button.dataset.delta) }))) renderApp(); }
+  else if (action === 'cart-qty-step') { const input = document.querySelector('#cart-item-qty'); const kg = document.querySelector('#cart-item-unit').value === 'κιλά'; input.value = String(Math.max(0, Math.round(((Number(input.value) || 0) + Number(button.dataset.delta) * (kg ? 0.1 : 1)) * 1000) / 1000)); }
+  else if (action === 'keypad') {
+    const input = document.querySelector('#cart-item-price');
+    const key = button.dataset.key;
+    let value = input.value.replace('.', ',');
+    if (key === '⌫') value = value.slice(0, -1);
+    else if (key === ',') { if (!value.includes(',')) value = `${value || '0'},`; }
+    else if (!/,\d{2}$/.test(value)) value = value === '0' ? key : value + key;
+    input.value = value;
+  } else if (action === 'cart-finish') finishCart();
+  else if (action === 'cart-cancel') {
+    const trip = activeTrip();
+    if (trip) showConfirm('Το καλάθι θα διαγραφεί χωρίς να καταγραφεί τίποτα.', () => { state.trips = state.trips.filter((entry) => entry.id !== trip.id); cartScanning = false; if (persist()) renderApp(); }, 'Ακύρωση καλαθιού;');
   } else if (action === 'add-bill') openBillDialog();
   else if (action === 'close-bill') document.querySelector('#bill-dialog').close();
   else if (action === 'bill-edit') openBillDialog(id);
@@ -1285,7 +1461,7 @@ function handleAction(button) {
   });
   else if (action === 'sync-leave') showConfirm('Θα επιστρέψεις στο δικό σου νοικοκυριό. Τα κοινά προϊόντα θα μείνουν στο κοινό νοικοκυριό.', () => syncAction(() => sync.leaveHousehold(), 'Αποχώρησες από το νοικοκυριό.'), 'Αποχώρηση;');
   else if (action === 'scan-barcode') openScanner();
-  else if (action === 'close-scan') closeScanner();
+  else if (action === 'close-scan') { cartScanning = false; closeScanner(); }
   else if (action === 'lookup-barcode') fillFromBarcode(itemForm.elements.barcode.value);
   else if (action === 'enable-notifications') enableNotifications();
   else if (action === 'disable-notifications') { saveNotifySettings({ enabled: false }); updateBackgroundCheck(); renderApp(); showToast('Οι ειδοποιήσεις απενεργοποιήθηκαν.'); }
@@ -1329,7 +1505,7 @@ function handleAction(button) {
     else loadDemo();
   } else if (action === 'clear-data') {
     showConfirm(`${t('Θα διαγραφούν όλα τα προϊόντα και η λίστα αγορών από αυτή τη συσκευή.')}${syncStatus.user ? t(' Επειδή είσαι συνδεδεμένος, θα διαγραφούν και από τις συγχρονισμένες συσκευές.') : ''}${t(' Φρόντισε να έχεις αντίγραφο αν τα χρειάζεσαι.')}`, () => {
-      state = { items: [], shopping: [], recurring: [], stores: [], purchases: [], waste: [], receipts: [], meals: [], bills: [] }; persist(); renderApp(); showToast('Τα δεδομένα διαγράφηκαν.');
+      state = { items: [], shopping: [], recurring: [], stores: [], purchases: [], waste: [], receipts: [], meals: [], bills: [], trips: [], prices: [] }; persist(); renderApp(); showToast('Τα δεδομένα διαγράφηκαν.');
     }, 'Διαγραφή όλων των δεδομένων;');
   }
 }
@@ -1347,6 +1523,7 @@ document.addEventListener('input', (event) => {
 
 document.addEventListener('change', (event) => {
   if (event.target.id === 'bill-type') event.target.form.dataset.typeTouched = '1';
+  if (event.target.id === 'cart-item-unit') updateCartQtyLabel();
   if (event.target.matches?.('[data-bill-file]')) { importBillFile(event.target.files?.[0]); event.target.value = ''; return; }
   if (event.target.matches?.('[data-receipt-photo]')) { loadReceiptPhoto(event.target.files?.[0]); return; }
   if (event.target.classList?.contains('price-input')) {
@@ -1399,6 +1576,14 @@ document.addEventListener('input', (event) => {
 
 document.addEventListener('submit', (event) => {
   if (event.target.id === 'bill-form') { event.preventDefault(); saveBillForm(event.target); return; }
+  if (event.target.id === 'cart-item-form') { event.preventDefault(); saveCartItem(event.target); return; }
+  if (event.target.id === 'cart-start-form') {
+    event.preventDefault();
+    const form = event.target;
+    const store = (state.stores || []).find((entry) => entry.id === form.elements.store.value) || null;
+    if (saveTrip(createTrip({ store, storeName: form.elements.storeName.value, budget: form.elements.budget.value }))) renderApp();
+    return;
+  }
   if (event.target === itemForm) {
     event.preventDefault();
     const formData = new FormData(itemForm);

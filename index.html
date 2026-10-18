@@ -130,6 +130,26 @@
     </form>
   </dialog>
 
+  <dialog id="cart-item-dialog" class="item-dialog cart-item-dialog" aria-labelledby="cart-item-title">
+    <form id="cart-item-form" novalidate>
+      <div class="dialog-heading"><div><p class="eyebrow">ΚΑΛΑΘΙ</p><h2 id="cart-item-title">Προϊόν στο καλάθι</h2></div><button class="icon-button" type="button" data-action="close-cart-item" aria-label="Κλείσιμο">×</button></div>
+      <input type="hidden" name="key"><input type="hidden" name="barcode"><input type="hidden" name="shoppingId"><input type="hidden" name="category">
+      <label class="field-label" for="cart-item-name">Όνομα προϊόντος</label>
+      <input class="field-input" id="cart-item-name" name="name" maxlength="80" required autocomplete="off">
+      <p class="field-hint" id="cart-item-lookup" role="status"></p>
+      <div class="field-row">
+        <div><label class="field-label" for="cart-item-unit">Τιμή ανά</label><select class="field-input" id="cart-item-unit" name="unit"><option value="τεμ.">τεμ.</option><option value="κιλά">κιλό</option></select></div>
+        <div><label class="field-label" for="cart-item-qty" id="cart-qty-label">Ποσότητα</label><div class="qty-stepper"><button class="icon-button" type="button" data-action="cart-qty-step" data-delta="-1" aria-label="Λιγότερα">−</button><input class="field-input" id="cart-item-qty" name="qty" type="number" min="0" max="999" step="0.001" inputmode="decimal" value="1"><button class="icon-button" type="button" data-action="cart-qty-step" data-delta="1" aria-label="Περισσότερα">＋</button></div></div>
+      </div>
+      <label class="field-label" for="cart-item-price">Τιμή (€)</label>
+      <input class="field-input cart-price-display" id="cart-item-price" name="price" inputmode="decimal" autocomplete="off" placeholder="0,00">
+      <p class="field-hint" id="cart-price-hint" role="status"></p>
+      <div class="keypad" role="group" aria-label="Πληκτρολόγιο τιμής"><button type="button" class="keypad-key" data-action="keypad" data-key="1">1</button><button type="button" class="keypad-key" data-action="keypad" data-key="2">2</button><button type="button" class="keypad-key" data-action="keypad" data-key="3">3</button><button type="button" class="keypad-key" data-action="keypad" data-key="4">4</button><button type="button" class="keypad-key" data-action="keypad" data-key="5">5</button><button type="button" class="keypad-key" data-action="keypad" data-key="6">6</button><button type="button" class="keypad-key" data-action="keypad" data-key="7">7</button><button type="button" class="keypad-key" data-action="keypad" data-key="8">8</button><button type="button" class="keypad-key" data-action="keypad" data-key="9">9</button><button type="button" class="keypad-key" data-action="keypad" data-key=",">,</button><button type="button" class="keypad-key" data-action="keypad" data-key="0">0</button><button type="button" class="keypad-key" data-action="keypad" data-key="⌫">⌫</button></div>
+      <p class="form-error" id="cart-item-error" role="alert" hidden></p>
+      <div class="dialog-actions"><button class="button button-quiet" type="button" data-action="close-cart-item">Άκυρο</button><button class="button button-primary" type="submit" id="cart-item-save">Στο καλάθι</button></div>
+    </form>
+  </dialog>
+
   <dialog id="meal-dialog" class="item-dialog meal-dialog" aria-labelledby="meal-title">
     <div class="dialog-heading"><div><p class="eyebrow" id="meal-when" data-no-i18n></p><h2 id="meal-title">Γεύμα</h2></div><button class="icon-button" type="button" data-action="close-meal" aria-label="Κλείσιμο">×</button></div>
     <div id="meal-body"></div>

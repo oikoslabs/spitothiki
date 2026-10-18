@@ -2,14 +2,14 @@
 // Strategy: network-first for everything from this site (HTML, JS, CSS, manifest), so a new
 // deploy shows up on the next load; the cache is only used when the network is unavailable.
 // Bump CACHE_VERSION when the list of shell files changes; old caches are deleted on activate.
-const CACHE_VERSION = 'v15';
+const CACHE_VERSION = 'v16';
 const CACHE = `spitothiki-${CACHE_VERSION}`;
 const OCR_CACHE = 'spitothiki-ocr';
 const SHARE_CACHE = 'spitothiki-share'; // a file shared to the app (Web Share Target), picked up by the page // Tesseract.js script/worker/core/language files, kept across versions
 const DATA_CACHE = 'spitothiki-data'; // written by the app: expiry snapshot for background checks
 const SHELL = [
   './', './index.html', './styles.css', './manifest.webmanifest',
-  './src/app.js', './src/i18n.js', './src/features.js', './src/recipes.js', './src/receipt.js', './src/receipt-photo.js', './src/mealplan.js', './src/bills.js', './src/bill-pdf.js', './src/domain.js', './src/storage.js', './src/barcode.js', './src/firebase-config.js', './src/sync-core.js', './src/sync-firebase.js',
+  './src/app.js', './src/i18n.js', './src/features.js', './src/recipes.js', './src/receipt.js', './src/receipt-photo.js', './src/mealplan.js', './src/bills.js', './src/bill-pdf.js', './src/cart.js', './src/domain.js', './src/storage.js', './src/barcode.js', './src/firebase-config.js', './src/sync-core.js', './src/sync-firebase.js',
   './icons/icon-192.png', './icons/icon-512.png', './icons/icon.svg'
 ];
 
