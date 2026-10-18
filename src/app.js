@@ -1025,8 +1025,8 @@ function renderCart() {
       <section class="panel settings-card" id="cart-start"><span class="stat-icon">🛒</span><h2>Νέα ψώνια</h2>
         <form id="cart-start-form" class="cart-start-form" novalidate>
           <label class="field-label" for="cart-store">Κατάστημα</label>
-          <select class="field-input" id="cart-store" name="store"><option value="">${escapeHtml(t('Άλλο / χωρίς κατάστημα'))}</option>${stores.map((store) => `<option value="${escapeHtml(store.id)}" data-no-i18n>${escapeHtml(store.name)}</option>`).join('')}</select>
-          <input class="field-input" name="storeName" maxlength="40" placeholder="Όνομα καταστήματος (προαιρετικά)" aria-label="Όνομα καταστήματος">
+          <select class="field-input" id="cart-store" name="store">${stores.map((store) => `<option value="${escapeHtml(store.id)}" data-no-i18n ${activeStore()?.id === store.id ? 'selected' : ''}>${escapeHtml(store.name)}</option>`).join('')}<option value="__new" ${stores.length ? '' : 'selected'}>${escapeHtml(t('＋ Νέο κατάστημα…'))}</option><option value="">${escapeHtml(t('Άλλο / χωρίς κατάστημα'))}</option></select>
+          <div id="cart-new-store-row" ${stores.length ? 'hidden' : ''}><input class="field-input" id="cart-new-store" name="storeName" maxlength="40" placeholder="π.χ. Σκλαβενίτης Παγκρατίου" aria-label="Όνομα νέου καταστήματος" autocomplete="off"><p class="field-hint">${escapeHtml(t('Θα αποθηκευτεί στα καταστήματά σου για την επόμενη φορά.'))}</p></div>
           <label class="field-label" for="cart-budget">Προϋπολογισμός (€, προαιρετικά)</label>
           <input class="field-input" id="cart-budget" name="budget" type="number" min="0" step="1" inputmode="decimal" placeholder="π.χ. 50">
           <button class="button button-primary" type="submit">Ξεκίνα</button>
@@ -1581,6 +1581,7 @@ document.addEventListener('input', (event) => {
 document.addEventListener('change', (event) => {
   if (event.target.id === 'bill-type') event.target.form.dataset.typeTouched = '1';
   if (event.target.id === 'cart-item-unit') updateCartQtyLabel();
+  if (event.target.id === 'cart-store') { const row = document.querySelector('#cart-new-store-row'); row.hidden = event.target.value !== '__new'; if (!row.hidden) document.querySelector('#cart-new-store').focus(); }
   if (event.target.classList?.contains('vm-mode')) {
     const current = activeStore();
     if (current) { const vm = { ...(current.vm || {}) }; if (event.target.value === 'auto') delete vm[event.target.dataset.prefix]; else vm[event.target.dataset.prefix] = event.target.value; state.stores = state.stores.map((store) => (store.id === current.id ? { ...store, vm, updatedAt: new Date().toISOString() } : store)); persist(); showToast(t('Αποθηκεύτηκε.')); }
@@ -1642,8 +1643,18 @@ document.addEventListener('submit', (event) => {
   if (event.target.id === 'cart-start-form') {
     event.preventDefault();
     const form = event.target;
-    const store = (state.stores || []).find((entry) => entry.id === form.elements.store.value) || null;
-    if (saveTrip(createTrip({ store, storeName: form.elements.storeName.value, budget: form.elements.budget.value }))) renderApp();
+    let store = (state.stores || []).find((entry) => entry.id === form.elements.store.value) || null;
+    const typed = form.elements.storeName.value.trim();
+    if (form.elements.store.value === '__new' && typed) {
+      store = (state.stores || []).find((entry) => normalizeSearch(entry.name).trim() === normalizeSearch(typed).trim()) || null;
+      if (!store) {
+        try { store = createStore({ name: typed }); } catch (error) { showToast(t(error.message)); return; }
+        state.stores = [...(state.stores || []), store];
+        showToast(t('Το κατάστημα «{name}» αποθηκεύτηκε.', { name: store.name }));
+      }
+    }
+    if (store) { try { localStorage.setItem(STORE_KEY, store.id); } catch {} }
+    if (saveTrip(createTrip({ store, budget: form.elements.budget.value }))) renderApp();
     return;
   }
   if (event.target === itemForm) {

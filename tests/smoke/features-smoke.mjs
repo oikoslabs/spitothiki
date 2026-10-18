@@ -57,7 +57,7 @@ async function check(name, fn) {
   catch (e) { console.log(`FAIL ${name}: ${e.message}`); errors.push(`${name}: ${e.message}`); }
 }
 const shot = async (name) => { if (shots) await page.screenshot({ path: `${shots}/feature-${name}-${lang}${width < 700 ? '-phone' : ''}.png`, fullPage: true }); };
-const greekLeft = async () => en ? (await page.evaluate(() => window.__i18n.untranslatedGreek())).filter((s) => !/Γάλα|Ψωμί|Αυγά|Μήλα|Ρύζι|Γιαούρτι|Ελαιόλαδο|Ντομάτες|Φέτα|Κοτόπουλο|Πατάτες|Χαρτί|Πεκορίνο|ΔΟΚΙΜΑΣΤΙΚΟ|ΧΑΣΙΩΤΗ|Χασιώτη|Φέτα Δοκιμής|Ντομάτες|Ρύζι|ΔΕΗ|ΕΥΔΑΠ|Φακές με ρύζι|Χουρμαδες|Κασιους|Καρυδοψιχα|(aria-label|title)=(Import: |Decrease quantity of |Increase quantity of |Edit |Thrown away: |Delete )/.test(s)) : [];
+const greekLeft = async () => en ? (await page.evaluate(() => window.__i18n.untranslatedGreek())).filter((s) => !/Γάλα|Ψωμί|Αυγά|Μήλα|Ρύζι|Γιαούρτι|Ελαιόλαδο|Ντομάτες|Φέτα|Κοτόπουλο|Πατάτες|Χαρτί|Πεκορίνο|ΔΟΚΙΜΑΣΤΙΚΟ|ΧΑΣΙΩΤΗ|Χασιώτη|Μασούτης|Φέτα Δοκιμής|Ντομάτες|Ρύζι|ΔΕΗ|ΕΥΔΑΠ|Φακές με ρύζι|Χουρμαδες|Κασιους|Καρυδοψιχα|(aria-label|title)=(Import: |Decrease quantity of |Increase quantity of |Edit |Thrown away: |Delete )/.test(s)) : [];
 
 await page.goto(url, { waitUntil: 'networkidle0' });
 await page.evaluate(() => localStorage.clear());
@@ -556,6 +556,25 @@ await check('cart: start trip, scan with remembered price, OFF lookup, weighed i
     && s.prices.some((p) => p.barcode === '5209999999999' && p.price === 4.5) && s.prices.find((p) => p.barcode === '5201111111111').price === 1.89
     && linkBanner !== null && pantryUnchecked && !s2.purchases.some((p) => p.tripId === trip.id) && s2.purchases.some((p) => p.storeName === 'ΧΑΣΙΩΤΗ') && s2.trips[0].receiptTotal === 16 && /16/.test(recent);
   if (!ok) console.log('  cart:', { scan1, scan2, keyed, over: !!over, remaining1, total, left, trip: trip?.status, shopping: s.shopping.map((r) => r.checked), tripPurchases: s.purchases.filter((p) => p.tripId === trip?.id).length, milk: s.items.find((i) => i.id === 'milk')?.quantity, prices: s.prices.length, link: !!linkBanner, pantryUnchecked, after: s2.purchases.length, rt: s2.trips[0]?.receiptTotal, recent });
+  return ok;
+});
+
+await check('cart start: inline new store is saved, survives reload, selected next time', async () => {
+  await page.evaluate(() => { const st = JSON.parse(localStorage.getItem('spitothiki:v1')); Object.assign(st, { stores: [], trips: [] }); localStorage.setItem('spitothiki:v1', JSON.stringify(st)); localStorage.removeItem('spitothiki:store'); });
+  await page.reload({ waitUntil: 'networkidle0' });
+  await nav('shopping'); await tap('#open-cart'); await wait();
+  const defaultNew = await page.$eval('#cart-store', (e) => e.value === '__new') && !(await page.$eval('#cart-new-store-row', (e) => e.hidden));
+  await page.type('#cart-new-store', 'Μασούτης'); await shot('cart-new-store');
+  await tap('#cart-start-form button[type=submit]'); await wait();
+  await tap('[data-action="cart-cancel"]'); await wait(); await tap('#confirm-accept'); await wait();
+  await page.reload({ waitUntil: 'networkidle0' });
+  await nav('shopping'); await tap('#open-cart'); await wait();
+  const selected = await page.$eval('#cart-store', (e) => e.options[e.selectedIndex].textContent);
+  const hidden = await page.$eval('#cart-new-store-row', (e) => e.hidden);
+  const s = await stored();
+  const left = await greekLeft();
+  const ok = defaultNew && s.stores.length === 1 && s.stores[0].name === 'Μασούτης' && selected === 'Μασούτης' && hidden && !left.length;
+  if (!ok) console.log('  new store:', { defaultNew, stores: s.stores, selected, hidden, left });
   return ok;
 });
 

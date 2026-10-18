@@ -4,8 +4,8 @@ export const fakeApp = `export function initializeApp(config) { return { config 
 
 export const fakeAuth = `
 const listeners = [];
-let current = null;
-const emit = () => listeners.forEach((fn) => fn(current));
+let current = (() => { try { return JSON.parse(sessionStorage.getItem('__fakeUser') || 'null'); } catch { return null; } })();
+const emit = () => { try { sessionStorage.setItem('__fakeUser', JSON.stringify(current)); } catch {} listeners.forEach((fn) => fn(current)); };
 export function getAuth() { return {}; }
 export function useDeviceLanguage() {}
 export function onAuthStateChanged(auth, fn) { listeners.push(fn); setTimeout(() => fn(current), 0); return () => {}; }

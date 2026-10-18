@@ -13,6 +13,7 @@ const CONFIG = `export const firebaseConfig = { apiKey: 'test', authDomain: 'tes
 async function device(name) {
   const context = await browser.createBrowserContext();
   const page = await context.newPage();
+  await page.setBypassServiceWorker(true);
   await page.setViewport({ width: 1100, height: 900 });
   page.on('pageerror', (e) => errors.push(`${name} pageerror: ${e.message}`));
   page.on('console', (m) => { if (m.type() === 'error' && !m.text().includes('404')) errors.push(`${name} console: ${m.text()}`); });
@@ -92,6 +93,22 @@ await check('changes and deletions propagate', async () => {
   await phone.click(`.inventory-card:nth-child(${names.indexOf('Ρύζι') + 1}) [data-action="delete-item"]`); await wait();
   await phone.click('#confirm-accept'); await wait(900);
   return bumped && JSON.stringify(await items(laptop)) === JSON.stringify(['Γάλα:2']);
+});
+await check('stores created in ⚙ and at cart start persist after reload and reach the other device', async () => {
+  await phone.setViewport({ width: 375, height: 800, isMobile: true, hasTouch: true });
+  await phone.evaluate(() => { location.hash = '#shopping'; }); await wait();
+  await phone.click('[data-action="toggle-stores"]'); await wait();
+  await phone.type('#store-form input[name=name]', 'Σκλαβενίτης'); await phone.click('#store-form button[type=submit]'); await wait(900);
+  await phone.click('#open-cart'); await wait();
+  await phone.select('#cart-store', '__new'); await wait();
+  await phone.type('#cart-new-store', 'Μασούτης'); await phone.click('#cart-start-form button[type=submit]'); await wait(900);
+  await phone.reload({ waitUntil: 'networkidle0' }); await wait(1500);
+  const names = (p) => p.evaluate(() => (JSON.parse(localStorage.getItem('spitothiki:v1')).stores || []).map((s) => s.name).sort().join(','));
+  const local = await names(phone), other = await names(laptop);
+  const trip = await phone.evaluate(() => JSON.parse(localStorage.getItem('spitothiki:v1')).trips.find((t) => t.status === 'active'));
+  const stillSignedIn = /Συγχρονισμένο|Synced/.test(await phone.evaluate(() => { location.hash = '#settings'; return new Promise((r) => setTimeout(() => r(document.querySelector('#sync-status')?.textContent || ''), 600)); }));
+  if (local !== 'Μασούτης,Σκλαβενίτης' || other !== local) console.log('  stores:', { local, other, trip: trip?.storeName, stillSignedIn });
+  return local === 'Μασούτης,Σκλαβενίτης' && other === local && trip?.storeName === 'Μασούτης' && Boolean(trip.storeId) && stillSignedIn;
 });
 await check('sign out keeps local data', async () => {
   await phone.evaluate(() => { location.hash = '#settings'; }); await wait();
