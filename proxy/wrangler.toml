@@ -3,3 +3,7 @@ account_id = "509f96807f1c43e201c2a56cc6d65683"
 main = "worker.js"
 compatibility_date = "2026-10-01"
 workers_dev = true
+
+[[analytics_engine_datasets]]
+binding = "RECEIPTS"
+dataset = "spitothiki_receipts"
