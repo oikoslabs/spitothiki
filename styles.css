@@ -509,3 +509,24 @@ body[data-screen="pantry"] .topbar .button-add { display: none; }
 .history-filter select { max-width: 260px; }
 .history-month h3 { display: flex; justify-content: space-between; font-size: 14px; text-transform: capitalize; margin: 14px 0 6px; color: #4f5f55; }
 .history-more { width: 100%; margin-top: 10px; }
+
+/* Consolidated menu (☰): one list with every section; phones keep 4 bottom shortcuts. */
+.menu-button { display: none; }
+.nav-menu-item { display: none; }
+.menu-sheet { width: min(100% - 24px, 420px); max-height: 88vh; margin: auto 0 auto auto; height: 100vh; max-height: 100vh; padding: 20px; border: 0; border-radius: 22px 0 0 22px; background: #fff; color: var(--ink); box-shadow: 0 24px 80px rgba(24,44,32,.25); overflow: auto; }
+.menu-sheet::backdrop { background: rgba(23,38,30,.42); backdrop-filter: blur(3px); }
+.menu-list { display: grid; gap: 4px; }
+.menu-group { margin: 12px 4px 2px; color: var(--muted, #6b7d70); font-size: 10px; font-weight: 800; letter-spacing: .12em; }
+.menu-item { display: flex; align-items: center; gap: 14px; width: 100%; min-height: 50px; padding: 8px 12px; border: 0; border-radius: 14px; background: transparent; color: inherit; font: 600 15px var(--body, inherit); text-align: left; cursor: pointer; }
+.menu-item:hover, .menu-item.is-active { background: #eef4ea; }
+.menu-icon { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 12px; background: #f0f5ec; font-size: 18px; }
+@media (max-width: 760px) {
+  .menu-button { display: grid; margin-right: -2px; }
+  .primary-nav { grid-template-columns: repeat(4,minmax(0,1fr)); }
+  .nav-secondary { display: none !important; }
+  .nav-menu-item { display: flex; }
+  .menu-sheet { margin: auto 0 0; width: 100%; max-width: 100%; height: auto; max-height: 86vh; border-radius: 22px 22px 0 0; padding-bottom: calc(20px + env(safe-area-inset-bottom)); }
+}
+:root[data-theme="dark"] .menu-sheet { background: #18221c; color: #e8efe9; }
+:root[data-theme="dark"] .menu-item:hover, :root[data-theme="dark"] .menu-item.is-active, :root[data-theme="dark"] .menu-icon { background: #22302a; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .menu-sheet { background: #18221c; color: #e8efe9; } :root:not([data-theme="light"]) .menu-item.is-active, :root:not([data-theme="light"]) .menu-icon { background: #22302a; } }

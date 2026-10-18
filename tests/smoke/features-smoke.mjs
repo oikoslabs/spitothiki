@@ -51,7 +51,7 @@ page.on('response', (r) => { if (r.status() >= 400 && !r.url().endsWith('favicon
 const wait = (ms = 300) => new Promise((r) => setTimeout(r, ms));
 const stored = () => page.evaluate(() => JSON.parse(localStorage.getItem('spitothiki:v1') || '{}'));
 async function tap(selector) { await page.$eval(selector, (el) => el.scrollIntoView({ block: 'center', behavior: 'instant' })); await wait(250); await page.click(selector); }
-async function nav(view) { await page.click(`.nav-item[data-view="${view}"]`); await wait(); }
+async function nav(view) { const direct = await page.$eval(`.nav-item[data-view="${view}"]`, (e) => e.offsetParent !== null).catch(() => false); if (direct) await page.click(`.nav-item[data-view="${view}"]`); else { await page.click('.nav-item[data-action="open-menu"]'); await wait(200); await page.click(`#menu-sheet [data-view="${view}"]`); } await wait(); }
 async function check(name, fn) {
   try { const ok = await fn(); console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}`); if (!ok) errors.push(name); }
   catch (e) { console.log(`FAIL ${name}: ${e.message}`); errors.push(`${name}: ${e.message}`); }
@@ -664,7 +664,59 @@ await check('scan: variable-measure EAN (weight→price switch per store), GS1 D
   return ok;
 });
 
-for (const view of ['shopping', 'settings', 'insights', 'pantry', 'cook']) await check(`no Greek UI left on ${view} (${lang})`, async () => { await nav(view); const left = await greekLeft(); if (left.length) console.log('  left:', left); return !left.length; });
+await check('transport: quick-add fuel with €/l + consumption, toll, recurring pass, vehicles, insights totals, fuel receipt photo → transport', async () => {
+  await page.evaluate(() => { const st = JSON.parse(localStorage.getItem('spitothiki:v1')); st.transport = []; st.transportRecurring = []; st.vehicles = []; localStorage.setItem('spitothiki:v1', JSON.stringify(st)); });
+  await page.reload({ waitUntil: 'networkidle0' }); await wait();
+  await nav('transport');
+  const fill = async (sel, v) => { await page.$eval(sel, (e) => { e.value = ''; }); await page.type(sel, v); };
+  const today = await page.$eval('#transport-date', (e) => e.value);
+  const month = today.slice(0, 8);
+  await page.select('#transport-type', 'fuel');
+  await fill('#transport-amount', '60'); await fill('#transport-liters', '40'); await fill('#transport-odometer', '10000'); await page.$eval('#transport-date', (e, d) => { e.value = d; }, `${month}01`);
+  await tap('#transport-save'); await wait();
+  await page.select('#transport-type', 'fuel');
+  await fill('#transport-amount', '45'); await fill('#transport-liters', '30'); await fill('#transport-odometer', '10500'); await page.$eval('#transport-date', (e, d) => { e.value = d; }, `${month}02`);
+  await tap('#transport-save'); await wait();
+  await page.select('#transport-type', 'tolls');
+  const fuelHidden = await page.$eval('#transport-fuel', (e) => e.hidden);
+  await fill('#transport-amount', '2.80'); await fill('#transport-note', 'Αττική Οδός');
+  await tap('#transport-save'); await wait();
+  await page.select('#transport-recurring-form select[name="type"]', 'transit');
+  await page.type('#transport-recurring-form input[name="amount"]', '27');
+  await tap('#transport-recurring-form button[type="submit"]'); await wait();
+  await page.type('#vehicle-form input[name="name"]', 'Μηχανάκι'); await tap('#vehicle-form button[type="submit"]'); await wait();
+  const total = await page.$eval('#transport-total', (e) => e.textContent);
+  const rows = (await page.$$('#transport-list .transport-row')).length;
+  const listText = await page.$eval('#transport-list', (e) => e.textContent);
+  const vehicleOpts = await page.$$eval('#transport-vehicle option', (els) => els.length);
+  await shot('transport');
+  const left = await greekLeft();
+  await nav('insights');
+  const grand = await page.$eval('#month-grand-total', (e) => e.textContent);
+  const card = await page.$eval('#transport-insights-total', (e) => e.textContent);
+  await shot('transport-insights');
+  // Fuel receipt via photo OCR, from the general receipt import: offer to save as transport.
+  await page.evaluate(() => { window.__spitoOcrMock = async () => ({ text: 'SHELL ΠΡΑΤΗΡΙΟ ΚΑΥΣΙΜΩΝ\n15/10/2026\nDIESEL 25,00 L x 1,659 €/L 41,48 24%\nΣΥΝΟΛΟ 41,48', confidence: 91 }); });
+  await nav('overview');
+  await tap('[data-action="open-receipt"]'); await wait();
+  const icon = new URL('../../icons/icon-192.png', import.meta.url).pathname;
+  await (await page.$('#receipt-photo-file')).uploadFile(icon); await wait(1500);
+  const offer = await page.$eval('#receipt-transport', (e) => e.textContent).catch(() => '');
+  await shot('transport-receipt-offer');
+  await tap('[data-action="receipt-to-transport"]'); await wait();
+  const pre = await page.evaluate(() => ({ type: document.querySelector('#transport-type').value, amount: document.querySelector('#transport-amount').value, liters: document.querySelector('#transport-liters').value, date: document.querySelector('#transport-date').value, hint: document.querySelector('#transport-ppl').textContent }));
+  await tap('#transport-save'); await wait();
+  await page.evaluate(() => { delete window.__spitoOcrMock; });
+  const s = await stored();
+  const ok = s.transport.length === 5 && s.transportRecurring.length === 1 && s.vehicles.length === 1 && rows === 4 && fuelHidden && vehicleOpts === 2
+    && /134[.,]80/.test(total) && /1[.,]5\d* €\/l/.test(listText) && /6 l\/100km/.test(listText) && /134[.,]80/.test(card) && grand.length > 0
+    && /καυσίμων|fuel/.test(offer) && pre.type === 'fuel' && pre.amount === '41.48' && pre.liters === '25' && pre.date === '2026-10-15' && /1[.,]659/.test(pre.hint)
+    && s.receipts.some((r) => r.format === 'transport') && !left.length;
+  if (!ok) console.log('  transport:', { n: s.transport.length, rows, fuelHidden, vehicleOpts, total, listText, card, grand, offer, pre, left });
+  return ok;
+});
+
+for (const view of ['shopping', 'settings', 'insights', 'pantry', 'cook', 'transport']) await check(`no Greek UI left on ${view} (${lang})`, async () => { await nav(view); const left = await greekLeft(); if (left.length) console.log('  left:', left); return !left.length; });
 
 console.log(`features ${width} ${lang}: ${errors.length ? 'FAILED ' + JSON.stringify(errors) : 'passed'}`);
 await browser.close();

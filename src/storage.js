@@ -1,6 +1,6 @@
 export const STORAGE_KEY = 'spitothiki:v1';
 // Optional record lists added after v0.1; old saves/backups without them stay valid.
-export const EXTRA_KINDS = ['recurring', 'stores', 'purchases', 'waste', 'receipts', 'meals', 'bills', 'trips', 'prices'];
+export const EXTRA_KINDS = ['recurring', 'stores', 'purchases', 'waste', 'receipts', 'meals', 'bills', 'trips', 'prices', 'transport', 'transportRecurring', 'vehicles'];
 export const DATA_KINDS = ['items', 'shopping', ...EXTRA_KINDS];
 
 function pick(value) {

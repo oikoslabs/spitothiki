@@ -19,7 +19,7 @@ async function check(name, fn) {
   try { const ok = await fn(); console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}`); if (!ok) errors.push(name); }
   catch (e) { console.log(`FAIL ${name}: ${e.message}`); errors.push(`${name}: ${e.message}`); }
 }
-const nav = async (v) => { await page.click(`.nav-item[data-view="${v}"]`); await wait(); };
+async function nav(view) { const direct = await page.$eval(`.nav-item[data-view="${view}"]`, (e) => e.offsetParent !== null).catch(() => false); if (direct) await page.click(`.nav-item[data-view="${view}"]`); else { await page.click('.nav-item[data-action="open-menu"]'); await wait(200); await page.click(`#menu-sheet [data-view="${view}"]`); } await wait(); }
 
 await page.goto(url, { waitUntil: 'networkidle0' });
 await page.evaluate(() => localStorage.clear());

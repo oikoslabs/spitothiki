@@ -29,10 +29,12 @@
         <button class="nav-item is-active" type="button" data-view="overview" aria-current="page"><span class="nav-icon" aria-hidden="true">⌂</span><span>Επισκόπηση</span></button>
         <button class="nav-item" type="button" data-view="pantry"><span class="nav-icon" aria-hidden="true">▦</span><span>Το απόθεμά μου</span><span class="nav-count" id="nav-pantry-count">0</span></button>
         <button class="nav-item" type="button" data-view="shopping"><span class="nav-icon" aria-hidden="true">✓</span><span>Λίστα αγορών</span><span class="nav-count" id="nav-shopping-count">0</span></button>
-        <button class="nav-item" type="button" data-view="cook"><span class="nav-icon" aria-hidden="true">🍳</span><span>Μαγείρεμα</span></button>
-        <button class="nav-item" type="button" data-view="bills"><span class="nav-icon" aria-hidden="true">📄</span><span>Λογαριασμοί</span><span class="nav-count" id="nav-bills-count" hidden>0</span></button>
-        <button class="nav-item" type="button" data-view="insights"><span class="nav-icon" aria-hidden="true">◔</span><span>Στατιστικά</span></button>
-        <button class="nav-item" type="button" data-view="settings"><span class="nav-icon" aria-hidden="true">⚙</span><span>Ρυθμίσεις</span></button>
+        <button class="nav-item nav-secondary" type="button" data-view="cook"><span class="nav-icon" aria-hidden="true">🍳</span><span>Μαγείρεμα</span></button>
+        <button class="nav-item nav-secondary" type="button" data-view="bills"><span class="nav-icon" aria-hidden="true">📄</span><span>Λογαριασμοί</span><span class="nav-count" id="nav-bills-count" hidden>0</span></button>
+        <button class="nav-item nav-secondary" type="button" data-view="transport"><span class="nav-icon" aria-hidden="true">🚗</span><span>Μετακινήσεις</span></button>
+        <button class="nav-item nav-secondary" type="button" data-view="insights"><span class="nav-icon" aria-hidden="true">◔</span><span>Στατιστικά</span></button>
+        <button class="nav-item nav-menu-item" type="button" data-action="open-menu" aria-haspopup="dialog"><span class="nav-icon" aria-hidden="true">☰</span><span>Μενού</span></button>
+        <button class="nav-item nav-secondary" type="button" data-view="settings"><span class="nav-icon" aria-hidden="true">⚙</span><span>Ρυθμίσεις</span></button>
       </nav>
 
       <div class="sidebar-bottom">
@@ -43,7 +45,7 @@
 
     <main id="main-content" class="main-content">
       <header class="topbar">
-        <div class="mobile-brand"><span class="brand-mark" aria-hidden="true">⌂</span><strong>Σπιτοθήκη</strong></div>
+        <button class="icon-button menu-button" type="button" data-action="open-menu" aria-haspopup="dialog" aria-label="Μενού">☰</button><div class="mobile-brand"><span class="brand-mark" aria-hidden="true">⌂</span><strong id="current-section">Σπιτοθήκη</strong></div>
         <div class="topbar-note"><span class="status-dot" aria-hidden="true"></span><span>Δουλεύει και χωρίς internet</span></div>
         <button class="button button-quiet lang-toggle" id="lang-toggle" type="button" data-action="toggle-lang" data-no-i18n aria-label="Αλλαγή σε English" title="Αλλαγή σε English">EN</button>
         <button class="button button-primary button-add" type="button" data-action="add-item"><span aria-hidden="true">＋</span> Προσθήκη προϊόντος</button>
@@ -52,6 +54,28 @@
       <footer class="app-footer"><span>Απλά, για το σπίτι.</span><button type="button" class="text-button" data-view="settings">Αντίγραφο ασφαλείας & απόρρητο</button></footer>
     </main>
   </div>
+
+  <dialog id="menu-sheet" class="menu-sheet" aria-labelledby="menu-title">
+    <div class="dialog-heading"><div><p class="eyebrow">ΣΠΙΤΟΘΗΚΗ</p><h2 id="menu-title">Μενού</h2></div><button class="icon-button" type="button" data-action="close-menu" aria-label="Κλείσιμο">×</button></div>
+    <nav class="menu-list" id="menu-list" aria-label="Όλες οι ενότητες">
+      <p class="menu-group">ΣΠΙΤΙ</p>
+      <button class="menu-item" type="button" data-view="overview"><span class="menu-icon" aria-hidden="true">⌂</span><span>Επισκόπηση</span></button>
+      <button class="menu-item" type="button" data-view="pantry"><span class="menu-icon" aria-hidden="true">▦</span><span>Το απόθεμά μου</span></button>
+      <p class="menu-group">ΨΩΝΙΑ</p>
+      <button class="menu-item" type="button" data-view="shopping"><span class="menu-icon" aria-hidden="true">✓</span><span>Λίστα αγορών</span></button>
+      <button class="menu-item" type="button" data-view="cart"><span class="menu-icon" aria-hidden="true">🛒</span><span>Καλάθι στο κατάστημα</span></button>
+      <button class="menu-item" type="button" data-action="menu-receipt"><span class="menu-icon" aria-hidden="true">🧾</span><span>Σάρωση απόδειξης</span></button>
+      <p class="menu-group">ΦΑΓΗΤΟ</p>
+      <button class="menu-item" type="button" data-view="cook"><span class="menu-icon" aria-hidden="true">🍳</span><span>Τι να μαγειρέψω;</span></button>
+      <button class="menu-item" type="button" data-action="menu-mealplan"><span class="menu-icon" aria-hidden="true">📅</span><span>Πρόγραμμα φαγητού</span></button>
+      <p class="menu-group">ΕΞΟΔΑ</p>
+      <button class="menu-item" type="button" data-view="bills"><span class="menu-icon" aria-hidden="true">📄</span><span>Λογαριασμοί</span></button>
+      <button class="menu-item" type="button" data-view="transport"><span class="menu-icon" aria-hidden="true">🚗</span><span>Μετακινήσεις</span></button>
+      <button class="menu-item" type="button" data-view="insights"><span class="menu-icon" aria-hidden="true">◔</span><span>Στατιστικά</span></button>
+      <p class="menu-group">ΕΦΑΡΜΟΓΗ</p>
+      <button class="menu-item" type="button" data-view="settings"><span class="menu-icon" aria-hidden="true">⚙</span><span>Ρυθμίσεις</span></button>
+    </nav>
+  </dialog>
 
   <dialog id="item-dialog" class="item-dialog" aria-labelledby="dialog-title">
     <form id="item-form" method="dialog" novalidate>

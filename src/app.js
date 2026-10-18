@@ -12,6 +12,7 @@ import { BILL_ICONS, BILL_PERIODS, BILL_TYPES, billStats, billsDue, createBill, 
 import { findDuplicateBill, readBillFile } from './bill-pdf.js';
 import { addCartItem, budgetState, createTrip, finishTrip, lastPrice, lineTotal, remainingShopping, removeCartItem, tripForReceipt, updateCartItem } from './cart.js';
 import { VM_MODES, interpretCode } from './gs1.js';
+import { TRANSPORT_ICONS, TRANSPORT_TYPES, applyTransportRecurring, classifyReceipt, consumptionFor, createTransport, createTransportRecurring, fuelStats, pricePerLiter, transportMonth } from './transport.js';
 import { getLang, locale, setLang, t, translateDom, untranslatedGreek } from './i18n.js';
 
 const viewRoot = document.querySelector('#view-content');
@@ -22,7 +23,7 @@ const backupFile = document.querySelector('#backup-file');
 const toast = document.querySelector('#toast');
 
 let state = loadState();
-const VIEWS = ['overview', 'pantry', 'shopping', 'cart', 'cook', 'bills', 'insights', 'settings'];
+const VIEWS = ['overview', 'pantry', 'shopping', 'cart', 'cook', 'bills', 'transport', 'insights', 'settings'];
 let activeView = VIEWS.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'overview';
 let pantryQuery = '';
 let pantryCategory = 'Όλα';
@@ -106,8 +107,11 @@ function pendingLabel(count) {
   return t(count === 1 ? '{count} εκκρεμές προϊόν' : '{count} εκκρεμή προϊόντα', { count });
 }
 
+const SECTION_LABELS = { overview: 'Σπιτοθήκη', pantry: 'Το απόθεμά μου', shopping: 'Λίστα αγορών', cart: 'Καλάθι στο κατάστημα', cook: 'Μαγείρεμα', bills: 'Λογαριασμοί', transport: 'Μετακινήσεις', insights: 'Στατιστικά', settings: 'Ρυθμίσεις' };
 function setActiveNavigation() {
   document.body.dataset.screen = activeView;
+  const current = document.querySelector('#current-section');
+  if (current) current.textContent = t(SECTION_LABELS[activeView] || 'Σπιτοθήκη');
   document.querySelectorAll('[data-view]').forEach((button) => {
     const active = button.dataset.view === activeView;
     button.classList.toggle('is-active', active);
@@ -277,6 +281,7 @@ function renderApp() {
   else if (activeView === 'shopping') viewRoot.innerHTML = renderShopping();
   else if (activeView === 'insights') viewRoot.innerHTML = renderInsights();
   else if (activeView === 'bills') viewRoot.innerHTML = renderBills();
+  else if (activeView === 'transport') viewRoot.innerHTML = renderTransport();
   else if (activeView === 'cart') viewRoot.innerHTML = renderCart();
   else if (activeView === 'cook') { viewRoot.innerHTML = renderCook(); loadOnlineRecipes(); }
   else viewRoot.innerHTML = renderSettings();
@@ -712,6 +717,7 @@ const DEFAULT_PROXY = 'https://spitothiki-receipt-proxy.cornerstore553.workers.d
 const storedProxy = () => { try { return localStorage.getItem(PROXY_KEY) || ''; } catch { return ''; } };
 const receiptProxy = () => storedProxy() || DEFAULT_PROXY;
 let receiptState = { step: 'start' };
+let receiptTarget = '';
 const photoButtons = () => `<div class="settings-actions receipt-photo-actions"><label class="button button-quiet file-button"><span>📸 Φωτογραφία απόδειξης</span><input type="file" accept="image/*" capture="environment" class="visually-hidden" data-receipt-photo id="receipt-photo-camera"></label><label class="button button-quiet file-button"><span>🖼️ Από τη συλλογή</span><input type="file" accept="image/*" class="visually-hidden" data-receipt-photo id="receipt-photo-file"></label></div>`;
 
 async function loadReceiptPhoto(file) {
@@ -733,14 +739,15 @@ async function loadReceiptPhoto(file) {
     if (!receipt.lines.length && !receipt.total) throw new Error('Δεν βρέθηκαν είδη στη φωτογραφία. Δοκίμασε πιο καθαρή, ίσια λήψη με καλό φως.');
     const id = await receiptId(receipt, `photo:${receipt.issuerName}`);
     const duplicate = (state.receipts || []).find((entry) => entry.id === id);
-    receiptState = { step: 'review', receipt, id, duplicate, photo: true, trip: tripForReceipt(state.trips || [], receipt) };
+    receiptState = { step: 'review', receipt, id, duplicate, photo: true, trip: tripForReceipt(state.trips || [], receipt), target: receiptTarget, guess: classifyReceipt(receipt, result.text) };
   } catch (error) {
     receiptState = { step: 'start', error: t(error.message || 'Η αναγνώριση απέτυχε.') };
   }
   renderReceipt();
 }
 
-function openReceiptDialog() {
+function openReceiptDialog(target = '') {
+  receiptTarget = target;
   receiptState = { step: 'start' };
   renderReceipt();
   document.querySelector('#receipt-dialog').showModal();
@@ -753,7 +760,7 @@ async function loadReceipt(link) {
     const receipt = await fetchReceipt(receiptState.link, { proxy: receiptProxy() });
     const id = await receiptId(receipt, receipt.sourceUrl);
     const duplicate = (state.receipts || []).find((entry) => entry.id === id);
-    receiptState = { step: 'review', receipt, id, duplicate, trip: tripForReceipt(state.trips || [], receipt) };
+    receiptState = { step: 'review', receipt, id, duplicate, trip: tripForReceipt(state.trips || [], receipt), target: receiptTarget, guess: classifyReceipt(receipt) };
   } catch (error) {
     receiptState = { step: 'start', link: receiptState.link, error: t(error.message || 'Η αναζήτηση απέτυχε.'), cors: Boolean(error.cors) };
   }
@@ -784,7 +791,7 @@ function renderReceiptReview() {
   const head = `<div class="receipt-summary"><div><strong class="product-name" id="receipt-store">${escapeHtml(store)}</strong><span class="field-hint">${escapeHtml(receipt.date ? formatDate(receipt.date) : '')}${receipt.lines.length ? ` · ${escapeHtml(t('{count} είδη', { count: receipt.lines.length }))}` : ''}</span></div><strong class="big-number" id="receipt-total">${escapeHtml(money(receipt.total))}</strong></div>`;
   const dup = duplicate ? `<p class="alert-banner" id="receipt-duplicate" role="status">${escapeHtml(t('Αυτή η απόδειξη έχει ήδη εισαχθεί ({date}).', { date: formatDate(String(duplicate.importedAt || '').slice(0, 10)) }))}</p>` : '';
   if (!receipt.lines.length) {
-    return `${head}${dup}${renderTripLink()}<p class="field-hint" id="receipt-aade-note">Οι αποδείξεις με QR της ΑΑΔΕ (ταμειακές) δεν περιέχουν τα είδη στο QR, μόνο το σύνολο. Για να περάσουν τα είδη, βγάλε φωτογραφία την απόδειξη — ή κατέγραψε μόνο το ποσό ως έξοδο.</p>${photoButtons()}
+    return `${head}${dup}${renderTransportReceiptOffer()}${renderTripLink()}<p class="field-hint" id="receipt-aade-note">Οι αποδείξεις με QR της ΑΑΔΕ (ταμειακές) δεν περιέχουν τα είδη στο QR, μόνο το σύνολο. Για να περάσουν τα είδη, βγάλε φωτογραφία την απόδειξη — ή κατέγραψε μόνο το ποσό ως έξοδο.</p>${photoButtons()}
       <form id="receipt-review-form" novalidate><input type="hidden" name="mode" value="total"><div class="dialog-actions"><button class="button button-quiet" type="button" data-action="receipt-reset">Πίσω</button><button class="button button-primary" type="submit" ${duplicate ? 'disabled' : ''}>Καταγραφή εξόδου</button></div></form>`;
   }
   const rows = receipt.lines.map((line, index) => `<div class="receipt-line${line.doubtful ? ' is-doubtful' : ''}" data-line="${index}"${line.doubtful ? ` title="${escapeHtml(t('Έλεγξε αυτή τη γραμμή: ποσότητα × τιμή δεν ταιριάζει με το ποσό.'))}"` : ''}><input class="shopping-check" type="checkbox" name="use" checked aria-label="${escapeHtml(t('Εισαγωγή: {name}', { name: line.name }))}">
@@ -794,7 +801,7 @@ function renderReceiptReview() {
     <select class="field-input receipt-category" name="category" aria-label="Κατηγορία">${CATEGORIES.map((category) => `<option value="${escapeHtml(category)}" ${category === line.category ? 'selected' : ''}>${escapeHtml(categoryLabel(category))}</option>`).join('')}</select></div>`).join('');
   const doubtful = receipt.lines.filter((line) => line.doubtful).length;
   const photoNote = receiptState.photo ? `<p class="field-hint" id="receipt-photo-note">${escapeHtml(t('Διαβάστηκε από φωτογραφία — έλεγξε ονόματα και ποσά πριν την εισαγωγή.'))}${doubtful ? ` <strong class="doubtful-hint">${escapeHtml(t('{count} γραμμές θέλουν έλεγχο (σημειωμένες).', { count: doubtful }))}</strong>` : ''}${receipt.totalMismatch ? ` ${escapeHtml(t('Το άθροισμα των ειδών ({sum}) διαφέρει από το σύνολο.', { sum: money(receipt.linesTotal) }))}` : ''}</p>` : '';
-  return `${head}${dup}${renderTripLink()}${photoNote}<form id="receipt-review-form" novalidate><input type="hidden" name="mode" value="lines">
+  return `${head}${dup}${renderTransportReceiptOffer()}${renderTripLink()}${photoNote}<form id="receipt-review-form" novalidate><input type="hidden" name="mode" value="lines">
     <div class="receipt-lines" id="receipt-lines">${rows}</div>
     <label class="check-row"><input type="checkbox" name="toPantry" ${receiptState.trip && !duplicate ? '' : 'checked'}> <span>Πρόσθεσε στο απόθεμα (ενώνεται με ίδια προϊόντα)</span></label>${receiptState.trip && !duplicate ? `<p class="field-hint">${escapeHtml(t('Τα προϊόντα του καλαθιού έχουν ήδη μπει στο απόθεμα.'))}</p>` : ''}
     <label class="check-row"><input type="checkbox" name="toSpending" checked> <span>Κατέγραψε τα έξοδα στα Στατιστικά</span></label>
@@ -1173,6 +1180,136 @@ function finishCart() {
   }, 'Τέλος ψωνίσματος;');
 }
 
+
+// ---------- Transport (fuel, tolls, public transport…) ----------
+const TRANSPORT_LABELS = { fuel: 'Βενζίνη / καύσιμα', tolls: 'Διόδια', transit: 'ΜΜΜ (μετρό/λεωφορείο/τρένο)', taxi: 'Ταξί', parking: 'Στάθμευση', other: 'Άλλο' };
+let transportMonthKey = monthKey(localDateKey());
+let transportDraft = null;
+const vehicleName = (id) => (state.vehicles || []).find((v) => v.id === id)?.name || '';
+const transportTypeOptions = (selected) => TRANSPORT_TYPES.map((type) => `<option value="${type}" ${type === selected ? 'selected' : ''}>${TRANSPORT_ICONS[type]} ${escapeHtml(t(TRANSPORT_LABELS[type]))}</option>`).join('');
+const fmtNum = (n, digits) => new Intl.NumberFormat(locale(), { maximumFractionDigits: digits }).format(n);
+
+function runTransportRecurring() {
+  const result = applyTransportRecurring(state.transportRecurring || [], state.transport || [], localDateKey());
+  if (!result.changed) return;
+  state.transportRecurring = result.rules;
+  state.transport = result.entries;
+  persist();
+}
+
+function renderTransportEntry(entry) {
+  const ppl = pricePerLiter(entry);
+  const cons = entry.type === 'fuel' ? consumptionFor(state.transport || [], entry) : null;
+  const meta = [formatDate(entry.date)];
+  if (entry.liters) meta.push(`${fmtNum(entry.liters, 2)} l`);
+  if (ppl) meta.push(`${fmtNum(ppl, 3)} €/l`);
+  if (cons) meta.push(`${fmtNum(cons.l100, 1)} l/100km`);
+  if (entry.odometer) meta.push(`${fmtNum(entry.odometer, 0)} km`);
+  const vname = vehicleName(entry.vehicle);
+  return `<article class="product-card bill-row transport-row" data-transport="${escapeHtml(entry.id)}"><span class="product-emoji" aria-hidden="true">${TRANSPORT_ICONS[entry.type] || '🚗'}</span>
+    <div class="bill-main"><h3 class="product-name">${escapeHtml(t(TRANSPORT_LABELS[entry.type]))}</h3><p class="bill-meta" data-no-i18n>${escapeHtml(meta.join(' · '))}${vname ? ` · ${escapeHtml(vname)}` : ''}${entry.note ? ` · ${escapeHtml(entry.note)}` : ''}${entry.recurringId ? ' · ↻' : ''}</p></div>
+    <strong class="bill-amount">${escapeHtml(money(entry.amount))}</strong>
+    <div class="bill-actions"><button class="icon-button" type="button" data-action="transport-edit" data-id="${escapeHtml(entry.id)}" aria-label="${escapeHtml(t('Επεξεργασία'))}">✎</button><button class="icon-button" type="button" data-action="transport-delete" data-id="${escapeHtml(entry.id)}" aria-label="${escapeHtml(t('Διαγραφή'))}">🗑️</button></div></article>`;
+}
+
+function renderTransportForm() {
+  const d = transportDraft || {};
+  const type = d.type || 'fuel';
+  const vehicles = state.vehicles || [];
+  return `<section class="panel" id="transport-add"><div class="panel-heading"><div><h2>${escapeHtml(t(d.id ? 'Επεξεργασία εξόδου' : 'Νέο έξοδο μετακίνησης'))}</h2>${d.fromReceipt ? `<p id="transport-from-receipt">${escapeHtml(t('Από απόδειξη — έλεγξε τα στοιχεία και πάτα Αποθήκευση.'))}</p>` : ''}</div></div>
+    <form id="transport-form" novalidate><input type="hidden" name="entryId" value="${escapeHtml(d.id || '')}"><input type="hidden" name="receiptId" value="${escapeHtml(d.receiptId || '')}">
+      <div class="field-row field-row-three">
+        <div><label class="field-label" for="transport-type">Κατηγορία</label><select class="field-input" id="transport-type" name="type">${transportTypeOptions(type)}</select></div>
+        <div><label class="field-label" for="transport-amount">Ποσό (€)</label><input class="field-input" id="transport-amount" name="amount" type="number" min="0" max="100000" step="0.01" inputmode="decimal" required value="${escapeHtml(d.amount ?? '')}"></div>
+        <div><label class="field-label" for="transport-date">Ημερομηνία</label><input class="field-input" id="transport-date" name="date" type="date" required value="${escapeHtml(d.date || localDateKey())}"></div>
+      </div>
+      <div class="field-row field-row-three transport-fuel" id="transport-fuel" ${type === 'fuel' ? '' : 'hidden'}>
+        <div><label class="field-label" for="transport-liters">Λίτρα</label><input class="field-input" id="transport-liters" name="liters" type="number" min="0" step="0.01" inputmode="decimal" value="${escapeHtml(d.liters ?? '')}"></div>
+        <div><label class="field-label" for="transport-odometer">Χιλιόμετρα οδόμετρου</label><input class="field-input" id="transport-odometer" name="odometer" type="number" min="0" step="1" inputmode="numeric" value="${escapeHtml(d.odometer ?? '')}"></div>
+        <div><label class="field-label" for="transport-vehicle">Όχημα</label><select class="field-input" id="transport-vehicle" name="vehicle"><option value="">${escapeHtml(t('Κύριο όχημα'))}</option>${vehicles.map((v) => `<option value="${escapeHtml(v.id)}" data-no-i18n ${v.id === d.vehicle ? 'selected' : ''}>${escapeHtml(v.name)}</option>`).join('')}</select></div>
+      </div>
+      <p class="field-hint" id="transport-ppl" ${type === 'fuel' ? '' : 'hidden'}>${d.ppl ? escapeHtml(t('Τιμή απόδειξης: {ppl} €/λίτρο', { ppl: fmtNum(d.ppl, 3) })) : escapeHtml(t('Με λίτρα υπολογίζεται η τιμή ανά λίτρο· με τα χιλιόμετρα κάθε γεμίσματος και η κατανάλωση (l/100km).'))}</p>
+      <label class="field-label" for="transport-note">Σημείωση</label><input class="field-input" id="transport-note" name="note" maxlength="80" placeholder="π.χ. Αθήνα – Κόρινθος" value="${escapeHtml(d.note || '')}">
+      <p class="form-error" id="transport-error" role="alert" hidden></p>
+      <div class="dialog-actions">${d.id || d.fromReceipt ? '<button class="button button-quiet" type="button" data-action="transport-cancel">Άκυρο</button>' : ''}<button class="button button-quiet" type="button" data-action="transport-receipt">🧾 Σάρωση απόδειξης</button><button class="button button-primary" type="submit" id="transport-save">Αποθήκευση</button></div>
+    </form></section>`;
+}
+
+function renderTransport() {
+  const entries = state.transport || [];
+  const month = transportMonth(entries, transportMonthKey);
+  const list = entries.filter((e) => e.date.startsWith(`${transportMonthKey}-`)).sort((a, b) => b.date.localeCompare(a.date) || String(b.createdAt).localeCompare(String(a.createdAt)));
+  const isCurrent = transportMonthKey >= monthKey(localDateKey());
+  const vehicles = state.vehicles || [];
+  const fuelAvg = [{ id: '', name: t('Κύριο όχημα') }, ...vehicles].map((v) => ({ v, s: fuelStats(entries, v.id) })).filter((x) => x.s.average);
+  const rules = state.transportRecurring || [];
+  return `${renderHeader('Μετακινήσεις', 'Βενζίνη, διόδια, ΜΜΜ, ταξί και στάθμευση — πόσα ξοδεύεις κάθε μήνα.')}
+    ${renderTransportForm()}
+    <div class="month-switch" role="group" aria-label="Μήνας"><button class="icon-button" type="button" data-action="transport-month" data-delta="-1" aria-label="Προηγούμενος μήνας">‹</button><strong id="transport-month" data-no-i18n>${escapeHtml(monthLabel(transportMonthKey))}</strong><button class="icon-button" type="button" data-action="transport-month" data-delta="1" aria-label="Επόμενος μήνας" ${isCurrent ? 'disabled' : ''}>›</button></div>
+    <section class="panel"><div class="panel-heading"><div><h2>Σύνολο μήνα</h2><p class="big-number" id="transport-total">${escapeHtml(money(month.total))}</p></div></div>
+      ${month.count ? renderBars(month.byType.map((row) => ({ label: `${TRANSPORT_ICONS[row.type]} ${t(TRANSPORT_LABELS[row.type])}`, value: row.total })), money) : '<p class="subtle-empty">Κανένα έξοδο μετακίνησης αυτόν τον μήνα.</p>'}
+      ${fuelAvg.length ? `<p class="field-hint" id="transport-consumption" data-no-i18n>${fuelAvg.map((x) => `⛽ ${escapeHtml(x.v.name)}: ${escapeHtml(t('μέση κατανάλωση {l} l/100km', { l: fmtNum(x.s.average, 1) }))}`).join(' · ')}</p>` : ''}
+      <div class="product-list" id="transport-list">${list.map(renderTransportEntry).join('')}</div></section>
+    <section class="panel" id="transport-recurring"><div class="panel-heading"><div><h2>Μηνιαία πάγια</h2><p>π.χ. κάρτα απεριορίστων διαδρομών ή μηνιαία στάθμευση· καταχωρούνται μόνα τους κάθε μήνα.</p></div></div>
+      <form id="transport-recurring-form" class="shopping-add-form recurring-form" novalidate><select class="field-input" name="type" aria-label="Κατηγορία">${transportTypeOptions('transit')}</select><input class="field-input" name="amount" type="number" min="0" step="0.01" inputmode="decimal" placeholder="€" aria-label="Ποσό (€)"><input class="field-input" name="day" type="number" min="1" max="28" value="1" aria-label="Ημέρα του μήνα"><input class="field-input" name="note" maxlength="80" placeholder="π.χ. Κάρτα ΜΜΜ" aria-label="Σημείωση"><button class="button button-quiet" type="submit">＋ Προσθήκη</button></form>
+      <p class="form-error" id="transport-recurring-error" role="alert" hidden></p>
+      <ul class="waste-top" id="transport-rules">${rules.map((r) => `<li><span class="product-name">${TRANSPORT_ICONS[r.type]} ${escapeHtml(t(TRANSPORT_LABELS[r.type]))}${r.note ? ` · <span data-no-i18n>${escapeHtml(r.note)}</span>` : ''} · <span>${escapeHtml(t('κάθε μήνα στις {day}', { day: r.day }))}</span></span><strong>${escapeHtml(money(r.amount))}</strong><button class="icon-button" type="button" data-action="transport-rule-delete" data-id="${escapeHtml(r.id)}" aria-label="${escapeHtml(t('Διαγραφή'))}">🗑️</button></li>`).join('')}</ul></section>
+    <section class="panel" id="transport-vehicles"><div class="panel-heading"><div><h2>Οχήματα</h2><p>Προαιρετικά, αν έχεις πάνω από ένα όχημα (για χωριστή κατανάλωση).</p></div></div>
+      <form id="vehicle-form" class="store-form" novalidate><input class="field-input" name="name" maxlength="40" placeholder="π.χ. Αυτοκίνητο, Μηχανάκι" aria-label="Όνομα οχήματος"><button class="button button-quiet" type="submit">＋ Προσθήκη</button></form>
+      <ul class="waste-top" id="vehicle-list">${vehicles.map((v) => `<li><span class="product-name" data-no-i18n>${escapeHtml(v.name)}</span><button class="icon-button" type="button" data-action="vehicle-delete" data-id="${escapeHtml(v.id)}" aria-label="${escapeHtml(t('Διαγραφή'))}">🗑️</button></li>`).join('')}</ul></section>`;
+}
+
+function saveTransportForm(form) {
+  const error = document.querySelector('#transport-error');
+  const id = form.elements.entryId.value;
+  const existing = (state.transport || []).find((e) => e.id === id);
+  const receiptRef = form.elements.receiptId.value;
+  try {
+    const entry = createTransport({ ...(existing || {}), id: id || undefined, type: form.elements.type.value, amount: form.elements.amount.value, date: form.elements.date.value, note: form.elements.note.value, liters: form.elements.liters.value, odometer: form.elements.odometer.value, vehicle: form.elements.vehicle.value, ...(receiptRef ? { receiptId: receiptRef } : {}) });
+    if (receiptRef) entry.receiptId = receiptRef;
+    state.transport = existing ? state.transport.map((e) => (e.id === id ? entry : e)) : [...(state.transport || []), entry];
+    if (receiptRef && !(state.receipts || []).some((r) => r.id === receiptRef)) state.receipts = [...(state.receipts || []), { id: receiptRef, date: entry.date, total: entry.amount, store: entry.note, format: 'transport', lines: 0, importedAt: new Date().toISOString() }];
+    transportMonthKey = monthKey(entry.date);
+  } catch (err) { error.textContent = t(err.message); error.hidden = false; return; }
+  if (!persist()) return;
+  transportDraft = null;
+  renderApp();
+  showToast(existing ? 'Το έξοδο ενημερώθηκε.' : 'Το έξοδο μετακίνησης καταχωρήθηκε.');
+}
+
+function receiptToTransport() {
+  const { receipt, id, guess } = receiptState;
+  if (!receipt) return;
+  const g = guess || { type: 'other', amount: receipt.total, date: receipt.date, note: receipt.issuerName };
+  transportDraft = { ...g, amount: g.amount || '', date: g.date || localDateKey(), receiptId: id, fromReceipt: true };
+  receiptState = { step: 'start' };
+  renderReceipt();
+  document.querySelector('#receipt-dialog').close();
+  navigate('transport');
+}
+
+function renderTransportReceiptOffer() {
+  const { guess, target, duplicate } = receiptState;
+  if (duplicate || (!guess && target !== 'transport')) return '';
+  const label = guess?.type === 'tolls' ? t('Μοιάζει με απόδειξη διοδίων.') : guess?.type === 'fuel' ? t('Μοιάζει με απόδειξη καυσίμων.') : '';
+  return `<div class="alert-banner receipt-transport" id="receipt-transport" role="status"><p>${escapeHtml(label)} ${escapeHtml(t('Θες να την καταχωρίσεις ως έξοδο μετακίνησης αντί για προϊόντα;'))}</p><div class="settings-actions"><button class="button button-primary" type="button" data-action="receipt-to-transport">🚗 ${escapeHtml(t('Καταχώριση στις Μετακινήσεις'))}</button></div></div>`;
+}
+
+function renderTransportCard() {
+  const month = transportMonth(state.transport || [], insightsMonth);
+  return `<section class="panel settings-card" id="transport-card"><span class="stat-icon">🚗</span><h2>Μετακινήσεις</h2>
+    <p class="big-number" id="transport-insights-total">${escapeHtml(money(month.total))}</p>
+    ${month.count ? renderBars(month.byType.map((row) => ({ label: `${TRANSPORT_ICONS[row.type]} ${t(TRANSPORT_LABELS[row.type])}`, value: row.total })), money) : '<p class="subtle-empty">Κανένα έξοδο μετακίνησης αυτόν τον μήνα.</p>'}</section>`;
+}
+
+function renderMonthTotals(spending) {
+  const transport = transportMonth(state.transport || [], insightsMonth).total;
+  const bills = (state.bills || []).filter((b) => String(b.due).startsWith(`${insightsMonth}-`)).reduce((s, b) => s + b.amount, 0);
+  const total = Math.round((spending.total + transport + bills) * 100) / 100;
+  return `<section class="panel settings-card" id="month-totals-card"><span class="stat-icon blue">∑</span><h2>Σύνολο εξόδων μήνα</h2><p class="big-number" id="month-grand-total">${escapeHtml(money(total))}</p>
+    ${renderBars([{ label: `🛒 ${t('Αγορές')}`, value: spending.total }, { label: `📄 ${t('Λογαριασμοί')}`, value: Math.round(bills * 100) / 100 }, { label: `🚗 ${t('Μετακινήσεις')}`, value: transport }], money)}</section>`;
+}
+
 // ---------- Household bills ----------
 const BILL_TYPE_LABELS = { electricity: 'Ρεύμα', water: 'Νερό', gas: 'Φυσικό αέριο / θέρμανση', rent: 'Ενοίκιο / κοινόχρηστα', phone: 'Τηλέφωνο', internet: 'Internet', subscription: 'Συνδρομή', insurance: 'Ασφάλεια', tax: 'Φόροι / τέλη', other: 'Άλλο' };
 const BILL_PERIOD_LABELS = { 0: 'Μία φορά', 1: 'Κάθε μήνα', 2: 'Κάθε 2 μήνες', 3: 'Κάθε 3 μήνες', 4: 'Κάθε 4 μήνες', 6: 'Κάθε 6 μήνες', 12: 'Κάθε χρόνο' };
@@ -1381,7 +1518,7 @@ function renderInsights() {
   const isCurrent = insightsMonth >= monthKey(localDateKey());
   return `${renderHeader('Στατιστικά', 'Πόσα ξοδεύεις και τι πετιέται, ανά μήνα.')}
     <div class="month-switch" role="group" aria-label="Μήνας"><button class="icon-button" type="button" data-action="insights-month" data-delta="-1" aria-label="Προηγούμενος μήνας">‹</button><strong id="insights-month" data-no-i18n>${escapeHtml(monthLabel(insightsMonth))}</strong><button class="icon-button" type="button" data-action="insights-month" data-delta="1" aria-label="Επόμενος μήνας" ${isCurrent ? 'disabled' : ''}>›</button></div>
-    <div class="settings-grid insights-grid">
+    <div class="settings-grid insights-grid">${renderMonthTotals(spending)}
     <section class="panel settings-card" id="spending-card"><span class="stat-icon blue">€</span><h2>Έξοδα</h2>
       <p class="big-number" id="spending-total">${escapeHtml(money(spending.total))}</p>
       <p class="field-hint">${escapeHtml(t('{count} αγορές με τιμή · προηγούμενος μήνας: {prev}', { count: spending.count, prev: money(previous.total) }))}</p>
@@ -1390,7 +1527,7 @@ function renderInsights() {
       <p class="big-number" id="waste-total">${waste.count}</p>
       <p class="field-hint">${escapeHtml(t(waste.count === 1 ? 'φορά που πετάχτηκε κάτι' : 'φορές που πετάχτηκε κάτι'))}</p>
       ${waste.count ? `${renderBars(WASTE_REASONS.filter((reason) => waste.byReason[reason]).map((reason) => ({ label: t(WASTE_LABELS[reason]), value: waste.byReason[reason] })), String)}
-      <h3 class="insights-subtitle">Πετιούνται πιο συχνά</h3><ul class="waste-top">${waste.top.map((entry) => `<li><span class="product-name">${escapeHtml(entry.name)}</span><strong>× ${entry.count}</strong></li>`).join('')}</ul>` : '<p class="subtle-empty">Τίποτα αυτόν τον μήνα. Όταν πετάς κάτι, πάτα 🗑 στο απόθεμα για να το καταγράψεις.</p>'}</section>${renderBillsCard()}</div>`;
+      <h3 class="insights-subtitle">Πετιούνται πιο συχνά</h3><ul class="waste-top">${waste.top.map((entry) => `<li><span class="product-name">${escapeHtml(entry.name)}</span><strong>× ${entry.count}</strong></li>`).join('')}</ul>` : '<p class="subtle-empty">Τίποτα αυτόν τον μήνα. Όταν πετάς κάτι, πάτα 🗑 στο απόθεμα για να το καταγράψεις.</p>'}</section>${renderBillsCard()}${renderTransportCard()}</div>`;
 }
 
 function makeDemoItems() {
@@ -1451,7 +1588,19 @@ function handleAction(button) {
   else if (action === 'cart-cancel') {
     const trip = activeTrip();
     if (trip) showConfirm('Το καλάθι θα διαγραφεί χωρίς να καταγραφεί τίποτα.', () => { state.trips = state.trips.filter((entry) => entry.id !== trip.id); cartScanning = false; if (persist()) renderApp(); }, 'Ακύρωση καλαθιού;');
-  } else if (action === 'add-bill') openBillDialog();
+  } else if (action === 'open-menu') { const sheet = document.querySelector('#menu-sheet'); sheet.querySelectorAll('[data-view]').forEach((b) => b.classList.toggle('is-active', b.dataset.view === activeView)); sheet.showModal(); }
+  else if (action === 'close-menu') document.querySelector('#menu-sheet').close();
+  else if (action === 'menu-receipt') { document.querySelector('#menu-sheet').close(); openReceiptDialog(); }
+  else if (action === 'menu-mealplan') { document.querySelector('#menu-sheet').close(); navigate('cook'); setTimeout(() => document.querySelector('#plan-grid')?.scrollIntoView({ block: 'start' }), 50); }
+  else if (action === 'transport-month') { transportMonthKey = shiftMonth(transportMonthKey, Number(button.dataset.delta)); renderApp(); }
+  else if (action === 'transport-receipt') openReceiptDialog('transport');
+  else if (action === 'receipt-to-transport') receiptToTransport();
+  else if (action === 'transport-cancel') { transportDraft = null; renderApp(); }
+  else if (action === 'transport-edit') { const e = (state.transport || []).find((x) => x.id === id); if (e) { transportDraft = { ...e }; renderApp(); document.querySelector('#transport-add')?.scrollIntoView({ behavior: 'smooth' }); } }
+  else if (action === 'transport-delete') showConfirm('Θα διαγραφεί αυτό το έξοδο μετακίνησης.', () => { state.transport = (state.transport || []).filter((e) => e.id !== id); if (persist()) renderApp(); }, 'Διαγραφή εξόδου;');
+  else if (action === 'transport-rule-delete') { state.transportRecurring = (state.transportRecurring || []).filter((r) => r.id !== id); if (persist()) renderApp(); }
+  else if (action === 'vehicle-delete') { state.vehicles = (state.vehicles || []).filter((v) => v.id !== id); if (persist()) renderApp(); }
+  else if (action === 'add-bill') openBillDialog();
   else if (action === 'close-bill') document.querySelector('#bill-dialog').close();
   else if (action === 'bill-edit') openBillDialog(id);
   else if (action === 'bill-scan') openScanner({ qr: 'any', onCode: applyBillCode });
@@ -1578,14 +1727,15 @@ function handleAction(button) {
     else loadDemo();
   } else if (action === 'clear-data') {
     showConfirm(`${t('Θα διαγραφούν όλα τα προϊόντα και η λίστα αγορών από αυτή τη συσκευή.')}${syncStatus.user ? t(' Επειδή είσαι συνδεδεμένος, θα διαγραφούν και από τις συγχρονισμένες συσκευές.') : ''}${t(' Φρόντισε να έχεις αντίγραφο αν τα χρειάζεσαι.')}`, () => {
-      state = { items: [], shopping: [], recurring: [], stores: [], purchases: [], waste: [], receipts: [], meals: [], bills: [], trips: [], prices: [] }; persist(); renderApp(); showToast('Τα δεδομένα διαγράφηκαν.');
+      state = { items: [], shopping: [], recurring: [], stores: [], purchases: [], waste: [], receipts: [], meals: [], bills: [], trips: [], prices: [], transport: [], transportRecurring: [], vehicles: [] }; persist(); renderApp(); showToast('Τα δεδομένα διαγράφηκαν.');
     }, 'Διαγραφή όλων των δεδομένων;');
   }
 }
 
 document.addEventListener('click', (event) => {
   const viewButton = event.target.closest('[data-view]');
-  if (viewButton) { event.preventDefault(); navigate(viewButton.dataset.view); return; }
+  if (viewButton) { event.preventDefault(); if (viewButton.closest('#menu-sheet')) document.querySelector('#menu-sheet').close(); navigate(viewButton.dataset.view); return; }
+  if (event.target.id === 'menu-sheet') { event.target.close(); return; }
   const button = event.target.closest('[data-action]');
   if (button && button.type !== 'checkbox') handleAction(button);
 });
@@ -1595,6 +1745,7 @@ document.addEventListener('input', (event) => {
 });
 
 document.addEventListener('change', (event) => {
+  if (event.target.id === 'transport-type') { const fuel = event.target.value === 'fuel'; document.querySelector('#transport-fuel').hidden = !fuel; document.querySelector('#transport-ppl').hidden = !fuel; }
   if (event.target.id === 'bill-type') event.target.form.dataset.typeTouched = '1';
   if (event.target.id === 'cart-item-unit') updateCartQtyLabel();
   if (event.target.id === 'bills-history-filter') { billsHistory.filter = event.target.value; billsHistory.limit = 10; renderApp(); return; }
@@ -1656,6 +1807,26 @@ document.addEventListener('input', (event) => {
 
 document.addEventListener('submit', (event) => {
   if (event.target.id === 'bill-form') { event.preventDefault(); saveBillForm(event.target); return; }
+  if (event.target.id === 'transport-form') { event.preventDefault(); saveTransportForm(event.target); return; }
+  if (event.target.id === 'transport-recurring-form') {
+    event.preventDefault();
+    const f = event.target; const err = document.querySelector('#transport-recurring-error');
+    const day = Math.min(28, Math.max(1, Number(f.elements.day.value) || 1));
+    const today = localDateKey();
+    const start = `${today.slice(0, 7)}-${String(day).padStart(2, '0')}`;
+    try { state.transportRecurring = [...(state.transportRecurring || []), createTransportRecurring({ type: f.elements.type.value, amount: f.elements.amount.value, note: f.elements.note.value, day, start: start > today ? `${shiftMonth(today.slice(0, 7), 1)}-${String(day).padStart(2, '0')}` : start })]; }
+    catch (e) { err.textContent = t(e.message); err.hidden = false; return; }
+    runTransportRecurring(); if (persist()) { renderApp(); showToast('Το μηνιαίο πάγιο προστέθηκε.'); }
+    return;
+  }
+  if (event.target.id === 'vehicle-form') {
+    event.preventDefault();
+    const name = event.target.elements.name.value.trim();
+    if (!name) return;
+    state.vehicles = [...(state.vehicles || []), { id: globalThis.crypto?.randomUUID ? crypto.randomUUID() : `veh-${Date.now()}`, name: name.slice(0, 40), updatedAt: new Date().toISOString() }];
+    if (persist()) renderApp();
+    return;
+  }
   if (event.target.id === 'cart-item-form') { event.preventDefault(); saveCartItem(event.target); return; }
   if (event.target.id === 'cart-start-form') {
     event.preventDefault();
@@ -1778,7 +1949,7 @@ document.addEventListener('submit', (event) => {
       state.recurring = [...(state.recurring || []), rule];
       persist();
       showToast(t('Το «{name}» θα μπαίνει στη λίστα: {every}.', { name: rule.name, every: intervalLabel(rule.everyDays).toLocaleLowerCase(locale()) }));
-      runRecurring(); renderApp();
+      runRecurring(); runTransportRecurring(); renderApp();
     } catch (error) {
       const message = document.querySelector('#recurring-error');
       message.textContent = t(error.message || 'Έλεγξε τα στοιχεία.');
@@ -1830,6 +2001,7 @@ takeSharedFile();
 
 function runDailyChecks() {
   runRecurring();
+  runTransportRecurring();
   checkExpiryNotifications();
 }
 runDailyChecks();

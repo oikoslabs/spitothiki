@@ -37,7 +37,7 @@ const count = async (selector) => (await page.$$(selector)).length;
 const text = (selector) => page.$eval(selector, (el) => el.textContent);
 // Scroll to the middle first so the fixed mobile bottom navigation doesn't cover the target.
 async function tap(selector) { await page.$eval(selector, (el) => el.scrollIntoView({ block: 'center', behavior: 'instant' })); await wait(400); await page.click(selector); }
-async function nav(view) { await page.click(`.nav-item[data-view="${view}"]`); await wait(); }
+async function nav(view) { const direct = await page.$eval(`.nav-item[data-view="${view}"]`, (e) => e.offsetParent !== null).catch(() => false); if (direct) await page.click(`.nav-item[data-view="${view}"]`); else { await page.click('.nav-item[data-action="open-menu"]'); await wait(200); await page.click(`#menu-sheet [data-view="${view}"]`); } await wait(); }
 async function check(name, fn) {
   try { const ok = await fn(); console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}`); if (!ok) errors.push(`assert: ${name}`); }
   catch (error) { console.log(`FAIL ${name}: ${error.message}`); errors.push(`assert: ${name}: ${error.message}`); }
@@ -169,6 +169,21 @@ const steps = [
     await nav('pantry');
     if (!(card.includes('Ανενεργός') || signIn)) console.log('  sync card:', card);
     return card.includes('Ανενεργός') || signIn;
+  }],
+  ['menu lists every section and opens them; header shows current section', async () => {
+    await page.click('[data-action="open-menu"]:not([hidden])').catch(async () => page.evaluate(() => document.querySelector('[data-action="open-menu"]').click())); await wait();
+    const open = await page.$eval('#menu-sheet', (e) => e.open);
+    const items = await page.$$eval('#menu-sheet .menu-item', (els) => els.map((e) => e.dataset.view || e.dataset.action));
+    await page.click('#menu-sheet [data-view="transport"]'); await wait();
+    const view = await page.evaluate(() => document.body.dataset.screen);
+    const closed = !(await page.$eval('#menu-sheet', (e) => e.open));
+    const header = await page.$eval('#current-section', (e) => e.textContent);
+    const bottom = width < 700 ? await page.$$eval('.primary-nav .nav-item', (els) => els.filter((e) => e.offsetParent !== null).length) : 4;
+    await page.evaluate(() => document.querySelector('#menu-sheet').open && document.querySelector('#menu-sheet').close());
+    await nav('pantry');
+    const ok = open && items.length === 11 && items.includes('menu-mealplan') && items.includes('menu-receipt') && view === 'transport' && closed && header === 'Μετακινήσεις' && bottom === 4;
+    if (!ok) console.log('  menu:', { open, items, view, closed, header, bottom });
+    return ok;
   }],
   ['reload keeps screen and data', async () => {
     await page.reload({ waitUntil: 'networkidle0' }); await wait();
