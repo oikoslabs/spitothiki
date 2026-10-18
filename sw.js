@@ -2,13 +2,14 @@
 // Strategy: network-first for everything from this site (HTML, JS, CSS, manifest), so a new
 // deploy shows up on the next load; the cache is only used when the network is unavailable.
 // Bump CACHE_VERSION when the list of shell files changes; old caches are deleted on activate.
-const CACHE_VERSION = 'v14';
+const CACHE_VERSION = 'v15';
 const CACHE = `spitothiki-${CACHE_VERSION}`;
-const OCR_CACHE = 'spitothiki-ocr'; // Tesseract.js script/worker/core/language files, kept across versions
+const OCR_CACHE = 'spitothiki-ocr';
+const SHARE_CACHE = 'spitothiki-share'; // a file shared to the app (Web Share Target), picked up by the page // Tesseract.js script/worker/core/language files, kept across versions
 const DATA_CACHE = 'spitothiki-data'; // written by the app: expiry snapshot for background checks
 const SHELL = [
   './', './index.html', './styles.css', './manifest.webmanifest',
-  './src/app.js', './src/i18n.js', './src/features.js', './src/recipes.js', './src/receipt.js', './src/receipt-photo.js', './src/mealplan.js', './src/bills.js', './src/domain.js', './src/storage.js', './src/barcode.js', './src/firebase-config.js', './src/sync-core.js', './src/sync-firebase.js',
+  './src/app.js', './src/i18n.js', './src/features.js', './src/recipes.js', './src/receipt.js', './src/receipt-photo.js', './src/mealplan.js', './src/bills.js', './src/bill-pdf.js', './src/domain.js', './src/storage.js', './src/barcode.js', './src/firebase-config.js', './src/sync-core.js', './src/sync-firebase.js',
   './icons/icon-192.png', './icons/icon-512.png', './icons/icon.svg'
 ];
 
@@ -18,15 +19,30 @@ self.addEventListener('install', (event) => {
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(caches.keys()
-    .then((keys) => Promise.all(keys.filter((key) => key.startsWith('spitothiki-') && key !== CACHE && key !== DATA_CACHE && key !== OCR_CACHE).map((key) => caches.delete(key))))
+    .then((keys) => Promise.all(keys.filter((key) => key.startsWith('spitothiki-') && key !== CACHE && key !== DATA_CACHE && key !== OCR_CACHE && key !== SHARE_CACHE).map((key) => caches.delete(key))))
     .then(() => self.clients.claim()));
 });
 
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
+  // Web Share Target: a bill PDF/photo shared from another app (Android, installed PWA).
+  if (request.method === 'POST' && url.origin === self.location.origin && url.pathname.endsWith('/share-target')) {
+    event.respondWith((async () => {
+      try {
+        const form = await request.formData();
+        const file = form.getAll('file').find((f) => f && typeof f === 'object' && f.size);
+        if (file) {
+          const cache = await caches.open(SHARE_CACHE);
+          await cache.put('./__shared-file', new Response(file, { headers: { 'content-type': file.type || 'application/octet-stream', 'x-file-name': encodeURIComponent(file.name || 'shared') } }));
+        }
+      } catch {}
+      return Response.redirect('./?share=1#bills', 303);
+    })());
+    return;
+  }
   // OCR engine files are versioned on the CDN: cache-first, so photo import works offline after first use.
-  if (request.method === 'GET' && url.hostname === 'cdn.jsdelivr.net' && /tesseract/.test(url.pathname)) {
+  if (request.method === 'GET' && url.hostname === 'cdn.jsdelivr.net' && /tesseract|pdfjs-dist/.test(url.pathname)) {
     event.respondWith(caches.open(OCR_CACHE).then(async (cache) => {
       const hit = await cache.match(request);
       if (hit) return hit;

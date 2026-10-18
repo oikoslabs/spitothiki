@@ -48,6 +48,7 @@ export function createBill(input = {}, now = new Date().toISOString()) {
     id: input.id || newId(), name, type, amount, due, period, remind,
     reference: String(input.reference || '').replace(/\s+/g, '').slice(0, 40),
     paid: Boolean(input.paid), paidAt: input.paid ? String(input.paidAt || '') : '',
+    billingFrom: DATE.test(String(input.billingFrom || '')) ? input.billingFrom : '', billingTo: DATE.test(String(input.billingTo || '')) ? input.billingTo : '',
     seriesId: input.seriesId || input.id || '', updatedAt: now
   };
 }
@@ -62,7 +63,7 @@ export function payBill(bills = [], id, today, now = new Date().toISOString()) {
   if (bill.period) {
     const due = addMonths(bill.due, bill.period);
     if (!bills.some((b) => (b.seriesId || b.id) === series && b.due === due)) {
-      next = { ...bill, id: `${series}-${due}`, due, paid: false, paidAt: '', seriesId: series, updatedAt: now };
+      next = { ...bill, id: `${series}-${due}`, due, paid: false, paidAt: '', billingFrom: '', billingTo: '', seriesId: series, updatedAt: now };
     }
   }
   return { bills: [...bills.map((b) => (b.id === id ? paid : b)), ...(next ? [next] : [])], next };

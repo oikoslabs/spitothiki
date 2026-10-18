@@ -9,6 +9,7 @@ import { RECURRING_INTERVALS, applyRecurring, createRecurring, dueFromSnapshot, 
 import { MEAL_SLOTS, copyPreviousWeek, createMeal, recipeFromMealDb, shiftDays, weekDays, weekShoppingNeeds, weekStart } from './mealplan.js';
 import { BUILTIN_RECIPES } from './recipes.js';
 import { BILL_ICONS, BILL_PERIODS, BILL_TYPES, billStats, billsDue, createBill, guessBillType, parseBillCode, payBill, unpayBill } from './bills.js';
+import { findDuplicateBill, readBillFile } from './bill-pdf.js';
 import { getLang, locale, setLang, t, translateDom, untranslatedGreek } from './i18n.js';
 
 const viewRoot = document.querySelector('#view-content');
@@ -989,7 +990,7 @@ function renderBillRow(bill) {
   const today = localDateKey();
   const state_ = bill.paid ? 'paid' : bill.due < today ? 'overdue' : billsDue([bill], today).length ? 'soon' : 'later';
   return `<article class="product-card bill-row is-${state_}" data-bill="${escapeHtml(bill.id)}"><span class="product-emoji" aria-hidden="true">${BILL_ICONS[bill.type] || '📄'}</span>
-    <div class="bill-main"><h3 class="product-name" data-no-i18n>${escapeHtml(bill.name)}</h3><p class="bill-meta"><span class="bill-due">${escapeHtml(billDueLabel(bill))}</span>${bill.period ? ` · <span>${escapeHtml(t(BILL_PERIOD_LABELS[bill.period]))}</span>` : ''}${bill.reference ? ` · <code class="bill-ref" data-no-i18n>${escapeHtml(bill.reference)}</code>` : ''}</p></div>
+    <div class="bill-main"><h3 class="product-name" data-no-i18n>${escapeHtml(bill.name)}</h3><p class="bill-meta"><span class="bill-due">${escapeHtml(billDueLabel(bill))}</span>${bill.period ? ` · <span>${escapeHtml(t(BILL_PERIOD_LABELS[bill.period]))}</span>` : ''}${bill.billingFrom && bill.billingTo ? ` · <span class="bill-billing">${escapeHtml(t('περίοδος {from} – {to}', { from: formatDate(bill.billingFrom), to: formatDate(bill.billingTo) }))}</span>` : ''}${bill.reference ? ` · <code class="bill-ref" data-no-i18n>${escapeHtml(bill.reference)}</code>` : ''}</p></div>
     <strong class="bill-amount">${escapeHtml(money(bill.amount))}</strong>
     <div class="bill-actions">${bill.paid ? `<button class="button button-quiet" type="button" data-action="bill-unpay" data-id="${escapeHtml(bill.id)}">Αναίρεση</button>` : `<button class="button button-primary" type="button" data-action="bill-pay" data-id="${escapeHtml(bill.id)}">✓ Πληρώθηκε</button>`}
     ${bill.reference ? `<button class="icon-button" type="button" data-action="bill-copy" data-id="${escapeHtml(bill.id)}" aria-label="${escapeHtml(t('Αντιγραφή κωδικού {name}', { name: bill.name }))}">📋</button>` : ''}
@@ -1004,7 +1005,7 @@ function renderBills() {
   const due = billsDue(bills, today);
   const overdue = due.filter((bill) => bill.overdue);
   const toPay = unpaid.reduce((sum, bill) => sum + bill.amount, 0);
-  return `<header class="page-heading"><div><p class="eyebrow">ΣΠΙΤΟΘΗΚΗ</p><h1>Λογαριασμοί</h1><p>ΔΕΗ, νερό, ενοίκιο, συνδρομές: τι πληρώνεις και πότε.</p></div><button class="button button-primary" type="button" data-action="add-bill"><span aria-hidden="true">＋</span>Προσθήκη λογαριασμού</button></header>
+  return `<header class="page-heading"><div><p class="eyebrow">ΣΠΙΤΟΘΗΚΗ</p><h1>Λογαριασμοί</h1><p>ΔΕΗ, νερό, ενοίκιο, συνδρομές: τι πληρώνεις και πότε.</p></div><div class="page-actions"><label class="button button-quiet file-button" id="bill-import"><span>📥 Εισαγωγή PDF</span><input type="file" accept="application/pdf,.pdf,image/*" class="visually-hidden" data-bill-file id="bill-file"></label><button class="button button-primary" type="button" data-action="add-bill"><span aria-hidden="true">＋</span>Προσθήκη λογαριασμού</button></div></header>
     ${due.length ? `<div class="alert-banner${overdue.length ? ' is-danger' : ''}" role="status" id="bills-alert">${escapeHtml(overdue.length ? t(overdue.length === 1 ? '1 ληξιπρόθεσμος λογαριασμός · σύνολο {sum}' : '{count} ληξιπρόθεσμοι λογαριασμοί · σύνολο {sum}', { count: overdue.length, sum: money(overdue.reduce((s, b) => s + b.amount, 0)) }) : t(due.length === 1 ? '1 λογαριασμός λήγει σύντομα · σύνολο {sum}' : '{count} λογαριασμοί λήγουν σύντομα · σύνολο {sum}', { count: due.length, sum: money(due.reduce((s, b) => s + b.amount, 0)) }))}</div>` : ''}
     ${bills.length ? `<section class="panel"><div class="panel-heading"><div><h2>Προς πληρωμή</h2><p>${escapeHtml(t('{count} απλήρωτοι · {sum}', { count: unpaid.length, sum: money(toPay) }))}</p></div></div><div class="product-list" id="bills-unpaid">${unpaid.length ? unpaid.map(renderBillRow).join('') : '<p class="subtle-empty">Όλα πληρωμένα! 🎉</p>'}</div></section>
     ${paid.length ? `<section class="panel"><div class="panel-heading"><div><h2>Πληρωμένοι</h2><p>Οι πιο πρόσφατοι</p></div></div><div class="product-list" id="bills-paid">${paid.map(renderBillRow).join('')}</div></section>` : ''}
@@ -1027,6 +1028,9 @@ function openBillDialog(id = '') {
   form.elements.remind.value = String(bill?.remind ?? 3);
   form.elements.reference.value = bill?.reference || '';
   form.dataset.typeTouched = bill ? '1' : '';
+  form.elements.billingFrom.value = bill?.billingFrom || '';
+  form.elements.billingTo.value = bill?.billingTo || '';
+  setBillDuplicate(null);
   document.querySelector('#bill-error').hidden = true;
   document.querySelector('#bill-scan-status').textContent = t('Σκάναρε το QR ή τον barcode του λογαριασμού για να συμπληρωθεί ο κωδικός πληρωμής (RF) και, αν υπάρχει, το ποσό.');
   document.querySelector('#bill-title').textContent = t(bill ? 'Επεξεργασία λογαριασμού' : 'Προσθήκη λογαριασμού');
@@ -1049,12 +1053,65 @@ function applyBillCode(code) {
     : t('Ο κωδικός αποθηκεύτηκε ως αναφορά πληρωμής. Συμπλήρωσε ποσό και λήξη.');
 }
 
+function setBillDuplicate(duplicate) {
+  const banner = document.querySelector('#bill-duplicate');
+  banner.hidden = !duplicate;
+  banner.textContent = duplicate ? t('Αυτός ο λογαριασμός υπάρχει ήδη ({name}, {amount}, λήξη {date}).', { name: duplicate.name, amount: money(duplicate.amount), date: formatDate(duplicate.due) }) : '';
+  document.querySelector('#bill-save').disabled = Boolean(duplicate);
+}
+
+// PDF / photo of a bill -> prefilled dialog for review (nothing is saved until the user presses Save).
+async function importBillFile(file) {
+  if (!file) return;
+  openBillDialog();
+  const form = document.querySelector('#bill-form');
+  const status = document.querySelector('#bill-scan-status');
+  status.textContent = t('Ανάγνωση λογαριασμού…');
+  try {
+    const { parsed, source } = await readBillFile(file, {
+      recognizeImpl: window.__spitoOcrMock,
+      onProgress: (m) => { status.textContent = m.status === 'recognizing text' ? t('Αναγνώριση κειμένου… {pct}%', { pct: Math.round((m.progress || 0) * 100) }) : m.status === 'ocr' ? t('Το PDF δεν έχει κείμενο· αναγνώριση από εικόνα…') : t('Ανάγνωση λογαριασμού…'); }
+    });
+    if (parsed.name) { form.elements.name.value = parsed.name; form.elements.type.value = parsed.type; form.dataset.typeTouched = '1'; }
+    if (parsed.amount != null) form.elements.amount.value = parsed.amount;
+    if (parsed.due) form.elements.due.value = parsed.due;
+    if (parsed.reference) form.elements.reference.value = parsed.reference;
+    form.elements.period.value = parsed.type === 'water' ? '4' : parsed.type === 'electricity' ? '1' : form.elements.period.value;
+    form.elements.billingFrom.value = parsed.period?.from || '';
+    form.elements.billingTo.value = parsed.period?.to || '';
+    const found = [parsed.name && t('πάροχος'), parsed.amount != null && t('ποσό'), parsed.due && t('λήξη'), parsed.reference && (parsed.rfValid ? t('κωδικός RF ✓') : t('κωδικός RF (έλεγξέ τον)')), parsed.period && t('περίοδος {from} – {to}', { from: formatDate(parsed.period.from), to: formatDate(parsed.period.to) })].filter(Boolean);
+    const missing = [!parsed.name && t('πάροχος'), parsed.amount == null && t('ποσό'), !parsed.due && t('λήξη')].filter(Boolean);
+    status.textContent = found.length
+      ? `${t(source === 'ocr' ? 'Από αναγνώριση εικόνας' : 'Από το PDF')}: ${found.join(', ')}.${missing.length ? ` ${t('Συμπλήρωσε: {fields}.', { fields: missing.join(', ') })}` : ''} ${t('Έλεγξε και πάτα Αποθήκευση.')}`
+      : t('Δεν βρέθηκαν στοιχεία λογαριασμού στο αρχείο. Συμπλήρωσε τα στοιχεία με το χέρι.');
+    setBillDuplicate(parsed.name || parsed.reference ? findDuplicateBill(state.bills || [], { ...parsed, amount: parsed.amount ?? 0 }) : null);
+  } catch (error) {
+    status.textContent = t('Δεν ήταν δυνατή η ανάγνωση του αρχείου. Συμπλήρωσε τα στοιχεία με το χέρι.');
+  }
+}
+
+// A file shared to the app (Web Share Target) waits in the SW cache; import it once.
+async function takeSharedFile() {
+  if (!new URLSearchParams(location.search).has('share') || !('caches' in window)) return;
+  history.replaceState(null, '', `${location.pathname}#bills`);
+  try {
+    const cache = await caches.open('spitothiki-share');
+    const response = await cache.match('./__shared-file');
+    if (!response) { showToast('Δεν βρέθηκε το κοινοποιημένο αρχείο.'); return; }
+    await cache.delete('./__shared-file');
+    const blob = await response.blob();
+    const file = new File([blob], decodeURIComponent(response.headers.get('x-file-name') || 'shared'), { type: response.headers.get('content-type') || blob.type });
+    navigate('bills');
+    importBillFile(file);
+  } catch {}
+}
+
 function saveBillForm(form) {
   const error = document.querySelector('#bill-error');
   const id = form.elements.billId.value;
   const existing = (state.bills || []).find((bill) => bill.id === id);
   try {
-    const bill = createBill({ ...(existing || {}), id: id || undefined, name: form.elements.name.value, type: form.elements.type.value, amount: form.elements.amount.value === '' ? NaN : form.elements.amount.value, due: form.elements.due.value, period: form.elements.period.value, remind: form.elements.remind.value, reference: form.elements.reference.value });
+    const bill = createBill({ ...(existing || {}), id: id || undefined, name: form.elements.name.value, type: form.elements.type.value, amount: form.elements.amount.value === '' ? NaN : form.elements.amount.value, due: form.elements.due.value, period: form.elements.period.value, remind: form.elements.remind.value, reference: form.elements.reference.value, billingFrom: form.elements.billingFrom.value, billingTo: form.elements.billingTo.value });
     state.bills = existing ? state.bills.map((entry) => (entry.id === id ? bill : entry)) : [...(state.bills || []), bill];
   } catch (err) { error.textContent = t(err.message); error.hidden = false; return; }
   if (!persist()) return;
@@ -1290,6 +1347,7 @@ document.addEventListener('input', (event) => {
 
 document.addEventListener('change', (event) => {
   if (event.target.id === 'bill-type') event.target.form.dataset.typeTouched = '1';
+  if (event.target.matches?.('[data-bill-file]')) { importBillFile(event.target.files?.[0]); event.target.value = ''; return; }
   if (event.target.matches?.('[data-receipt-photo]')) { loadReceiptPhoto(event.target.files?.[0]); return; }
   if (event.target.classList?.contains('price-input')) {
     const row = state.shopping.find((entry) => entry.id === event.target.dataset.id);
@@ -1492,6 +1550,8 @@ renderApp();
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
   window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
 }
+
+takeSharedFile();
 
 function runDailyChecks() {
   runRecurring();

@@ -100,7 +100,7 @@ export function preprocess(img, angle = 0) {
 }
 
 let workerPromise = null;
-async function getWorker(onProgress) {
+export async function getWorker(onProgress) {
   if (!workerPromise) {
     workerPromise = (async () => {
       const Tesseract = await import(TESSERACT_URL);

@@ -425,6 +425,59 @@ await check('bills: add manually + by scanning EPC QR, overdue alert, pay recurr
   return ok;
 });
 
+await check('bill PDF: text PDF prefills dialog, duplicate refused, scanned PDF via OCR, share target', async () => {
+  const pdf = (name) => new URL(`../fixtures/bills/${name}`, import.meta.url).pathname;
+  await page.evaluate(() => { const st = JSON.parse(localStorage.getItem('spitothiki:v1')); st.bills = []; localStorage.setItem('spitothiki:v1', JSON.stringify(st)); });
+  await page.reload({ waitUntil: 'networkidle0' });
+  await nav('bills');
+  const waitName = (value) => page.waitForFunction((v) => document.querySelector('#bill-name')?.value === v, { timeout: 45000 }, value);
+  await (await page.$('#bill-file')).uploadFile(pdf('dei.pdf'));
+  await waitName('ΔΕΗ');
+  const dei = await page.evaluate(() => ({ amount: document.querySelector('#bill-amount').value, due: document.querySelector('#bill-due').value, ref: document.querySelector('#bill-reference').value, type: document.querySelector('#bill-type').value, status: document.querySelector('#bill-scan-status').textContent, from: document.querySelector('[name=billingFrom]').value }));
+  const leftDialog = await greekLeft();
+  await shot('bills-pdf-review');
+  await tap('#bill-save'); await wait();
+  const row = await page.$eval('#bills-unpaid .bill-row', (e) => e.textContent);
+  await (await page.$('#bill-file')).uploadFile(pdf('dei.pdf'));
+  await waitName('ΔΕΗ'); await wait(300);
+  const dupVisible = await page.$eval('#bill-duplicate', (e) => !e.hidden);
+  const saveDisabled = await page.$eval('#bill-save', (e) => e.disabled);
+  await shot('bills-pdf-duplicate');
+  await tap('[data-action="close-bill"]'); await wait();
+  // Scanned PDF (no text layer) -> OCR fallback (mocked OCR result here; real OCR is checked separately).
+  const eydapText = fixture('bills/eydap.txt');
+  await page.evaluate((text) => { window.__spitoOcrMock = async () => ({ text, confidence: 90 }); }, eydapText);
+  await (await page.$('#bill-file')).uploadFile(pdf('eydap-scanned.pdf'));
+  await waitName('ΕΥΔΑΠ');
+  const eydap = await page.evaluate(() => ({ amount: document.querySelector('#bill-amount').value, due: document.querySelector('#bill-due').value, status: document.querySelector('#bill-scan-status').textContent }));
+  await page.evaluate(() => { delete window.__spitoOcrMock; });
+  await tap('#bill-save'); await wait();
+  // Web Share Target: POST the file to ./share-target through the service worker, then open the redirect.
+  const manifest = await page.evaluate(async () => (await (await fetch('./manifest.webmanifest')).json()).share_target);
+  await page.evaluate(async () => { await navigator.serviceWorker.ready; });
+  await page.reload({ waitUntil: 'networkidle0' });
+  const b64 = readFileSync(pdf('cosmote.pdf')).toString('base64');
+  const shared = await page.evaluate(async (data) => {
+    if (!navigator.serviceWorker.controller) return 'no-controller';
+    const bytes = Uint8Array.from(atob(data), (c) => c.charCodeAt(0));
+    const form = new FormData(); form.append('file', new File([bytes], 'cosmote.pdf', { type: 'application/pdf' }));
+    const res = await fetch('./share-target', { method: 'POST', body: form, redirect: 'manual' });
+    return res.type;
+  }, b64);
+  await page.goto(new URL('./?share=1#bills', page.url()).href, { waitUntil: 'networkidle0' });
+  await waitName('Cosmote');
+  const cosmote = await page.evaluate(() => ({ amount: document.querySelector('#bill-amount').value, url: location.href, open: document.querySelector('#bill-dialog').open }));
+  const leftover = await page.evaluate(async () => Boolean(await (await caches.open('spitothiki-share')).match('./__shared-file')));
+  await shot('bills-pdf-shared');
+  await tap('[data-action="close-bill"]'); await wait();
+  const s = await stored();
+  const ok = dei.amount === '86.4' && dei.due === '2026-10-29' && dei.ref === 'RF18539007547034' && dei.type === 'electricity' && dei.from === '2026-08-05' && !leftDialog.length
+    && /RF/.test(row) && dupVisible && saveDisabled && eydap.amount === '1031.4' && eydap.due === '2026-11-15'
+    && manifest?.method === 'POST' && shared !== 'no-controller' && cosmote.amount === '32.9' && cosmote.open && !cosmote.url.includes('share=') && !leftover && s.bills.length === 2;
+  if (!ok) console.log('  billpdf:', { dei, leftDialog, row, dupVisible, saveDisabled, eydap, manifest, shared, cosmote, leftover, n: s.bills.length });
+  return ok;
+});
+
 for (const view of ['shopping', 'settings', 'insights', 'pantry', 'cook']) await check(`no Greek UI left on ${view} (${lang})`, async () => { await nav(view); const left = await greekLeft(); if (left.length) console.log('  left:', left); return !left.length; });
 
 console.log(`features ${width} ${lang}: ${errors.length ? 'FAILED ' + JSON.stringify(errors) : 'passed'}`);

@@ -109,7 +109,7 @@
   <dialog id="bill-dialog" class="item-dialog" aria-labelledby="bill-title">
     <form id="bill-form" novalidate>
       <div class="dialog-heading"><div><p class="eyebrow">ΛΟΓΑΡΙΑΣΜΟΣ</p><h2 id="bill-title">Προσθήκη λογαριασμού</h2></div><button class="icon-button" type="button" data-action="close-bill" aria-label="Κλείσιμο">×</button></div>
-      <input type="hidden" name="billId">
+      <input type="hidden" name="billId"><input type="hidden" name="billingFrom"><input type="hidden" name="billingTo">
       <div class="barcode-row bill-scan-row"><button class="button button-quiet" type="button" data-action="bill-scan"><span aria-hidden="true">📷</span> Σάρωση κωδικού</button><p class="field-hint" id="bill-scan-status" role="status">Σκάναρε το QR ή τον barcode του λογαριασμού για να συμπληρωθεί ο κωδικός πληρωμής (RF) και, αν υπάρχει, το ποσό.</p></div>
       <label class="field-label" for="bill-name">Όνομα <span aria-hidden="true">*</span></label>
       <input class="field-input" id="bill-name" name="name" required maxlength="60" placeholder="π.χ. ΔΕΗ, ΕΥΔΑΠ, Ενοίκιο, Netflix">
@@ -124,8 +124,9 @@
       </div>
       <label class="field-label" for="bill-reference">Κωδικός πληρωμής (RF)</label>
       <input class="field-input" id="bill-reference" name="reference" maxlength="40" autocomplete="off" placeholder="RF…" data-no-i18n>
+      <p class="alert-banner" id="bill-duplicate" role="status" hidden></p>
       <p class="form-error" id="bill-error" role="alert" hidden></p>
-      <div class="dialog-actions"><button class="button button-quiet" type="button" data-action="close-bill">Άκυρο</button><button class="button button-primary" type="submit">Αποθήκευση</button></div>
+      <div class="dialog-actions"><button class="button button-quiet" type="button" data-action="close-bill">Άκυρο</button><button class="button button-primary" type="submit" id="bill-save">Αποθήκευση</button></div>
     </form>
   </dialog>
 
