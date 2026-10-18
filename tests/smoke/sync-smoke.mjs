@@ -61,7 +61,7 @@ await check('sign up uploads local data', async () => {
   await signUp(phone, 'giannis@example.com');
   const status = await phone.$eval('#sync-status', (el) => el.textContent);
   const records = [...backend.docs.keys()].filter((k) => k.startsWith('households/uid-giannisexamplecom/records/'));
-  return status.includes('Συγχρονισμένο') && records.length === 1;
+  return /Συγχρονισμένο|Synced/.test(status) && records.length === 1;
 });
 let invite = '';
 await check('invite code is created', async () => {
