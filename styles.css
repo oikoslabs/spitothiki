@@ -414,7 +414,7 @@ body[data-screen="pantry"] .topbar .button-add { display: none; }
 .recipe-steps p { font-size: 13px; }
 .recipe-card .settings-actions { margin-top: auto; padding-top: 6px; }
 .section-title { margin: 8px 0 10px; font-size: 16px; }
-@media (max-width: 760px) { .primary-nav { grid-template-columns: repeat(6,minmax(0,1fr)); } .recipe-grid { grid-template-columns: 1fr; } }
+@media (max-width: 760px) { .primary-nav { grid-template-columns: repeat(7,minmax(0,1fr)); } .recipe-grid { grid-template-columns: 1fr; } }
 
 /* Scan receipt */
 .receipt-dialog { width: min(820px, calc(100vw - 24px)); }
@@ -454,3 +454,17 @@ body[data-screen="pantry"] .topbar .button-add { display: none; }
 .meal-option:hover, .plan-cell:hover { border-color: var(--green, #2f6b4f); }
 @media (max-width: 1020px) { .plan-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 760px) { .plan-grid { grid-template-columns: 1fr; } .plan-day { grid-template-columns: repeat(3, minmax(0, 1fr)); } .plan-day-name { grid-column: 1 / -1; } }
+.bill-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 6px 12px; align-items: center; }
+.bill-main { min-width: 0; }
+.bill-meta { margin: 2px 0 0; font-size: 12px; color: #6b7a70; overflow-wrap: anywhere; }
+.bill-ref { font-size: 11px; background: #f1f5ef; padding: 1px 5px; border-radius: 6px; }
+.bill-amount { font-size: 16px; }
+.bill-actions { grid-column: 1 / -1; display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
+.bill-row.is-overdue { border-color: #e5484d; box-shadow: inset 4px 0 0 #e5484d; }
+.bill-row.is-overdue .bill-due { color: #c62a2f; font-weight: 700; }
+.bill-row.is-soon { box-shadow: inset 4px 0 0 #e0a800; }
+.bill-row.is-soon .bill-due { color: #8a5a00; font-weight: 700; }
+.bill-row.is-paid { opacity: .75; }
+.alert-banner.is-danger { background: #fdecec; color: #9b1c1f; }
+.bill-scan-row { align-items: center; }
+@media (min-width: 761px) { .bill-row { grid-template-columns: auto minmax(0, 1fr) auto auto; } .bill-actions { grid-column: auto; } }

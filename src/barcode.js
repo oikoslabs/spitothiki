@@ -64,7 +64,7 @@ export async function startScanner(video, onCode, { qr = false } = {}) {
   if (!navigator.mediaDevices?.getUserMedia) throw new Error('Η κάμερα δεν είναι διαθέσιμη σε αυτόν τον browser.');
   let formats = [];
   if ('BarcodeDetector' in globalThis) formats = await globalThis.BarcodeDetector.getSupportedFormats().catch(() => []);
-  const wanted = formats.filter((f) => (qr ? f === 'qr_code' : /ean|upc|code_128|code_39|itf/.test(f)));
+  const wanted = formats.filter((f) => (qr === 'any' ? /qr_code|data_matrix|pdf417|aztec|ean|upc|code_128|code_39|itf|codabar/.test(f) : qr ? f === 'qr_code' : /ean|upc|code_128|code_39|itf/.test(f)));
   if (wanted.length) {
     const detector = new globalThis.BarcodeDetector({ formats: wanted });
     const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });

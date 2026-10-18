@@ -30,6 +30,7 @@
         <button class="nav-item" type="button" data-view="pantry"><span class="nav-icon" aria-hidden="true">▦</span><span>Το απόθεμά μου</span><span class="nav-count" id="nav-pantry-count">0</span></button>
         <button class="nav-item" type="button" data-view="shopping"><span class="nav-icon" aria-hidden="true">✓</span><span>Λίστα αγορών</span><span class="nav-count" id="nav-shopping-count">0</span></button>
         <button class="nav-item" type="button" data-view="cook"><span class="nav-icon" aria-hidden="true">🍳</span><span>Μαγείρεμα</span></button>
+        <button class="nav-item" type="button" data-view="bills"><span class="nav-icon" aria-hidden="true">📄</span><span>Λογαριασμοί</span><span class="nav-count" id="nav-bills-count" hidden>0</span></button>
         <button class="nav-item" type="button" data-view="insights"><span class="nav-icon" aria-hidden="true">◔</span><span>Στατιστικά</span></button>
         <button class="nav-item" type="button" data-view="settings"><span class="nav-icon" aria-hidden="true">⚙</span><span>Ρυθμίσεις</span></button>
       </nav>
@@ -103,6 +104,29 @@
   <dialog id="receipt-dialog" class="item-dialog receipt-dialog" aria-labelledby="receipt-title">
     <div class="dialog-heading"><div><p class="eyebrow">ΑΠΟΔΕΙΞΗ</p><h2 id="receipt-title">Σάρωση απόδειξης</h2></div><button class="icon-button" type="button" data-action="close-receipt" aria-label="Κλείσιμο">×</button></div>
     <div id="receipt-body"></div>
+  </dialog>
+
+  <dialog id="bill-dialog" class="item-dialog" aria-labelledby="bill-title">
+    <form id="bill-form" novalidate>
+      <div class="dialog-heading"><div><p class="eyebrow">ΛΟΓΑΡΙΑΣΜΟΣ</p><h2 id="bill-title">Προσθήκη λογαριασμού</h2></div><button class="icon-button" type="button" data-action="close-bill" aria-label="Κλείσιμο">×</button></div>
+      <input type="hidden" name="billId">
+      <div class="barcode-row bill-scan-row"><button class="button button-quiet" type="button" data-action="bill-scan"><span aria-hidden="true">📷</span> Σάρωση κωδικού</button><p class="field-hint" id="bill-scan-status" role="status">Σκάναρε το QR ή τον barcode του λογαριασμού για να συμπληρωθεί ο κωδικός πληρωμής (RF) και, αν υπάρχει, το ποσό.</p></div>
+      <label class="field-label" for="bill-name">Όνομα <span aria-hidden="true">*</span></label>
+      <input class="field-input" id="bill-name" name="name" required maxlength="60" placeholder="π.χ. ΔΕΗ, ΕΥΔΑΠ, Ενοίκιο, Netflix">
+      <div class="field-row">
+        <div><label class="field-label" for="bill-type">Είδος</label><select class="field-input" id="bill-type" name="type"></select></div>
+        <div><label class="field-label" for="bill-amount">Ποσό (€)</label><input class="field-input" id="bill-amount" name="amount" type="number" min="0" max="100000" step="0.01" inputmode="decimal" required></div>
+      </div>
+      <div class="field-row field-row-three">
+        <div><label class="field-label" for="bill-due">Λήξη πληρωμής</label><input class="field-input" id="bill-due" name="due" type="date" required></div>
+        <div><label class="field-label" for="bill-period">Επανάληψη</label><select class="field-input" id="bill-period" name="period"></select></div>
+        <div><label class="field-label" for="bill-remind">Υπενθύμιση (ημέρες πριν)</label><input class="field-input" id="bill-remind" name="remind" type="number" min="0" max="30" step="1" value="3" inputmode="numeric"></div>
+      </div>
+      <label class="field-label" for="bill-reference">Κωδικός πληρωμής (RF)</label>
+      <input class="field-input" id="bill-reference" name="reference" maxlength="40" autocomplete="off" placeholder="RF…" data-no-i18n>
+      <p class="form-error" id="bill-error" role="alert" hidden></p>
+      <div class="dialog-actions"><button class="button button-quiet" type="button" data-action="close-bill">Άκυρο</button><button class="button button-primary" type="submit">Αποθήκευση</button></div>
+    </form>
   </dialog>
 
   <dialog id="meal-dialog" class="item-dialog meal-dialog" aria-labelledby="meal-title">

@@ -21,7 +21,7 @@ await page.evaluateOnNewDocument((lang) => {
   window.__speech = lang === 'en' ? 'bread and 2 eggs' : 'ψωμί και 2 αυγά';
   window.SpeechRecognition = class { start() { setTimeout(() => { this.onresult?.({ results: [[{ transcript: window.__speech }]] }); this.onend?.(); }, 50); } stop() { this.onend?.(); } };
   // Fake QR detector: "sees" the receipt link on the (fake) camera.
-  window.BarcodeDetector = class { static async getSupportedFormats() { return ['qr_code', 'ean_13']; } constructor(o) { this.formats = o.formats; } async detect() { return this.formats.includes('qr_code') ? [{ rawValue: 'https://test-shop.epsilonnet.gr/fd/abc123:1' }] : []; } };
+  window.BarcodeDetector = class { static async getSupportedFormats() { return ['qr_code', 'ean_13']; } constructor(o) { this.formats = o.formats; } async detect() { return this.formats.includes('qr_code') ? [{ rawValue: window.__fakeCode || 'https://test-shop.epsilonnet.gr/fd/abc123:1' }] : []; } };
   window.__notifications = [];
   if (window.ServiceWorkerRegistration) ServiceWorkerRegistration.prototype.showNotification = (title, o) => { window.__notifications.push({ title, body: o?.body }); return Promise.resolve(); };
 }, lang);
@@ -53,7 +53,7 @@ async function check(name, fn) {
   catch (e) { console.log(`FAIL ${name}: ${e.message}`); errors.push(`${name}: ${e.message}`); }
 }
 const shot = async (name) => { if (shots) await page.screenshot({ path: `${shots}/feature-${name}-${lang}${width < 700 ? '-phone' : ''}.png`, fullPage: true }); };
-const greekLeft = async () => en ? (await page.evaluate(() => window.__i18n.untranslatedGreek())).filter((s) => !/Γάλα|Ψωμί|Αυγά|Μήλα|Ρύζι|Γιαούρτι|Ελαιόλαδο|Ντομάτες|Φέτα|Κοτόπουλο|Πατάτες|Χαρτί|Πεκορίνο|ΔΟΚΙΜΑΣΤΙΚΟ|ΧΑΣΙΩΤΗ|Φακές με ρύζι|Χουρμαδες|Κασιους|Καρυδοψιχα|(aria-label|title)=(Import: |Decrease quantity of |Increase quantity of |Edit |Thrown away: |Delete )/.test(s)) : [];
+const greekLeft = async () => en ? (await page.evaluate(() => window.__i18n.untranslatedGreek())).filter((s) => !/Γάλα|Ψωμί|Αυγά|Μήλα|Ρύζι|Γιαούρτι|Ελαιόλαδο|Ντομάτες|Φέτα|Κοτόπουλο|Πατάτες|Χαρτί|Πεκορίνο|ΔΟΚΙΜΑΣΤΙΚΟ|ΧΑΣΙΩΤΗ|ΔΕΗ|ΕΥΔΑΠ|Φακές με ρύζι|Χουρμαδες|Κασιους|Καρυδοψιχα|(aria-label|title)=(Import: |Decrease quantity of |Increase quantity of |Edit |Thrown away: |Delete )/.test(s)) : [];
 
 await page.goto(url, { waitUntil: 'networkidle0' });
 await page.evaluate(() => localStorage.clear());
@@ -373,6 +373,55 @@ await check('meal plan: pick built-in, free text and TheMealDB, week list, copy 
     && names.some((n) => /τυρί|cheese/.test(n)) && names.some((n) => /φακ|lentil/.test(n)) && names.some((n) => /ρύζι|rice/.test(n)) && names.includes('cumin') && !names.some((n) => /αυγ|egg/.test(n))
     && s2.meals.length === 6 && s2.meals.some((m) => m.recipeId === 'mealdb-777' && m.date > days[6]);
   if (!ok) console.log('  plan:', { cells, meals: s1.meals.length, names, after: s2.meals.length, left });
+  return ok;
+});
+
+await check('bills: add manually + by scanning EPC QR, overdue alert, pay recurring, reminder, insights chart', async () => {
+  const day = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+  await page.evaluate(() => { const st = JSON.parse(localStorage.getItem('spitothiki:v1')); st.bills = []; localStorage.setItem('spitothiki:v1', JSON.stringify(st)); });
+  await page.reload({ waitUntil: 'networkidle0' });
+  await nav('bills');
+  const empty = await page.$('.empty-state');
+  await tap('.page-heading [data-action="add-bill"]'); await wait();
+  await page.type('#bill-name', 'ΔΕΗ');
+  const guessed = await page.$eval('#bill-type', (e) => e.value);
+  await page.type('#bill-amount', '84.5');
+  await page.$eval('#bill-due', (e, v) => { e.value = v; }, day(2));
+  await page.select('#bill-period', '2');
+  await tap('#bill-form button[type=submit]'); await wait();
+  const firstErr = await page.$eval('#bill-error', (e) => e.hidden ? '' : e.textContent);
+  if (firstErr) console.log('  bill error:', firstErr, await page.$eval('#bill-due', (e) => e.value));
+  await tap('.page-heading [data-action="add-bill"]'); await wait();
+  await page.evaluate(() => { window.__fakeCode = 'BCD\n002\n1\nSCT\n\nΕΥΔΑΠ ΑΕ\nGR1601101250000000012300695\nEUR31.40\n\nRF18539007547034\n'; });
+  await tap('[data-action="bill-scan"]'); await wait(2500);
+  const scanned = await page.evaluate(() => ({ name: document.querySelector('#bill-name').value, amount: document.querySelector('#bill-amount').value, ref: document.querySelector('#bill-reference').value, type: document.querySelector('#bill-type').value, status: document.querySelector('#bill-scan-status').textContent }));
+  await page.$eval('#bill-due', (e, v) => { e.value = v; }, day(-1));
+  await shot('bills-dialog');
+  await tap('#bill-form button[type=submit]'); await wait();
+  await page.evaluate(() => { delete window.__fakeCode; });
+  const rows = (await page.$$('#bills-unpaid .bill-row')).length;
+  const danger = await page.$('#bills-alert.is-danger');
+  const count = await page.$eval('#nav-bills-count', (e) => e.textContent);
+  const left1 = await greekLeft();
+  await shot('bills-list');
+  // Reminder notification on app open.
+  await page.evaluate(() => { const n = JSON.parse(localStorage.getItem('spitothiki:notifications') || '{}'); delete n.lastBillNotified; localStorage.setItem('spitothiki:notifications', JSON.stringify({ ...n, enabled: true })); });
+  await page.reload({ waitUntil: 'networkidle0' }); await wait(1200);
+  const notes = await page.evaluate(() => window.__notifications.map((n) => n.title));
+  await nav('bills');
+  const deiId = (await stored()).bills.find((b) => b.name === 'ΔΕΗ').id;
+  await tap(`[data-action="bill-pay"][data-id="${deiId}"]`); await wait();
+  const s = await stored();
+  const next = s.bills.find((b) => b.name === 'ΔΕΗ' && !b.paid);
+  const paidRows = (await page.$$('#bills-paid .bill-row')).length;
+  await nav('insights');
+  const yearTotal = await page.$eval('#bills-year-total', (e) => e.textContent);
+  const left2 = await greekLeft();
+  await shot('bills-insights');
+  const ok = empty !== null && guessed === 'electricity' && scanned.name === 'ΕΥΔΑΠ ΑΕ' && scanned.amount === '31.4' && scanned.ref === 'RF18539007547034' && scanned.type === 'water'
+    && rows === 2 && danger !== null && count === '2' && notes.some((n) => /λογαριασμοί προς πληρωμή|bills to pay/.test(n))
+    && next && next.amount === 84.5 && paidRows === 1 && s.bills.length === 3 && /199[.,]40|200[.,]?|\d/.test(yearTotal) && !left1.length && !left2.length;
+  if (!ok) console.log('  bills:', { empty: !!empty, guessed, scanned, rows, danger: !!danger, count, notes, next, paidRows, yearTotal, left1, left2 });
   return ok;
 });
 
