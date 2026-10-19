@@ -29,3 +29,10 @@ test('default language: English only for en* browsers, saved choice wins', () =>
   assert.equal(detectLanguage('el', 'en-US'), 'el');
   assert.equal(detectLanguage('en', 'el'), 'en');
 });
+
+test('plain language: no technical jargon (RF, EPC, GS1, PLU, SEPA, JSON, OCR) in user-facing text', async () => {
+  const { dictionaries } = await import('../src/i18n.js');
+  const jargon = /\b(RF|EPC|GS1|PLU|SEPA|JSON|OCR)\b/;
+  const bad = Object.entries(dictionaries.en).filter(([el, en]) => jargon.test(el) || jargon.test(en));
+  assert.deepEqual(bad, []);
+});

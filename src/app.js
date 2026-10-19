@@ -309,7 +309,7 @@ function renderStoreBar() {
   const order = current ? storeOrder(current.order) : [];
   return `${bar}<div class="store-manager" id="store-manager"><form id="store-form" class="store-form" novalidate><input class="field-input" name="name" maxlength="40" placeholder="π.χ. Σουπερμάρκετ της γειτονιάς" aria-label="Όνομα καταστήματος"><button class="button button-quiet" type="submit">＋ Νέο κατάστημα</button></form>
     ${current ? `<p class="field-hint">${escapeHtml(t('Σειρά διαδρόμων στο «{name}»: βάλε τις κατηγορίες με τη σειρά που περπατάς.', { name: current.name }))}</p><ol class="aisle-list">${order.map((category, index) => `<li class="aisle-row"><span class="aisle-number">${index + 1}</span><span class="aisle-name">${escapeHtml(categoryLabel(category))}</span><button class="icon-button" type="button" data-action="aisle-up" data-category="${escapeHtml(category)}" ${index === 0 ? 'disabled' : ''} aria-label="${escapeHtml(t('Πιο νωρίς: {name}', { name: t(category) }))}">↑</button><button class="icon-button" type="button" data-action="aisle-down" data-category="${escapeHtml(category)}" ${index === order.length - 1 ? 'disabled' : ''} aria-label="${escapeHtml(t('Πιο αργά: {name}', { name: t(category) }))}">↓</button></li>`).join('')}</ol>
-    <details class="vm-settings" id="vm-settings"><summary>${escapeHtml(t('Barcode ζυγιζόμενων (20–29)'))}</summary><p class="field-hint">${escapeHtml(t('Οι ζυγαριές του καταστήματος τυπώνουν τιμή ή βάρος μέσα στον barcode. «Αυτόματα»: 25–29 βάρος (GS1 Ελλάδας), 20–24 με βάση τη λογική και ό,τι θυμάμαι.'))}</p><div class="vm-grid">${['20','21','22','23','24','25','26','27','28','29'].map((prefix) => `<label class="vm-row"><span data-no-i18n>${prefix}…</span><select class="field-input vm-mode" data-prefix="${prefix}" aria-label="${escapeHtml(t('Πρόθεμα {prefix}', { prefix }))}">${VM_MODES.map((mode) => `<option value="${mode}" ${(current.vm?.[prefix] || 'auto') === mode ? 'selected' : ''}>${escapeHtml(t({ auto: 'Αυτόματα', price: 'Τιμή', weight: 'Βάρος' }[mode]))}</option>`).join('')}</select></label>`).join('')}</div></details>
+    <details class="vm-settings" id="vm-settings"><summary>${escapeHtml(t('Barcode ζυγιζόμενων (20–29)'))}</summary><p class="field-hint">${escapeHtml(t('Οι ζυγαριές του καταστήματος τυπώνουν τιμή ή βάρος μέσα στον barcode. Με το «Αυτόματα» η εφαρμογή το καταλαβαίνει μόνη της.'))}</p><div class="vm-grid">${['20','21','22','23','24','25','26','27','28','29'].map((prefix) => `<label class="vm-row"><span data-no-i18n>${prefix}…</span><select class="field-input vm-mode" data-prefix="${prefix}" aria-label="${escapeHtml(t('Πρόθεμα {prefix}', { prefix }))}">${VM_MODES.map((mode) => `<option value="${mode}" ${(current.vm?.[prefix] || 'auto') === mode ? 'selected' : ''}>${escapeHtml(t({ auto: 'Αυτόματα', price: 'Τιμή', weight: 'Βάρος' }[mode]))}</option>`).join('')}</select></label>`).join('')}</div></details>
     <div class="settings-actions"><button class="button button-quiet" type="button" data-action="delete-store">${escapeHtml(t('Διαγραφή καταστήματος «{name}»', { name: current.name }))}</button></div>` : '<p class="field-hint">Διάλεξε ή φτιάξε ένα κατάστημα για να ορίσεις τη σειρά των διαδρόμων.</p>'}</div>`;
 }
 
@@ -344,8 +344,8 @@ function renderSettings() {
     ${renderLanguageCard()}
     ${renderSyncCard()}
     ${renderNotificationCard()}
-    <section class="panel settings-card"><span class="stat-icon blue">↗</span><h2>Αντίγραφο ασφαλείας</h2><p>Εξήγαγε ή εισήγαγε ένα αρχείο JSON. Το αρχείο περιέχει όλα τα δεδομένα σου: απόθεμα, λίστες και έξοδα.</p><div class="settings-actions"><button class="button button-primary" type="button" data-action="export-backup">⬇ Εξαγωγή αντιγράφου</button><button class="button button-quiet" type="button" data-action="import-backup">⬆ Εισαγωγή αντιγράφου</button></div></section></div>
-    <details class="panel collapsible settings-more" id="settings-advanced" ${openAttr('settings-advanced')}><summary><h2>Για προχωρημένους</h2><span class="field-hint">Proxy αποδείξεων, δοκιμαστικά δεδομένα, διαγραφή όλων</span></summary>
+    <section class="panel settings-card"><span class="stat-icon blue">↗</span><h2>Αντίγραφο ασφαλείας</h2><p>Αποθήκευσε όλα τα δεδομένα σου (απόθεμα, λίστες, έξοδα) σε ένα αρχείο, ή φέρε τα πίσω από ένα αρχείο.</p><div class="settings-actions"><button class="button button-primary" type="button" data-action="export-backup">⬇ Εξαγωγή αντιγράφου</button><button class="button button-quiet" type="button" data-action="import-backup">⬆ Εισαγωγή αντιγράφου</button></div></section></div>
+    <details class="panel collapsible settings-more" id="settings-advanced" ${openAttr('settings-advanced')}><summary><h2>Για προχωρημένους</h2><span class="field-hint">Ρύθμιση αποδείξεων, δοκιμαστικά δεδομένα, διαγραφή όλων</span></summary>
     <div class="settings-grid">
     ${renderReceiptSettingsCard()}
     <section class="panel settings-card"><span class="stat-icon amber">✨</span><h2>Δοκιμαστικά δεδομένα</h2><p>Γέμισε την εφαρμογή με ενδεικτικά προϊόντα για να δεις πώς λειτουργεί.</p><div class="settings-actions"><button class="button button-quiet" type="button" data-action="load-demo">Φόρτωση παραδειγμάτων</button></div></section>
@@ -898,7 +898,7 @@ function renderReceiptStart() {
     <p class="field-hint">Χωρίς QR παρόχου (π.χ. ταμειακή με QR της ΑΑΔΕ); Βγάλε φωτογραφία την απόδειξη και θα διαβαστούν τα είδη στη συσκευή σου.</p>${photoButtons()}
     <form id="receipt-link-form" class="store-form" novalidate><input class="field-input" name="link" type="url" inputmode="url" value="${escapeHtml(link)}" placeholder="https://… (σύνδεσμος απόδειξης)" aria-label="Σύνδεσμος απόδειξης" autocomplete="off"><button class="button button-quiet" type="submit">Άνοιγμα</button></form>
     ${error ? `<p class="form-error" id="receipt-error" role="alert">${escapeHtml(error)}</p>` : ''}${receiptState.raw ? `<p class="field-hint" id="receipt-raw-code"><small>${escapeHtml(t('Διαβάστηκε:'))} <code data-no-i18n>${escapeHtml(receiptState.raw)}</code> (${receiptState.raw.length})</small></p>` : ''}
-    ${cors && !receiptProxy() ? '<p class="field-hint">Μπορείς να ορίσεις proxy αποδείξεων στις Ρυθμίσεις για παρόχους που μπλοκάρουν την απευθείας πρόσβαση.</p>' : ''}`;
+    ${cors && !receiptProxy() ? '<p class="field-hint">Αν δεν ανοίγει, δοκίμασε τη φωτογραφία της απόδειξης.</p>' : ''}`;
 }
 
 function renderTripLink() {
@@ -1745,7 +1745,7 @@ function openBillDialog(id = '') {
   form.elements.billingTo.value = bill?.billingTo || '';
   setBillDuplicate(null);
   document.querySelector('#bill-error').hidden = true;
-  document.querySelector('#bill-scan-status').textContent = t('Σκάναρε το QR ή τον barcode του λογαριασμού για να συμπληρωθεί ο κωδικός πληρωμής (RF) και, αν υπάρχει, το ποσό.');
+  document.querySelector('#bill-scan-status').textContent = t('Σκάναρε το QR ή τον barcode του λογαριασμού για να συμπληρωθεί ο κωδικός πληρωμής και, αν υπάρχει, το ποσό.');
   document.querySelector('#bill-title').textContent = t(bill ? 'Επεξεργασία λογαριασμού' : 'Προσθήκη λογαριασμού');
   document.querySelector('#bill-dialog').showModal();
 }
@@ -1760,9 +1760,9 @@ function applyBillCode(code) {
   if (parsed.reference) form.elements.reference.value = parsed.reference;
   if (parsed.amount) form.elements.amount.value = parsed.amount;
   if (parsed.name && !form.elements.name.value) { form.elements.name.value = parsed.name; if (!form.dataset.typeTouched) form.elements.type.value = guessBillType(parsed.name); }
-  status.textContent = parsed.kind === 'epc' ? t('Βρέθηκε QR πληρωμής SEPA: συμπληρώθηκαν δικαιούχος, ποσό και κωδικός.')
-    : parsed.rfValid ? t('Βρέθηκε έγκυρος κωδικός πληρωμής RF.')
-    : parsed.kind === 'rf' ? t('Βρέθηκε κωδικός RF, αλλά το ψηφίο ελέγχου δεν ταιριάζει. Έλεγξέ τον.')
+  status.textContent = parsed.kind === 'epc' ? t('Βρέθηκε QR πληρωμής: συμπληρώθηκαν δικαιούχος, ποσό και κωδικός πληρωμής.')
+    : parsed.rfValid ? t('Βρέθηκε έγκυρος κωδικός πληρωμής.')
+    : parsed.kind === 'rf' ? t('Βρέθηκε κωδικός πληρωμής, αλλά φαίνεται λάθος. Έλεγξέ τον με τον λογαριασμό.')
     : t('Ο κωδικός αποθηκεύτηκε ως αναφορά πληρωμής. Συμπλήρωσε ποσό και λήξη.');
 }
 
@@ -1799,7 +1799,7 @@ async function importBillFile(file) {
       put('amount', parsed.amount); put('due', parsed.due); put('reference', parsed.reference);
       if (!filled.period) { form.elements.period.value = parsed.type === 'water' ? '4' : parsed.type === 'electricity' ? '1' : form.elements.period.value; filled.period = true; }
       put('billingFrom', parsed.period?.from || ''); put('billingTo', parsed.period?.to || '');
-      const found = [parsed.name && t('πάροχος'), parsed.amount != null && (parsed.sources?.amount === 'code' ? t('ποσό (από QR)') : parsed.sources?.amount === 'ocr' ? t('ποσό (από εικόνα)') : t('ποσό')), parsed.due && (parsed.sources?.due === 'ocr' ? t('λήξη (από εικόνα)') : t('λήξη')), parsed.reference && (parsed.rfValid ? t('κωδικός RF ✓') : t('κωδικός RF (έλεγξέ τον)')), parsed.period && t('περίοδος {from} – {to}', { from: formatDate(parsed.period.from), to: formatDate(parsed.period.to) })].filter(Boolean);
+      const found = [parsed.name && t('πάροχος'), parsed.amount != null && (parsed.sources?.amount === 'code' ? t('ποσό (από QR)') : parsed.sources?.amount === 'ocr' ? t('ποσό (από εικόνα)') : t('ποσό')), parsed.due && (parsed.sources?.due === 'ocr' ? t('λήξη (από εικόνα)') : t('λήξη')), parsed.reference && (parsed.rfValid ? t('κωδικός πληρωμής ✓') : t('κωδικός πληρωμής (έλεγξέ τον)')), parsed.period && t('περίοδος {from} – {to}', { from: formatDate(parsed.period.from), to: formatDate(parsed.period.to) })].filter(Boolean);
       const missing = [!parsed.name && t('πάροχος'), parsed.amount == null && t('ποσό'), !parsed.due && t('λήξη')].filter(Boolean);
       status.textContent = found.length
         ? `${t(source === 'ocr' ? 'Από αναγνώριση εικόνας' : 'Από το PDF')}: ${found.join(', ')}.${missing.length ? ` ${final ? t('Συμπλήρωσε: {fields}.', { fields: missing.join(', ') }) : t('Αναζήτηση για: {fields}…', { fields: missing.join(', ') })}` : ''} ${t('Έλεγξε και πάτα Αποθήκευση.')}`

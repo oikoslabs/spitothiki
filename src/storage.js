@@ -39,7 +39,7 @@ export function parseBackup(text) {
   try {
     parsed = JSON.parse(String(text));
   } catch {
-    throw new Error('Το αρχείο αντιγράφου δεν είναι έγκυρο JSON.');
+    throw new Error('Το αρχείο δεν είναι αντίγραφο της Σπιτοθήκης ή είναι χαλασμένο.');
   }
   if (!validState(parsed)) throw new Error('Το αρχείο αντιγράφου έχει μη έγκυρη μορφή.');
   return pick(parsed);
