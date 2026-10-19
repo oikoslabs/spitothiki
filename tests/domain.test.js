@@ -151,3 +151,9 @@ test('keeps an optional barcode on pantry items', () => {
   assert.equal(createPantryItem({ name: 'Γάλα', quantity: 1, barcode: '520-1004000014' }).barcode, '5201004000014');
   assert.equal('barcode' in createPantryItem({ name: 'Γάλα', quantity: 1 }), false);
 });
+
+test('expiringItems: only expiring/expired, expired first then soonest', async () => {
+  const { expiringItems } = await import('../src/domain.js');
+  const items = [{ name: 'a', expiry: '2026-10-24' }, { name: 'b', expiry: '2026-10-10' }, { name: 'c', expiry: '2026-12-01' }, { name: 'd', expiry: '' }, { name: 'e', expiry: '2026-10-18' }, { name: 'f', expiry: '2026-10-15' }];
+  assert.deepEqual(expiringItems(items, '2026-10-17').map((i) => i.name), ['b', 'f', 'e', 'a']);
+});

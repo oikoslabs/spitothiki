@@ -1,7 +1,7 @@
 {
   "name": "Σπιτοθήκη — Το σπίτι σε τάξη",
   "short_name": "Σπιτοθήκη",
-  "description": "Οργάνωσε τα τρόφιμα του σπιτιού, τις ημερομηνίες λήξης και τη λίστα αγορών σου. · Organise your household food, expiry dates and shopping list (Greek & English).",
+  "description": "Οργάνωσε το σπίτι και τα έξοδά σου: απόθεμα και λήξεις, λίστα αγορών, λογαριασμοί, μετακινήσεις και μικροέξοδα. · Organise your home and spending: pantry and expiry dates, shopping list, bills, transport and small expenses (Greek & English).",
   "lang": "el",
   "start_url": "./",
   "scope": "./",

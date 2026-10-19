@@ -1,4 +1,4 @@
-import { MAX_QUANTITY, createPantryItem, createShoppingItem, expiringWithin, expiryStatus, expiryWarning, normalizeSearch, normalizeUnit, pantrySummary, receiveShoppingItem, returnShoppingItem, shoppingListText, syncShoppingWithItem, toggleShoppingItem } from './domain.js';
+import { MAX_QUANTITY, expiringItems, createPantryItem, createShoppingItem, expiringWithin, expiryStatus, expiryWarning, normalizeSearch, normalizeUnit, pantrySummary, receiveShoppingItem, returnShoppingItem, shoppingListText, syncShoppingWithItem, toggleShoppingItem } from './domain.js';
 import { decodeImageCodes, lookupBarcode, normalizeBarcode, startScanner } from './barcode.js';
 import { isUrlCode, lastTollAmount, parseTollBarcode, parseTollText, tollAmountFromText } from './toll-barcode.js';
 import { authProviders, firebaseConfig } from './firebase-config.js';
@@ -14,7 +14,7 @@ import { findDuplicateBill, readBillFile } from './bill-pdf.js';
 import { addCartItem, budgetState, createTrip, finishTrip, lastPrice, lineTotal, remainingShopping, removeCartItem, tripForReceipt, updateCartItem } from './cart.js';
 import { VM_MODES, interpretCode } from './gs1.js';
 import { TRANSPORT_ICONS, TRANSPORT_TYPES, applyTransportRecurring, classifyReceipt, consumptionFor, createTransport, createTransportRecurring, fuelStats, pricePerLiter, transportMonth } from './transport.js';
-import { DEFAULT_EXTRA_CATEGORIES, EXTRA_DEFAULT_EMOJI, createExtra, createExtraCategory, deleteExtraCategory, extraCategories, extrasMonth, extrasSummary, lastUnitPrice, quickExtra, setExtraQty, unitPrice } from './extras.js';
+import { EXTRA_DEFAULT_EMOJI, EXTRA_SUGGESTIONS, LEGACY_EXTRA_CATEGORIES, createExtra, createExtraCategory, deleteExtraCategory, extraCategories, findExtraCategory, suggestEmoji, extrasMonth, extrasSummary, lastUnitPrice, quickExtra, setExtraQty, unitPrice } from './extras.js';
 import { getLang, locale, setLang, t, translateDom, untranslatedGreek } from './i18n.js';
 
 const viewRoot = document.querySelector('#view-content');
@@ -29,6 +29,7 @@ const VIEWS = ['overview', 'pantry', 'shopping', 'cart', 'cook', 'bills', 'trans
 let activeView = VIEWS.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'overview';
 let pantryQuery = '';
 let pantryCategory = 'Όλα';
+let pantryStatus = ''; // '' | 'expiring' (opened from the home card «λήγουν ή έληξαν»)
 let toastTimer;
 let confirmAction = null;
 
@@ -205,25 +206,25 @@ function renderInventoryCard(item) {
 function renderOverview() {
   const today = localDateKey();
   const summary = pantrySummary(state.items, today);
-  const upcoming = state.items.filter((item) => ['soon', 'expired'].includes(expiryStatus(item.expiry, today)))
+  const upcoming = expiringItems(state.items, today)
     .sort((a, b) => String(a.expiry).localeCompare(String(b.expiry))).slice(0, 3);
   const month = monthKey(today);
   const totals = monthTotals(month);
   const pending = state.shopping.filter((item) => !item.checked).length;
   const due = billsDue(state.bills || [], today);
-  return `<section class="hero-panel home-hero"><div class="hero-copy"><p class="eyebrow">ΜΙΚΡΕΣ ΣΥΝΗΘΕΙΕΣ, ΠΙΟ ΗΡΕΜΟ ΣΠΙΤΙ</p><h1>Η κουζίνα σου,<br>με μια ματιά.</h1><p>Ξέρεις τι έχεις, τι τελειώνει και τι χρειάζεται να μπει στη λίστα.</p></div><div class="hero-illustration" aria-hidden="true"><span>🫒</span></div></section>
+  return `<section class="hero-panel home-hero"><div class="hero-copy"><p class="eyebrow">ΜΙΚΡΕΣ ΣΥΝΗΘΕΙΕΣ, ΠΙΟ ΗΡΕΜΟ ΣΠΙΤΙ</p><h1>Η Σπιτοθήκη σου<br>με μια ματιά</h1><p>Τι έχεις στο σπίτι, τι λήγει, τι χρειάζεται η λίστα και πόσα ξοδεύεις κάθε μήνα.</p></div><div class="hero-illustration" aria-hidden="true"><span>🫒</span></div></section>
     ${summary.expired ? `<div class="alert-banner" role="status">${t(summary.expired === 1 ? '⚠️ Έχεις {count} προϊόν που έχει λήξει. Έλεγξέ τα πριν τα χρησιμοποιήσεις.' : '⚠️ Έχεις {count} προϊόντα που έχουν λήξει. Έλεγξέ τα πριν τα χρησιμοποιήσεις.', { count: summary.expired })}</div>` : ''}
     <section class="stats-grid home-stats" aria-label="Σύνοψη αποθέματος">
-      <button class="stat-card" type="button" data-view="pantry"><span class="stat-icon">🧺</span><div><strong>${summary.products}</strong><span>προϊόντα στο σπίτι</span></div></button>
-      <button class="stat-card" type="button" data-view="pantry"><span class="stat-icon amber">◷</span><div><strong>${summary.expiringSoon + summary.expired}</strong><span>λήγουν ή έληξαν</span></div></button>
-      <button class="stat-card" type="button" data-view="shopping"><span class="stat-icon blue">✓</span><div><strong>${pending}</strong><span>${escapeHtml(t('στη λίστα αγορών'))}</span></div></button>
+      <button class="stat-card" type="button" data-action="home-card" data-card="all" id="home-card-all"><span class="stat-icon">🧺</span><div><strong>${summary.products}</strong><span>προϊόντα στο σπίτι</span></div></button>
+      <button class="stat-card" type="button" data-action="home-card" data-card="expiring" id="home-card-expiring"><span class="stat-icon amber">◷</span><div><strong>${summary.expiringSoon + summary.expired}</strong><span>λήγουν ή έληξαν</span></div></button>
+      <button class="stat-card" type="button" data-action="home-card" data-card="shopping" id="home-card-shopping"><span class="stat-icon blue">✓</span><div><strong>${pending}</strong><span>${escapeHtml(t('στη λίστα αγορών'))}</span></div></button>
     </section>
     <div class="dashboard-grid">
       <section class="panel" id="home-month"><div class="panel-heading"><div><h2>${escapeHtml(t('Τα έξοδα του μήνα'))}</h2><p data-no-i18n>${escapeHtml(monthLabel(month))}</p></div><button class="panel-link" type="button" data-view="insights">${escapeHtml(t('Αναλυτικά →'))}</button></div>
         <p class="big-number" id="home-month-total">${escapeHtml(money(totals.total))}</p>${renderBars(totals.rows, money)}
         ${due.length ? `<button class="alert-banner home-bills-due" type="button" data-view="bills">📄 ${escapeHtml(t('{count} λογαριασμοί λήγουν σύντομα ή έχουν λήξει', { count: due.length }))} ›</button>` : ''}</section>
       <section class="panel quick-panel" id="home-quick"><div class="panel-heading"><div><h2>Γρήγορες κινήσεις</h2><p>Τα βασικά, χωρίς ψάξιμο</p></div></div><div class="quick-actions quick-grid">${renderQuickActions(['receipt', 'list', 'extra', 'transport', 'bill', 'product'])}</div></section>
-      <section class="panel" id="home-expiry"><div class="panel-heading"><div><h2>Έλεγξε τις ημερομηνίες</h2><p>Ό,τι λήγει μέσα στις επόμενες 7 ημέρες</p></div><button class="panel-link" type="button" data-view="pantry">Όλο το απόθεμα →</button></div><div class="product-list">${upcoming.length ? upcoming.map(renderMiniProduct).join('') : renderEmpty('Όλα καλά εδώ', 'Δεν έχεις προϊόντα που λήγουν σύντομα.', 'add-item', 'Πρόσθεσε προϊόν', '🌿')}</div></section>
+      <section class="panel" id="home-expiry"><div class="panel-heading"><div><h2>Έλεγξε τις ημερομηνίες</h2><p>Ό,τι λήγει μέσα στις επόμενες 7 ημέρες</p></div><button class="panel-link" type="button" data-action="home-card" data-card="expiring">${escapeHtml(t('Όλα όσα λήγουν →'))}</button></div><div class="product-list">${upcoming.length ? upcoming.map(renderMiniProduct).join('') : renderEmpty('Όλα καλά εδώ', 'Δεν έχεις προϊόντα που λήγουν σύντομα.', 'add-item', 'Πρόσθεσε προϊόν', '🌿')}</div></section>
     </div>`;
 }
 
@@ -232,11 +233,13 @@ function renderPantryList() {
   const count = document.querySelector('#inventory-count');
   if (!list || !count) return;
   const q = normalizeSearch(pantryQuery.trim());
-  const filtered = state.items.filter((item) => {
+  const source = pantryStatus === 'expiring' ? expiringItems(state.items, localDateKey()) : state.items;
+  const filtered = source.filter((item) => {
     const matchesText = !q || normalizeSearch(`${item.name} ${item.category} ${item.location} ${t(item.category)} ${t(item.location)}`).includes(q);
     const matchesCategory = pantryCategory === 'Όλα' || item.category === pantryCategory;
     return matchesText && matchesCategory;
-  }).sort((a, b) => a.name.localeCompare(b.name, getLang()));
+  });
+  if (pantryStatus !== 'expiring') filtered.sort((a, b) => a.name.localeCompare(b.name, getLang()));
   count.textContent = t(filtered.length === 1 ? '{count} προϊόν' : '{count} προϊόντα', { count: filtered.length });
   list.innerHTML = filtered.length ? filtered.map(renderInventoryCard).join('') : renderEmpty(state.items.length ? 'Δεν βρήκα προϊόντα' : 'Το απόθεμα είναι άδειο', state.items.length ? 'Δοκίμασε άλλη αναζήτηση ή κατηγορία.' : 'Πρόσθεσε τα πρώτα προϊόντα που έχεις στο σπίτι.', state.items.length ? 'clear-filters' : 'add-item', state.items.length ? 'Καθαρισμός φίλτρων' : 'Προσθήκη προϊόντος');
   translateDom(list);
@@ -252,6 +255,7 @@ function renderPantry() {
   return `${renderHeader('Το απόθεμά μου', 'Όσα έχεις στο σπίτι, οργανωμένα σε ένα σημείο.', 'Προσθήκη προϊόντος')}
     <div class="settings-actions page-actions">${renderReceiptButton()}</div>
     <section class="panel"><div class="toolbar"><label class="search-wrap"><span aria-hidden="true">⌕</span><input id="pantry-search" class="search-input" type="search" value="${escapeHtml(pantryQuery)}" placeholder="Αναζήτηση προϊόντος ή θέσης" aria-label="Αναζήτηση στο απόθεμα"></label><span class="inventory-count" id="inventory-count">${t('{count} προϊόντα', { count: state.items.length })}</span></div>
+    ${pantryStatus === 'expiring' ? `<div class="active-filter" id="pantry-status-filter" role="status"><span>${escapeHtml(t('Εμφανίζονται μόνο όσα λήγουν μέσα σε 7 ημέρες ή έληξαν, πρώτα τα πιο επείγοντα.'))}</span><button type="button" class="filter-chip is-active" data-action="clear-pantry-status" aria-label="${escapeHtml(t('Κατάργηση φίλτρου: Λήγουν ή έληξαν'))}">◷ ${escapeHtml(t('Λήγουν ή έληξαν'))} ×</button></div>` : ''}
     <div class="filter-row" aria-label="Φίλτρο κατηγορίας">${categories.map((category) => `<button type="button" class="filter-chip ${pantryCategory === category ? 'is-active' : ''}" data-action="filter-category" data-category="${escapeHtml(category)}" aria-pressed="${pantryCategory === category}">${category === 'Όλα' ? '' : `<span aria-hidden="true">${CATEGORY_ICONS[category] || '🧺'}</span> `}${escapeHtml(category)}</button>`).join('')}</div>
     <div id="inventory-list" class="inventory-list"></div></section>`;
 }
@@ -308,17 +312,17 @@ function renderShopping() {
 
 function renderSettings() {
   return `${renderHeader('Ρυθμίσεις', 'Διαχείριση και αντίγραφο ασφαλείας των δεδομένων σου.')}
-    <div class="settings-grid"><section class="panel settings-card"><span class="stat-icon">🔒</span><h2>Απόρρητο πρώτα</h2><p>Το απόθεμα και η λίστα αγορών αποθηκεύονται στη συσκευή σου και η εφαρμογή δουλεύει και χωρίς internet. Αν συνδεθείς, συγχρονίζονται ιδιωτικά μέσω Firebase μόνο με τα μέλη του νοικοκυριού σου. Δεν υπάρχουν διαφημίσεις ούτε παρακολούθηση.</p><div class="privacy-note">Η αναζήτηση barcode στέλνει μόνο τον αριθμό του barcode στο Open Food Facts. Αν δεν έχεις συνδεθεί και καθαρίσεις τα δεδομένα του browser ή αλλάξεις συσκευή, χρησιμοποίησε αντίγραφο ασφαλείας.</div></section>
+    <div class="settings-grid"><section class="panel settings-card"><span class="stat-icon">🔒</span><h2>Απόρρητο πρώτα</h2><p>Το απόθεμα, οι λίστες και τα έξοδά σου αποθηκεύονται στη συσκευή σου και η εφαρμογή δουλεύει και χωρίς internet. Αν συνδεθείς, συγχρονίζονται ιδιωτικά μέσω Firebase μόνο με τα μέλη του νοικοκυριού σου. Δεν υπάρχουν διαφημίσεις ούτε παρακολούθηση.</p><div class="privacy-note">Η αναζήτηση barcode στέλνει μόνο τον αριθμό του barcode στο Open Food Facts. Αν δεν έχεις συνδεθεί και καθαρίσεις τα δεδομένα του browser ή αλλάξεις συσκευή, χρησιμοποίησε αντίγραφο ασφαλείας.</div></section>
     <section class="panel settings-card"><span class="stat-icon">◐</span><h2>Εμφάνιση</h2><p>Διάλεξε φωτεινό ή σκούρο θέμα, ή άφησέ το να ακολουθεί τη συσκευή.</p><div class="theme-options" role="group" aria-label="Θέμα">${[['auto', 'Αυτόματο'], ['light', 'Φωτεινό'], ['dark', 'Σκούρο']].map(([value, label]) => `<button type="button" class="filter-chip ${currentTheme() === value ? 'is-active' : ''}" data-action="set-theme" data-theme="${value}" aria-pressed="${currentTheme() === value}">${label}</button>`).join('')}</div></section>
     ${renderLanguageCard()}
     ${renderSyncCard()}
     ${renderNotificationCard()}
-    <section class="panel settings-card"><span class="stat-icon blue">↗</span><h2>Αντίγραφο ασφαλείας</h2><p>Εξήγαγε ή εισήγαγε ένα αρχείο JSON. Το αρχείο περιέχει τα προϊόντα και τη λίστα αγορών σου.</p><div class="settings-actions"><button class="button button-primary" type="button" data-action="export-backup">⬇ Εξαγωγή αντιγράφου</button><button class="button button-quiet" type="button" data-action="import-backup">⬆ Εισαγωγή αντιγράφου</button></div></section></div>
+    <section class="panel settings-card"><span class="stat-icon blue">↗</span><h2>Αντίγραφο ασφαλείας</h2><p>Εξήγαγε ή εισήγαγε ένα αρχείο JSON. Το αρχείο περιέχει όλα τα δεδομένα σου: απόθεμα, λίστες και έξοδα.</p><div class="settings-actions"><button class="button button-primary" type="button" data-action="export-backup">⬇ Εξαγωγή αντιγράφου</button><button class="button button-quiet" type="button" data-action="import-backup">⬆ Εισαγωγή αντιγράφου</button></div></section></div>
     <details class="panel collapsible settings-more" id="settings-advanced" ${openAttr('settings-advanced')}><summary><h2>Για προχωρημένους</h2><span class="field-hint">Proxy αποδείξεων, δοκιμαστικά δεδομένα, διαγραφή όλων</span></summary>
     <div class="settings-grid">
     ${renderReceiptSettingsCard()}
     <section class="panel settings-card"><span class="stat-icon amber">✨</span><h2>Δοκιμαστικά δεδομένα</h2><p>Γέμισε την εφαρμογή με ενδεικτικά προϊόντα για να δεις πώς λειτουργεί.</p><div class="settings-actions"><button class="button button-quiet" type="button" data-action="load-demo">Φόρτωση παραδειγμάτων</button></div></section>
-    <section class="panel settings-card danger-zone"><span class="stat-icon" style="background:var(--red-soft)">⌫</span><h2>Καθαρισμός δεδομένων</h2><p>Διέγραψε όλα τα προϊόντα και τις λίστες από αυτή τη συσκευή.</p><div class="settings-actions"><button class="button button-danger" type="button" data-action="clear-data">Διαγραφή όλων</button></div></section></div></details>`;
+    <section class="panel settings-card danger-zone"><span class="stat-icon" style="background:var(--red-soft)">⌫</span><h2>Καθαρισμός δεδομένων</h2><p>Διέγραψε όλα τα δεδομένα (απόθεμα, λίστες, έξοδα) από αυτή τη συσκευή.</p><div class="settings-actions"><button class="button button-danger" type="button" data-action="clear-data">Διαγραφή όλων</button></div></section></div></details>`;
 }
 
 function renderApp() {
@@ -343,6 +347,7 @@ function navigate(view) {
   activeView = view;
   if (location.hash !== `#${view}`) history.replaceState(null, '', `#${view}`);
   pantryQuery = view === 'pantry' ? pantryQuery : '';
+  if (view !== 'pantry') pantryStatus = '';
   renderApp();
   viewRoot.focus({ preventScroll: true });
   window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -662,7 +667,7 @@ function applyLanguage() {
   const lang = getLang();
   document.documentElement.lang = lang;
   document.title = t('Σπιτοθήκη — Το σπίτι σε τάξη');
-  document.querySelector('meta[name="description"]')?.setAttribute('content', t('Οργάνωσε τα τρόφιμα του σπιτιού, τις ημερομηνίες λήξης και τη λίστα αγορών σου.'));
+  document.querySelector('meta[name="description"]')?.setAttribute('content', t('Οργάνωσε το σπίτι και τα έξοδά σου: απόθεμα και λήξεις, λίστα αγορών, λογαριασμοί, μετακινήσεις και μικροέξοδα.'));
   const toggle = document.querySelector('#lang-toggle');
   if (toggle) { toggle.textContent = lang === 'en' ? 'ΕΛ' : 'EN'; toggle.setAttribute('aria-label', lang === 'en' ? 'Switch to Greek' : 'Αλλαγή σε English'); toggle.setAttribute('title', toggle.getAttribute('aria-label')); }
   translateDom(document.body);
@@ -1433,17 +1438,21 @@ function renderMonthTotals() {
 // ---------- Small daily expenses (coffee, snacks, tobacco…) ----------
 let extrasMonthKey = monthKey(localDateKey());
 let extrasDraft = null; // manual form prefill / edit
-let extrasAsk = null; // category id waiting for its first price
+let extrasAsk = null; // category id (or 'suggest:<id>') waiting for its first price
 let extrasLast = null; // id of the entry just added with a quick button (undo / change)
 let extrasCatEdit = null; // category being renamed
-const extraCats = () => extraCategories(state.extraCategories || []);
-const extraCatLabel = (c) => (c.builtin && !c.renamed ? t(c.name) : c.name);
+const extraCats = () => extraCategories(state.extraCategories || [], state.extras || []);
+const extraCatLabel = (c) => (c.legacy ? t(c.name) : c.name);
+const SUGGEST_OFF_KEY = 'spitothiki:extras-suggestions-off';
+const suggestionsOff = () => { try { return localStorage.getItem(SUGGEST_OFF_KEY) === '1'; } catch { return false; } };
 function extraCatOf(id) {
   const c = extraCats().find((x) => x.id === id);
   if (c) return { emoji: c.emoji || EXTRA_DEFAULT_EMOJI, label: extraCatLabel(c) };
-  const d = DEFAULT_EXTRA_CATEGORIES.find((x) => x.id === id);
+  const sug = String(id).startsWith('suggest:') && EXTRA_SUGGESTIONS.find((x) => `suggest:${x.id}` === id);
+  if (sug) return { emoji: sug.emoji, label: t(sug.name) };
+  const d = LEGACY_EXTRA_CATEGORIES.find((x) => x.id === id);
   const stored = (state.extraCategories || []).find((x) => x.id === id);
-  if (d) return { emoji: d.emoji, label: stored?.name || t(d.name) };
+  if (d || stored?.name) return { emoji: stored?.emoji || d?.emoji || EXTRA_DEFAULT_EMOJI, label: stored?.name || t(d.name) };
   return { emoji: EXTRA_DEFAULT_EMOJI, label: t('Κατηγορία που διαγράφηκε') };
 }
 const extraMonthList = (month) => (state.extras || []).filter((e) => e.date.startsWith(`${month}-`)).sort((a, b) => b.date.localeCompare(a.date) || String(b.createdAt).localeCompare(String(a.createdAt)));
@@ -1477,13 +1486,42 @@ function renderExtrasLast() {
     <button class="button button-quiet" type="button" data-action="extras-last-edit">✎ ${escapeHtml(t('Αλλαγή ποσού'))}</button><button class="button button-quiet" type="button" data-action="extras-undo" id="extras-undo">↶ ${escapeHtml(t('Αναίρεση'))}</button></div></div>`;
 }
 
+// Faint chips while the user has no buttons of their own; a chip becomes a real button only when used.
+function renderExtrasSuggestions() {
+  if (suggestionsOff()) return `<p class="field-hint" id="extras-empty">${escapeHtml(t('Γράψε παρακάτω κάτι που αγοράζεις συχνά — γίνεται κουμπί.'))}</p>`;
+  return `<div class="extras-suggest" id="extras-suggest"><p class="field-hint">${escapeHtml(t('Δεν έχεις ακόμα κουμπιά. Γράψε παρακάτω κάτι που αγοράζεις συχνά ή πάτα μια πρόταση:'))}</p>
+    <div class="extras-suggest-row">${EXTRA_SUGGESTIONS.map((x) => `<button class="extras-chip" type="button" data-action="extras-suggest" data-id="${escapeHtml(x.id)}"><span aria-hidden="true">${x.emoji}</span> ${escapeHtml(t(x.name))}</button>`).join('')}<button class="icon-button extras-chip-off" type="button" data-action="extras-suggest-off" aria-label="${escapeHtml(t('Απόκρυψη προτάσεων'))}" title="${escapeHtml(t('Απόκρυψη προτάσεων'))}">×</button></div></div>`;
+}
+// Typing an item once (name + price) records it today and turns it into a quick button.
+function renderExtrasNewForm(first) {
+  return `<form class="extras-new" id="extras-new-form" novalidate><label class="field-label" for="extras-new-name">${escapeHtml(t(first ? 'Το πρώτο σου κουμπί' : '＋ Νέο κουμπί'))}</label>
+    <div class="extras-new-row"><input class="field-input extras-emoji-input" id="extras-new-emoji" name="emoji" maxlength="16" placeholder="${EXTRA_DEFAULT_EMOJI}" aria-label="${escapeHtml(t('Εικονίδιο (προαιρετικό)'))}"><input class="field-input" id="extras-new-name" name="name" maxlength="40" placeholder="${escapeHtml(t('π.χ. Φρέντο'))}" aria-label="${escapeHtml(t('Τι αγόρασες;'))}" autocomplete="off"><input class="field-input" id="extras-new-amount" name="amount" type="number" min="0" max="10000" step="0.01" inputmode="decimal" placeholder="€" aria-label="${escapeHtml(t('Ποσό (€)'))}"><button class="button button-primary" type="submit" id="extras-new-save">${escapeHtml(t('Καταχώριση'))}</button></div>
+    <p class="field-hint">${escapeHtml(t('Καταχωρείται σήμερα και γίνεται κουμπί· την επόμενη φορά αρκεί ένα πάτημα.'))}</p>
+    <p class="form-error" id="extras-new-error" role="alert" hidden></p></form>`;
+}
+function saveExtrasNew(form) {
+  const error = document.querySelector('#extras-new-error');
+  const name = form.elements.name.value;
+  try {
+    const amountCheck = createExtra({ category: 'x', amount: form.elements.amount.value, date: localDateKey() });
+    let cat = findExtraCategory(extraCats(), name);
+    if (!cat) {
+      const stored = state.extraCategories || [];
+      cat = createExtraCategory({ name, emoji: form.elements.emoji.value }, stored, undefined, state.extras || []);
+      state.extraCategories = [...stored, cat];
+    }
+    addExtra({ ...amountCheck, category: cat.id }, true);
+  } catch (err) { error.textContent = t(err.message); error.hidden = false; }
+}
+
 function renderExtrasForm() {
   const d = extrasDraft || {};
   const cats = extraCats();
   const sel = d.category || cats[0]?.id || '';
   const opts = cats.map((c) => `<option value="${escapeHtml(c.id)}" data-no-i18n ${c.id === sel ? 'selected' : ''}>${escapeHtml(`${c.emoji || EXTRA_DEFAULT_EMOJI} ${extraCatLabel(c)}`)}</option>`).join('')
     + (d.category && !cats.some((c) => c.id === d.category) ? `<option value="${escapeHtml(d.category)}" selected data-no-i18n>${escapeHtml(extraCatOf(d.category).label)}</option>` : '');
-  return `<section class="panel" id="extras-add"><div class="panel-heading"><div><h2>${escapeHtml(t(d.id ? 'Επεξεργασία εξόδου' : 'Καταχώριση με το χέρι'))}</h2>${d.id ? '' : `<p>${escapeHtml(t('Για άλλη μέρα, άλλη τιμή ή σημείωση.'))}</p>`}</div></div>
+  if (!cats.length && !d.id) return '';
+  return `<details class="panel collapsible" id="extras-add" ${d.id || openPanels.has('extras-add') ? 'open' : ''}><summary><h2>${escapeHtml(t(d.id ? 'Επεξεργασία εξόδου' : 'Καταχώριση με το χέρι'))}</h2>${d.id ? '' : `<span class="field-hint">${escapeHtml(t('Για άλλη μέρα, άλλη τιμή ή σημείωση.'))}</span>`}</summary>
     <form id="extras-form" novalidate><input type="hidden" name="entryId" value="${escapeHtml(d.id || '')}">
       <div class="field-row"><div><label class="field-label" for="extras-category">${escapeHtml(t('Κατηγορία'))}</label><select class="field-input" id="extras-category" name="category">${opts}</select></div>
         <div><label class="field-label" for="extras-amount">${escapeHtml(t('Ποσό (€)'))}</label><input class="field-input" id="extras-amount" name="amount" type="number" min="0" max="10000" step="0.01" inputmode="decimal" required value="${escapeHtml(d.amount ?? '')}"></div></div>
@@ -1493,17 +1531,17 @@ function renderExtrasForm() {
       <p class="field-hint">${escapeHtml(t('Το ποσό είναι το σύνολο για όλα τα τεμάχια.'))}</p>
       <p class="form-error" id="extras-error" role="alert" hidden></p>
       <div class="dialog-actions">${d.id ? `<button class="button button-quiet" type="button" data-action="extras-cancel">${escapeHtml(t('Άκυρο'))}</button>` : ''}<button class="button button-primary" type="submit" id="extras-save">${escapeHtml(t('Αποθήκευση'))}</button></div>
-    </form></section>`;
+    </form></details>`;
 }
 
 function renderExtrasCategories() {
   const cats = extraCats();
+  if (!cats.length) return '';
   const row = (c) => (extrasCatEdit === c.id
-    ? `<li><form class="extras-cat-form" id="extras-cat-edit-form" novalidate><input type="hidden" name="id" value="${escapeHtml(c.id)}"><input class="field-input extras-emoji-input" name="emoji" maxlength="16" value="${escapeHtml(c.emoji)}" aria-label="${escapeHtml(t('Εικονίδιο (προαιρετικό)'))}"><input class="field-input" name="name" maxlength="40" value="${escapeHtml(extraCatLabel(c))}" aria-label="${escapeHtml(t('Όνομα κατηγορίας'))}" data-no-i18n><button class="button button-primary" type="submit">${escapeHtml(t('Αποθήκευση'))}</button><button class="button button-quiet" type="button" data-action="extras-cat-cancel">${escapeHtml(t('Άκυρο'))}</button></form></li>`
+    ? `<li><form class="extras-cat-form" id="extras-cat-edit-form" novalidate><input type="hidden" name="catId" value="${escapeHtml(c.id)}"><input class="field-input extras-emoji-input" name="emoji" maxlength="16" value="${escapeHtml(c.emoji)}" aria-label="${escapeHtml(t('Εικονίδιο (προαιρετικό)'))}"><input class="field-input" name="name" maxlength="40" value="${escapeHtml(extraCatLabel(c))}" aria-label="${escapeHtml(t('Όνομα κατηγορίας'))}" data-no-i18n><button class="button button-primary" type="submit">${escapeHtml(t('Αποθήκευση'))}</button><button class="button button-quiet" type="button" data-action="extras-cat-cancel">${escapeHtml(t('Άκυρο'))}</button></form></li>`
     : `<li><span class="product-name">${escapeHtml(c.emoji || EXTRA_DEFAULT_EMOJI)} ${escapeHtml(extraCatLabel(c))}</span><span class="extras-cat-actions"><button class="icon-button" type="button" data-action="extras-cat-edit" data-id="${escapeHtml(c.id)}" aria-label="${escapeHtml(t('Μετονομασία'))}">✎</button><button class="icon-button" type="button" data-action="extras-cat-delete" data-id="${escapeHtml(c.id)}" aria-label="${escapeHtml(t('Διαγραφή'))}">🗑️</button></span></li>`);
-  return `<details class="panel collapsible extras-cats" id="extras-categories" ${extrasCatEdit || openPanels.has('extras-categories') ? 'open' : ''}><summary><h2>${escapeHtml(t('Οι κατηγορίες μου'))}</h2><span class="field-hint">${escapeHtml(t('Πρόσθεσε, μετονόμασε ή αφαίρεσε κουμπιά.'))}</span></summary>
+  return `<details class="panel collapsible extras-cats" id="extras-categories" ${extrasCatEdit || openPanels.has('extras-categories') ? 'open' : ''}><summary><h2>${escapeHtml(t('Τα κουμπιά μου'))}</h2><span class="field-hint">${escapeHtml(t('Μετονόμασε ή αφαίρεσε κουμπιά. Τα πιο συχνά μπαίνουν πρώτα.'))}</span></summary>
     <ul class="waste-top" id="extras-cat-list">${cats.map(row).join('')}</ul>
-    <form class="extras-cat-form" id="extras-cat-form" novalidate><input class="field-input extras-emoji-input" name="emoji" maxlength="16" placeholder="🍺" aria-label="${escapeHtml(t('Εικονίδιο (προαιρετικό)'))}"><input class="field-input" name="name" maxlength="40" placeholder="${escapeHtml(t('π.χ. Περίπτερο, Λαχεία'))}" aria-label="${escapeHtml(t('Όνομα κατηγορίας'))}"><button class="button button-quiet" type="submit">${escapeHtml(t('＋ Προσθήκη'))}</button></form>
     <p class="form-error" id="extras-cat-error" role="alert" hidden></p></details>`;
 }
 
@@ -1525,7 +1563,8 @@ function renderExtras() {
   return `${renderHeader('Μικροέξοδα', 'Καφές, σάντουιτς, καπνός και ό,τι μικρό πληρώνεις κάθε μέρα — με ένα πάτημα.')}
     <section class="panel" id="extras-quick-panel"><div class="panel-heading"><div><h2>Γρήγορη καταχώριση</h2><p>Ένα πάτημα = ένα έξοδο σήμερα, με την τελευταία τιμή.</p></div></div>
       ${renderExtrasAsk()}${renderExtrasLast()}
-      <div class="extras-quick" id="extras-quick">${quick}</div></section>
+      ${cats.length ? `<div class="extras-quick" id="extras-quick">${quick}</div>` : renderExtrasSuggestions()}
+      ${renderExtrasNewForm(!cats.length)}</section>
     <section class="stats-grid extras-stats" aria-label="${escapeHtml(t('Σύνοψη μικροεξόδων'))}">
       <article class="stat-card"><span class="stat-icon">☀️</span><div><strong id="extras-today">${escapeHtml(money(sum.today))}</strong><span>${escapeHtml(t('σήμερα'))}</span></div></article>
       <article class="stat-card"><span class="stat-icon amber">7</span><div><strong id="extras-week">${escapeHtml(money(sum.week))}</strong><span>${escapeHtml(t('αυτή την εβδομάδα'))}</span></div></article>
@@ -1590,7 +1629,7 @@ function saveExtraCategory(form, isEdit) {
   const error = document.querySelector('#extras-cat-error');
   const stored = state.extraCategories || [];
   try {
-    const rec = createExtraCategory({ id: isEdit ? form.elements.id.value : undefined, name: form.elements.name.value, emoji: form.elements.emoji.value }, stored);
+    const rec = createExtraCategory({ id: isEdit ? form.elements.catId.value : undefined, name: form.elements.name.value, emoji: form.elements.emoji.value }, stored, undefined, state.extras || []);
     state.extraCategories = stored.some((c) => c.id === rec.id) ? stored.map((c) => (c.id === rec.id ? rec : c)) : [...stored, rec];
   } catch (err) { if (error) { error.textContent = t(err.message); error.hidden = false; } return; }
   extrasCatEdit = null;
@@ -1895,6 +1934,8 @@ function handleAction(button) {
   else if (action === 'close-extras-history') closeExtrasHistory();
   else if (action === 'extras-quick') extrasQuick(id);
   else if (action === 'extras-ask-cancel') { extrasAsk = null; renderApp(); }
+  else if (action === 'extras-suggest') { extrasAsk = `suggest:${id}`; extrasLast = null; renderApp(); requestAnimationFrame(() => document.querySelector('#extras-ask-amount')?.focus()); }
+  else if (action === 'extras-suggest-off') { try { localStorage.setItem(SUGGEST_OFF_KEY, '1'); } catch {} renderApp(); }
   else if (action === 'extras-qty') { const e = (state.extras || []).find((x) => x.id === extrasLast); if (e) { state.extras = state.extras.map((x) => (x.id === e.id ? setExtraQty(e, e.qty + Number(button.dataset.delta)) : x)); if (persist()) renderApp(); } }
   else if (action === 'extras-undo') { const e = (state.extras || []).find((x) => x.id === extrasLast); if (e) { state.extras = state.extras.filter((x) => x.id !== e.id); extrasLast = null; if (persist()) { renderApp(); showToast('Αναιρέθηκε.'); } } }
   else if (action === 'extras-last-edit' || action === 'extras-edit') { const e = (state.extras || []).find((x) => x.id === (action === 'extras-edit' ? id : extrasLast)); if (e) { closeExtrasHistory(); extrasDraft = { ...e }; extrasLast = null; renderApp(); requestAnimationFrame(() => { document.querySelector('#extras-add')?.scrollIntoView({ block: 'center' }); const el = document.querySelector('#extras-amount'); el?.focus(); el?.select?.(); }); } }
@@ -2028,7 +2069,15 @@ function handleAction(button) {
     pantryCategory = button.dataset.category || 'Όλα';
     renderApp();
   } else if (action === 'clear-filters') {
-    pantryCategory = 'Όλα'; pantryQuery = ''; renderApp();
+    pantryCategory = 'Όλα'; pantryQuery = ''; pantryStatus = ''; renderApp();
+  } else if (action === 'clear-pantry-status') { pantryStatus = ''; renderApp(); }
+  else if (action === 'home-card') {
+    // Each home count card opens the matching view: all products / only expiring / the open shopping list.
+    const card = button.dataset.card;
+    pantryCategory = 'Όλα'; pantryQuery = '';
+    if (card === 'shopping') { navigate('shopping'); requestAnimationFrame(() => document.querySelector('.shopping-list')?.scrollIntoView({ block: 'start' })); return; }
+    pantryStatus = card === 'expiring' ? 'expiring' : '';
+    navigate('pantry');
   } else if (action === 'focus-shopping') {
     document.querySelector('#shopping-form input[name="name"]')?.focus();
   } else if (action === 'export-backup') downloadBackup();
@@ -2038,7 +2087,7 @@ function handleAction(button) {
     if (state.items.length || state.shopping.length) showConfirm('Τα τωρινά δεδομένα θα αντικατασταθούν από δοκιμαστικά προϊόντα.', loadDemo, 'Φόρτωση παραδειγμάτων;');
     else loadDemo();
   } else if (action === 'clear-data') {
-    showConfirm(`${t('Θα διαγραφούν όλα τα προϊόντα και η λίστα αγορών από αυτή τη συσκευή.')}${syncStatus.user ? t(' Επειδή είσαι συνδεδεμένος, θα διαγραφούν και από τις συγχρονισμένες συσκευές.') : ''}${t(' Φρόντισε να έχεις αντίγραφο αν τα χρειάζεσαι.')}`, () => {
+    showConfirm(`${t('Θα διαγραφούν όλα τα δεδομένα (απόθεμα, λίστες και έξοδα) από αυτή τη συσκευή.')}${syncStatus.user ? t(' Επειδή είσαι συνδεδεμένος, θα διαγραφούν και από τις συγχρονισμένες συσκευές.') : ''}${t(' Φρόντισε να έχεις αντίγραφο αν τα χρειάζεσαι.')}`, () => {
       state = { items: [], shopping: [], recurring: [], stores: [], purchases: [], waste: [], receipts: [], meals: [], bills: [], trips: [], prices: [], transport: [], transportRecurring: [], vehicles: [], extras: [], extraCategories: [] }; persist(); renderApp(); showToast('Τα δεδομένα διαγράφηκαν.');
     }, 'Διαγραφή όλων των δεδομένων;');
   }
@@ -2053,6 +2102,7 @@ document.addEventListener('click', (event) => {
 });
 
 document.addEventListener('input', (event) => {
+  if (event.target.id === 'extras-new-name') { const e = document.querySelector('#extras-new-emoji'); if (e) e.placeholder = suggestEmoji(event.target.value) || EXTRA_DEFAULT_EMOJI; }
   if (event.target.id === 'bill-name' && !event.target.form.dataset.typeTouched) event.target.form.elements.type.value = guessBillType(event.target.value);
 });
 
@@ -2121,12 +2171,24 @@ document.addEventListener('submit', (event) => {
   if (event.target.id === 'bill-form') { event.preventDefault(); saveBillForm(event.target); return; }
   if (event.target.id === 'transport-form') { event.preventDefault(); saveTransportForm(event.target); return; }
   if (event.target.id === 'extras-form') { event.preventDefault(); saveExtrasForm(event.target); return; }
-  if (event.target.id === 'extras-cat-form') { event.preventDefault(); saveExtraCategory(event.target, false); return; }
+  if (event.target.id === 'extras-new-form') { event.preventDefault(); saveExtrasNew(event.target); return; }
   if (event.target.id === 'extras-cat-edit-form') { event.preventDefault(); saveExtraCategory(event.target, true); return; }
   if (event.target.id === 'extras-price-form') {
     event.preventDefault();
     const f = event.target;
-    try { addExtra(createExtra({ category: f.elements.category.value, amount: f.elements.amount.value, qty: 1, date: localDateKey() }), true); }
+    try {
+      let category = f.elements.category.value;
+      const entry = createExtra({ category, amount: f.elements.amount.value, qty: 1, date: localDateKey() });
+      const sug = EXTRA_SUGGESTIONS.find((x) => `suggest:${x.id}` === category);
+      if (sug) {
+        // A suggestion chip becomes a real button (fixed id, so synced devices don't duplicate it).
+        const stored = (state.extraCategories || []).filter((c) => c.id !== sug.id);
+        const existing = findExtraCategory(extraCats(), t(sug.name));
+        if (existing) category = existing.id;
+        else { state.extraCategories = [...stored, createExtraCategory({ id: sug.id, name: t(sug.name), emoji: sug.emoji }, stored)]; category = sug.id; }
+      }
+      addExtra({ ...entry, category }, true);
+    }
     catch (err) { const e = document.querySelector('#extras-ask-error'); e.textContent = t(err.message); e.hidden = false; }
     return;
   }

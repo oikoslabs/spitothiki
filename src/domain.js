@@ -180,3 +180,9 @@ export function expiringWithin(items = [], today = new Date().toISOString().slic
     .sort((a, b) => a.due - b.due)
     .map(({ item }) => item);
 }
+
+// Items that expire within 7 days or already expired: expired first, then soonest expiry first.
+export function expiringItems(items = [], today = new Date().toISOString().slice(0, 10)) {
+  return items.filter((item) => ['soon', 'expired'].includes(expiryStatus(item.expiry, today)))
+    .sort((a, b) => String(a.expiry).localeCompare(String(b.expiry)) || String(a.name).localeCompare(String(b.name)));
+}

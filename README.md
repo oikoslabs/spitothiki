@@ -1,6 +1,6 @@
 # Σπιτοθήκη
 
-A small Greek home-pantry and shopping-list web app. Mobile-first, offline-friendly, and local-only.
+A small bilingual (Greek/English) home and spending app: pantry and expiry dates, shopping list, in-store cart, meal ideas, bills, transport and small daily expenses. Mobile-first and offline-friendly; optional private household sync via Firebase.
 
 ## What works in this MVP
 
