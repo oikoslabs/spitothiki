@@ -636,6 +636,9 @@ const EN = {
   'Συνδέσου για να μη χάσεις τα δεδομένα σου': 'Sign in so you never lose your data',
   'Με σύνδεση, όλα συγχρονίζονται αυτόματα σε κάθε κινητό ή υπολογιστή σου.': 'Once signed in, everything syncs automatically to every phone or computer you use.',
   'Απόκρυψη για 14 ημέρες': 'Hide for 14 days',
+  'ποσό (από QR)': 'amount (from QR)',
+  'ποσό (από εικόνα)': 'amount (from image)',
+  'λήξη (από εικόνα)': 'due date (from image)',
 };
 
 export const dictionaries = { el: Object.fromEntries(Object.keys(EN).map((key) => [key, key])), en: EN };

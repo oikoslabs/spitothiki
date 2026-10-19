@@ -818,7 +818,7 @@ async function loadReceiptPhoto(file) {
   try {
     const { ocrReceipt } = await import('./receipt-photo.js');
     const result = await ocrReceipt(file, {
-      recognizeImpl: window.__spitoOcrMock,
+      recognizeImpl: window.__spitoOcrMock, decodeImpl: window.__spitoBillCodesMock,
       onProgress: (m) => {
         const el = document.querySelector('#receipt-loading');
         if (!el) return;
@@ -1788,7 +1788,7 @@ async function importBillFile(file) {
     form.elements.period.value = parsed.type === 'water' ? '4' : parsed.type === 'electricity' ? '1' : form.elements.period.value;
     form.elements.billingFrom.value = parsed.period?.from || '';
     form.elements.billingTo.value = parsed.period?.to || '';
-    const found = [parsed.name && t('πάροχος'), parsed.amount != null && t('ποσό'), parsed.due && t('λήξη'), parsed.reference && (parsed.rfValid ? t('κωδικός RF ✓') : t('κωδικός RF (έλεγξέ τον)')), parsed.period && t('περίοδος {from} – {to}', { from: formatDate(parsed.period.from), to: formatDate(parsed.period.to) })].filter(Boolean);
+    const found = [parsed.name && t('πάροχος'), parsed.amount != null && (parsed.sources?.amount === 'code' ? t('ποσό (από QR)') : parsed.sources?.amount === 'ocr' ? t('ποσό (από εικόνα)') : t('ποσό')), parsed.due && (parsed.sources?.due === 'ocr' ? t('λήξη (από εικόνα)') : t('λήξη')), parsed.reference && (parsed.rfValid ? t('κωδικός RF ✓') : t('κωδικός RF (έλεγξέ τον)')), parsed.period && t('περίοδος {from} – {to}', { from: formatDate(parsed.period.from), to: formatDate(parsed.period.to) })].filter(Boolean);
     const missing = [!parsed.name && t('πάροχος'), parsed.amount == null && t('ποσό'), !parsed.due && t('λήξη')].filter(Boolean);
     status.textContent = found.length
       ? `${t(source === 'ocr' ? 'Από αναγνώριση εικόνας' : 'Από το PDF')}: ${found.join(', ')}.${missing.length ? ` ${t('Συμπλήρωσε: {fields}.', { fields: missing.join(', ') })}` : ''} ${t('Έλεγξε και πάτα Αποθήκευση.')}`
