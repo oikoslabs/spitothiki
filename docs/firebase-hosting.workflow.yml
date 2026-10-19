@@ -1,11 +1,11 @@
-# To enable: copy this file to .github/workflows/firebase-hosting.yml (needs a token with the "workflow" scope).
+# OPTIONAL, not installed. Manual `firebase deploy` (README → Deploy) is the source of truth.
+# If you ever want a one-click deploy button in GitHub: copy to .github/workflows/firebase-hosting.yml
+# (needs a token with the "workflow" scope) and add the FIREBASE_SERVICE_ACCOUNT_SPITOTHIKI secret.
+# It runs only when started by hand (Actions → Run workflow); it never deploys on push.
 name: Test and deploy to Firebase Hosting
 
-# Runs on pushes to main once the FIREBASE_SERVICE_ACCOUNT_SPITOTHIKI secret exists;
-# without it the deploy step is skipped (tests still run). Can also be started by hand.
+# Without the secret the deploy step is skipped (tests still run).
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:

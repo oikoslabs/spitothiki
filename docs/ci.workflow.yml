@@ -1,0 +1,25 @@
+# Replacement for .github/workflows/pages.yml (GitHub Pages is not enabled for this repo, so that
+# workflow fails on every push). This one only runs the unit tests on pushes and pull requests and
+# deploys nothing: the live site is deployed by hand with `firebase deploy` (see README → Deploy).
+# To install (needs a GitHub token with the "workflow" scope, e.g. `gh auth refresh -s workflow`):
+#   git mv docs/ci.workflow.yml .github/workflows/ci.yml && git rm .github/workflows/pages.yml
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm test
