@@ -209,3 +209,19 @@ export function weekIngredients(plan, week, { items = [], shopping = [] } = {}) 
     return { name, count, countable, have: Boolean(staple) || (countable ? stock >= count : stock > 0), pending: pending.some(match) };
   });
 }
+
+// Merge a newly read page (e.g. the back of the sheet) into the review draft: never replaces anything,
+// matches meal slots by name (or time), skips options already present, appends new slots at the end.
+export function mergeParsed(base, extra) {
+  const key = (s) => plain(s || '');
+  const out = { ...base, appointment: base.appointment || extra.appointment || '', slots: base.slots.map((s) => ({ ...s, options: s.options.map((o) => ({ ...o })) })) };
+  for (const slot of extra.slots || []) {
+    let target = out.slots.find((s) => key(s.name) && key(s.name) === key(slot.name)) || out.slots.find((s) => !key(s.name) && s.time && s.time === slot.time);
+    if (!target) { out.slots.push({ ...slot, options: [] }); target = out.slots[out.slots.length - 1]; }
+    if (!target.time && slot.time) target.time = slot.time;
+    const seen = new Set(target.options.map((o) => key(o.text)).filter(Boolean));
+    target.options = target.options.filter((o) => key(o.text)); // drop the empty placeholder
+    for (const o of slot.options) { const k = key(o.text); if (k && !seen.has(k)) { seen.add(k); target.options.push({ ...o }); } }
+  }
+  return out;
+}

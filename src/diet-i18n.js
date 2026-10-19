@@ -60,6 +60,12 @@ export const DIET_EN = {
   'Συνέχεια': 'Continue',
   'Δεν βρέθηκαν γεύματα. Γράψε κάθε γεύμα σε δική του γραμμή με την ώρα του.': 'No meals found. Put each meal on its own line with its time.',
   'Προσοχή: αυτή η επιλογή είναι πάνω από το όριο της εβδομάδας.': 'Note: this option is now over its weekly limit.',
+  'Πρόσθεσε κι άλλη σελίδα (πίσω όψη)': 'Add another page (back side)',
+  '{n} σελίδα': '{n} page',
+  '{n} σελίδες': '{n} pages',
+  'Διαβάζω τη νέα σελίδα…': 'Reading the new page…',
+  'Προστέθηκαν {count} επιλογές από τη νέα σελίδα.': '{count} options added from the new page.',
+  'Δεν βρέθηκαν νέες επιλογές σε αυτή τη σελίδα.': 'No new options found on this page.',
   // Meal slot names found on Greek plans
   'Πρωινό': 'Breakfast', 'Δεκατιανό': 'Morning snack', 'Κυρίως γεύμα': 'Main meal', 'Απογευματινό': 'Afternoon snack', 'Σνακ': 'Snack', 'Ελαφρύ γεύμα': 'Light meal',
   // Ingredients

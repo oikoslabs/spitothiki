@@ -1,6 +1,6 @@
 // UI for the diet plan («Πρόγραμμα διατροφής») inside the meal-plan tab: scan/paste -> review -> week -> shopping list.
 // Kept out of app.js: app.js only calls initDietUi() once and renderDietSection() inside the plan tab.
-import { PAGE_BREAK, createDietPlan, generateWeek, overLimit, parseDietText, setWeek, usage, weekIngredients } from './diet-plan.js';
+import { PAGE_BREAK, createDietPlan, mergeParsed, generateWeek, overLimit, parseDietText, setWeek, usage, weekIngredients } from './diet-plan.js';
 import { PDFJS_URL, PDFJS_WORKER_URL } from './bill-pdf.js';
 import { getLang, locale, t, translateDom } from './i18n.js';
 
@@ -82,14 +82,15 @@ function renderReview() {
     <div id="diet-review">${draft.slots.map((s, si) => `<fieldset class="diet-slot" data-s="${si}"><div class="field-row"><div><label class="field-label">${esc(t('Γεύμα'))}</label><input class="field-input" data-diet-field="name" data-s="${si}" maxlength="40" value="${esc(s.name)}" data-no-i18n></div><div class="diet-time"><label class="field-label">${esc(t('Ώρα'))}</label><input class="field-input" inputmode="numeric" maxlength="5" placeholder="12:00" data-diet-field="time" data-s="${si}" value="${esc(s.time)}"></div></div>
       <ol class="diet-options">${s.options.map((o, oi) => `<li class="diet-option"><textarea class="field-input" rows="2" data-diet-field="text" data-s="${si}" data-o="${oi}" aria-label="${esc(t('Επιλογή'))}">${esc(o.text)}</textarea><div class="diet-option-tools">${freqSelect(o, si, oi)}${oi ? `<button class="text-button" type="button" data-diet="merge" data-s="${si}" data-o="${oi}" title="${esc(t('Ένωση με την από πάνω'))}">⤒ ${esc(t('Ένωση'))}</button>` : ''}<button class="text-button" type="button" data-diet="del-option" data-s="${si}" data-o="${oi}" aria-label="${esc(t('Διαγραφή επιλογής'))}">✕ ${esc(t('Διαγραφή'))}</button></div></li>`).join('')}</ol>
       <div class="settings-actions"><button class="button button-quiet" type="button" data-diet="add-option" data-s="${si}">＋ ${esc(t('Επιλογή'))}</button><button class="text-button" type="button" data-diet="del-slot" data-s="${si}">${esc(t('Διαγραφή γεύματος'))}</button></div></fieldset>`).join('')}</div>
+    ${draft.pages ? `<div class="settings-actions diet-add-page"><label class="button button-quiet file-button" id="diet-add-page"><span>➕ ${esc(t('Πρόσθεσε κι άλλη σελίδα (πίσω όψη)'))}</span><input type="file" accept="image/*,application/pdf" class="visually-hidden" data-diet-file data-add-page></label><span class="field-hint" id="diet-pages">${esc(t(draft.pages === 1 ? '{n} σελίδα' : '{n} σελίδες', { n: draft.pages }))}</span></div>${busy ? `<p class="field-hint" role="status" id="diet-busy">${esc(busy)}</p>` : ''}` : ''}
     <div class="settings-actions"><button class="button button-quiet" type="button" data-diet="add-slot">＋ ${esc(t('Γεύμα'))}</button></div>
     <p class="form-error" id="diet-error" role="alert" hidden></p>
     <div class="dialog-actions diet-sticky"><button class="button button-quiet" type="button" data-diet="close">${esc(t('Άκυρο'))}</button><button class="button button-primary" type="button" data-diet="save" id="diet-save">${esc(t('Αποθήκευση'))}</button></div>`;
   openDialog('ΠΡΟΓΡΑΜΜΑ ΔΙΑΤΡΟΦΗΣ', 'Έλεγχος πριν την αποθήκευση', html);
 }
 
-function startReview(parsed, editing = null) {
-  draft = { person: editing?.person || '', title: parsed.title, appointment: parsed.appointment || '', slots: parsed.slots.map((s) => ({ ...s, options: s.options.map((o) => ({ ...o })) })), editingId: editing?.id || '' };
+function startReview(parsed, editing = null, pages = 0) {
+  draft = { pages, person: editing?.person || '', title: parsed.title, appointment: parsed.appointment || '', slots: parsed.slots.map((s) => ({ ...s, options: s.options.map((o) => ({ ...o })) })), editingId: editing?.id || '' };
   if (!draft.slots.length) draft.slots = [{ id: '', name: 'Πρωινό', time: '', options: [{ text: '', perWeek: null, free: false }] }];
   renderReview();
 }
@@ -210,20 +211,40 @@ async function readFiles(files) {
     if (file.type === 'application/pdf' || /\.pdf$/i.test(file.name)) texts.push(...await pdfPages(file, progress));
     else { const r = await readPhoto(file, progress); texts.push(r.text); confidences.push(r.confidence); }
   }
-  return { text: texts.join(`\n${PAGE_BREAK}\n`), confidences };
+  return { text: texts.join(`\n${PAGE_BREAK}\n`), confidences, pages: texts.length };
 }
 
-async function importFiles(files) {
+async function importFiles(files, addPage = false) {
   if (!files?.length) return;
+  if (addPage && draft) return addPages(files);
   try {
-    const { text, confidences } = await readFiles(files);
+    const { text, confidences, pages } = await readFiles(files);
     busy = ''; rerender();
     const parsed = parseDietText(text);
     window.__spitoDietLast = { text, parsed, confidences };
     if (!parsed.slots.length) { ctx.toast(t('Δεν βρέθηκαν γεύματα. Δοκίμασε πιο καθαρή φωτογραφία ή επικόλλησε το κείμενο.')); openPaste(text); return; }
-    startReview(parsed);
+    startReview(parsed, null, pages);
     if (confidences.some((c) => c < 60)) ctx.toast(t('Κάποια σελίδα δεν διαβάστηκε καθαρά: έλεγξε προσεκτικά τις επιλογές.'));
   } catch (error) { busy = ''; rerender(); ctx.toast(t(error.message || 'Η αναγνώριση απέτυχε.')); }
+}
+
+// Extra page from the review screen: read it and merge into the current draft (nothing already there is replaced).
+async function addPages(files) {
+  const rd = () => { const el = document.querySelector('#diet-busy'); if (el) el.textContent = busy; };
+  const rerenderOrig = ctx.rerender; ctx.rerender = rd; // keep the dialog open while reading
+  try {
+    busy = t('Διαβάζω τη νέα σελίδα…'); renderReview();
+    const { text, confidences, pages } = await readFiles(files);
+    const parsed = parseDietText(text);
+    busy = '';
+    const before = draft.slots.reduce((n, s) => n + s.options.length, 0);
+    draft = { ...mergeParsed(draft, parsed), person: draft.person, editingId: draft.editingId, pages: (draft.pages || 0) + pages };
+    const added = draft.slots.reduce((n, s) => n + s.options.length, 0) - before;
+    renderReview();
+    ctx.toast(added > 0 ? t('Προστέθηκαν {count} επιλογές από τη νέα σελίδα.', { count: added }) : t('Δεν βρέθηκαν νέες επιλογές σε αυτή τη σελίδα.'));
+    if (confidences.some((c) => c < 60)) ctx.toast(t('Κάποια σελίδα δεν διαβάστηκε καθαρά: έλεγξε προσεκτικά τις επιλογές.'));
+  } catch (error) { busy = ''; renderReview(); ctx.toast(t(error.message || 'Η αναγνώριση απέτυχε.')); }
+  finally { ctx.rerender = rerenderOrig; }
 }
 
 function openPaste(text = '') {
@@ -247,7 +268,7 @@ function syncField(el) {
 function onInput(event) { if (event.target.closest?.('#diet-dialog')) syncField(event.target); }
 function onChange(event) {
   const el = event.target;
-  if (el.matches?.('[data-diet-file]')) { const files = [...el.files]; el.value = ''; importFiles(files); return; }
+  if (el.matches?.('[data-diet-file]')) { const files = [...el.files]; const add = el.hasAttribute('data-add-page'); el.value = ''; importFiles(files, add); return; }
   if (el.matches?.('[data-diet-check]')) { listRows[Number(el.dataset.dietCheck)].on = el.checked; const b = document.querySelector('#diet-list-add'); if (b) b.textContent = t('Πρόσθεσε στη λίστα ({count})', { count: listRows.filter((r) => r.on).length }); return; }
   if (el.closest?.('#diet-dialog')) syncField(el);
 }
