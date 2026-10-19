@@ -673,6 +673,18 @@ const EN = {
   'Δεν βρήκα QR ή barcode στην εικόνα. Τι είναι;': 'I found no QR or barcode in the image. What is it?',
   'Απόδειξη': 'Receipt',
   'Λογαριασμός': 'Bill',
+  // Direct debit
+  'Πληρώνεται με πάγια εντολή': 'Paid by direct debit',
+  '(χρεώνεται αυτόματα από την τράπεζα· δεν θα σου ζητάει πληρωμή)': '(your bank pays it automatically; the app won’t ask you to pay)',
+  'Χρεώθηκε με πάγια εντολή {date}': 'Debited by direct debit {date}',
+  'Θα χρεωθεί στις {date}': 'Will be debited on {date}',
+  '🏦 Πάγια εντολή': '🏦 Direct debit',
+  'Με πάγια εντολή': 'By direct debit',
+  'Χρεώνονται αυτόματα · {sum}': 'Debited automatically · {sum}',
+  'Τίποτα να πληρώσεις με το χέρι. 🎉': 'Nothing to pay by hand. 🎉',
+  '1 λογαριασμός χρεώθηκε με πάγια εντολή.': '1 bill was debited by direct debit.',
+  '{count} λογαριασμοί χρεώθηκαν με πάγια εντολή.': '{count} bills were debited by direct debit.',
+  '1 απλήρωτος · {sum}': '1 unpaid · {sum}',
 };
 
 export const dictionaries = { el: Object.fromEntries(Object.keys(EN).map((key) => [key, key])), en: EN };

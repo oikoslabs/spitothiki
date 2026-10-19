@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { addMonths, billStats, billsDue, createBill, guessBillType, parseBillCode, payBill, unpayBill, validRf } from '../src/bills.js';
+import { addMonths, billStats, billsDue, createBill, guessBillType, parseBillCode, payBill, unpaidBills, unpayBill, validRf } from '../src/bills.js';
 
 const now = '2026-10-18T10:00:00.000Z';
 
@@ -87,4 +87,32 @@ test('bills: unpaid order and paid history grouping, filters, paging', async () 
   assert.equal(dei.matched, 7); assert.ok(dei.groups.flatMap((g) => g.bills).every((b) => b.name === 'ΔΕΗ'));
   assert.equal(paidHistory(bills, { filter: 'type:phone' }).matched, 7);
   assert.deepEqual(h.types, ['electricity', 'phone']); assert.deepEqual([...h.names].sort(), ['Cosmote', 'ΔΕΗ']);
+});
+
+test('bills: direct debit — not "to pay", no warnings, auto-paid on the due date, remembered per provider', async () => {
+  const { applyAutoPay, autoPayFor, scheduledDebits } = await import('../src/bills.js');
+  const dd = createBill({ id: 'b1', name: 'ΔΕΗ', amount: 50, due: '2026-10-20', period: 1, autoPay: true });
+  const manual = createBill({ id: 'b2', name: 'ΕΥΔΑΠ', amount: 30, due: '2026-10-21' });
+  assert.equal(dd.autoPay, true); assert.equal(manual.autoPay, false);
+  const bills = [dd, manual];
+  assert.deepEqual(unpaidBills(bills).map((b) => b.id), ['b2']);
+  assert.deepEqual(billsDue(bills, '2026-10-25').map((b) => b.id), ['b2']); // overdue manual only
+  assert.deepEqual(scheduledDebits(bills).map((b) => b.id), ['b1']);
+  // before the due date nothing changes
+  assert.deepEqual(applyAutoPay(bills, '2026-10-19').paid, []);
+  // on/after the due date: paid at the due date, next month's instance created (still direct debit)
+  const after = applyAutoPay(bills, '2026-10-20').bills;
+  const paid = after.find((b) => b.id === 'b1');
+  assert.deepEqual([paid.paid, paid.paidAt], [true, '2026-10-20']);
+  const next = after.find((b) => b.due === '2026-11-20');
+  assert.deepEqual([next.paid, next.autoPay], [false, true]);
+  // long absence: catches up month by month, once each
+  const caught = applyAutoPay(bills, '2027-01-25');
+  assert.deepEqual(caught.paid.length, 4);
+  assert.equal(caught.bills.filter((b) => b.name === 'ΔΕΗ' && !b.paid).length, 1);
+  // counted once in the yearly stats
+  assert.equal(billStats(caught.bills, 2026).months[9].total, 80);
+  assert.equal(autoPayFor(after, 'δεη'), true);
+  assert.equal(autoPayFor(after, 'ΕΥΔΑΠ'), false);
+  assert.equal(autoPayFor(after, 'Cosmote'), false);
 });

@@ -12,7 +12,7 @@ import { applyDisplayPrefs, highContrast, setHighContrast, setTextSize, textSize
 import { RECURRING_INTERVALS, applyRecurring, createRecurring, dueFromSnapshot, expirySnapshot, parseVoiceItems } from './features.js';
 import { MEAL_SLOTS, copyPreviousWeek, createMeal, recipeFromMealDb, shiftDays, weekDays, weekShoppingNeeds, weekStart } from './mealplan.js';
 import { BUILTIN_RECIPES } from './recipes.js';
-import { BILL_ICONS, BILL_PERIODS, BILL_TYPES, billStats, billsDue, createBill, guessBillType, paidHistory, parseBillCode, unpaidBills, payBill, unpayBill } from './bills.js';
+import { BILL_ICONS, BILL_PERIODS, BILL_TYPES, applyAutoPay, autoPayFor, scheduledDebits, billStats, billsDue, createBill, guessBillType, paidHistory, parseBillCode, unpaidBills, payBill, unpayBill } from './bills.js';
 import { findDuplicateBill, readBillFile } from './bill-pdf.js';
 import { addCartItem, budgetState, createTrip, finishTrip, lastPrice, lineTotal, remainingShopping, removeCartItem, tripForReceipt, updateCartItem } from './cart.js';
 import { VM_MODES, interpretCode } from './gs1.js';
@@ -651,7 +651,7 @@ async function writeBackgroundSnapshot() {
     const snapshot = expirySnapshot(state.items, { days: settings.days, lang: getLang(), lastNotified: settings.lastNotified,
       titleOne: t('1 προϊόν λήγει σύντομα'), titleMany: t('{count} προϊόντα λήγουν σύντομα', { count: '{count}' }), more: t(' και {count} ακόμη', { count: '{count}' }) });
     Object.assign(snapshot, { lastBillNotified: settings.lastBillNotified, billTitleOne: t('1 λογαριασμός προς πληρωμή'), billTitleMany: t('{count} λογαριασμοί προς πληρωμή', { count: '{count}' }),
-      bills: (state.bills || []).filter((bill) => !bill.paid).map((bill) => ({ name: bill.name, due: bill.due, remind: bill.remind ?? 3, amount: money(bill.amount) })) });
+      bills: (state.bills || []).filter((bill) => !bill.paid && !bill.autoPay).map((bill) => ({ name: bill.name, due: bill.due, remind: bill.remind ?? 3, amount: money(bill.amount) })) });
     await cache.put(SNAPSHOT_URL, new Response(JSON.stringify(snapshot), { headers: { 'content-type': 'application/json' } }));
   } catch {}
 }
@@ -1743,7 +1743,8 @@ const BILL_PERIOD_LABELS = { 0: 'Μία φορά', 1: 'Κάθε μήνα', 2: '�
 let billsYear = Number(localDateKey().slice(0, 4));
 
 function billDueLabel(bill) {
-  if (bill.paid) return t('Πληρώθηκε {date}', { date: formatDate(bill.paidAt || bill.due) });
+  if (bill.paid) return t(bill.autoPay ? 'Χρεώθηκε με πάγια εντολή {date}' : 'Πληρώθηκε {date}', { date: formatDate(bill.paidAt || bill.due) });
+  if (bill.autoPay) return t('Θα χρεωθεί στις {date}', { date: formatDate(bill.due) });
   const days = Math.round((Date.parse(`${bill.due}T00:00:00Z`) - Date.parse(`${localDateKey()}T00:00:00Z`)) / 86_400_000);
   if (days < 0) return t('Έληξε πριν {days} ημ. ({date})', { days: -days, date: formatDate(bill.due) });
   if (days === 0) return t('Λήγει σήμερα');
@@ -1753,11 +1754,11 @@ function billDueLabel(bill) {
 
 function renderBillRow(bill) {
   const today = localDateKey();
-  const state_ = bill.paid ? 'paid' : bill.due < today ? 'overdue' : billsDue([bill], today).length ? 'soon' : 'later';
+  const state_ = bill.paid ? 'paid' : bill.autoPay ? 'debit' : bill.due < today ? 'overdue' : billsDue([bill], today).length ? 'soon' : 'later';
   return `<article class="product-card bill-row is-${state_}" data-bill="${escapeHtml(bill.id)}"><span class="product-emoji" aria-hidden="true">${BILL_ICONS[bill.type] || '📄'}</span>
-    <div class="bill-main"><h3 class="product-name" data-no-i18n>${escapeHtml(bill.name)}</h3><p class="bill-meta"><span class="bill-due">${escapeHtml(billDueLabel(bill))}</span>${bill.period ? ` · <span>${escapeHtml(t(BILL_PERIOD_LABELS[bill.period]))}</span>` : ''}${bill.billingFrom && bill.billingTo ? ` · <span class="bill-billing">${escapeHtml(t('περίοδος {from} – {to}', { from: formatDate(bill.billingFrom), to: formatDate(bill.billingTo) }))}</span>` : ''}${bill.reference ? ` · <code class="bill-ref" data-no-i18n>${escapeHtml(bill.reference)}</code>` : ''}</p></div>
+    <div class="bill-main"><h3 class="product-name"><span data-no-i18n>${escapeHtml(bill.name)}</span>${bill.autoPay ? ` <span class="bill-badge">${escapeHtml(t('🏦 Πάγια εντολή'))}</span>` : ''}</h3><p class="bill-meta"><span class="bill-due">${escapeHtml(billDueLabel(bill))}</span>${bill.period ? ` · <span>${escapeHtml(t(BILL_PERIOD_LABELS[bill.period]))}</span>` : ''}${bill.billingFrom && bill.billingTo ? ` · <span class="bill-billing">${escapeHtml(t('περίοδος {from} – {to}', { from: formatDate(bill.billingFrom), to: formatDate(bill.billingTo) }))}</span>` : ''}${bill.reference ? ` · <code class="bill-ref" data-no-i18n>${escapeHtml(bill.reference)}</code>` : ''}</p></div>
     <strong class="bill-amount">${escapeHtml(money(bill.amount))}</strong>
-    <div class="bill-actions">${bill.paid ? `<button class="button button-quiet" type="button" data-action="bill-unpay" data-id="${escapeHtml(bill.id)}">Αναίρεση</button>` : `<button class="button button-primary" type="button" data-action="bill-pay" data-id="${escapeHtml(bill.id)}">✓ Πληρώθηκε</button>`}
+    <div class="bill-actions">${bill.autoPay && !bill.paid ? '' : bill.paid ? `<button class="button button-quiet" type="button" data-action="bill-unpay" data-id="${escapeHtml(bill.id)}">Αναίρεση</button>` : `<button class="button button-primary" type="button" data-action="bill-pay" data-id="${escapeHtml(bill.id)}">✓ Πληρώθηκε</button>`}
     ${bill.reference ? `<button class="icon-button" type="button" data-action="bill-copy" data-id="${escapeHtml(bill.id)}" aria-label="${escapeHtml(t('Αντιγραφή κωδικού {name}', { name: bill.name }))}">📋</button>` : ''}
     <button class="icon-button" type="button" data-action="bill-edit" data-id="${escapeHtml(bill.id)}" aria-label="${escapeHtml(t('Επεξεργασία {name}', { name: bill.name }))}">✎</button><button class="icon-button" type="button" data-action="bill-delete" data-id="${escapeHtml(bill.id)}" aria-label="${escapeHtml(t('Διαγραφή {name}', { name: bill.name }))}">🗑️</button></div></article>`;
 }
@@ -1780,13 +1781,15 @@ function renderBills() {
   const bills = state.bills || [];
   const today = localDateKey();
   const unpaid = unpaidBills(bills);
+  const debits = scheduledDebits(bills);
   const history = paidHistory(bills, { filter: billsHistory.filter, limit: billsHistory.limit });
   const due = billsDue(bills, today);
   const overdue = due.filter((bill) => bill.overdue);
   const toPay = unpaid.reduce((sum, bill) => sum + bill.amount, 0);
   return `<header class="page-heading"><div>${renderCrumbs()}<h1>Λογαριασμοί</h1><p>ΔΕΗ, νερό, ενοίκιο, συνδρομές: τι πληρώνεις και πότε.</p></div><div class="page-actions"><label class="button button-quiet file-button" id="bill-import"><span>📥 Εισαγωγή PDF</span><input type="file" accept="application/pdf,.pdf,image/*" class="visually-hidden" data-bill-file id="bill-file"></label><button class="button button-primary" type="button" data-action="add-bill"><span aria-hidden="true">＋</span>Προσθήκη λογαριασμού</button></div></header>
     ${due.length ? `<div class="alert-banner${overdue.length ? ' is-danger' : ''}" role="status" id="bills-alert">${escapeHtml(overdue.length ? t(overdue.length === 1 ? '1 ληξιπρόθεσμος λογαριασμός · σύνολο {sum}' : '{count} ληξιπρόθεσμοι λογαριασμοί · σύνολο {sum}', { count: overdue.length, sum: money(overdue.reduce((s, b) => s + b.amount, 0)) }) : t(due.length === 1 ? '1 λογαριασμός λήγει σύντομα · σύνολο {sum}' : '{count} λογαριασμοί λήγουν σύντομα · σύνολο {sum}', { count: due.length, sum: money(due.reduce((s, b) => s + b.amount, 0)) }))}</div>` : ''}
-    ${bills.length ? `<section class="panel"><div class="panel-heading"><div><h2>Προς πληρωμή</h2><p>${escapeHtml(t('{count} απλήρωτοι · {sum}', { count: unpaid.length, sum: money(toPay) }))}</p></div></div><div class="product-list" id="bills-unpaid">${unpaid.length ? unpaid.map(renderBillRow).join('') : '<p class="subtle-empty">Όλα πληρωμένα! 🎉</p>'}</div></section>
+    ${bills.length ? `<section class="panel"><div class="panel-heading"><div><h2>Προς πληρωμή</h2><p>${escapeHtml(t(unpaid.length === 1 ? '1 απλήρωτος · {sum}' : '{count} απλήρωτοι · {sum}', { count: unpaid.length, sum: money(toPay) }))}</p></div></div><div class="product-list" id="bills-unpaid">${unpaid.length ? unpaid.map(renderBillRow).join('') : `<p class="subtle-empty">${escapeHtml(t(debits.length ? 'Τίποτα να πληρώσεις με το χέρι. 🎉' : 'Όλα πληρωμένα! 🎉'))}</p>`}</div></section>
+    ${debits.length ? `<section class="panel" id="bills-debits"><div class="panel-heading"><div><h2>Με πάγια εντολή</h2><p>${escapeHtml(t('Χρεώνονται αυτόματα · {sum}', { sum: money(debits.reduce((sum, bill) => sum + bill.amount, 0)) }))}</p></div></div><div class="product-list">${debits.map(renderBillRow).join('')}</div></section>` : ''}
     ${renderBillsHistory(history)}
     <p class="field-hint">${escapeHtml(t('Οι υπενθυμίσεις έρχονται με τις ειδοποιήσεις της εφαρμογής (Ρυθμίσεις). Στατιστικά ανά μήνα και έτος στα Στατιστικά.'))}</p>`
     : renderEmpty('Κανένας λογαριασμός ακόμη', 'Πρόσθεσε ΔΕΗ, νερό, ενοίκιο ή συνδρομές για να θυμάσαι πότε λήγουν.', 'add-bill', 'Προσθήκη λογαριασμού', '📄')}`;
@@ -1809,6 +1812,8 @@ function openBillDialog(id = '') {
   form.dataset.typeTouched = bill ? '1' : '';
   form.elements.billingFrom.value = bill?.billingFrom || '';
   form.elements.billingTo.value = bill?.billingTo || '';
+  form.elements.autoPay.checked = Boolean(bill?.autoPay);
+  form.dataset.autoPayTouched = bill ? '1' : '';
   setBillDuplicate(null);
   document.querySelector('#bill-error').hidden = true;
   document.querySelector('#bill-scan-status').textContent = t('Σκάναρε το QR ή τον barcode του λογαριασμού για να συμπληρωθεί ο κωδικός πληρωμής και, αν υπάρχει, το ποσό.');
@@ -1830,6 +1835,21 @@ function applyBillCode(code) {
     : parsed.rfValid ? t('Βρέθηκε έγκυρος κωδικός πληρωμής.')
     : parsed.kind === 'rf' ? t('Βρέθηκε κωδικός πληρωμής, αλλά φαίνεται λάθος. Έλεγξέ τον με τον λογαριασμό.')
     : t('Ο κωδικός αποθηκεύτηκε ως αναφορά πληρωμής. Συμπλήρωσε ποσό και λήξη.');
+}
+
+// New bill of a provider already paid by direct debit: tick «πάγια εντολή» (unless the user changed it).
+function rememberAutoPay(form) {
+  if (form.dataset.autoPayTouched || form.elements.billId.value) return;
+  form.elements.autoPay.checked = autoPayFor(state.bills || [], form.elements.name.value);
+}
+// Direct-debit bills whose due date has come are marked paid (once; recurring ones get their next instance).
+function runAutoPay() {
+  const { bills, paid } = applyAutoPay(state.bills || [], localDateKey());
+  if (!paid.length) return;
+  state.bills = bills;
+  if (!persist()) return;
+  renderApp(); scheduleBackgroundSnapshot();
+  showToast(t(paid.length === 1 ? '1 λογαριασμός χρεώθηκε με πάγια εντολή.' : '{count} λογαριασμοί χρεώθηκαν με πάγια εντολή.', { count: paid.length }));
 }
 
 function setBillDuplicate(duplicate) {
@@ -1863,6 +1883,7 @@ async function importBillFile(file) {
       if (!current()) return; // a newer import or a closed dialog: drop late results
       if (parsed.name) { put('name', parsed.name); if (filled.name === parsed.name) { form.elements.type.value = parsed.type; form.dataset.typeTouched = '1'; } }
       put('amount', parsed.amount); put('due', parsed.due); put('reference', parsed.reference);
+      rememberAutoPay(form);
       if (!filled.period) { form.elements.period.value = parsed.type === 'water' ? '4' : parsed.type === 'electricity' ? '1' : form.elements.period.value; filled.period = true; }
       put('billingFrom', parsed.period?.from || ''); put('billingTo', parsed.period?.to || '');
       const found = [parsed.name && t('πάροχος'), parsed.amount != null && (parsed.sources?.amount === 'code' ? t('ποσό (από QR)') : parsed.sources?.amount === 'ocr' ? t('ποσό (από εικόνα)') : t('ποσό')), parsed.due && (parsed.sources?.due === 'ocr' ? t('λήξη (από εικόνα)') : t('λήξη')), parsed.reference && (parsed.rfValid ? t('κωδικός πληρωμής ✓') : t('κωδικός πληρωμής (έλεγξέ τον)')), parsed.period && t('περίοδος {from} – {to}', { from: formatDate(parsed.period.from), to: formatDate(parsed.period.to) })].filter(Boolean);
@@ -1906,7 +1927,7 @@ function saveBillForm(form) {
   const id = form.elements.billId.value;
   const existing = (state.bills || []).find((bill) => bill.id === id);
   try {
-    const bill = createBill({ ...(existing || {}), id: id || undefined, name: form.elements.name.value, type: form.elements.type.value, amount: form.elements.amount.value === '' ? NaN : form.elements.amount.value, due: form.elements.due.value, period: form.elements.period.value, remind: form.elements.remind.value, reference: form.elements.reference.value, billingFrom: form.elements.billingFrom.value, billingTo: form.elements.billingTo.value });
+    const bill = createBill({ ...(existing || {}), id: id || undefined, name: form.elements.name.value, type: form.elements.type.value, amount: form.elements.amount.value === '' ? NaN : form.elements.amount.value, due: form.elements.due.value, period: form.elements.period.value, remind: form.elements.remind.value, reference: form.elements.reference.value, billingFrom: form.elements.billingFrom.value, billingTo: form.elements.billingTo.value, autoPay: form.elements.autoPay.checked });
     state.bills = existing ? state.bills.map((entry) => (entry.id === id ? bill : entry)) : [...(state.bills || []), bill];
   } catch (err) { error.textContent = t(err.message); error.hidden = false; return; }
   if (!persist()) return;
@@ -2219,9 +2240,11 @@ document.addEventListener('click', (event) => {
 document.addEventListener('input', (event) => {
   if (event.target.id === 'extras-new-name') { const e = document.querySelector('#extras-new-emoji'); if (e) e.placeholder = suggestEmoji(event.target.value) || EXTRA_DEFAULT_EMOJI; }
   if (event.target.id === 'bill-name' && !event.target.form.dataset.typeTouched) event.target.form.elements.type.value = guessBillType(event.target.value);
+  if (event.target.id === 'bill-name') rememberAutoPay(event.target.form);
 });
 
 document.addEventListener('change', (event) => {
+  if (event.target.id === 'bill-autopay') event.target.form.dataset.autoPayTouched = '1';
   if (event.target.id === 'scan-file') { const file = event.target.files?.[0]; event.target.value = ''; handleScanFile(file); return; }
   if (event.target.id === 'high-contrast') { setHighContrast(event.target.checked); renderApp(); document.querySelector('#high-contrast')?.focus(); return; }
   if (event.target.id === 'transport-type') { const fuel = event.target.value === 'fuel'; document.querySelector('#transport-fuel').hidden = !fuel; document.querySelector('#transport-ppl').hidden = !fuel; }
@@ -2507,6 +2530,7 @@ takeSharedFile();
 
 function runDailyChecks() {
   runRecurring();
+  runAutoPay();
   runTransportRecurring();
   checkExpiryNotifications();
 }

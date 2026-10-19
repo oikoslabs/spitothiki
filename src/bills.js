@@ -49,6 +49,7 @@ export function createBill(input = {}, now = new Date().toISOString()) {
     reference: String(input.reference || '').replace(/\s+/g, '').slice(0, 40),
     paid: Boolean(input.paid), paidAt: input.paid ? String(input.paidAt || '') : '',
     billingFrom: DATE.test(String(input.billingFrom || '')) ? input.billingFrom : '', billingTo: DATE.test(String(input.billingTo || '')) ? input.billingTo : '',
+    autoPay: Boolean(input.autoPay),
     seriesId: input.seriesId || input.id || '', updatedAt: now
   };
 }
@@ -75,7 +76,7 @@ export function unpayBill(bills = [], id, now = new Date().toISOString()) {
 
 // Unpaid bills to remind about: overdue, or within each bill's own reminder window.
 export function billsDue(bills = [], today) {
-  return bills.filter((b) => !b.paid && DATE.test(b.due) && addDays(today, Number(b.remind ?? 3)) >= b.due)
+  return bills.filter((b) => !b.paid && !b.autoPay && DATE.test(b.due) && addDays(today, Number(b.remind ?? 3)) >= b.due)
     .map((b) => ({ ...b, days: daysBetween(today, b.due), overdue: b.due < today }))
     .sort((a, b) => a.due.localeCompare(b.due));
 }
@@ -129,7 +130,7 @@ export function parseBillCode(text) {
 }
 
 // Unpaid bills, overdue first then by due date (overdue ones are simply the earliest due dates).
-export const unpaidBills = (bills = []) => bills.filter((b) => !b.paid).sort((a, b) => String(a.due).localeCompare(String(b.due)) || String(a.name).localeCompare(String(b.name)));
+export const unpaidBills = (bills = []) => bills.filter((b) => !b.paid && !b.autoPay).sort((a, b) => String(a.due).localeCompare(String(b.due)) || String(a.name).localeCompare(String(b.name)));
 
 // Paid history: filter ('' | 'type:<type>' | 'name:<provider>'), newest first, grouped by paid month, paged by limit.
 export function paidHistory(bills = [], { filter = '', limit = 10 } = {}) {
@@ -151,4 +152,26 @@ export function paidHistory(bills = [], { filter = '', limit = 10 } = {}) {
   const types = [...new Set(all.map((b) => b.type))].sort();
   const names = [...new Map(all.map((b) => [String(b.name).trim().toLocaleLowerCase('el-GR'), String(b.name).trim()])).values()].sort((a, b) => a.localeCompare(b, 'el'));
   return { count: all.length, matched: list.length, shown: shown.length, more: list.length - shown.length, groups, types, names };
+}
+
+// ---------- Direct debit («Πληρώνεται με πάγια εντολή») ----------
+// Not "to pay", no due/overdue warnings; on the due date they are marked paid automatically (a recurring one
+// gets its next instance, like a manual payment). Totals count each bill once, by due month, as before.
+export const scheduledDebits = (bills = []) => bills.filter((b) => !b.paid && b.autoPay).sort((a, b) => String(a.due).localeCompare(String(b.due)));
+export function applyAutoPay(bills = [], today, now = new Date().toISOString()) {
+  let out = bills; const paid = [];
+  for (let guard = 0; guard < 500; guard++) {
+    const bill = out.find((b) => !b.paid && b.autoPay && DATE.test(b.due) && b.due <= today);
+    if (!bill) break;
+    out = payBill(out, bill.id, bill.due, now).bills;
+    paid.push(bill.id);
+  }
+  return { bills: out, paid };
+}
+// Remembered per provider: the latest bill with the same name decides the default for a new one.
+export function autoPayFor(bills = [], name) {
+  const key = plain(name).replace(/[^A-ZΑ-Ω0-9]/g, '');
+  if (!key) return false;
+  const same = bills.filter((b) => plain(b.name).replace(/[^A-ZΑ-Ω0-9]/g, '') === key).sort((a, b) => String(b.due).localeCompare(String(a.due)));
+  return Boolean(same[0]?.autoPay);
 }
