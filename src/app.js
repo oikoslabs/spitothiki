@@ -343,6 +343,10 @@ function renderSettings() {
     <section class="panel settings-card danger-zone"><span class="stat-icon" style="background:var(--red-soft)">⌫</span><h2>Καθαρισμός δεδομένων</h2><p>Διέγραψε όλα τα δεδομένα (απόθεμα, λίστες, έξοδα) από αυτή τη συσκευή.</p><div class="settings-actions"><button class="button button-danger" type="button" data-action="clear-data">Διαγραφή όλων</button></div></section></div></details>`;
 }
 
+// Let the browser paint the tap's feedback before running heavy work (keeps INP low on slow phones).
+function afterPaint(fn) { requestAnimationFrame(() => setTimeout(fn, 0)); }
+function pressFeedback(el) { el.classList.add('is-pressed'); setTimeout(() => el.classList.remove('is-pressed'), 400); }
+
 function renderApp() {
   setActiveNavigation();
   renderNavCounts();
@@ -2093,10 +2097,10 @@ function handleAction(button) {
     if (trip) undoable('Το καλάθι ακυρώθηκε.', () => { state.trips = state.trips.filter((entry) => entry.id !== trip.id); cartScanning = false; if (persist()) renderApp(); });
   } else if (action === 'open-menu') { const sheet = document.querySelector('#menu-sheet'); sheet.querySelectorAll('[data-view]').forEach((b) => b.classList.toggle('is-active', b.dataset.view === activeView)); sheet.showModal(); }
   else if (action === 'close-menu') document.querySelector('#menu-sheet').close();
-  else if (action === 'quick') runQuickAction(button.dataset.quick);
+  else if (action === 'quick') { const id = button.dataset.quick; if (button.closest('#quick-sheet')) document.querySelector('#quick-sheet')?.close(); pressFeedback(button); afterPaint(() => runQuickAction(id)); }
   else if (action === 'close-quick') document.querySelector('#quick-sheet').close();
   else if (action === 'menu-receipt') { document.querySelector('#menu-sheet').close(); openReceiptDialog(); }
-  else if (action === 'menu-mealplan') { document.querySelector('#menu-sheet').close(); navigate('cook'); setTimeout(() => (document.querySelector('#plan-classic:not([open])') ? document.querySelector('#diet-section') : document.querySelector('#plan-grid'))?.scrollIntoView({ block: 'start' }), 50); }
+  else if (action === 'menu-mealplan') { document.querySelector('#menu-sheet').close(); afterPaint(() => { navigate('cook'); setTimeout(() => (document.querySelector('#plan-classic:not([open])') ? document.querySelector('#diet-section') : document.querySelector('#plan-grid'))?.scrollIntoView({ block: 'start' }), 50); }); }
   else if (action === 'transport-month') { transportMonthKey = shiftMonth(transportMonthKey, Number(button.dataset.delta)); renderApp(); if (transportHistoryDialog()?.open) renderTransportHistory(); }
   else if (action === 'transport-history') openTransportHistory();
   else if (action === 'extras-month') { extrasMonthKey = shiftMonth(extrasMonthKey, Number(button.dataset.delta)); renderApp(); if (extrasHistoryDialog()?.open) renderExtrasHistory(); }
@@ -2280,7 +2284,12 @@ initDietUi({ getState: () => state, persist, rerender: () => renderApp(), toast:
 
 document.addEventListener('click', (event) => {
   const viewButton = event.target.closest('[data-view]');
-  if (viewButton) { event.preventDefault(); if (viewButton.closest('#menu-sheet')) document.querySelector('#menu-sheet').close(); navigate(viewButton.dataset.view); return; }
+  if (viewButton) {
+    event.preventDefault(); const view = viewButton.dataset.view;
+    // Fast feedback first (close the menu, highlight the target), heavy render after the next paint (INP).
+    if (viewButton.closest('#menu-sheet')) document.querySelector('#menu-sheet').close();
+    pressFeedback(viewButton); afterPaint(() => navigate(view)); return;
+  }
   if (event.target.id === 'menu-sheet' || event.target.id === 'quick-sheet') { event.target.close(); return; }
   const button = event.target.closest('[data-action]');
   if (button && button.type !== 'checkbox') handleAction(button);
