@@ -109,7 +109,7 @@ export async function startScanner(video, onCode, { qr = false } = {}) {
   video.srcObject = stream;
   await video.play();
   const hasTorch = track ? await tuneCamera(track) : false;
-  let stopped = false, frame = 0;
+  let stopped = false, frame = 0, last = '';
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
   const stop = () => { stopped = true; stream.getTracks().forEach((t) => t.stop()); video.srcObject = null; };
@@ -125,11 +125,53 @@ export async function startScanner(video, onCode, { qr = false } = {}) {
       ctx.drawImage(video, (w - sw) / 2, (h - sh) / 2, sw, sh, 0, 0, sw, sh);
       try {
         const value = await decode(canvas);
-        if (value && accept(value) && !stopped) { stop(); onCode(value); return; }
+        // Receipt mode: a non-link code must be read the same way twice in a row (avoids partial 1D reads).
+        const stable = mode !== 'receipt' || /^https?:\/\//i.test(value) || value === last;
+        last = value;
+        if (value && accept(value) && stable && !stopped) { stop(); onCode(value); return; }
       } catch {}
     }
     setTimeout(tick, 125);
   };
   tick();
   return stop;
+}
+
+// Decodes QR/barcodes from a photo (File/Blob). Native BarcodeDetector first, then ZXing over rotations,
+// crops (full, bottom, top, middle) and a light blur (helps with thermal-paper texture). Returns [] if none.
+export async function decodeImageCodes(file, { mode = 'receipt', timeBudgetMs = 8000 } = {}) {
+  const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' }).catch(() => createImageBitmap(file));
+  const scale = Math.min(1, 2000 / Math.max(bitmap.width, bitmap.height));
+  const W = Math.round(bitmap.width * scale), H = Math.round(bitmap.height * scale);
+  const base = document.createElement('canvas'); base.width = W; base.height = H;
+  base.getContext('2d').drawImage(bitmap, 0, 0, W, H);
+  const found = new Set();
+  if ('BarcodeDetector' in globalThis) {
+    try {
+      const supported = await globalThis.BarcodeDetector.getSupportedFormats();
+      const formats = scanFormats(mode).filter((f) => supported.includes(f));
+      if (formats.length) for (const r of await new globalThis.BarcodeDetector({ formats }).detect(base)) if (r.rawValue) found.add(r.rawValue);
+    } catch {}
+    if (found.size) return [...found];
+  }
+  let ZXing;
+  try { ZXing = await loadZxing(); } catch { return []; }
+  const reader = new ZXing.BrowserMultiFormatReader(new Map([[2, zxingFormats(mode)], [3, true]]));
+  const t0 = Date.now();
+  const regions = [[0, 0, 1, 1], [0, 0.6, 1, 0.4], [0, 0, 1, 0.4], [0, 0.3, 1, 0.4]];
+  for (const blur of [0, 2]) for (const angle of [0, 90, 270, 180]) for (const [rx, ry, rw, rh] of regions) {
+    if (Date.now() - t0 > timeBudgetMs) return [];
+    const rot = angle % 180 ? [H, W] : [W, H];
+    const c = document.createElement('canvas');
+    const sw = Math.round(rot[0] * rw), sh = Math.round(rot[1] * rh);
+    c.width = Math.min(sw, 1600); c.height = Math.round(sh * (c.width / sw));
+    const ctx = c.getContext('2d', { willReadFrequently: true });
+    if (blur) ctx.filter = `blur(${blur}px)`;
+    const k = c.width / sw;
+    ctx.setTransform(k, 0, 0, k, -rx * rot[0] * k, -ry * rot[1] * k);
+    ctx.translate(rot[0] / 2, rot[1] / 2); ctx.rotate((angle * Math.PI) / 180); ctx.drawImage(base, -W / 2, -H / 2);
+    try { const text = reader.decodeFromCanvas(c).getText(); if (text) return [text]; } catch {}
+    await new Promise((r) => setTimeout(r, 0));
+  }
+  return [];
 }

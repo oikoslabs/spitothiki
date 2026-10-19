@@ -1,6 +1,6 @@
 import { MAX_QUANTITY, createPantryItem, createShoppingItem, expiringWithin, expiryStatus, expiryWarning, normalizeSearch, normalizeUnit, pantrySummary, receiveShoppingItem, returnShoppingItem, shoppingListText, syncShoppingWithItem, toggleShoppingItem } from './domain.js';
-import { lookupBarcode, normalizeBarcode, startScanner } from './barcode.js';
-import { isUrlCode, lastTollAmount, parseTollBarcode } from './toll-barcode.js';
+import { decodeImageCodes, lookupBarcode, normalizeBarcode, startScanner } from './barcode.js';
+import { isUrlCode, lastTollAmount, parseTollBarcode, parseTollText, tollAmountFromText } from './toll-barcode.js';
 import { authProviders, firebaseConfig } from './firebase-config.js';
 import { loadState, parseBackup, saveState } from './storage.js';
 import { fetchReceipt, receiptId } from './receipt.js';
@@ -728,6 +728,16 @@ async function loadReceiptPhoto(file) {
   if (!file) return;
   receiptState = { step: 'loading', photo: true, progress: '' };
   renderReceipt();
+  let toll = null;
+  try {
+    // 1) A QR link or toll barcode in the photo beats OCR.
+    const loading = document.querySelector('#receipt-loading');
+    if (loading) loading.textContent = t('Αναζήτηση QR / barcode στη φωτογραφία…');
+    const codes = await decodeImageCodes(file).catch(() => []);
+    const link = codes.find(isUrlCode);
+    if (link) { loadReceipt(link); return; }
+    toll = codes.map(parseTollBarcode).find(Boolean) || null;
+  } catch {}
   try {
     const { ocrReceipt } = await import('./receipt-photo.js');
     const result = await ocrReceipt(file, {
@@ -739,12 +749,17 @@ async function loadReceiptPhoto(file) {
           : m.status === 'orientation' ? t('Αναγνώριση κειμένου… (περιστροφή {angle}°)', { angle: m.angle }) : t('Φόρτωση αναγνώρισης κειμένου (μόνο την πρώτη φορά)…');
       }
     });
+    // 2) Toll receipt: barcode data (if read) + amount from the OCR text, or everything from the text.
+    if (toll) { tollToTransport({ ...toll, amount: tollAmountFromText(result?.text) }); return; }
+    const tollText = parseTollText(result?.text);
+    if (tollText && !result.parsed.lines.length) { tollToTransport(tollText); return; }
     const receipt = result.parsed;
     if (!receipt.lines.length && !receipt.total) throw new Error('Δεν βρέθηκαν είδη στη φωτογραφία. Δοκίμασε πιο καθαρή, ίσια λήψη με καλό φως.');
     const id = await receiptId(receipt, `photo:${receipt.issuerName}`);
     const duplicate = (state.receipts || []).find((entry) => entry.id === id);
     receiptState = { step: 'review', receipt, id, duplicate, photo: true, trip: tripForReceipt(state.trips || [], receipt), target: receiptTarget, guess: classifyReceipt(receipt, result.text) };
   } catch (error) {
+    if (toll) { tollToTransport(toll); return; }
     receiptState = { step: 'start', error: t(error.message || 'Η αναγνώριση απέτυχε.') };
   }
   renderReceipt();
@@ -756,7 +771,7 @@ function receiptCode(code) {
   if (isUrlCode(value)) { loadReceipt(value); return; }
   const toll = parseTollBarcode(value);
   if (toll) { tollToTransport(toll); return; }
-  receiptState = { step: 'start', error: t('Ο barcode αυτής της απόδειξης δεν περιέχει τα στοιχεία της. Σκάναρε το QR code (αν υπάρχει) ή βγάλε φωτογραφία την απόδειξη για αναγνώριση κειμένου.') };
+  receiptState = { step: 'start', error: t('Ο barcode αυτής της απόδειξης δεν περιέχει τα στοιχεία της. Σκάναρε το QR code (αν υπάρχει) ή βγάλε φωτογραφία την απόδειξη για αναγνώριση κειμένου.'), raw: value.slice(0, 120) };
   renderReceipt();
 }
 
@@ -766,7 +781,7 @@ function tollToTransport(toll) {
     renderReceipt();
     return;
   }
-  transportDraft = { type: 'tolls', amount: lastTollAmount(state.transport || [], toll.prefix), date: toll.date, note: `${toll.operator} · ${toll.time.slice(0, 5)} · #${toll.receiptNo}`, receiptId: toll.id, fromReceipt: true, tollBarcode: true };
+  transportDraft = { type: 'tolls', amount: toll.amount || lastTollAmount(state.transport || []), date: toll.date, note: `${toll.operator} · ${toll.time.slice(0, 5)} · #${toll.receiptNo}`, receiptId: toll.id, fromReceipt: true, tollBarcode: true, amountFromOcr: Boolean(toll.amount) };
   receiptState = { step: 'start' };
   renderReceipt();
   document.querySelector('#receipt-dialog')?.close();
@@ -801,7 +816,7 @@ function renderReceiptStart() {
     <div class="settings-actions"><button class="button button-primary" type="button" data-action="receipt-scan">📷 Σάρωση QR</button></div>
     <p class="field-hint">Χωρίς QR παρόχου (π.χ. ταμειακή με QR της ΑΑΔΕ); Βγάλε φωτογραφία την απόδειξη και θα διαβαστούν τα είδη στη συσκευή σου.</p>${photoButtons()}
     <form id="receipt-link-form" class="store-form" novalidate><input class="field-input" name="link" type="url" inputmode="url" value="${escapeHtml(link)}" placeholder="https://… (σύνδεσμος απόδειξης)" aria-label="Σύνδεσμος απόδειξης" autocomplete="off"><button class="button button-quiet" type="submit">Άνοιγμα</button></form>
-    ${error ? `<p class="form-error" id="receipt-error" role="alert">${escapeHtml(error)}</p>` : ''}
+    ${error ? `<p class="form-error" id="receipt-error" role="alert">${escapeHtml(error)}</p>` : ''}${receiptState.raw ? `<p class="field-hint" id="receipt-raw-code"><small>${escapeHtml(t('Διαβάστηκε:'))} <code data-no-i18n>${escapeHtml(receiptState.raw)}</code> (${receiptState.raw.length})</small></p>` : ''}
     ${cors && !receiptProxy() ? '<p class="field-hint">Μπορείς να ορίσεις proxy αποδείξεων στις Ρυθμίσεις για παρόχους που μπλοκάρουν την απευθείας πρόσβαση.</p>' : ''}`;
 }
 
@@ -1244,7 +1259,7 @@ function renderTransportForm() {
   const d = transportDraft || {};
   const type = d.type || 'fuel';
   const vehicles = state.vehicles || [];
-  return `<section class="panel" id="transport-add"><div class="panel-heading"><div><h2>${escapeHtml(t(d.id ? 'Επεξεργασία εξόδου' : 'Νέο έξοδο μετακίνησης'))}</h2>${d.fromReceipt ? `<p id="transport-from-receipt">${escapeHtml(t(d.tollBarcode ? 'Απόδειξη διοδίων από barcode — το ποσό δεν υπάρχει στον barcode: γράψε το ποσό και πάτα Αποθήκευση.' : 'Από απόδειξη — έλεγξε τα στοιχεία και πάτα Αποθήκευση.'))}</p>` : ''}</div></div>
+  return `<section class="panel" id="transport-add"><div class="panel-heading"><div><h2>${escapeHtml(t(d.id ? 'Επεξεργασία εξόδου' : 'Νέο έξοδο μετακίνησης'))}</h2>${d.fromReceipt ? `<p id="transport-from-receipt">${escapeHtml(t(d.tollBarcode ? (d.amountFromOcr ? 'Απόδειξη διοδίων — το ποσό διαβάστηκε από τη φωτογραφία: έλεγξέ το και πάτα Αποθήκευση.' : 'Απόδειξη διοδίων από barcode — το ποσό δεν υπάρχει στον barcode: γράψε το ποσό και πάτα Αποθήκευση.') : 'Από απόδειξη — έλεγξε τα στοιχεία και πάτα Αποθήκευση.'))}</p>` : ''}</div></div>
     <form id="transport-form" novalidate><input type="hidden" name="entryId" value="${escapeHtml(d.id || '')}"><input type="hidden" name="receiptId" value="${escapeHtml(d.receiptId || '')}">
       <div class="field-row field-row-three">
         <div><label class="field-label" for="transport-type">Κατηγορία</label><select class="field-input" id="transport-type" name="type">${transportTypeOptions(type)}</select></div>

@@ -1,43 +1,45 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseTollBarcode, lastTollAmount, isUrlCode } from '../src/toll-barcode.js';
+import { parseTollBarcode, parseTollText, tollAmountFromText, lastTollAmount, isUrlCode } from '../src/toll-barcode.js';
 
-const SAMPLE = '0520261014163347008353391009987000009';
+const REAL = '052026101416334700835339100998700009'; // decoded from the real receipt photo (36 digits, Code128)
 
-test('toll barcode: parses the real Rupaki sample', () => {
-  const r = parseTollBarcode(SAMPLE);
-  assert.equal(r.date, '2026-10-14');
-  assert.equal(r.time, '16:33:47');
-  assert.equal(r.receiptNo, '8353391');
-  assert.equal(r.id, 'toll:05:8353391');
-  assert.equal(r.operator, 'Αττική Οδός');
-  assert.ok(!SAMPLE.includes('255'), 'amount 2,55 is not in the barcode');
+test('toll barcode: real 36-digit read', () => {
+  const r = parseTollBarcode(REAL);
+  assert.deepEqual([r.date, r.time, r.receiptNo, r.prefix, r.id], ['2026-10-14', '16:33:47', '8353391', '05', 'toll:8353391:2026-10-14']);
+  assert.ok(!REAL.includes('255'));
 });
 
-test('toll barcode: rejects wrong length, letters, invalid dates/times', () => {
-  assert.equal(parseTollBarcode(SAMPLE.slice(1)), null);
-  assert.equal(parseTollBarcode(SAMPLE + '1'), null);
-  assert.equal(parseTollBarcode(SAMPLE.replace('8353', 'A353')), null);
-  assert.equal(parseTollBarcode('05' + '20261314' + SAMPLE.slice(10)), null); // month 13
-  assert.equal(parseTollBarcode('05' + '20260230' + SAMPLE.slice(10)), null); // 30 Feb
-  assert.equal(parseTollBarcode('05' + '20261014' + '256000' + SAMPLE.slice(16)), null); // hour 25
-  assert.equal(parseTollBarcode('5201234567890'), null); // EAN-13
+test('toll barcode: lenient to symbology ids, spaces, extra/missing digits', () => {
+  for (const v of [`]C0${REAL}`, ` ${REAL}\n`, REAL.replace(/(\d{6})/g, '$1 '), REAL + '0', '0' + REAL, REAL.slice(0, 35), '0520261014163347008353391009987000009'])
+    assert.equal(parseTollBarcode(v)?.receiptNo, '8353391', v);
+});
+
+test('toll barcode: rejects EAN-13, short/long codes, invalid timestamps', () => {
+  assert.equal(parseTollBarcode('5201054017739'), null);
+  assert.equal(parseTollBarcode('4006381333931'), null);
+  assert.equal(parseTollBarcode(REAL.slice(0, 30)), null);
+  assert.equal(parseTollBarcode(REAL + '00000'), null);
+  assert.equal(parseTollBarcode('9'.repeat(36)), null);
+  assert.equal(parseTollBarcode('05' + '20261314' + REAL.slice(10)), null);
+  assert.equal(parseTollBarcode('05' + '20190101' + REAL.slice(10)), null);
   assert.equal(parseTollBarcode(''), null);
   assert.equal(parseTollBarcode(null), null);
 });
 
-test('toll barcode: trims whitespace', () => {
-  assert.equal(parseTollBarcode(` ${SAMPLE}\n`).receiptNo, '8353391');
+// Actual Tesseract output for the real photo (garbled Greek).
+const OCR = 'NEA ΑΤΤΙΚΗ ΟΛΟΣ\nANOCAET EN ΠΛΗΡΩΜΗΣΙ ATO0ALGH\n1 Catagory 2\nΑΤΙΑ NE ΦΠΑ 24,00 ΕΥΡΩ 2,98\nCYROAO ΕΥΡΩ 2, 55\nΜΕΤΡΗΤΑ ΕΥΡΩ 2,558\nΞΤΑΘΙΗΟΣ ATOAION ΡΟΥΠΑΚΙ\n14/10/2026 16:33:47 8353391 1\nROU~-LO4 4451\n';
+
+test('toll text: amount and receipt from real OCR text', () => {
+  assert.equal(tollAmountFromText(OCR), 2.55);
+  const r = parseTollText(OCR);
+  assert.deepEqual([r.date, r.time, r.receiptNo, r.amount, r.id], ['2026-10-14', '16:33:47', '8353391', 2.55, 'toll:8353391:2026-10-14']);
+  assert.equal(parseTollText('ΣΚΛΑΒΕΝΙΤΗΣ\n14/10/2026 16:33:47 8353391\nΣΥΝΟΛΟ 12,40'), null);
 });
 
-test('toll barcode: last amount for same prefix', () => {
-  const entries = [
-    { type: 'tolls', amount: 2.55, date: '2026-10-10', receiptId: 'toll:05:1' },
-    { type: 'tolls', amount: 2.8, date: '2026-10-12', receiptId: 'toll:05:2' },
-    { type: 'tolls', amount: 9, date: '2026-10-13', receiptId: 'toll:07:3' },
-    { type: 'fuel', amount: 50, date: '2026-10-14', receiptId: 'toll:05:4' }
-  ];
-  assert.equal(lastTollAmount(entries, '05'), 2.8);
-  assert.equal(lastTollAmount(entries, '99'), '');
-  assert.ok(isUrlCode('https://x.gr/a') && !isUrlCode(SAMPLE));
+test('toll: last amount and url check', () => {
+  const entries = [{ type: 'tolls', amount: 2.55, date: '2026-10-10', receiptId: 'toll:1:2026-10-10' }, { type: 'tolls', amount: 2.8, date: '2026-10-12', receiptId: 'toll:2:2026-10-12' }, { type: 'tolls', amount: 9, date: '2026-10-13' }];
+  assert.equal(lastTollAmount(entries), 2.8);
+  assert.equal(lastTollAmount([]), '');
+  assert.ok(isUrlCode('https://x.gr/a') && !isUrlCode(REAL));
 });
