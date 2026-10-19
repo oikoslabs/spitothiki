@@ -667,3 +667,6 @@ button.stat-card:hover { border-color: #bfd4c1; }
 .settings-sub { margin: 16px 0 8px; font-size: calc(14px * var(--text-scale)); }
 .check-row input[type=checkbox] { width: 22px; height: 22px; flex: 0 0 22px; accent-color: var(--green); }
 .check-row { min-height: 44px; }
+.choice-actions { display: grid; gap: 10px; margin-top: 14px; }
+.choice-actions .button { min-height: 48px; width: 100%; }
+.choice-raw { max-height: 140px; overflow: auto; white-space: pre-wrap; word-break: break-all; padding: 10px; border-radius: 10px; background: var(--surface-soft); border: 1px solid var(--line); font-size: calc(13px * var(--text-scale)); }

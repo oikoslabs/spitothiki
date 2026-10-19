@@ -7,6 +7,7 @@ import { fetchReceipt, receiptId } from './receipt.js';
 import { fetchMealDbSuggestions, ingredientName, pantryIngredients, suggestBuiltin } from './recipes.js';
 import { CATEGORIES, WASTE_REASONS, applyWaste, createStore, createWaste, groupByStore, monthKey, rowCategory, monthlySpending, moveCategory, purchaseFor, shiftMonth, storeOrder, wasteStats } from './features.js';
 import { showSigninCard } from './features.js';
+import { routeCode } from './scan-router.js';
 import { applyDisplayPrefs, highContrast, setHighContrast, setTextSize, textSize } from './prefs.js';
 import { RECURRING_INTERVALS, applyRecurring, createRecurring, dueFromSnapshot, expirySnapshot, parseVoiceItems } from './features.js';
 import { MEAL_SLOTS, copyPreviousWeek, createMeal, recipeFromMealDb, shiftDays, weekDays, weekShoppingNeeds, weekStart } from './mealplan.js';
@@ -141,11 +142,12 @@ function renderCrumbs() {
 
 // Most common actions: bottom bar on phones (first four + "all"), the quick-actions sheet and the home screen.
 const QUICK_ACTIONS = [
-  { id: 'receipt', icon: '🧾', label: 'Σάρωση απόδειξης', hint: 'Ψώνια, καύσιμα ή διόδια με ένα QR/barcode' },
+  { id: 'scan', icon: '📷', label: 'Σκάναρε οτιδήποτε', hint: 'Απόδειξη, λογαριασμός, διόδια ή προϊόν' },
   { id: 'list', icon: '✓', label: 'Πρόσθεσε στη λίστα', hint: 'Κάτι που χρειάζεται το σπίτι' },
   { id: 'extra', icon: '☕', label: 'Μικροέξοδο', hint: 'Καφές, σάντουιτς, καπνός με ένα πάτημα' },
   { id: 'transport', icon: '⛽', label: 'Καύσιμα / μετακίνηση', hint: 'Βενζίνη, διόδια, ΜΜΜ, ταξί' },
   { id: 'bill', icon: '📄', label: 'Νέος λογαριασμός', hint: 'ΔΕΗ, νερό, ενοίκιο, συνδρομές' },
+  { id: 'receipt', icon: '🧾', label: 'Σάρωση απόδειξης', hint: 'Ψώνια, καύσιμα ή διόδια με ένα QR/barcode' },
   { id: 'product', icon: '＋', label: 'Πρόσθεσε προϊόν', hint: 'Κάτι που έφερες σπίτι' },
   { id: 'cart', icon: '🛒', label: 'Καλάθι στο κατάστημα', hint: 'Σκάναρε ό,τι βάζεις στο καρότσι' },
   { id: 'cook', icon: '🍳', label: 'Τι να μαγειρέψω;', hint: 'Ιδέες με ό,τι λήγει πρώτο' }
@@ -156,6 +158,7 @@ function runQuickAction(id) {
   if (sheet?.open) sheet.close();
   const focus = (selector, block = 'center') => requestAnimationFrame(() => { const el = document.querySelector(selector); el?.scrollIntoView({ block }); if (el?.matches('input, select')) el.focus({ preventScroll: true }); });
   if (id === 'all') { document.querySelector('#quick-sheet-list').innerHTML = renderQuickActions(); translateDom(sheet); sheet.showModal(); }
+  else if (id === 'scan') openUniversalScan();
   else if (id === 'receipt') openReceiptDialog();
   else if (id === 'product') openItemDialog();
   else if (id === 'list') { navigate('shopping'); focus('#shopping-form input[name="name"]'); }
@@ -248,7 +251,7 @@ function renderOverview() {
       <section class="panel" id="home-month"><div class="panel-heading"><div><h2>${escapeHtml(t('Τα έξοδα του μήνα'))}</h2><p data-no-i18n>${escapeHtml(monthLabel(month))}</p></div><button class="panel-link" type="button" data-view="insights">${escapeHtml(t('Αναλυτικά →'))}</button></div>
         <p class="big-number" id="home-month-total">${escapeHtml(money(totals.total))}</p>${renderBars(totals.rows, money)}
         ${due.length ? `<button class="alert-banner home-bills-due" type="button" data-view="bills">📄 ${escapeHtml(t('{count} λογαριασμοί λήγουν σύντομα ή έχουν λήξει', { count: due.length }))} ›</button>` : ''}</section>
-      <section class="panel quick-panel" id="home-quick"><div class="panel-heading"><div><h2>Γρήγορες κινήσεις</h2><p>Τα βασικά, χωρίς ψάξιμο</p></div></div><div class="quick-actions quick-grid">${renderQuickActions(['receipt', 'list', 'extra', 'transport', 'bill', 'product'])}</div></section>
+      <section class="panel quick-panel" id="home-quick"><div class="panel-heading"><div><h2>Γρήγορες κινήσεις</h2><p>Τα βασικά, χωρίς ψάξιμο</p></div></div><div class="quick-actions quick-grid">${renderQuickActions(['scan', 'list', 'extra', 'transport', 'bill', 'product'])}</div></section>
       <section class="panel" id="home-expiry"><div class="panel-heading"><div><h2>Έλεγξε τις ημερομηνίες</h2><p>Ό,τι λήγει μέσα στις επόμενες 7 ημέρες</p></div><button class="panel-link" type="button" data-action="home-card" data-card="expiring">${escapeHtml(t('Όλα όσα λήγουν →'))}</button></div><div class="product-list">${upcoming.length ? upcoming.map(renderMiniProduct).join('') : renderEmpty('Όλα καλά εδώ', 'Δεν έχεις προϊόντα που λήγουν σύντομα.', 'add-item', 'Πρόσθεσε προϊόν', '🌿')}</div></section>
     </div>`;
 }
@@ -538,7 +541,8 @@ async function openScanner({ onCode = fillFromBarcode, qr = false } = {}) {
   const dialog = document.querySelector('#scan-dialog');
   const status = document.querySelector('#scan-status');
   status.textContent = t('Άνοιγμα κάμερας…');
-  document.querySelector('#scan-title').textContent = t(qr === 'any' ? 'Σάρωση κωδικού λογαριασμού' : qr ? 'Σάρωση QR απόδειξης' : 'Σάρωση προϊόντος');
+  document.querySelector('#scan-file-row').hidden = qr !== 'all';
+  document.querySelector('#scan-title').textContent = t(qr === 'all' ? 'Σκάναρε οτιδήποτε' : qr === 'any' ? 'Σάρωση κωδικού λογαριασμού' : qr ? 'Σάρωση QR απόδειξης' : 'Σάρωση προϊόντος');
   const torch = document.querySelector('#scan-torch');
   torch.hidden = true; torch.setAttribute('aria-pressed', 'false');
   dialog.showModal();
@@ -549,13 +553,75 @@ async function openScanner({ onCode = fillFromBarcode, qr = false } = {}) {
       onCode(code);
     }, { qr });
     if (stopScanner?.hasTorch) torch.hidden = false;
-    if (dialog.open) status.textContent = t(qr === 'any' ? 'Στόχευσε το QR ή τον barcode του λογαριασμού.' : qr ? 'Στόχευσε το QR ή τον barcode της απόδειξης μέσα στο πλαίσιο.' : 'Στόχευσε τον barcode με την κάμερα.');
+    if (dialog.open) status.textContent = t(qr === 'all' ? 'Στόχευσε QR ή barcode: απόδειξη, λογαριασμό, διόδια ή προϊόν.' : qr === 'any' ? 'Στόχευσε το QR ή τον barcode του λογαριασμού.' : qr ? 'Στόχευσε το QR ή τον barcode της απόδειξης μέσα στο πλαίσιο.' : 'Στόχευσε τον barcode με την κάμερα.');
     else closeScanner();
   } catch (error) {
     status.textContent = t(error?.name === 'NotAllowedError' ? 'Δεν δόθηκε άδεια για την κάμερα. Μπορείς να γράψεις τον barcode με το χέρι.'
       : error?.name === 'NotFoundError' ? 'Δεν βρέθηκε κάμερα. Μπορείς να γράψεις τον barcode με το χέρι.'
       : (error.message || 'Η σάρωση δεν είναι διαθέσιμη.'));
   }
+}
+
+// ---------- «Σκάναρε οτιδήποτε» ----------
+function openUniversalScan() { openScanner({ qr: 'all', onCode: handleScanned }); }
+
+function showChoice({ title, message = '', raw = '', choices }) {
+  const dialog = document.querySelector('#choice-dialog');
+  document.querySelector('#choice-title').textContent = t(title);
+  document.querySelector('#choice-message').textContent = message;
+  const pre = document.querySelector('#choice-raw'); pre.hidden = !raw; pre.textContent = raw;
+  choiceHandlers = choices.map((c) => c.run);
+  document.querySelector('#choice-actions').innerHTML = choices.map((c, i) => `<button class="button ${c.primary ? 'button-primary' : 'button-quiet'}" type="button" data-action="choice" data-index="${i}">${escapeHtml(t(c.label))}</button>`).join('');
+  dialog.showModal();
+  dialog.querySelector('[data-action="choice"]')?.focus();
+}
+let choiceHandlers = [];
+
+async function addBarcodeToList(code) {
+  const info = codeInfo(code);
+  const known = state.items.find((item) => item.barcode === info.barcode);
+  let name = known?.name || '';
+  if (!name && info.barcode && info.kind !== 'vm') { try { name = (await lookupBarcode(info.barcode))?.name || ''; } catch {} }
+  name ||= t('Προϊόν {code}', { code: info.barcode || code });
+  state.shopping.push(createShoppingItem({ name, itemId: known?.id }));
+  if (!persist()) return;
+  navigate('shopping');
+  showToast(t('Προστέθηκε στη λίστα: {name}', { name }));
+}
+
+function handleScanned(code) {
+  const r = routeCode(code);
+  if (r.route === 'receipt') { openReceiptDialog(); receiptCode(r.raw); return; }
+  if (r.route === 'toll') { tollToTransport(r.toll); return; }
+  if (r.route === 'bill') { navigate('bills'); openBillDialog(); applyBillCode(r.raw); return; }
+  if (r.route === 'product') {
+    showChoice({ title: 'Βρέθηκε προϊόν', message: t('Barcode {code}. Πού να το βάλω;', { code: r.barcode }), choices: [
+      { label: 'Στο απόθεμα του σπιτιού', primary: true, run: () => { navigate('pantry'); openItemDialog(); fillFromBarcode(r.raw); } },
+      { label: 'Στη λίστα αγορών', run: () => addBarcodeToList(r.raw) }
+    ] });
+    return;
+  }
+  showChoice({ title: 'Άγνωστος κωδικός', message: t('Δεν αναγνώρισα τι είναι. Αυτό διάβασα:'), raw: r.raw.slice(0, 300), choices: [
+    { label: 'Αντιγραφή', primary: true, run: async () => { try { await navigator.clipboard.writeText(r.raw); showToast('Αντιγράφηκε.'); } catch { showToast('Η αντιγραφή δεν ήταν δυνατή.'); } } },
+    { label: 'Ως κωδικός πληρωμής σε νέο λογαριασμό', run: () => { navigate('bills'); openBillDialog(); document.querySelector('#bill-reference').value = r.raw.replace(/\s+/g, '').slice(0, 40); } },
+    { label: 'Κλείσιμο', run: () => {} }
+  ] });
+}
+
+async function handleScanFile(file) {
+  if (!file) return;
+  closeScanner();
+  const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name || '');
+  if (isPdf) { navigate('bills'); importBillFile(file); return; }
+  showToast('Ανάγνωση εικόνας…');
+  let codes = [];
+  try { codes = await decodeImageCodes(file, { mode: 'all', timeBudgetMs: 6000 }); } catch {}
+  if (codes.length) { handleScanned(codes.find(isUrlCode) || codes[0]); return; }
+  showChoice({ title: 'Δεν βρέθηκε κωδικός', message: t('Δεν βρήκα QR ή barcode στην εικόνα. Τι είναι;'), choices: [
+    { label: 'Απόδειξη', primary: true, run: () => { openReceiptDialog(); loadReceiptPhoto(file); } },
+    { label: 'Λογαριασμός', run: () => { navigate('bills'); importBillFile(file); } },
+    { label: 'Κλείσιμο', run: () => {} }
+  ] });
 }
 
 function closeScanner() {
@@ -2071,6 +2137,8 @@ function handleAction(button) {
   else if (action === 'enable-notifications') enableNotifications();
   else if (action === 'disable-notifications') { saveNotifySettings({ enabled: false }); updateBackgroundCheck(); renderApp(); showToast('Οι ειδοποιήσεις απενεργοποιήθηκαν.'); }
   else if (action === 'set-theme') setTheme(button.dataset.theme);
+  else if (action === 'choice') { const run = choiceHandlers[Number(button.dataset.index)]; document.querySelector('#choice-dialog').close(); run?.(); }
+  else if (action === 'close-choice') document.querySelector('#choice-dialog').close();
   else if (action === 'set-text-size') { const size = setTextSize(button.dataset.size); renderApp(); document.querySelector(`[data-action="set-text-size"][data-size="${size}"]`)?.focus(); showToast(t('Το μέγεθος γραμμάτων άλλαξε.')); }
   else if (action === 'set-store') { try { if (button.dataset.store) localStorage.setItem(STORE_KEY, button.dataset.store); else localStorage.removeItem(STORE_KEY); } catch {} renderApp(); }
   else if (action === 'vm-switch') {
@@ -2154,6 +2222,7 @@ document.addEventListener('input', (event) => {
 });
 
 document.addEventListener('change', (event) => {
+  if (event.target.id === 'scan-file') { const file = event.target.files?.[0]; event.target.value = ''; handleScanFile(file); return; }
   if (event.target.id === 'high-contrast') { setHighContrast(event.target.checked); renderApp(); document.querySelector('#high-contrast')?.focus(); return; }
   if (event.target.id === 'transport-type') { const fuel = event.target.value === 'fuel'; document.querySelector('#transport-fuel').hidden = !fuel; document.querySelector('#transport-ppl').hidden = !fuel; }
   if (event.target.id === 'bill-type') event.target.form.dataset.typeTouched = '1';

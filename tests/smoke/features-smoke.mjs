@@ -259,7 +259,7 @@ await check('scan receipt: paste link, review, edit, import to pantry + spending
   });
   await page.reload({ waitUntil: 'networkidle0' });
   await nav('overview');
-  await tap('.quick-action[data-quick="receipt"]'); await wait();
+  await nav('pantry'); await tap('#view-content [data-action="open-receipt"]'); await wait();
   await page.type('#receipt-link-form input[name=link]', `${RECEIPT}/`);
   await page.click('#receipt-link-form button[type=submit]'); await wait(1200);
   const lines = (await page.$$('#receipt-lines .receipt-line')).length;
@@ -706,7 +706,7 @@ await check('transport: quick-add fuel with €/l + consumption, toll, recurring
   await shot('transport-insights');
   // Fuel receipt via photo OCR, from the general receipt import: offer to save as transport.
   await page.evaluate(() => { window.__spitoOcrMock = async () => ({ text: 'SHELL ΠΡΑΤΗΡΙΟ ΚΑΥΣΙΜΩΝ\n15/10/2026\nDIESEL 25,00 L x 1,659 €/L 41,48 24%\nΣΥΝΟΛΟ 41,48', confidence: 91 }); });
-  await nav('overview');
+  await nav('pantry');
   await tap('#view-content [data-action="open-receipt"], #view-content [data-quick="receipt"]'); await wait();
   const icon = new URL('../../icons/icon-192.png', import.meta.url).pathname;
   await (await page.$('#receipt-photo-file')).uploadFile(icon); await page.waitForSelector('#receipt-transport', { timeout: 15000 }).catch(() => {});

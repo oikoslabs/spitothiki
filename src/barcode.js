@@ -63,11 +63,12 @@ function loadZxing() {
 const MODE_FORMATS = {
   product: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'data_matrix', 'qr_code'],
   bill: ['code_128', 'itf', 'code_39', 'pdf417', 'qr_code', 'data_matrix'],
-  receipt: ['qr_code', 'code_128', 'itf', 'code_39', 'ean_13', 'pdf417']
+  receipt: ['qr_code', 'code_128', 'itf', 'code_39', 'ean_13', 'pdf417'],
+  all: ['qr_code', 'ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'itf', 'code_39', 'data_matrix', 'pdf417']
 };
 // ZXing BarcodeFormat enum values for the same names.
 const ZX = { aztec: 0, codabar: 1, code_39: 2, code_93: 3, code_128: 4, data_matrix: 5, ean_8: 6, ean_13: 7, itf: 8, pdf417: 10, qr_code: 11, upc_a: 14, upc_e: 15 };
-export function scanMode(qr) { return qr === 'any' ? 'bill' : qr ? 'receipt' : 'product'; }
+export function scanMode(qr) { return qr === 'all' ? 'all' : qr === 'any' ? 'bill' : qr ? 'receipt' : 'product'; }
 export function scanFormats(mode) { return MODE_FORMATS[mode] || MODE_FORMATS.product; }
 export function zxingFormats(mode) { return scanFormats(mode).map((f) => ZX[f]).filter((n) => n !== undefined); }
 

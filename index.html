@@ -41,7 +41,7 @@
         <button class="nav-item" type="button" data-view="settings"><span class="nav-icon" aria-hidden="true">⚙</span><span>Ρυθμίσεις</span></button>
       </nav>
       <nav class="quick-bar" aria-label="Γρήγορες κινήσεις">
-        <button class="quick-bar-item" type="button" data-action="quick" data-quick="receipt"><span class="nav-icon" aria-hidden="true">🧾</span><span>Απόδειξη</span></button>
+        <button class="quick-bar-item" type="button" data-action="quick" data-quick="scan"><span class="nav-icon" aria-hidden="true">📷</span><span>Σάρωση</span></button>
         <button class="quick-bar-item" type="button" data-action="quick" data-quick="list"><span class="nav-icon" aria-hidden="true">✓</span><span>Στη λίστα</span></button>
         <button class="quick-bar-item" type="button" data-action="quick" data-quick="extra"><span class="nav-icon" aria-hidden="true">☕</span><span>Μικροέξοδο</span></button>
         <button class="quick-bar-item" type="button" data-action="quick" data-quick="transport"><span class="nav-icon" aria-hidden="true">⛽</span><span>Μετακίνηση</span></button>
@@ -132,7 +132,15 @@
     <div class="dialog-heading"><div><p class="eyebrow">BARCODE</p><h2 id="scan-title">Σάρωση προϊόντος</h2></div><button class="icon-button" type="button" data-action="close-scan" aria-label="Κλείσιμο">×</button></div>
     <div class="scan-wrap"><video id="scan-video" class="scan-video" playsinline muted></video><div class="scan-box" aria-hidden="true"></div></div>
     <div class="settings-actions"><button class="button button-quiet" type="button" id="scan-torch" data-action="scan-torch" aria-pressed="false" hidden>🔦 Φακός</button></div>
+    <div class="settings-actions" id="scan-file-row" hidden><label class="button button-quiet file-button"><span>📎 Από φωτογραφία ή PDF</span><input type="file" accept="image/*,application/pdf,.pdf" class="visually-hidden" id="scan-file"></label></div>
     <p class="field-hint" id="scan-status" role="status">Στόχευσε τον barcode με την κάμερα.</p>
+  </dialog>
+
+  <dialog id="choice-dialog" class="confirm-dialog" aria-labelledby="choice-title">
+    <div class="dialog-heading"><div><p class="eyebrow">ΣΑΡΩΣΗ</p><h2 id="choice-title">Τι να κάνω;</h2></div><button class="icon-button" type="button" data-action="close-choice" aria-label="Κλείσιμο">×</button></div>
+    <p id="choice-message"></p>
+    <pre class="choice-raw" id="choice-raw" hidden data-no-i18n></pre>
+    <div class="choice-actions" id="choice-actions"></div>
   </dialog>
 
   <dialog id="transport-history-dialog" class="confirm-dialog history-dialog" aria-labelledby="transport-history-title">
