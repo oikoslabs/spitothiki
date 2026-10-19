@@ -498,7 +498,7 @@ function renderSyncCard() {
   }
   if (status.state === 'loading' || status.state === 'connecting') return `${head}<p id="sync-status">Σύνδεση…</p></section>`;
   if (status.state === 'signed-out' || (status.state === 'error' && !status.user)) {
-    return `${head}<p>Συνδέσου για να συγχρονίζονται το απόθεμα και η λίστα σε όλες τις συσκευές σου. Τα δεδομένα αυτής της συσκευής θα ενωθούν με όσα έχεις ήδη.</p>
+    return `${head}<p>Συνδέσου για να έχεις τα ίδια δεδομένα σε όλες τις συσκευές σου και για να τα μοιράζεσαι με τα μέλη του σπιτιού σου. Τα δεδομένα αυτής της συσκευής θα ενωθούν με όσα έχεις ήδη.</p>
       ${status.message ? `<p class="form-error" id="sync-status">${escapeHtml(t(status.message))}</p>` : '<p class="field-hint" id="sync-status">Αποσυνδεδεμένος</p>'}
       ${authProviders.includes('google') ? '<div class="settings-actions"><button class="button button-primary" type="button" data-action="sync-google">Σύνδεση με Google</button></div>' : ''}
       ${authProviders.includes('password') ? `<form id="sync-email-form" class="sync-email-form" novalidate><input class="field-input" name="email" type="email" autocomplete="email" placeholder="Email" aria-label="Email" required><input class="field-input" name="password" type="password" autocomplete="current-password" placeholder="Κωδικός" aria-label="Κωδικός" minlength="6" required>
@@ -508,10 +508,21 @@ function renderSyncCard() {
   const shared = status.householdId && status.user && status.householdId !== status.user.uid;
   const line = status.state === 'error' ? `<p class="form-error" id="sync-status">${escapeHtml(t(status.message || 'Σφάλμα συγχρονισμού'))}</p>`
     : `<p class="field-hint" id="sync-status">${status.offline ? 'Εκτός σύνδεσης: οι αλλαγές θα σταλούν μόλις επιστρέψει το internet.' : 'Συγχρονισμένο ✓'}</p>`;
-  return `${head}<p>Συνδεδεμένος ως <strong>${escapeHtml(who)}</strong>${shared ? ' · κοινό νοικοκυριό' : ''}.</p>${line}
-    <div class="settings-actions"><button class="button button-quiet" type="button" data-action="sync-invite">Πρόσκληση μέλους</button>${shared ? '<button class="button button-quiet" type="button" data-action="sync-leave">Αποχώρηση από νοικοκυριό</button>' : ''}<button class="button button-quiet" type="button" data-action="sync-signout">Αποσύνδεση</button></div>
-    <form id="sync-join-form" class="sync-join-form" novalidate><input class="field-input" name="invite" placeholder="Κωδικός πρόσκλησης" aria-label="Κωδικός πρόσκλησης" autocomplete="off"><button class="button button-quiet" type="submit">Συμμετοχή</button></form>
-    <p class="field-hint">Με τη συμμετοχή σε άλλο νοικοκυριό, τα προϊόντα αυτής της συσκευής προστίθενται στο κοινό απόθεμα.</p></section>`;
+  return `${head}<p>Συνδεδεμένος ως <strong>${escapeHtml(who)}</strong>${shared ? ` · ${escapeHtml(t('μέλος κοινού σπιτιού'))}` : ''}.</p>${line}
+    <h3 class="settings-sub">Κοινό σπίτι</h3>
+    <p>Όσοι είναι στο ίδιο σπίτι βλέπουν και αλλάζουν τα ίδια: απόθεμα, λίστα αγορών, λογαριασμούς και έξοδα. Ό,τι αλλάζει ο ένας, το βλέπει ο άλλος σε λίγα δευτερόλεπτα.</p>
+    <div class="settings-actions"><button class="button button-quiet" type="button" data-action="sync-invite">＋ Πρόσκληση μέλους</button>${shared ? '<button class="button button-quiet" type="button" data-action="sync-leave">Αποχώρηση από το κοινό σπίτι</button>' : ''}<button class="button button-quiet" type="button" data-action="sync-signout">Αποσύνδεση</button></div>
+    <form id="sync-join-form" class="sync-join-form" novalidate><label class="field-label" for="sync-invite-code">Σου έδωσαν κωδικό πρόσκλησης; Γράψ' τον εδώ για να μπεις στο σπίτι τους.</label><input class="field-input" id="sync-invite-code" name="invite" placeholder="Κωδικός πρόσκλησης" autocomplete="off"><button class="button button-quiet" type="submit">Μπες στο σπίτι</button></form>
+    <p class="field-hint">Όταν μπαίνεις σε άλλο σπίτι, τα προϊόντα αυτής της συσκευής προστίθενται στο κοινό απόθεμα.</p>
+    <details class="relative-help" id="relative-help"><summary>Θέλεις να φροντίζεις την εφαρμογή για έναν δικό σου άνθρωπο (π.χ. γονιό);</summary>
+      <ol>
+        <li>Στο δικό του κινητό: άνοιξε τη Σπιτοθήκη, πάτα «Σύνδεση» και σύνδεσέ τον με το δικό του Google ή email.</li>
+        <li>Στο δικό του κινητό: πάτα «＋ Πρόσκληση μέλους». Εμφανίζεται ένας κωδικός και αντιγράφεται.</li>
+        <li>Στο δικό σου κινητό: γράψε αυτόν τον κωδικό στο «Μπες στο σπίτι».</li>
+        <li>Τώρα βλέπετε και οι δύο τα ίδια. Μπορείς από το δικό σου κινητό να του βάζεις λογαριασμούς, λίστα αγορών και ημερομηνίες λήξης, κι εκείνος τα βλέπει αμέσως.</li>
+      </ol>
+      <p class="field-hint">Όσο είσαι μέσα στο σπίτι του, βλέπεις τα δικά του δεδομένα. Για να γυρίσεις στα δικά σου, πάτα «Αποχώρηση από το κοινό σπίτι».</p>
+    </details></section>`;
 }
 
 async function syncAction(fn, success) {
@@ -2226,7 +2237,7 @@ function handleAction(button) {
   else if (action === 'sync-invite') syncAction(async () => {
     const code = await sync.createInvite();
     try { await navigator.clipboard.writeText(code); } catch {}
-    showConfirm(t('Δώσε αυτόν τον κωδικό στο άλλο μέλος (αντιγράφηκε): {code}', { code }), null, 'Κωδικός πρόσκλησης');
+    showConfirm(t('Ο κωδικός αντιγράφηκε. Δώσ’ τον στον άλλον άνθρωπο: θα τον γράψει στο «Μπες στο σπίτι» στο δικό του κινητό. Κωδικός: {code}', { code }), null, 'Κωδικός πρόσκλησης');
   });
   else if (action === 'sync-leave') showConfirm('Θα επιστρέψεις στο δικό σου νοικοκυριό. Τα κοινά προϊόντα θα μείνουν στο κοινό νοικοκυριό.', () => syncAction(() => sync.leaveHousehold(), 'Αποχώρησες από το νοικοκυριό.'), 'Αποχώρηση;');
   else if (action === 'scan-barcode') openScanner();

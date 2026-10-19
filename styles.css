@@ -677,3 +677,7 @@ button.stat-card:hover { border-color: #bfd4c1; }
 .bill-presets .theme-options { flex-wrap: wrap; }
 #onboard-dialog, #choice-dialog, #scan-dialog { padding: 22px 20px 20px; }
 .toast-undo { margin-left: 10px; min-height: 36px; padding: 6px 14px; border: 0; border-radius: 10px; background: #fff; color: #17301f; font-weight: 800; cursor: pointer; }
+.relative-help { margin-top: 14px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-soft); }
+.relative-help summary { cursor: pointer; font-weight: 700; min-height: 44px; display: flex; align-items: center; }
+.relative-help ol { margin: 8px 0; padding-left: 20px; display: grid; gap: 6px; }
+.sync-join-form .field-label { flex-basis: 100%; }

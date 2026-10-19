@@ -91,8 +91,15 @@ await check('changes and deletions propagate', async () => {
   await phone.evaluate(() => { location.hash = '#pantry'; }); await wait();
   const names = await phone.$$eval('.inventory-card', (els) => els.map((el) => el.querySelector('.product-name').textContent));
   await phone.click(`.inventory-card:nth-child(${names.indexOf('Ρύζι') + 1}) [data-action="delete-item"]`); await wait();
-  await phone.click('#confirm-accept'); await wait(900);
-  return bumped && JSON.stringify(await items(laptop)) === JSON.stringify(['Γάλα:2']);
+  await wait(900);
+  const deleted = JSON.stringify(await items(laptop)) === JSON.stringify(['Γάλα:2']);
+  // «Αναίρεση» brings it back on the other device too
+  await phone.click('#toast [data-action="toast-undo"]'); await wait(900);
+  const restored = (await items(laptop)).includes('Ρύζι:1') || (await items(laptop)).some((x) => x.startsWith('Ρύζι'));
+  await phone.evaluate(() => { location.hash = '#pantry'; }); await wait();
+  const again = await phone.$$eval('.inventory-card', (els) => els.map((el) => el.querySelector('.product-name').textContent));
+  await phone.click(`.inventory-card:nth-child(${again.indexOf('Ρύζι') + 1}) [data-action="delete-item"]`); await wait(900);
+  return bumped && deleted && restored && JSON.stringify(await items(laptop)) === JSON.stringify(['Γάλα:2']);
 });
 await check('stores created in ⚙ and at cart start persist after reload and reach the other device', async () => {
   await phone.setViewport({ width: 375, height: 800, isMobile: true, hasTouch: true });

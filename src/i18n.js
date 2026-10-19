@@ -715,6 +715,23 @@ const EN = {
   'Ο λογαριασμός «{name}» διαγράφηκε.': 'The bill “{name}” was deleted.',
   'Το «{name}» αφαιρέθηκε από το απόθεμα.': '“{name}” was removed from the pantry.',
   'Το κατάστημα «{name}» διαγράφηκε.': 'The store “{name}” was deleted.',
+  // Household sharing
+  'μέλος κοινού σπιτιού': 'member of a shared home',
+  'Κοινό σπίτι': 'Shared home',
+  'Όσοι είναι στο ίδιο σπίτι βλέπουν και αλλάζουν τα ίδια: απόθεμα, λίστα αγορών, λογαριασμούς και έξοδα. Ό,τι αλλάζει ο ένας, το βλέπει ο άλλος σε λίγα δευτερόλεπτα.': 'Everyone in the same home sees and edits the same things: pantry, shopping list, bills and spending. What one person changes, the others see within seconds.',
+  '＋ Πρόσκληση μέλους': '＋ Invite a member',
+  'Αποχώρηση από το κοινό σπίτι': 'Leave the shared home',
+  "Σου έδωσαν κωδικό πρόσκλησης; Γράψ' τον εδώ για να μπεις στο σπίτι τους.": 'Were you given an invite code? Type it here to join their home.',
+  'Μπες στο σπίτι': 'Join the home',
+  'Όταν μπαίνεις σε άλλο σπίτι, τα προϊόντα αυτής της συσκευής προστίθενται στο κοινό απόθεμα.': 'When you join another home, the products on this device are added to the shared pantry.',
+  'Θέλεις να φροντίζεις την εφαρμογή για έναν δικό σου άνθρωπο (π.χ. γονιό);': 'Want to manage the app for someone close to you (e.g. a parent)?',
+  'Στο δικό του κινητό: άνοιξε τη Σπιτοθήκη, πάτα «Σύνδεση» και σύνδεσέ τον με το δικό του Google ή email.': 'On their phone: open Spitothiki, tap “Sign in” and sign them in with their own Google account or email.',
+  'Στο δικό του κινητό: πάτα «＋ Πρόσκληση μέλους». Εμφανίζεται ένας κωδικός και αντιγράφεται.': 'On their phone: tap “＋ Invite a member”. A code appears and is copied.',
+  'Στο δικό σου κινητό: γράψε αυτόν τον κωδικό στο «Μπες στο σπίτι».': 'On your phone: type that code in “Join the home”.',
+  'Τώρα βλέπετε και οι δύο τα ίδια. Μπορείς από το δικό σου κινητό να του βάζεις λογαριασμούς, λίστα αγορών και ημερομηνίες λήξης, κι εκείνος τα βλέπει αμέσως.': 'Now you both see the same things. From your phone you can add their bills, shopping list and expiry dates, and they see them right away.',
+  'Όσο είσαι μέσα στο σπίτι του, βλέπεις τα δικά του δεδομένα. Για να γυρίσεις στα δικά σου, πάτα «Αποχώρηση από το κοινό σπίτι».': 'While you are in their home you see their data. To go back to yours, tap “Leave the shared home”.',
+  'Συνδέσου για να έχεις τα ίδια δεδομένα σε όλες τις συσκευές σου και για να τα μοιράζεσαι με τα μέλη του σπιτιού σου. Τα δεδομένα αυτής της συσκευής θα ενωθούν με όσα έχεις ήδη.': 'Sign in to have the same data on all your devices and to share it with the people in your home. The data on this device will be merged with what you already have.',
+  "Ο κωδικός αντιγράφηκε. Δώσ’ τον στον άλλον άνθρωπο: θα τον γράψει στο «Μπες στο σπίτι» στο δικό του κινητό. Κωδικός: {code}": 'The code was copied. Give it to the other person: they type it in “Join the home” on their phone. Code: {code}',
 };
 
 export const dictionaries = { el: Object.fromEntries(Object.keys(EN).map((key) => [key, key])), en: EN };
