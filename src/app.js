@@ -83,11 +83,34 @@ function expiryLabel(value) {
   return t('Λήξη {date}', { date: formatDate(value) });
 }
 
-function showToast(message) {
+function showToast(message, { undo = null } = {}) {
   toast.textContent = t(message);
+  toastUndo = undo;
+  if (undo) {
+    const button = document.createElement('button');
+    button.type = 'button'; button.className = 'toast-undo'; button.dataset.action = 'toast-undo'; button.textContent = t('Αναίρεση');
+    toast.append(' ', button);
+  }
+  toast.classList.toggle('has-undo', Boolean(undo));
   toast.classList.add('is-visible');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => toast.classList.remove('is-visible'), 2600);
+  toastTimer = setTimeout(() => { toast.classList.remove('is-visible'); toastUndo = null; }, undo ? 7000 : 2600);
+}
+let toastUndo = null;
+// Reversible delete: do it at once and offer «Αναίρεση» in the toast (only the lists that changed are restored).
+function undoable(message, mutate) {
+  const before = JSON.parse(JSON.stringify(state));
+  mutate();
+  const keys = Object.keys({ ...before, ...state }).filter((k) => JSON.stringify(before[k]) !== JSON.stringify(state[k]));
+  if (!keys.length) return;
+  showToast(message, { undo: () => {
+    for (const k of keys) { if (k in before) state[k] = before[k]; else delete state[k]; }
+    if (!persist()) return;
+    renderApp(); scheduleBackgroundSnapshot();
+    if (extrasHistoryDialog()?.open) renderExtrasHistory();
+    if (transportHistoryDialog()?.open) renderTransportHistory();
+    showToast('Αναιρέθηκε.');
+  } });
 }
 
 function persist() {
@@ -2106,7 +2129,7 @@ function handleAction(button) {
   } else if (action === 'cart-finish') finishCart();
   else if (action === 'cart-cancel') {
     const trip = activeTrip();
-    if (trip) showConfirm('Το καλάθι θα διαγραφεί χωρίς να καταγραφεί τίποτα.', () => { state.trips = state.trips.filter((entry) => entry.id !== trip.id); cartScanning = false; if (persist()) renderApp(); }, 'Ακύρωση καλαθιού;');
+    if (trip) undoable('Το καλάθι ακυρώθηκε.', () => { state.trips = state.trips.filter((entry) => entry.id !== trip.id); cartScanning = false; if (persist()) renderApp(); });
   } else if (action === 'open-menu') { const sheet = document.querySelector('#menu-sheet'); sheet.querySelectorAll('[data-view]').forEach((b) => b.classList.toggle('is-active', b.dataset.view === activeView)); sheet.showModal(); }
   else if (action === 'close-menu') document.querySelector('#menu-sheet').close();
   else if (action === 'quick') runQuickAction(button.dataset.quick);
@@ -2126,16 +2149,16 @@ function handleAction(button) {
   else if (action === 'extras-undo') { const e = (state.extras || []).find((x) => x.id === extrasLast); if (e) { state.extras = state.extras.filter((x) => x.id !== e.id); extrasLast = null; if (persist()) { renderApp(); showToast('Αναιρέθηκε.'); } } }
   else if (action === 'extras-last-edit' || action === 'extras-edit') { const e = (state.extras || []).find((x) => x.id === (action === 'extras-edit' ? id : extrasLast)); if (e) { closeExtrasHistory(); extrasDraft = { ...e }; extrasLast = null; renderApp(); requestAnimationFrame(() => { document.querySelector('#extras-add')?.scrollIntoView({ block: 'center' }); const el = document.querySelector('#extras-amount'); el?.focus(); el?.select?.(); }); } }
   else if (action === 'extras-cancel') { extrasDraft = null; renderApp(); }
-  else if (action === 'extras-delete') showConfirm('Θα διαγραφεί αυτό το μικροέξοδο.', () => { state.extras = (state.extras || []).filter((e) => e.id !== id); if (extrasLast === id) extrasLast = null; if (persist()) { renderApp(); if (extrasHistoryDialog()?.open) renderExtrasHistory(); } }, 'Διαγραφή εξόδου;');
+  else if (action === 'extras-delete') undoable('Το μικροέξοδο διαγράφηκε.', () => { state.extras = (state.extras || []).filter((e) => e.id !== id); if (extrasLast === id) extrasLast = null; if (persist()) { renderApp(); if (extrasHistoryDialog()?.open) renderExtrasHistory(); } });
   else if (action === 'extras-cat-edit') { extrasCatEdit = id; renderApp(); document.querySelector('#extras-cat-edit-form input[name="name"]')?.focus(); }
   else if (action === 'extras-cat-cancel') { extrasCatEdit = null; renderApp(); }
-  else if (action === 'extras-cat-delete') showConfirm('Το κουμπί της κατηγορίας θα αφαιρεθεί. Τα έξοδα που έχεις ήδη καταχωρίσει μένουν στο ιστορικό και στα σύνολα.', () => { state.extraCategories = deleteExtraCategory(state.extraCategories || [], id); if (extrasAsk === id) extrasAsk = null; if (persist()) renderApp(); }, 'Αφαίρεση κατηγορίας;');
+  else if (action === 'extras-cat-delete') undoable('Το κουμπί αφαιρέθηκε. Τα έξοδά του μένουν στο ιστορικό.', () => { state.extraCategories = deleteExtraCategory(state.extraCategories || [], id); if (extrasAsk === id) extrasAsk = null; if (persist()) renderApp(); });
   else if (action === 'close-transport-history') closeTransportHistory();
   else if (action === 'transport-receipt') openReceiptDialog('transport');
   else if (action === 'receipt-to-transport') receiptToTransport();
   else if (action === 'transport-cancel') { transportDraft = null; renderApp(); }
   else if (action === 'transport-edit') { const e = (state.transport || []).find((x) => x.id === id); if (e) { closeTransportHistory(); transportDraft = { ...e }; renderApp(); document.querySelector('#transport-add')?.scrollIntoView({ behavior: 'smooth' }); } }
-  else if (action === 'transport-delete') showConfirm('Θα διαγραφεί αυτό το έξοδο μετακίνησης.', () => { state.transport = (state.transport || []).filter((e) => e.id !== id); if (persist()) { renderApp(); if (transportHistoryDialog()?.open) renderTransportHistory(); } }, 'Διαγραφή εξόδου;');
+  else if (action === 'transport-delete') undoable('Το έξοδο μετακίνησης διαγράφηκε.', () => { state.transport = (state.transport || []).filter((e) => e.id !== id); if (persist()) { renderApp(); if (transportHistoryDialog()?.open) renderTransportHistory(); } });
   else if (action === 'transport-rule-delete') { state.transportRecurring = (state.transportRecurring || []).filter((r) => r.id !== id); if (persist()) renderApp(); }
   else if (action === 'vehicle-delete') { state.vehicles = (state.vehicles || []).filter((v) => v.id !== id); if (persist()) renderApp(); }
   else if (action === 'add-bill') openBillDialog();
@@ -2153,7 +2176,7 @@ function handleAction(button) {
   } else if (action === 'bill-delete') {
     const bill = (state.bills || []).find((entry) => entry.id === id);
     if (!bill) return;
-    showConfirm(t('Θα διαγραφεί ο λογαριασμός «{name}».', { name: bill.name }), () => { state.bills = state.bills.filter((entry) => entry.id !== id); if (persist()) { renderApp(); scheduleBackgroundSnapshot(); } }, 'Διαγραφή λογαριασμού;');
+    undoable(t('Ο λογαριασμός «{name}» διαγράφηκε.', { name: bill.name }), () => { state.bills = state.bills.filter((entry) => entry.id !== id); if (persist()) { renderApp(); scheduleBackgroundSnapshot(); } });
   } else if (action === 'bills-year') { billsYear += Number(button.dataset.delta); renderApp(); }
   else if (action === 'cook-tab') { cookTab = button.dataset.tab; renderApp(); }
   else if (action === 'plan-week') { planWeek = Number(button.dataset.delta) ? shiftDays(planWeek, Number(button.dataset.delta)) : weekStart(localDateKey()); renderApp(); }
@@ -2179,10 +2202,10 @@ function handleAction(button) {
   else if (action === 'delete-item') {
     const item = state.items.find((entry) => entry.id === id);
     if (!item) return;
-    showConfirm(t('Θα αφαιρεθεί το «{name}» από το απόθεμα.', { name: item.name }), () => {
+    undoable(t('Το «{name}» αφαιρέθηκε από το απόθεμα.', { name: item.name }), () => {
       state.items = state.items.filter((entry) => entry.id !== id);
-      persist(); renderApp(); showToast('Το προϊόν αφαιρέθηκε.');
-    }, 'Αφαίρεση προϊόντος;');
+      persist(); renderApp();
+    });
   } else if (action === 'add-to-shopping') {
     const item = state.items.find((entry) => entry.id === id);
     if (item) addItemToShopping(item);
@@ -2213,6 +2236,7 @@ function handleAction(button) {
   else if (action === 'enable-notifications') enableNotifications();
   else if (action === 'disable-notifications') { saveNotifySettings({ enabled: false }); updateBackgroundCheck(); renderApp(); showToast('Οι ειδοποιήσεις απενεργοποιήθηκαν.'); }
   else if (action === 'set-theme') setTheme(button.dataset.theme);
+  else if (action === 'toast-undo') { const run = toastUndo; toastUndo = null; clearTimeout(toastTimer); toast.classList.remove('is-visible'); run?.(); }
   else if (action === 'onboard-lang') { changeLanguage(button.dataset.lang); renderOnboard(); document.querySelector(`[data-action="onboard-lang"][data-lang="${button.dataset.lang}"]`)?.focus(); }
   else if (action === 'onboard-bill') { const id = button.dataset.id; if (onboardPicks.has(id)) onboardPicks.delete(id); else onboardPicks.add(id); renderOnboard(); document.querySelector(`[data-action="onboard-bill"][data-id="${id}"]`)?.focus(); }
   else if (action === 'onboard-size') { setTextSize(button.dataset.size); renderOnboard(); document.querySelector(`[data-action="onboard-size"][data-size="${button.dataset.size}"]`)?.focus(); }
@@ -2244,7 +2268,7 @@ function handleAction(button) {
     if (store) { state.stores = state.stores.map((entry) => entry.id === store.id ? moveCategory(entry, button.dataset.category, action === 'aisle-up' ? -1 : 1) : entry); persist(); renderApp(); }
   } else if (action === 'delete-store') {
     const store = activeStore();
-    if (store) showConfirm(t('Θα διαγραφεί το κατάστημα «{name}». Η λίστα δεν αλλάζει.', { name: store.name }), () => { state.stores = state.stores.filter((entry) => entry.id !== store.id); try { localStorage.removeItem(STORE_KEY); } catch {} persist(); renderApp(); }, 'Διαγραφή καταστήματος;');
+    if (store) undoable(t('Το κατάστημα «{name}» διαγράφηκε.', { name: store.name }), () => { state.stores = state.stores.filter((entry) => entry.id !== store.id); try { localStorage.removeItem(STORE_KEY); } catch {} persist(); renderApp(); });
   }
   else if (action === 'waste-item') openWasteDialog(id);
   else if (action === 'close-waste') document.querySelector('#waste-dialog').close();

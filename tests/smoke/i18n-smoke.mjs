@@ -80,14 +80,17 @@ await check('category filter + buttons work in English', async () => {
   const toast2 = await page.$eval('#toast', (e) => e.textContent);
   return n === 3 && /added to the list/.test(toast) && rows === 1 && !/[\u0370-\u03ff]{4,}/.test(toast2.replace(/«|»|“.*”/g, ''));
 });
-await check('delete confirm dialog is English and works', async () => {
+await check('delete is immediate with an English «Undo» toast that restores it', async () => {
   await nav('pantry');
   const before = (await page.$$('.inventory-card')).length;
   await page.click('[data-action="delete-item"]'); await wait();
-  const title = await page.$eval('#confirm-title', (e) => e.textContent);
-  const ok = await page.$eval('#confirm-accept', (e) => e.textContent);
-  await page.click('#confirm-accept'); await wait();
-  return title === 'Remove product?' && ok === 'Yes, continue' && (await page.$$('.inventory-card')).length === before - 1;
+  const toast = await page.$eval('#toast', (e) => e.textContent);
+  const gone = (await page.$$('.inventory-card')).length === before - 1;
+  await page.click('#toast [data-action="toast-undo"]'); await wait();
+  const back = (await page.$$('.inventory-card')).length === before;
+  await page.click('[data-action="delete-item"]'); await wait();
+  console.log('  undo:', { toast, gone, back, before });
+  return /removed from the pantry/.test(toast) && /Undo/.test(toast) && gone && back && (await page.$$('.inventory-card')).length === before - 1;
 });
 await check('English dates use English locale', async () => {
   await nav('overview');

@@ -675,7 +675,7 @@ const EN = {
   'Λογαριασμός': 'Bill',
   // Direct debit
   'Πληρώνεται με πάγια εντολή': 'Paid by direct debit',
-  '(χρεώνεται αυτόματα από την τράπεζα· δεν θα σου ζητάει πληρωμή)': '(your bank pays it automatically; the app won’t ask you to pay)',
+  'χρεώνεται αυτόματα από την τράπεζα· δεν θα σου ζητάει πληρωμή': 'your bank pays it automatically; the app won’t ask you to pay',
   'Χρεώθηκε με πάγια εντολή {date}': 'Debited by direct debit {date}',
   'Θα χρεωθεί στις {date}': 'Will be debited on {date}',
   '🏦 Πάγια εντολή': '🏦 Direct debit',
@@ -706,6 +706,15 @@ const EN = {
   'ΕΝΦΙΑ': 'Property tax (ENFIA)',
   'Τέλη κυκλοφορίας': 'Road tax',
   'Ασφάλιση': 'Insurance',
+  // Undo
+  'Αναιρέθηκε.': 'Undone.',
+  'Το καλάθι ακυρώθηκε.': 'The cart was cancelled.',
+  'Το μικροέξοδο διαγράφηκε.': 'The small expense was deleted.',
+  'Το κουμπί αφαιρέθηκε. Τα έξοδά του μένουν στο ιστορικό.': 'The button was removed. Its expenses stay in the history.',
+  'Το έξοδο μετακίνησης διαγράφηκε.': 'The transport expense was deleted.',
+  'Ο λογαριασμός «{name}» διαγράφηκε.': 'The bill “{name}” was deleted.',
+  'Το «{name}» αφαιρέθηκε από το απόθεμα.': '“{name}” was removed from the pantry.',
+  'Το κατάστημα «{name}» διαγράφηκε.': 'The store “{name}” was deleted.',
 };
 
 export const dictionaries = { el: Object.fromEntries(Object.keys(EN).map((key) => [key, key])), en: EN };

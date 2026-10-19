@@ -600,7 +600,7 @@ await check('cart start: inline new store is saved, survives reload, selected ne
   const defaultNew = await page.$eval('#cart-store', (e) => e.value === '__new') && !(await page.$eval('#cart-new-store-row', (e) => e.hidden));
   await page.type('#cart-new-store', 'Μασούτης'); await shot('cart-new-store');
   await tap('#cart-start-form button[type=submit]'); await wait();
-  await tap('[data-action="cart-cancel"]'); await wait(); await tap('#confirm-accept'); await wait();
+  await tap('[data-action="cart-cancel"]'); await wait();
   await page.reload({ waitUntil: 'networkidle0' });
   await nav('shopping'); await tap('#open-cart'); await wait();
   const selected = await page.$eval('#cart-store', (e) => e.options[e.selectedIndex].textContent);
