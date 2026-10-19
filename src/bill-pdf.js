@@ -56,7 +56,7 @@ const w = (s) => s.replace(/ /g, '\\s*');
 const AMOUNT_LABELS = ['ΣΥΝΟΛΙΚΟ ΠΟΣΟ ΠΛΗΡΩΜΗΣ', 'ΣΥΝΟΛΟ ΠΡΟΣ ΠΛΗΡΩΜΗ', 'ΣΥΝΟΛΙΚΟ ΠΟΣΟ ΠΡΟΣ ΠΛΗΡΩΜΗ', 'ΠΟΣΟ ΠΡΟΣ ΠΛΗΡΩΜΗ', 'ΠΟΣΟ ΠΛΗΡΩΜΗΣ', 'ΠΛΗΡΩΤΕΟ ΠΟΣΟ', 'ΣΥΝΟΛΙΚΟ ΠΛΗΡΩΤΕΟ', 'ΣΥΝΟΛΟ ΠΛΗΡΩΤΕΟ', 'ΤΕΛΙΚΟ ΠΛΗΡΩΤΕΟ', 'ΤΕΛΙΚΟ ΠΟΣΟ', 'ΑΣΦΑΛΙΣΤΡΟ ΠΛΗΡΩΤΕΟ', 'ΠΛΗΡΩΤΕΟ ΑΣΦΑΛΙΣΤΡΟ', 'ΣΥΝΟΛΙΚΗ ΟΦΕΙΛΗ', 'ΣΥΝΟΛΟ ΟΦΕΙΛΗΣ', 'ΠΟΣΟ ΟΦΕΙΛΗΣ', 'ΣΥΝΟΛΟ ΛΟΓΑΡΙΑΣΜΟΥ', 'ΠΟΣΟ ΛΟΓΑΡΙΑΣΜΟΥ', 'ΣΥΝΟΛΙΚΟ ΑΣΦΑΛΙΣΤΡΟ', 'ΣΥΝΟΛΙΚΟ ΠΟΣΟ', 'ΠΛΗΡΩΤΕΟ(?!Σ?\\s*(ΕΩΣ|ΜΕΧΡΙ))', 'AMOUNT TO PAY', 'TOTAL TO PAY', 'TOTAL AMOUNT DUE', 'AMOUNT DUE', 'TOTAL DUE']
   .map((l) => new RegExp(w(l)));
 const AMOUNT_SKIP = /ΧΩΡΙΣ|ΠΡΟ\s*ΦΠΑ|ΥΠΟΣΥΝΟΛΟ|ΠΡΟΗΓΟΥΜΕΝ|ΜΕΡΙΚ|ΚΑΘΑΡ|ΕΛΑΧΙΣΤ|ΔΟΣΗ/;
-const DUE_LABELS = ['ΛΗΞΗ ΠΡΟΘΕΣΜΙΑΣ ΠΛΗΡΩΜΗΣ', 'ΗΜΕΡΟΜΗΝΙΑ ΛΗΞΗΣ ΠΛΗΡΩΜΗΣ', 'ΗΜΕΡΟΜΗΝΙΑ ΛΗΞΗΣ', 'ΗΜ(?:\\/ΝΙΑ|\\.)? ΛΗΞΗΣ', 'ΛΗΞΗ ΠΡΟΘΕΣΜΙΑΣ', 'ΠΡΟΘΕΣΜΙΑ ΠΛΗΡΩΜΗΣ', 'ΛΗΞΗ ΠΛΗΡΩΜΗΣ', 'ΕΞΟΦΛΗΣΗ ΕΩΣ', 'ΕΞΟΦΛΗΤΕΟ(?:Σ)? ΕΩΣ', 'ΠΛΗΡΩΤΕΟ(?:Σ)? (?:ΕΩΣ|ΜΕΧΡΙ)', 'ΠΛΗΡΩΜΗ (?:ΕΩΣ|ΜΕΧΡΙ)', 'ΠΛΗΡΩΣΤΕ (?:ΕΩΣ|ΜΕΧΡΙ)', 'ΠΛΗΡΩΜΗΣ ΕΩΣ', 'ΗΜΕΡΟΜΗΝΙΑ ΠΛΗΡΩΜΗΣ', 'ΛΗΞΗ(?!\\s*(ΣΥΜΒ|ΠΡΟΣΦ|ΔΕΣΜ|ΙΣΧΥ|ΠΕΡΙΟΔ|ΚΑΡΤ))', 'PAYMENT DUE', 'DUE DATE', 'PAY BY']
+const DUE_LABELS = ['ΛΗΞΗ ΠΡΟΘΕΣΜΙΑΣ ΠΛΗΡΩΜΗΣ', 'ΗΜΕΡΟΜΗΝΙΑ ΛΗΞΗΣ ΠΛΗΡΩΜΗΣ', 'ΗΜΕΡΟΜΗΝΙΑ ΛΗΞΗΣ', 'ΗΜ(?:\\/ΝΙΑ|\\.)? ΛΗΞΗΣ', 'ΛΗΞΗ ΠΡΟΘΕΣΜΙΑΣ', 'ΠΡΟΘΕΣΜΙΑ ΠΛΗΡΩΜΗΣ', 'ΠΡΟΘΕΣΜΙΑ ΕΞΟΦΛΗΣΗΣ', 'ΛΗΞΗ ΠΛΗΡΩΜΗΣ', 'ΕΞΟΦΛΗΣΗ ΕΩΣ', 'ΕΞΟΦΛΗΤΕΟ(?:Σ)? ΕΩΣ', 'ΠΛΗΡΩΤΕΟ(?:Σ)? (?:ΕΩΣ|ΜΕΧΡΙ)', 'ΠΛΗΡΩΜΗ (?:ΕΩΣ|ΜΕΧΡΙ)', 'ΠΛΗΡΩΣΤΕ (?:ΕΩΣ|ΜΕΧΡΙ)', 'ΠΛΗΡΩΜΗΣ ΕΩΣ', 'ΗΜΕΡΟΜΗΝΙΑ ΠΛΗΡΩΜΗΣ', 'ΛΗΞΗ(?!\\s*(ΣΥΜΒ|ΠΡΟΣΦ|ΔΕΣΜ|ΙΣΧΥ|ΠΕΡΙΟΔ|ΚΑΡΤ))', 'PAYMENT DUE', 'DUE DATE', 'PAY BY']
   .map((l) => new RegExp(w(l)));
 const DUE_SKIP = /ΕΚΔΟΣΗΣ|ΠΕΡΙΟΔΟΣ|ΣΥΜΒΟΛΑΙ|ΣΥΜΒΑΣ|ΠΡΟΗΓΟΥΜΕΝ|ΕΠΟΜΕΝ/;
 const HEADER_WORD = /ΠΟΣΟ|ΣΥΝΟΛ|ΠΛΗΡΩΤΕΟ|ΥΠΟΛΟΙΠ|ΦΠΑ|ΑΞΙΑ|ΧΡΕΩΣ|ΟΦΕΙΛ|ΗΜΕΡΟΜΗΝΙΑ|ΗΜ\.|ΛΗΞΗ|ΕΚΔΟΣ|ΕΩΣ|ΠΡΟΘΕΣΜΙΑ|ΠΕΡΙΟΔ|ΑΡΙΘΜ|ΚΩΔΙΚ|DATE|AMOUNT|TOTAL/;
@@ -64,6 +64,25 @@ const DATE_HEADERS = /(?:ΗΜΕΡΟΜΗΝΙΑ|ΗΜ\/ΝΙΑ|ΗΜ\.)\s*[Α-ΩA-Z]+
 const MONEY_HEADERS = /(?:ΣΥΝΟΛΙΚΟ\s+|ΤΕΛΙΚΟ\s+)?ΠΟΣΟ(?:\s+ΠΡΟΣ)?\s*[Α-Ω]*|ΣΥΝΟΛ[Α-Ω]*(?:\s+ΠΡΟΣ)?\s*[Α-Ω]*|ΠΛΗΡΩΤΕΟ\s*[Α-Ω]*|ΥΠΟΛΟΙΠ[Α-Ω]*|ΦΠΑ|ΑΞΙΑ\s*[Α-Ω]*|ΟΦΕΙΛ[Α-Ω]*/g;
 const ANY_LABEL = (p) => AMOUNT_LABELS.some((re) => re.test(p)) || DUE_LABELS.some((re) => re.test(p));
 const PERIOD = /(?:ΠΕΡΙΟΔΟΣ[^\d]{0,30}|ΑΠΟ\s)(\d{1,2})\s?[/.-]\s?(\d{1,2})\s?[/.-]\s?(\d{4}|\d{2})\s*(?:-|–|ΕΩΣ|ΜΕΧΡΙ|ΩΣ|TO)\s*(\d{1,2})\s?[/.-]\s?(\d{1,2})\s?[/.-]\s?(\d{4}|\d{2})/;
+
+const BARE_PERIOD = /^(\d{1,2})[/.](\d{1,2})[/.](\d{4})\s*[-–]\s*(\d{1,2})[/.](\d{1,2})[/.](\d{4})$/;
+// No labels in the text (some bills draw them as graphics, e.g. Vodafone Business / SOFTONE): use the payment
+// block around the RF code. Amount only if one non-zero amount is repeated there (amount to pay printed twice);
+// due date only if exactly one date follows the RF, it isn't a period date and it is later than every other date
+// (there must be at least one, e.g. the issue date).
+function paymentBlock(lines, reference, period) {
+  const r = lines.findIndex((l) => plain(l).replace(/\s+/g, '').includes(reference));
+  if (r < 0) return {};
+  const win = lines.slice(r, r + 7);
+  const counts = new Map();
+  for (const l of win) for (const a of findAmounts(l)) if (a.value > 0) counts.set(a.value, (counts.get(a.value) || 0) + 1);
+  const repeated = [...counts].filter(([, n]) => n >= 2).map(([v]) => v);
+  const skip = new Set([period?.from, period?.to].filter(Boolean));
+  const near = [...new Set(win.flatMap((l) => findDates(l).map((d) => d.iso)))].filter((d) => !skip.has(d));
+  const others = lines.flatMap((l, i) => (i >= r && i < r + 7 ? [] : findDates(l).map((d) => d.iso))).filter((d) => !skip.has(d));
+  const due = near.length === 1 && others.length > 0 && others.every((d) => d < near[0]) ? near[0] : '';
+  return { amount: repeated.length === 1 ? repeated[0] : null, due };
+}
 
 // Label → value: same cell/line after the label, else the same column (cells split by 2+ spaces) or
 // the only value in the next two lines; header rows with several columns are matched by position.
@@ -124,13 +143,15 @@ export function parseBillText(text) {
   for (const entry of PROVIDERS) { const m = all.match(entry.re); if (m && m.index < at) { provider = entry; at = m.index; } }
   const amount = findLabeled(rows, AMOUNT_LABELS, AMOUNT_SKIP, amountValues, MONEY_HEADERS);
   const due = findLabeled(rows, DUE_LABELS, DUE_SKIP, dateValues, DATE_HEADERS);
-  const periodMatch = all.match(PERIOD);
+  const periodMatch = all.match(PERIOD) || lines.map((l) => plain(l).match(BARE_PERIOD)).find(Boolean);
   const rf = findRf(lines.join('\n'));
+  const period = periodMatch ? { from: isoDate(periodMatch[1], periodMatch[2], periodMatch[3]), to: isoDate(periodMatch[4], periodMatch[5], periodMatch[6]) } : null;
+  const block = (amount == null || !due) && rf.reference ? paymentBlock(lines, rf.reference, period) : {};
   const name = provider?.name || '';
   return {
     name, provider: name, type: provider?.type || (name ? guessBillType(name) : 'other'),
-    amount, due: due || '',
-    period: periodMatch ? { from: isoDate(periodMatch[1], periodMatch[2], periodMatch[3]), to: isoDate(periodMatch[4], periodMatch[5], periodMatch[6]) } : null,
+    amount: amount ?? block.amount ?? null, due: due || block.due || '',
+    period,
     reference: rf.reference, rfValid: rf.rfValid
   };
 }

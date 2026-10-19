@@ -84,3 +84,20 @@ test('itemsToLines: items a point apart share a row; wide gaps become column cel
   const b = parseBillText(lines.join('\n'));
   assert.deepEqual([b.amount, b.due], [32.45, '2026-11-05']);
 });
+
+test('bill text: Vodafone Business (labels drawn as graphics) → amount/due from the RF payment block', () => {
+  const fxj = JSON.parse(fx('vodafone-business-items.json'));
+  const b = parseBillText(itemsToLines(fxj.items).join('\n'));
+  // «Συνολική Οφειλή Πελάτη» 62,93 (printed twice), not this line's 35,01 or the 28,23 net; «Προθεσμία εξόφλησης έως» 28/10.
+  assert.deepEqual([b.name, b.amount, b.due, b.reference, b.rfValid], ['Vodafone', 62.93, '2026-10-28', fxj.rf, true]);
+  assert.deepEqual(b.period, { from: '2026-10-01', to: '2026-10-31' });
+});
+
+test('bill text: RF block fallback never guesses (single amount, two dates, earlier date)', () => {
+  const rf = 'RF18539007547034';
+  assert.deepEqual(((b) => [b.amount, b.due])(parseBillText(`X\n13/10/2026\n${rf}\n62,93 €\n28/10/2026`)), [null, '2026-10-28']);
+  assert.deepEqual(((b) => [b.amount, b.due])(parseBillText(`X\n${rf}\n10,00 €\n10,00 €\n20,00 €\n20,00 €\n28/10/2026\n30/10/2026`)), [null, '']);
+  assert.deepEqual(((b) => [b.amount, b.due])(parseBillText(`X\n${rf}\n5,00 €\n5,00 €\n01/10/2026\nπαλιό\n\n\n\n\n\n\n\n\n15/10/2026`)), [5, '']);
+  // labels still win over the block
+  assert.deepEqual(((b) => [b.amount, b.due])(parseBillText(`Ποσό πληρωμής 40,00 €\nΛήξη 30/10/2026\n${rf}\n62,93 €\n62,93 €\n28/10/2026`)), [40, '2026-10-30']);
+});
