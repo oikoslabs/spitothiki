@@ -11,7 +11,9 @@ await page.goto(url, { waitUntil: 'networkidle0' });
 await page.evaluate(() => { localStorage.setItem('spitothiki:onboarded', '1'); });
 await page.reload({ waitUntil: 'networkidle0' });
 // a bit of demo data so screens are not empty
-await page.evaluate(() => { const b = [...document.querySelectorAll('[data-action="load-demo"]')][0]; b?.click(); });
+await page.evaluate(() => { location.hash = '#settings'; }); await new Promise((r) => setTimeout(r, 400));
+await page.evaluate(() => { const b = [...document.querySelectorAll('[data-action="load-demo"]')].find((e) => e.getBoundingClientRect().height); b?.click(); });
+await new Promise((r) => setTimeout(r, 400)); await page.evaluate(() => document.querySelector('#confirm-accept')?.click());
 await new Promise((r) => setTimeout(r, 500));
 for (const view of ['overview', 'pantry', 'bills', 'settings']) {
   await page.evaluate((v) => { location.hash = `#${v}`; }, view);
