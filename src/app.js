@@ -850,7 +850,7 @@ function applyLanguage() {
   document.title = t('Σπιτοθήκη — Το σπίτι σε τάξη');
   document.querySelector('meta[name="description"]')?.setAttribute('content', t('Οργάνωσε το σπίτι και τα έξοδά σου: απόθεμα και λήξεις, λίστα αγορών, λογαριασμοί, μετακινήσεις και μικροέξοδα.'));
   const toggle = document.querySelector('#lang-toggle');
-  if (toggle) { toggle.textContent = lang === 'en' ? 'ΕΛ' : 'EN'; toggle.setAttribute('aria-label', lang === 'en' ? 'Switch to Greek' : 'Αλλαγή σε English'); toggle.setAttribute('title', toggle.getAttribute('aria-label')); }
+  if (toggle) { toggle.textContent = lang === 'en' ? 'ΕΛ' : 'EN'; toggle.setAttribute('title', lang === 'en' ? 'Switch to Greek' : 'Αλλαγή σε English'); toggle.setAttribute('aria-label', `${toggle.textContent} — ${toggle.title}`); }
   translateDom(document.body);
 }
 
@@ -1213,15 +1213,17 @@ function renderPlan() {
   const today = localDateKey();
   const range = `${dayLabel(days[0], undefined)} – ${dayLabel(days[6], undefined)}`;
   const count = meals.filter((meal) => meal.date >= days[0] && meal.date <= days[6]).length;
+  const hasDiet = (state.dietPlans || []).length > 0; // the diet plan's 4-meal grid is the main one; the classic grid folds away
   const cell = (date, slot) => {
     const meal = byId.get(`meal-${date}-${slot}`);
     return `<button type="button" class="plan-cell${meal ? ' has-meal' : ''}" data-action="plan-meal" data-date="${date}" data-slot="${slot}" aria-label="${escapeHtml(`${dayLabel(date)} · ${t(SLOT_LABELS[slot])}${meal ? `: ${mealTitle(meal)}` : ''}`)}" data-no-i18n><span class="plan-slot">${escapeHtml(t(SLOT_LABELS[slot]))}</span>${meal ? `<span class="plan-meal" ${meal.source === 'mealdb' ? 'lang="en"' : ''}>${escapeHtml(mealTitle(meal))}</span>` : '<span class="plan-add">＋</span>'}</button>`;
   };
   return `<div class="month-switch" role="group" aria-label="Εβδομάδα"><button class="icon-button" type="button" data-action="plan-week" data-delta="-7" aria-label="Προηγούμενη εβδομάδα">‹</button><strong id="plan-range" data-no-i18n>${escapeHtml(range)}</strong><button class="icon-button" type="button" data-action="plan-week" data-delta="7" aria-label="Επόμενη εβδομάδα">›</button>${planWeek !== weekStart(today) ? `<button class="text-button" type="button" data-action="plan-week" data-delta="0">Αυτή η εβδομάδα</button>` : ''}</div>
     ${renderDietSection()}
+    ${hasDiet ? `<details class="plan-classic" id="plan-classic"${count ? ' open' : ''}><summary>${escapeHtml(t('Άλλα γεύματα: πρωινό, μεσημεριανό, βραδινό'))}</summary>` : ''}
     <div class="settings-actions plan-actions"><button class="button button-primary" type="button" data-action="plan-shopping" ${count ? '' : 'disabled'}>🛒 Ό,τι λείπει στη λίστα</button><button class="button button-quiet" type="button" data-action="plan-copy">📋 Αντιγραφή προηγούμενης εβδομάδας</button></div>
     <div class="plan-grid" id="plan-grid">${days.map((date) => `<section class="plan-day${date === today ? ' is-today' : ''}" data-day="${date}"><h3 class="plan-day-name" data-no-i18n>${escapeHtml(dayLabel(date))}</h3>${MEAL_SLOTS.map((slot) => cell(date, slot)).join('')}</section>`).join('')}</div>
-    <p class="field-hint">${escapeHtml(t('{count} γεύματα αυτή την εβδομάδα. Η λίστα αφαιρεί ό,τι έχεις ήδη στο απόθεμα ή στη λίστα.', { count }))}</p>`;
+    <p class="field-hint">${escapeHtml(t('{count} γεύματα αυτή την εβδομάδα. Η λίστα αφαιρεί ό,τι έχεις ήδη στο απόθεμα ή στη λίστα.', { count }))}</p>${hasDiet ? '</details>' : ''}`;
 }
 
 function openMealDialog(date, slot) {
@@ -2148,7 +2150,7 @@ function handleAction(button) {
   else if (action === 'quick') runQuickAction(button.dataset.quick);
   else if (action === 'close-quick') document.querySelector('#quick-sheet').close();
   else if (action === 'menu-receipt') { document.querySelector('#menu-sheet').close(); openReceiptDialog(); }
-  else if (action === 'menu-mealplan') { document.querySelector('#menu-sheet').close(); navigate('cook'); setTimeout(() => document.querySelector('#plan-grid')?.scrollIntoView({ block: 'start' }), 50); }
+  else if (action === 'menu-mealplan') { document.querySelector('#menu-sheet').close(); navigate('cook'); setTimeout(() => (document.querySelector('#plan-classic:not([open])') ? document.querySelector('#diet-section') : document.querySelector('#plan-grid'))?.scrollIntoView({ block: 'start' }), 50); }
   else if (action === 'transport-month') { transportMonthKey = shiftMonth(transportMonthKey, Number(button.dataset.delta)); renderApp(); if (transportHistoryDialog()?.open) renderTransportHistory(); }
   else if (action === 'transport-history') openTransportHistory();
   else if (action === 'extras-month') { extrasMonthKey = shiftMonth(extrasMonthKey, Number(button.dataset.delta)); renderApp(); if (extrasHistoryDialog()?.open) renderExtrasHistory(); }

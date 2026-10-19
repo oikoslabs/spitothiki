@@ -71,6 +71,9 @@ const added = await page.evaluate(() => JSON.parse(localStorage.getItem('spitoth
 if (added < 5) fail(`list rows ${added}`);
 const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('spitothiki:v1')).dietPlans?.length);
 if (saved !== 1) fail('plan not saved');
+// with a diet plan the old breakfast/lunch/dinner grid folds away under one summary line (no two grids at once)
+const classic = await page.evaluate(() => { const d = document.querySelector('#plan-classic'); return d && !d.open && d.contains(document.querySelector('#plan-grid')); });
+if (!classic) fail('classic meal grid should be collapsed when a diet plan exists');
 // delete with undo toast
 await page.evaluate(() => { document.querySelector('.diet-more').open = true; });
 await page.click('[data-diet="delete"]');

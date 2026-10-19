@@ -7,6 +7,7 @@ test('first run: only for new users without data and without the done flag', () 
   assert.equal(shouldOnboard({ items: [], shopping: [] }, '1'), false);
   assert.equal(shouldOnboard({ items: [{ id: 'a' }] }, null), false); // existing user with data: never
   assert.equal(shouldOnboard({ bills: [{ id: 'b' }] }, null), false);
+  assert.equal(shouldOnboard({ dietPlans: [{ id: 'd' }] }, null), false); // only a diet plan still counts as data
   assert.equal(hasData({}), false);
 });
 

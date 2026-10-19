@@ -735,6 +735,7 @@ const EN = {
   'Όσο είσαι μέσα στο σπίτι του, βλέπεις τα δικά του δεδομένα. Για να γυρίσεις στα δικά σου, πάτα «Αποχώρηση από το κοινό σπίτι».': 'While you are in their home you see their data. To go back to yours, tap “Leave the shared home”.',
   'Συνδέσου για να έχεις τα ίδια δεδομένα σε όλες τις συσκευές σου και για να τα μοιράζεσαι με τα μέλη του σπιτιού σου. Τα δεδομένα αυτής της συσκευής θα ενωθούν με όσα έχεις ήδη.': 'Sign in to have the same data on all your devices and to share it with the people in your home. The data on this device will be merged with what you already have.',
   "Ο κωδικός αντιγράφηκε. Δώσ’ τον στον άλλον άνθρωπο: θα τον γράψει στο «Μπες στο σπίτι» στο δικό του κινητό. Κωδικός: {code}": 'The code was copied. Give it to the other person: they type it in “Join the home” on their phone. Code: {code}',
+  'Άλλα γεύματα: πρωινό, μεσημεριανό, βραδινό': 'Other meals: breakfast, lunch, dinner',
 };
 
 export const dictionaries = { el: Object.fromEntries(Object.keys(EN).map((key) => [key, key])), en: EN };

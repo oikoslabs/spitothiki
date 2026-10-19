@@ -10,7 +10,7 @@
   --green-dark: #22543c;
   --green-soft: #e7f1e8;
   --lime: #d9edb5;
-  --amber: #a86112;
+  --amber: #94530b;
   --amber-soft: #fff4df;
   --red: #a9413b;
   --red-soft: #fff0ed;
@@ -79,9 +79,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .hero-panel { position: relative; overflow: hidden; display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: center; gap: 20px; min-height: 180px; margin-bottom: 22px; padding: 30px 34px; border-radius: 22px; background: #e9f1e4; }
 .hero-panel::after { position: absolute; right: 11%; bottom: -80px; width: 220px; height: 220px; border: 1px solid rgba(45,107,76,.09); border-radius: 50%; content: ''; }
 .hero-copy { position: relative; z-index: 1; }
-.hero-copy .eyebrow { color: #5e8265; }
+.hero-copy .eyebrow { color: #4a6b51; }
 .hero-copy h1 { max-width: 560px; margin: 0; font: 800 clamp(26px, 3.6vw, 39px)/1.1 var(--display); letter-spacing: -.06em; }
-.hero-copy p { max-width: 515px; margin: 11px 0 0; color: #5f7467; font-size: calc(14px * var(--text-scale)); }
+.hero-copy p { max-width: 515px; margin: 11px 0 0; color: #53685b; font-size: calc(14px * var(--text-scale)); }
 .hero-illustration { position: relative; z-index: 1; display: grid; place-items: center; width: 120px; height: 120px; margin-right: 14px; border-radius: 36px; background: rgba(255,255,255,.65); transform: rotate(5deg); }
 .hero-illustration span { font-size: calc(57px * var(--text-scale)); transform: rotate(-5deg); }
 .stats-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 15px; margin: 0 0 24px; }
@@ -134,13 +134,13 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .search-input { padding-left: 38px; }
 .search-input::placeholder, .field-input::placeholder { color: var(--muted); }
 .filter-row { display: flex; flex-wrap: wrap; gap: 7px; margin: 0 0 14px; }
-.filter-chip { min-height: 32px; padding: 0 12px; border: 1px solid #e3e9df; border-radius: 30px; background: white; color: #66766c; font-size: calc(11px * var(--text-scale)); font-weight: 700; cursor: pointer; }
+.filter-chip { min-height: 32px; padding: 0 12px; border: 1px solid #e3e9df; border-radius: 30px; background: white; color: #56665c; font-size: calc(11px * var(--text-scale)); font-weight: 700; cursor: pointer; }
 .filter-chip.is-active { border-color: var(--green); background: var(--green); color: white; }
 .inventory-list { display: grid; gap: 9px; }
 .inventory-card { display: grid; grid-template-columns: 44px minmax(0,1fr) auto; align-items: center; gap: 12px; padding: 13px; border: 1px solid var(--line); border-radius: 15px; background: white; }
 .inventory-card .product-emoji { width: 44px; height: 44px; font-size: calc(21px * var(--text-scale)); }
 .inventory-meta { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 5px; }
-.meta-tag { padding: 2px 7px; border-radius: 8px; background: #f3f5f1; color: #758179; font-size: calc(10px * var(--text-scale)); }
+.meta-tag { padding: 2px 7px; border-radius: 8px; background: #f3f5f1; color: #5d6c64; font-size: calc(10px * var(--text-scale)); }
 .card-actions { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
 .icon-button { display: grid; place-items: center; width: 34px; height: 34px; border: 1px solid var(--line); border-radius: 10px; background: white; color: #5d7164; font-size: calc(17px * var(--text-scale)); cursor: pointer; }
 .icon-button:hover { border-color: #c6d8c7; color: var(--green); }
@@ -158,7 +158,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .shopping-row-detail { color: var(--muted); font-size: calc(10px * var(--text-scale)); }
 .shopping-summary { background: #edf4e9; }
 .shopping-summary h2 { margin: 0; font: 800 calc(17px * var(--text-scale)) var(--display); }
-.shopping-summary p { color: #617667; font-size: calc(12px * var(--text-scale)); }
+.shopping-summary p { color: #53685b; font-size: calc(12px * var(--text-scale)); }
 .shopping-summary-list { display: grid; gap: 9px; margin-top: 15px; }
 .summary-line { display: flex; justify-content: space-between; gap: 10px; padding-bottom: 8px; border-bottom: 1px solid rgba(45,107,76,.12); color: #51685a; font-size: calc(11px * var(--text-scale)); }
 .summary-line strong { color: var(--green-dark); }
@@ -633,7 +633,7 @@ button.stat-card:hover { border-color: #bfd4c1; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .quick-bar-item { color: #b3c2b8; } }
 /* Small expenses: suggestion chips (faint until used) and the "type once" form */
 .extras-suggest-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0 14px; }
-.extras-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 14px; border: 1px dashed var(--line); border-radius: 20px; background: transparent; color: var(--muted); font: inherit; font-size: calc(13px * var(--text-scale)); opacity: .75; cursor: pointer; }
+.extras-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 14px; border: 1px dashed var(--line); border-radius: 20px; background: transparent; color: var(--muted); font: inherit; font-size: calc(13px * var(--text-scale)); opacity: 1; cursor: pointer; }
 .extras-chip:hover, .extras-chip:focus-visible { opacity: 1; border-style: solid; color: inherit; }
 .extras-chip-off { width: 32px; height: 32px; font-size: calc(15px * var(--text-scale)); opacity: .7; }
 .extras-new { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
@@ -707,3 +707,17 @@ button.stat-card:hover { border-color: #bfd4c1; }
 .diet-day { display: grid; grid-template-columns: 1fr; gap: 6px; }
 .diet-day .diet-cell { width: 100%; min-height: 0; display: grid; gap: 2px; }
 .diet-day .diet-cell .plan-meal { font-weight: 600; }
+/* Accessibility: every tap target on touch screens is at least 44px tall (WCAG 2.5.5). Inline text links
+   grow their hit area with padding + equal negative margin so the layout does not move. */
+@media (max-width: 760px), (pointer: coarse) {
+  .button, .filter-chip, .extras-chip, .lang-toggle, .menu-button, .toast-undo, .skip-link, .signin-card .button, .button-add, .small-action,
+  .search-input, .field-input, .price-input, .receipt-line .field-input, select { min-height: 44px; }
+  .icon-button, .extras-chip-off { width: 44px; height: 44px; }
+  .home-button { min-width: 44px; min-height: 44px; }
+  .crumb-home, .panel-link, .text-button { display: inline-flex; align-items: center; min-height: 44px; margin-top: -12px; margin-bottom: -12px; }
+  summary { min-height: 44px; display: flex; align-items: center; }
+}
+
+.plan-classic { margin-top: 18px; }
+.plan-classic > summary { cursor: pointer; font-weight: 700; color: var(--muted); padding: 8px 0; }
+.plan-classic[open] > summary { margin-bottom: 10px; }

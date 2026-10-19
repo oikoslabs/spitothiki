@@ -13,7 +13,7 @@ export const BILL_PRESETS = [
   { id: 'road', name: 'Τέλη κυκλοφορίας', type: 'tax', period: 12, icon: '🚗' },
   { id: 'insurance', name: 'Ασφάλιση', type: 'insurance', period: 12, icon: '🛡️' }
 ];
-export const hasData = (state = {}) => ['items', 'shopping', 'bills', 'purchases', 'transport', 'extras', 'receipts', 'meals', 'trips'].some((k) => Array.isArray(state[k]) && state[k].length);
+export const hasData = (state = {}) => ['items', 'shopping', 'bills', 'purchases', 'transport', 'extras', 'receipts', 'meals', 'trips', 'dietPlans'].some((k) => Array.isArray(state[k]) && state[k].length);
 export const shouldOnboard = (state, flag) => !flag && !hasData(state);
 export const presetsFrom = (ids = []) => BILL_PRESETS.filter((p) => ids.includes(p.id));
 // Shortcuts still useful: presets with no bill of that name yet.
