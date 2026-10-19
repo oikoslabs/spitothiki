@@ -1,5 +1,6 @@
 // Home count cards land on the matching filtered view. Usage: node tests/smoke/home-cards-smoke.mjs <url> [width] [screenshotDir]
 import puppeteer from 'puppeteer-core';
+import { createFakeBackend, fakeApp, fakeAuth, fakeFirestore } from './fake-firebase.mjs';
 const url = process.argv[2] || 'http://127.0.0.1:8080/';
 const width = Number(process.argv[3] || 390);
 const shots = process.argv[4];
@@ -44,6 +45,63 @@ await check('«προϊόντα στο σπίτι» card → whole pantry (filte
   await page.click('#home-card-shopping'); await wait();
   const shop = (await page.evaluate(() => document.body.dataset.screen)) === 'shopping';
   return all && shop;
+});
+// Sign-in card: fake Firebase (signed out → card; signed in → none); sync not configured → none.
+const backend = createFakeBackend();
+async function device(config) {
+  const context = await browser.createBrowserContext();
+  const pg = await context.newPage();
+  await pg.setBypassServiceWorker(true);
+  await pg.setViewport({ width, height: 844, deviceScaleFactor: 2, isMobile: width < 700, hasTouch: width < 700 });
+  await pg.evaluateOnNewDocument(() => { Object.defineProperty(navigator, 'language', { get: () => 'el-GR' }); });
+  await pg.exposeFunction('__fb', (op, k, data, extra) => backend.handle(op, k, data, extra));
+  await pg.setRequestInterception(true);
+  pg.on('request', (request) => {
+    const u = request.url();
+    const js = (body) => request.respond({ status: 200, contentType: 'text/javascript', headers: { 'access-control-allow-origin': '*' }, body });
+    if (u.endsWith('/src/firebase-config.js')) return js(config);
+    if (u.includes('gstatic.com/firebasejs/') && u.endsWith('firebase-app.js')) return js(fakeApp);
+    if (u.includes('gstatic.com/firebasejs/') && u.endsWith('firebase-auth.js')) return js(fakeAuth);
+    if (u.includes('gstatic.com/firebasejs/') && u.endsWith('firebase-firestore.js')) return js(fakeFirestore);
+    return request.continue();
+  });
+  pg.on('pageerror', (e) => errors.push(e.message));
+  await pg.goto(url, { waitUntil: 'networkidle0' }); await pg.evaluate(() => localStorage.clear()); await pg.reload({ waitUntil: 'networkidle0' }); await wait(800);
+  return pg;
+}
+const ON = `export const firebaseConfig = { apiKey: 'test', authDomain: 'test.firebaseapp.com', projectId: 'test', appId: 'test' };\nexport const authProviders = ['google', 'password'];`;
+const OFF = `export const firebaseConfig = null;\nexport const authProviders = [];`;
+await check('sign-in card: shown when signed out; «Σύνδεση» opens the sync card; × hides it for 14 days', async () => {
+  const pg = await device(ON);
+  const shown = Boolean(await pg.$('#home-signin-card'));
+  const text = await pg.$eval('#home-signin-card', (e) => e.textContent).catch(() => '');
+  if (shots) await pg.screenshot({ path: `${shots}/home-signin-card-phone.png` });
+  await pg.click('#home-signin'); await wait(800);
+  const landed = await pg.evaluate(() => ({ screen: document.body.dataset.screen, focus: document.activeElement?.dataset?.action || document.activeElement?.name, top: Math.round(document.querySelector('#sync-card').getBoundingClientRect().top) }));
+  await pg.evaluate(() => { location.hash = '#overview'; }); await wait();
+  await pg.click('[data-action="home-signin-dismiss"]'); await wait();
+  const hidden = !(await pg.$('#home-signin-card'));
+  await pg.reload({ waitUntil: 'networkidle0' }); await wait(800);
+  const stillHidden = !(await pg.$('#home-signin-card'));
+  await pg.evaluate(() => localStorage.setItem('spitothiki:signin-card-dismissed', String(Date.now() - 15 * 86400000)));
+  await pg.reload({ waitUntil: 'networkidle0' }); await wait(800);
+  const back = Boolean(await pg.$('#home-signin-card'));
+  // Sign in (fake email account) → card never shown.
+  await pg.evaluate(() => { location.hash = '#settings'; }); await wait();
+  await pg.type('#sync-email-form input[name=email]', 'card@example.com'); await pg.type('#sync-email-form input[name=password]', 'secret123');
+  await pg.click('#sync-email-form button[value=signup]'); await wait(1200);
+  await pg.evaluate(() => { location.hash = '#overview'; }); await wait(800);
+  const signedInHidden = !(await pg.$('#home-signin-card'));
+  await pg.browserContext().close();
+  const ok = shown && /Συνδέσου για να μη χάσεις/.test(text) && landed.screen === 'settings' && landed.focus === 'sync-google' && landed.top < 300 && hidden && stillHidden && back && signedInHidden;
+  if (!ok) console.log('  signin:', { shown, landed, hidden, stillHidden, back, signedInHidden });
+  return ok;
+});
+await check('sign-in card: never shown when sync is not configured', async () => {
+  const pg = await device(OFF);
+  const none = !(await pg.$('#home-signin-card'));
+  await pg.browserContext().close();
+  return none;
 });
 await browser.close();
 if (errors.length) { console.log('errors:', errors); process.exit(1); }

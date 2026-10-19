@@ -86,3 +86,17 @@ test('waste records lower stock and feed monthly stats', () => {
   assert.equal(stats.byReason.expired, 1);
   assert.deepEqual(stats.top, [{ name: 'Γιαούρτι', count: 2 }]);
 });
+
+test('sign-in card: only signed out (sync configured), hidden for 14 days after dismiss', async () => {
+  const { showSigninCard } = await import('../src/features.js');
+  const now = Date.UTC(2026, 9, 19);
+  const day = 86_400_000;
+  assert.equal(showSigninCard({ state: 'signed-out' }, 0, now), true);
+  assert.equal(showSigninCard({ state: 'error', message: 'x' }, 0, now), true);
+  for (const state of ['disabled', 'loading', 'connecting', 'synced']) assert.equal(showSigninCard({ state }, 0, now), false, state);
+  assert.equal(showSigninCard({ state: 'error', user: { uid: 'u' } }, 0, now), false);
+  assert.equal(showSigninCard({ state: 'signed-out' }, now - 3 * day, now), false);
+  assert.equal(showSigninCard({ state: 'signed-out' }, now - 13.9 * day, now), false);
+  assert.equal(showSigninCard({ state: 'signed-out' }, now - 14 * day, now), true);
+  assert.equal(showSigninCard({ state: 'signed-out' }, now + day, now), true); // clock moved back: don't hide forever
+});

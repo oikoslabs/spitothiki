@@ -632,6 +632,10 @@ const EN = {
   'Μετονόμασε ή αφαίρεσε κουμπιά. Τα πιο συχνά μπαίνουν πρώτα.': 'Rename or remove buttons. The most used come first.',
   'Εμφανίζονται μόνο όσα λήγουν μέσα σε 7 ημέρες ή έληξαν, πρώτα τα πιο επείγοντα.': 'Showing only items expiring within 7 days or already expired, most urgent first.',
   'Κατάργηση φίλτρου: Λήγουν ή έληξαν': 'Clear filter: Expiring or expired', 'Λήγουν ή έληξαν': 'Expiring or expired', 'Όλα όσα λήγουν →': 'Everything expiring →',
+  // Home sign-in card
+  'Συνδέσου για να μη χάσεις τα δεδομένα σου': 'Sign in so you never lose your data',
+  'Με σύνδεση, όλα συγχρονίζονται αυτόματα σε κάθε κινητό ή υπολογιστή σου.': 'Once signed in, everything syncs automatically to every phone or computer you use.',
+  'Απόκρυψη για 14 ημέρες': 'Hide for 14 days',
 };
 
 export const dictionaries = { el: Object.fromEntries(Object.keys(EN).map((key) => [key, key])), en: EN };

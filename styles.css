@@ -640,3 +640,14 @@ button.stat-card:hover { border-color: #bfd4c1; }
 #extras-add { margin-top: 16px; }
 .active-filter { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0 0 12px; padding: 10px 12px; border-radius: 12px; background: var(--amber-soft); color: #79501a; font-size: 12px; }
 .active-filter .filter-chip { font-weight: 700; }
+/* Home: sign-in nudge (signed out only) */
+.signin-card { position: relative; display: grid; grid-template-columns: auto minmax(0,1fr) auto; align-items: center; gap: 10px 12px; margin: 0 0 14px; padding: 12px 44px 12px 14px; border: 1px solid #cfe0f3; border-radius: 14px; background: #eef5fc; }
+.signin-icon { font-size: 24px; line-height: 1; }
+.signin-text h2 { margin: 0; font: 800 14px/1.25 var(--display); }
+.signin-text p { margin: 3px 0 0; color: var(--muted); font-size: 12px; }
+.signin-card .button { min-height: 38px; }
+.signin-close { position: absolute; top: 8px; right: 8px; width: 28px; height: 28px; font-size: 15px; }
+.sync-card.is-highlight { box-shadow: 0 0 0 3px #7fb2e5; transition: box-shadow .3s; }
+@media (max-width: 480px) { .signin-card { grid-template-columns: auto minmax(0,1fr); } .signin-card .button { grid-column: 1 / -1; width: 100%; } }
+:root[data-theme="dark"] .signin-card { background: #1b2a36; border-color: #2d4356; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .signin-card { background: #1b2a36; border-color: #2d4356; } }

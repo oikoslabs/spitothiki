@@ -183,3 +183,13 @@ export function wasteStats(waste = [], month) {
   }
   return { month, count: rows.length, byReason, top: [...byName.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name)).slice(0, 5) };
 }
+
+// Home "sign in so you don't lose your data" card: only when sync is set up but nobody is signed in,
+// and not within `days` of the user dismissing it. dismissedAt / now are ms timestamps.
+export const SIGNIN_CARD_SNOOZE_DAYS = 14;
+export function showSigninCard(status = {}, dismissedAt = 0, now = Date.now(), days = SIGNIN_CARD_SNOOZE_DAYS) {
+  const signedOut = status.state === 'signed-out' || (status.state === 'error' && !status.user);
+  if (!signedOut || status.user) return false;
+  const at = Number(dismissedAt) || 0;
+  return !(at && now >= at && now - at < days * 86_400_000);
+}

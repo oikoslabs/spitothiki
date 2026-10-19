@@ -6,6 +6,7 @@ import { loadState, parseBackup, saveState } from './storage.js';
 import { fetchReceipt, receiptId } from './receipt.js';
 import { fetchMealDbSuggestions, ingredientName, pantryIngredients, suggestBuiltin } from './recipes.js';
 import { CATEGORIES, WASTE_REASONS, applyWaste, createStore, createWaste, groupByStore, monthKey, rowCategory, monthlySpending, moveCategory, purchaseFor, shiftMonth, storeOrder, wasteStats } from './features.js';
+import { showSigninCard } from './features.js';
 import { RECURRING_INTERVALS, applyRecurring, createRecurring, dueFromSnapshot, expirySnapshot, parseVoiceItems } from './features.js';
 import { MEAL_SLOTS, copyPreviousWeek, createMeal, recipeFromMealDb, shiftDays, weekDays, weekShoppingNeeds, weekStart } from './mealplan.js';
 import { BUILTIN_RECIPES } from './recipes.js';
@@ -203,6 +204,28 @@ function renderInventoryCard(item) {
   </article>`;
 }
 
+const SIGNIN_DISMISS_KEY = 'spitothiki:signin-card-dismissed';
+function signinDismissedAt() { try { return Number(localStorage.getItem(SIGNIN_DISMISS_KEY)) || 0; } catch { return 0; } }
+// Compact nudge on the home screen while sync is available but the user is signed out.
+function renderSigninCard() {
+  if (!showSigninCard(syncStatus, signinDismissedAt())) return '';
+  return `<section class="signin-card" id="home-signin-card" aria-labelledby="home-signin-title"><span class="signin-icon" aria-hidden="true">☁️</span>
+    <div class="signin-text"><h2 id="home-signin-title">${escapeHtml(t('Συνδέσου για να μη χάσεις τα δεδομένα σου'))}</h2><p>${escapeHtml(t('Με σύνδεση, όλα συγχρονίζονται αυτόματα σε κάθε κινητό ή υπολογιστή σου.'))}</p></div>
+    <button class="button button-primary" type="button" data-action="home-signin" id="home-signin">${escapeHtml(t('Σύνδεση'))}</button>
+    <button class="icon-button signin-close" type="button" data-action="home-signin-dismiss" aria-label="${escapeHtml(t('Απόκρυψη για 14 ημέρες'))}" title="${escapeHtml(t('Απόκρυψη για 14 ημέρες'))}">×</button></section>`;
+}
+function goToSignin() {
+  navigate('settings');
+  requestAnimationFrame(() => {
+    const card = document.querySelector('#sync-card');
+    if (!card) return;
+    card.scrollIntoView({ block: 'start' });
+    card.classList.add('is-highlight');
+    setTimeout(() => card.classList.remove('is-highlight'), 2500);
+    (card.querySelector('[data-action="sync-google"]') || card.querySelector('input[name="email"]'))?.focus({ preventScroll: true });
+  });
+}
+
 function renderOverview() {
   const today = localDateKey();
   const summary = pantrySummary(state.items, today);
@@ -214,6 +237,7 @@ function renderOverview() {
   const due = billsDue(state.bills || [], today);
   return `<section class="hero-panel home-hero"><div class="hero-copy"><p class="eyebrow">ΜΙΚΡΕΣ ΣΥΝΗΘΕΙΕΣ, ΠΙΟ ΗΡΕΜΟ ΣΠΙΤΙ</p><h1>Η Σπιτοθήκη σου<br>με μια ματιά</h1><p>Τι έχεις στο σπίτι, τι λήγει, τι χρειάζεται η λίστα και πόσα ξοδεύεις κάθε μήνα.</p></div><div class="hero-illustration" aria-hidden="true"><span>🫒</span></div></section>
     ${summary.expired ? `<div class="alert-banner" role="status">${t(summary.expired === 1 ? '⚠️ Έχεις {count} προϊόν που έχει λήξει. Έλεγξέ τα πριν τα χρησιμοποιήσεις.' : '⚠️ Έχεις {count} προϊόντα που έχουν λήξει. Έλεγξέ τα πριν τα χρησιμοποιήσεις.', { count: summary.expired })}</div>` : ''}
+    ${renderSigninCard()}
     <section class="stats-grid home-stats" aria-label="Σύνοψη αποθέματος">
       <button class="stat-card" type="button" data-action="home-card" data-card="all" id="home-card-all"><span class="stat-icon">🧺</span><div><strong>${summary.products}</strong><span>προϊόντα στο σπίτι</span></div></button>
       <button class="stat-card" type="button" data-action="home-card" data-card="expiring" id="home-card-expiring"><span class="stat-icon amber">◷</span><div><strong>${summary.expiringSoon + summary.expired}</strong><span>λήγουν ή έληξαν</span></div></button>
@@ -427,7 +451,7 @@ async function startSync() {
       config: firebaseConfig,
       getState: () => state,
       setState: (next) => { state = next; try { saveState(state); } catch {} renderApp(); },
-      onStatus: (status) => { syncStatus = status; if (activeView === 'settings') renderApp(); }
+      onStatus: (status) => { syncStatus = status; if (activeView === 'settings' || activeView === 'overview') renderApp(); }
     });
   } catch {
     syncStatus = { state: 'error', message: navigator.onLine === false ? 'Χωρίς σύνδεση: ο συγχρονισμός θα ξεκινήσει όταν επιστρέψει το internet.' : 'Δεν φόρτωσε το Firebase.' };
@@ -2071,6 +2095,8 @@ function handleAction(button) {
   } else if (action === 'clear-filters') {
     pantryCategory = 'Όλα'; pantryQuery = ''; pantryStatus = ''; renderApp();
   } else if (action === 'clear-pantry-status') { pantryStatus = ''; renderApp(); }
+  else if (action === 'home-signin') goToSignin();
+  else if (action === 'home-signin-dismiss') { try { localStorage.setItem(SIGNIN_DISMISS_KEY, String(Date.now())); } catch {} renderApp(); }
   else if (action === 'home-card') {
     // Each home count card opens the matching view: all products / only expiring / the open shopping list.
     const card = button.dataset.card;
