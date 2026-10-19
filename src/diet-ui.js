@@ -39,7 +39,7 @@ export function renderDietSection() {
   if (!ctx) return '';
   const plan = active();
   const scan = `<label class="button ${plan ? 'button-quiet' : 'button-primary'} file-button"><span>📷 ${esc(t('Σκάναρε πρόγραμμα διατροφής'))}</span><input type="file" accept="image/*,application/pdf" multiple class="visually-hidden" data-diet-file id="diet-file"></label><button class="button button-quiet" type="button" data-diet="paste">✍️ ${esc(t('Επικόλληση κειμένου'))}</button>`;
-  const undo = lastDeleted ? `<p class="field-hint">${esc(t('Το πρόγραμμα διαγράφηκε.'))} <button class="text-button" type="button" data-diet="undo-delete">↶ ${esc(t('Αναίρεση'))}</button></p>` : '';
+  const undo = '';
   if (!plan) {
     return `<section class="panel diet-section" id="diet-section"><div class="panel-heading"><div><h2>🥗 ${esc(t('Πρόγραμμα διατροφής'))}</h2><p>${esc(t('Φωτογράφισε το χαρτί του διαιτολόγου και η εβδομάδα γεμίζει μόνη της.'))}</p></div></div><div class="settings-actions">${scan}</div>${busy ? `<p class="field-hint" role="status" id="diet-busy">${esc(busy)}</p>` : ''}${undo}</section>`;
   }
@@ -230,6 +230,12 @@ function openPaste(text = '') {
   openDialog('ΠΡΟΓΡΑΜΜΑ ΔΙΑΤΡΟΦΗΣ', 'Επικόλληση κειμένου', `<p class="field-hint">${esc(t('Επικόλλησε το πρόγραμμα. Κάθε γεύμα σε δική του γραμμή με την ώρα, π.χ. «ΣΝΑΚ (18:00)», και από κάτω οι επιλογές.'))}</p><textarea class="field-input" id="diet-paste" rows="12">${esc(text)}</textarea><div class="dialog-actions"><button class="button button-quiet" type="button" data-diet="close">${esc(t('Άκυρο'))}</button><button class="button button-primary" type="button" data-diet="paste-go">${esc(t('Συνέχεια'))}</button></div>`);
 }
 
+function restoreDeleted() {
+  if (!lastDeleted) return;
+  const state = ctx.getState(); state.dietPlans = [...plans().filter((p) => p.id !== lastDeleted.id), lastDeleted]; activeId = lastDeleted.id; lastDeleted = null;
+  if (ctx.persist()) rerender();
+}
+
 // ---------- Events ----------
 function syncField(el) {
   const f = el.dataset.dietField; if (!draft || !f) return;
@@ -263,8 +269,10 @@ function onClick(event) {
   else if (a === 'pick') { activeId = button.dataset.id; rerender(); }
   else if (a === 'regen' && plan) { if (savePlan(setWeek(plan, start, generateWeek(plan)))) { rerender(); ctx.toast(t('Νέα εβδομάδα έτοιμη.')); } }
   else if (a === 'edit' && plan) startReview({ title: plan.title, appointment: plan.appointment, slots: plan.slots }, plan);
-  else if (a === 'delete' && plan) { lastDeleted = plan; state.dietPlans = plans().filter((p) => p.id !== plan.id); activeId = ''; if (ctx.persist()) rerender(); }
-  else if (a === 'undo-delete' && lastDeleted) { state.dietPlans = [...plans(), lastDeleted]; activeId = lastDeleted.id; lastDeleted = null; if (ctx.persist()) rerender(); }
+  else if (a === 'delete' && plan) {
+    lastDeleted = plan; state.dietPlans = plans().filter((p) => p.id !== plan.id); activeId = '';
+    if (ctx.persist()) { rerender(); ctx.toast(t('Το πρόγραμμα διαγράφηκε.'), { undo: () => restoreDeleted() }); }
+  }
   else if (a === 'swap' && plan?.weeks?.[start]) { swap = { slotId: button.dataset.slot, day: Number(button.dataset.day) }; renderSwap(); }
   else if ((a === 'swap-pick' || a === 'swap-clear') && plan && swap) {
     const week = structuredClone(plan.weeks[start]); week[swap.slotId][swap.day] = a === 'swap-pick' ? button.dataset.id : null;

@@ -71,6 +71,12 @@ const added = await page.evaluate(() => JSON.parse(localStorage.getItem('spitoth
 if (added < 5) fail(`list rows ${added}`);
 const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('spitothiki:v1')).dietPlans?.length);
 if (saved !== 1) fail('plan not saved');
+// delete with undo toast
+await page.evaluate(() => { document.querySelector('.diet-more').open = true; });
+await page.click('[data-diet="delete"]');
+await page.waitForSelector('.toast-undo');
+await page.click('.toast-undo');
+await page.waitForSelector('#diet-week');
 if (lang === 'en') { const greek = await page.evaluate(async () => (await import('./src/i18n.js')).untranslatedGreek(document.querySelector('#diet-section'))); if (greek.length) fail(`untranslated: ${greek.join(' | ')}`); }
 console.log(JSON.stringify({ cells, listRows: rows.length, added, errors }));
 if (errors.length) fail(errors.join('\n'));
