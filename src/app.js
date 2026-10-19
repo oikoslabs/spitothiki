@@ -109,7 +109,7 @@ function pendingLabel(count) {
   return t(count === 1 ? '{count} εκκρεμές προϊόν' : '{count} εκκρεμή προϊόντα', { count });
 }
 
-const SECTION_LABELS = { overview: 'Σπιτοθήκη', pantry: 'Το απόθεμά μου', shopping: 'Λίστα αγορών', cart: 'Καλάθι στο κατάστημα', cook: 'Μαγείρεμα', bills: 'Λογαριασμοί', transport: 'Μετακινήσεις', extras: 'Μικροέξοδα', insights: 'Στατιστικά', settings: 'Ρυθμίσεις' };
+const SECTION_LABELS = { overview: 'Σπιτοθήκη', pantry: 'Το απόθεμά μου', shopping: 'Λίστα αγορών', cart: 'Καλάθι στο κατάστημα', cook: 'Μαγείρεμα', bills: 'Λογαριασμοί', transport: 'Μετακινήσεις', extras: 'Μικροέξοδα', insights: 'Σύνολο εξόδων', settings: 'Ρυθμίσεις' };
 function setActiveNavigation() {
   document.body.dataset.screen = activeView;
   const current = document.querySelector('#current-section');
@@ -124,8 +124,46 @@ function setActiveNavigation() {
   });
 }
 
+// Collapsible panels (<details class="collapsible" id>) stay open across re-renders once the user opens them.
+const openPanels = new Set();
+const openAttr = (id) => (openPanels.has(id) ? 'open' : '');
+document.addEventListener('toggle', (event) => { const d = event.target; if (d.matches?.('details.collapsible[id]')) { if (d.open) openPanels.add(d.id); else openPanels.delete(d.id); } }, true);
+
+// Which menu group each section belongs to (shown as a breadcrumb under the top bar: ⌂ Αρχική › ΕΞΟΔΑ).
+const SECTION_GROUPS = { pantry: 'ΣΠΙΤΙ', shopping: 'ΣΠΙΤΙ', cart: 'ΣΠΙΤΙ', cook: 'ΣΠΙΤΙ', bills: 'ΕΞΟΔΑ', transport: 'ΕΞΟΔΑ', extras: 'ΕΞΟΔΑ', insights: 'ΕΞΟΔΑ', settings: 'ΕΦΑΡΜΟΓΗ' };
+function renderCrumbs() {
+  const group = SECTION_GROUPS[activeView];
+  return `<nav class="eyebrow crumbs" aria-label="${escapeHtml(t('Πού βρίσκομαι'))}"><button class="crumb-home" type="button" data-view="overview">⌂ ${escapeHtml(t('Αρχική'))}</button>${group ? `<span aria-hidden="true">›</span><span>${escapeHtml(t(group))}</span>` : ''}</nav>`;
+}
+
+// Most common actions: bottom bar on phones (first four + "all"), the quick-actions sheet and the home screen.
+const QUICK_ACTIONS = [
+  { id: 'receipt', icon: '🧾', label: 'Σάρωση απόδειξης', hint: 'Ψώνια, καύσιμα ή διόδια με ένα QR/barcode' },
+  { id: 'list', icon: '✓', label: 'Πρόσθεσε στη λίστα', hint: 'Κάτι που χρειάζεται το σπίτι' },
+  { id: 'extra', icon: '☕', label: 'Μικροέξοδο', hint: 'Καφές, σάντουιτς, καπνός με ένα πάτημα' },
+  { id: 'transport', icon: '⛽', label: 'Καύσιμα / μετακίνηση', hint: 'Βενζίνη, διόδια, ΜΜΜ, ταξί' },
+  { id: 'bill', icon: '📄', label: 'Νέος λογαριασμός', hint: 'ΔΕΗ, νερό, ενοίκιο, συνδρομές' },
+  { id: 'product', icon: '＋', label: 'Πρόσθεσε προϊόν', hint: 'Κάτι που έφερες σπίτι' },
+  { id: 'cart', icon: '🛒', label: 'Καλάθι στο κατάστημα', hint: 'Σκάναρε ό,τι βάζεις στο καρότσι' },
+  { id: 'cook', icon: '🍳', label: 'Τι να μαγειρέψω;', hint: 'Ιδέες με ό,τι λήγει πρώτο' }
+];
+const renderQuickActions = (ids) => QUICK_ACTIONS.filter((a) => !ids || ids.includes(a.id)).map((a) => `<button class="quick-action" type="button" data-action="quick" data-quick="${a.id}"><span class="quick-action-icon" aria-hidden="true">${a.icon}</span><span><strong>${escapeHtml(t(a.label))}</strong><small>${escapeHtml(t(a.hint))}</small></span><span class="arrow" aria-hidden="true">›</span></button>`).join('');
+function runQuickAction(id) {
+  const sheet = document.querySelector('#quick-sheet');
+  if (sheet?.open) sheet.close();
+  const focus = (selector, block = 'center') => requestAnimationFrame(() => { const el = document.querySelector(selector); el?.scrollIntoView({ block }); if (el?.matches('input, select')) el.focus({ preventScroll: true }); });
+  if (id === 'all') { document.querySelector('#quick-sheet-list').innerHTML = renderQuickActions(); translateDom(sheet); sheet.showModal(); }
+  else if (id === 'receipt') openReceiptDialog();
+  else if (id === 'product') openItemDialog();
+  else if (id === 'list') { navigate('shopping'); focus('#shopping-form input[name="name"]'); }
+  else if (id === 'extra') { navigate('extras'); focus('#extras-quick-panel', 'start'); }
+  else if (id === 'transport') { transportDraft = null; navigate('transport'); focus('#transport-amount'); }
+  else if (id === 'bill') { navigate('bills'); openBillDialog(); }
+  else if (id === 'cart' || id === 'cook') navigate(id);
+}
+
 function renderHeader(title, description, actionLabel = '') {
-  return `<header class="page-heading"><div><p class="eyebrow">ΣΠΙΤΟΘΗΚΗ</p><h1>${title}</h1><p>${description}</p></div>${actionLabel ? `<button class="button button-primary" type="button" data-action="add-item"><span aria-hidden="true">＋</span>${actionLabel}</button>` : ''}</header>`;
+  return `<header class="page-heading"><div>${renderCrumbs()}<h1>${title}</h1><p>${description}</p></div>${actionLabel ? `<button class="button button-primary" type="button" data-action="add-item"><span aria-hidden="true">＋</span>${actionLabel}</button>` : ''}</header>`;
 }
 
 function renderEmpty(title, description, action = 'add-item', label = 'Προσθήκη προϊόντος', emoji = '🧺') {
@@ -165,21 +203,27 @@ function renderInventoryCard(item) {
 }
 
 function renderOverview() {
-  const summary = pantrySummary(state.items, localDateKey());
-  const upcoming = state.items.filter((item) => ['soon', 'expired'].includes(expiryStatus(item.expiry, localDateKey())))
-    .sort((a, b) => String(a.expiry).localeCompare(String(b.expiry))).slice(0, 4);
-  const lowStock = state.items.filter((item) => Number(item.minimum) > 0 && Number(item.quantity) <= Number(item.minimum)).slice(0, 4);
-  return `<section class="hero-panel"><div class="hero-copy"><p class="eyebrow">ΜΙΚΡΕΣ ΣΥΝΗΘΕΙΕΣ, ΠΙΟ ΗΡΕΜΟ ΣΠΙΤΙ</p><h1>Η κουζίνα σου,<br>με μια ματιά.</h1><p>Ξέρεις τι έχεις, τι τελειώνει και τι χρειάζεται να μπει στη λίστα.</p></div><div class="hero-illustration" aria-hidden="true"><span>🫒</span></div></section>
-    <section class="stats-grid" aria-label="Σύνοψη αποθέματος">
-      <article class="stat-card"><span class="stat-icon">🧺</span><div><strong>${summary.products}</strong><span>προϊόντα στο σπίτι</span></div></article>
-      <article class="stat-card"><span class="stat-icon amber">◷</span><div><strong>${summary.expiringSoon + summary.expired}</strong><span>λήγουν ή έληξαν</span></div></article>
-      <article class="stat-card"><span class="stat-icon blue">＋</span><div><strong>${summary.lowStock}</strong><span>χρειάζονται αναπλήρωση</span></div></article>
-    </section>
+  const today = localDateKey();
+  const summary = pantrySummary(state.items, today);
+  const upcoming = state.items.filter((item) => ['soon', 'expired'].includes(expiryStatus(item.expiry, today)))
+    .sort((a, b) => String(a.expiry).localeCompare(String(b.expiry))).slice(0, 3);
+  const month = monthKey(today);
+  const totals = monthTotals(month);
+  const pending = state.shopping.filter((item) => !item.checked).length;
+  const due = billsDue(state.bills || [], today);
+  return `<section class="hero-panel home-hero"><div class="hero-copy"><p class="eyebrow">ΜΙΚΡΕΣ ΣΥΝΗΘΕΙΕΣ, ΠΙΟ ΗΡΕΜΟ ΣΠΙΤΙ</p><h1>Η κουζίνα σου,<br>με μια ματιά.</h1><p>Ξέρεις τι έχεις, τι τελειώνει και τι χρειάζεται να μπει στη λίστα.</p></div><div class="hero-illustration" aria-hidden="true"><span>🫒</span></div></section>
     ${summary.expired ? `<div class="alert-banner" role="status">${t(summary.expired === 1 ? '⚠️ Έχεις {count} προϊόν που έχει λήξει. Έλεγξέ τα πριν τα χρησιμοποιήσεις.' : '⚠️ Έχεις {count} προϊόντα που έχουν λήξει. Έλεγξέ τα πριν τα χρησιμοποιήσεις.', { count: summary.expired })}</div>` : ''}
+    <section class="stats-grid home-stats" aria-label="Σύνοψη αποθέματος">
+      <button class="stat-card" type="button" data-view="pantry"><span class="stat-icon">🧺</span><div><strong>${summary.products}</strong><span>προϊόντα στο σπίτι</span></div></button>
+      <button class="stat-card" type="button" data-view="pantry"><span class="stat-icon amber">◷</span><div><strong>${summary.expiringSoon + summary.expired}</strong><span>λήγουν ή έληξαν</span></div></button>
+      <button class="stat-card" type="button" data-view="shopping"><span class="stat-icon blue">✓</span><div><strong>${pending}</strong><span>${escapeHtml(t('στη λίστα αγορών'))}</span></div></button>
+    </section>
     <div class="dashboard-grid">
-      <section class="panel"><div class="panel-heading"><div><h2>Έλεγξε τις ημερομηνίες</h2><p>Ό,τι λήγει μέσα στις επόμενες 7 ημέρες</p></div><button class="panel-link" type="button" data-view="pantry">Όλο το απόθεμα →</button></div><div class="product-list">${upcoming.length ? upcoming.map(renderMiniProduct).join('') : renderEmpty('Όλα καλά εδώ', 'Δεν έχεις προϊόντα που λήγουν σύντομα.', 'add-item', 'Πρόσθεσε προϊόν', '🌿')}</div></section>
-      <div class="dashboard-side"><section class="panel"><div class="panel-heading"><div><h2>Χρειάζονται αναπλήρωση</h2><p>Με βάση το ελάχιστο απόθεμα</p></div></div><div class="product-list">${lowStock.length ? lowStock.map(renderMiniProduct).join('') : `<p class="subtle-empty">${state.items.length ? 'Δεν υπάρχει κάτι που να χρειάζεται αναπλήρωση.' : 'Όταν προσθέσεις προϊόντα, θα τα βλέπεις εδώ.'}</p>`}</div>${lowStock.length ? '<button class="button button-quiet full-width" type="button" data-view="pantry">Δες το απόθεμα</button>' : ''}</section>
-      <section class="panel quick-panel"><div class="panel-heading"><div><h2>Γρήγορες κινήσεις</h2><p>Τα βασικά, χωρίς ψάξιμο</p></div></div><div class="quick-actions"><button class="quick-action" type="button" data-action="add-item"><span class="quick-action-icon">＋</span><span><strong>Πρόσθεσε προϊόν</strong><small>Καταχώρισε κάτι που έφερες σπίτι</small></span><span class="arrow">›</span></button><button class="quick-action" type="button" data-action="open-receipt"><span class="quick-action-icon">🧾</span><span><strong>Σάρωση απόδειξης</strong><small>Τα ψώνια στο απόθεμα με ένα QR</small></span><span class="arrow">›</span></button><button class="quick-action" type="button" data-view="cook"><span class="quick-action-icon">🍳</span><span><strong>Τι να μαγειρέψω;</strong><small>Ιδέες με ό,τι λήγει πρώτο</small></span><span class="arrow">›</span></button><button class="quick-action" type="button" data-view="shopping"><span class="quick-action-icon">✓</span><span><strong>Άνοιξε τη λίστα</strong><small>${t('{pending} για ψώνια', { pending: pendingLabel(state.shopping.filter((item) => !item.checked).length) })}</small></span><span class="arrow">›</span></button></div></section></div>
+      <section class="panel" id="home-month"><div class="panel-heading"><div><h2>${escapeHtml(t('Τα έξοδα του μήνα'))}</h2><p data-no-i18n>${escapeHtml(monthLabel(month))}</p></div><button class="panel-link" type="button" data-view="insights">${escapeHtml(t('Αναλυτικά →'))}</button></div>
+        <p class="big-number" id="home-month-total">${escapeHtml(money(totals.total))}</p>${renderBars(totals.rows, money)}
+        ${due.length ? `<button class="alert-banner home-bills-due" type="button" data-view="bills">📄 ${escapeHtml(t('{count} λογαριασμοί λήγουν σύντομα ή έχουν λήξει', { count: due.length }))} ›</button>` : ''}</section>
+      <section class="panel quick-panel" id="home-quick"><div class="panel-heading"><div><h2>Γρήγορες κινήσεις</h2><p>Τα βασικά, χωρίς ψάξιμο</p></div></div><div class="quick-actions quick-grid">${renderQuickActions(['receipt', 'list', 'extra', 'transport', 'bill', 'product'])}</div></section>
+      <section class="panel" id="home-expiry"><div class="panel-heading"><div><h2>Έλεγξε τις ημερομηνίες</h2><p>Ό,τι λήγει μέσα στις επόμενες 7 ημέρες</p></div><button class="panel-link" type="button" data-view="pantry">Όλο το απόθεμα →</button></div><div class="product-list">${upcoming.length ? upcoming.map(renderMiniProduct).join('') : renderEmpty('Όλα καλά εδώ', 'Δεν έχεις προϊόντα που λήγουν σύντομα.', 'add-item', 'Πρόσθεσε προϊόν', '🌿')}</div></section>
     </div>`;
 }
 
@@ -267,12 +311,14 @@ function renderSettings() {
     <div class="settings-grid"><section class="panel settings-card"><span class="stat-icon">🔒</span><h2>Απόρρητο πρώτα</h2><p>Το απόθεμα και η λίστα αγορών αποθηκεύονται στη συσκευή σου και η εφαρμογή δουλεύει και χωρίς internet. Αν συνδεθείς, συγχρονίζονται ιδιωτικά μέσω Firebase μόνο με τα μέλη του νοικοκυριού σου. Δεν υπάρχουν διαφημίσεις ούτε παρακολούθηση.</p><div class="privacy-note">Η αναζήτηση barcode στέλνει μόνο τον αριθμό του barcode στο Open Food Facts. Αν δεν έχεις συνδεθεί και καθαρίσεις τα δεδομένα του browser ή αλλάξεις συσκευή, χρησιμοποίησε αντίγραφο ασφαλείας.</div></section>
     <section class="panel settings-card"><span class="stat-icon">◐</span><h2>Εμφάνιση</h2><p>Διάλεξε φωτεινό ή σκούρο θέμα, ή άφησέ το να ακολουθεί τη συσκευή.</p><div class="theme-options" role="group" aria-label="Θέμα">${[['auto', 'Αυτόματο'], ['light', 'Φωτεινό'], ['dark', 'Σκούρο']].map(([value, label]) => `<button type="button" class="filter-chip ${currentTheme() === value ? 'is-active' : ''}" data-action="set-theme" data-theme="${value}" aria-pressed="${currentTheme() === value}">${label}</button>`).join('')}</div></section>
     ${renderLanguageCard()}
-    ${renderReceiptSettingsCard()}
     ${renderSyncCard()}
     ${renderNotificationCard()}
-    <section class="panel settings-card"><span class="stat-icon blue">↗</span><h2>Αντίγραφο ασφαλείας</h2><p>Εξήγαγε ή εισήγαγε ένα αρχείο JSON. Το αρχείο περιέχει τα προϊόντα και τη λίστα αγορών σου.</p><div class="settings-actions"><button class="button button-primary" type="button" data-action="export-backup">⬇ Εξαγωγή αντιγράφου</button><button class="button button-quiet" type="button" data-action="import-backup">⬆ Εισαγωγή αντιγράφου</button></div></section>
+    <section class="panel settings-card"><span class="stat-icon blue">↗</span><h2>Αντίγραφο ασφαλείας</h2><p>Εξήγαγε ή εισήγαγε ένα αρχείο JSON. Το αρχείο περιέχει τα προϊόντα και τη λίστα αγορών σου.</p><div class="settings-actions"><button class="button button-primary" type="button" data-action="export-backup">⬇ Εξαγωγή αντιγράφου</button><button class="button button-quiet" type="button" data-action="import-backup">⬆ Εισαγωγή αντιγράφου</button></div></section></div>
+    <details class="panel collapsible settings-more" id="settings-advanced" ${openAttr('settings-advanced')}><summary><h2>Για προχωρημένους</h2><span class="field-hint">Proxy αποδείξεων, δοκιμαστικά δεδομένα, διαγραφή όλων</span></summary>
+    <div class="settings-grid">
+    ${renderReceiptSettingsCard()}
     <section class="panel settings-card"><span class="stat-icon amber">✨</span><h2>Δοκιμαστικά δεδομένα</h2><p>Γέμισε την εφαρμογή με ενδεικτικά προϊόντα για να δεις πώς λειτουργεί.</p><div class="settings-actions"><button class="button button-quiet" type="button" data-action="load-demo">Φόρτωση παραδειγμάτων</button></div></section>
-    <section class="panel settings-card danger-zone"><span class="stat-icon" style="background:var(--red-soft)">⌫</span><h2>Καθαρισμός δεδομένων</h2><p>Διέγραψε όλα τα προϊόντα και τις λίστες από αυτή τη συσκευή.</p><div class="settings-actions"><button class="button button-danger" type="button" data-action="clear-data">Διαγραφή όλων</button></div></section></div>`;
+    <section class="panel settings-card danger-zone"><span class="stat-icon" style="background:var(--red-soft)">⌫</span><h2>Καθαρισμός δεδομένων</h2><p>Διέγραψε όλα τα προϊόντα και τις λίστες από αυτή τη συσκευή.</p><div class="settings-actions"><button class="button button-danger" type="button" data-action="clear-data">Διαγραφή όλων</button></div></section></div></details>`;
 }
 
 function renderApp() {
@@ -1294,14 +1340,14 @@ function renderTransport() {
     <section class="panel"><div class="panel-heading"><div><h2>Σύνολο μήνα</h2><p class="big-number" id="transport-total">${escapeHtml(money(month.total))}</p></div></div>
       ${month.count ? renderBars(month.byType.map((row) => ({ label: `${TRANSPORT_ICONS[row.type]} ${t(TRANSPORT_LABELS[row.type])}`, value: row.total })), money) : '<p class="subtle-empty">Κανένα έξοδο μετακίνησης αυτόν τον μήνα.</p>'}
       ${fuelAvg.length ? `<p class="field-hint" id="transport-consumption" data-no-i18n>${fuelAvg.map((x) => `⛽ ${escapeHtml(x.v.name)}: ${escapeHtml(t('μέση κατανάλωση {l} l/100km', { l: fmtNum(x.s.average, 1) }))}`).join(' · ')}</p>` : ''}
-      <button class="button button-quiet history-open" type="button" data-action="transport-history" id="transport-history-open" aria-haspopup="dialog">📋 ${escapeHtml(t('Ιστορικό μετακινήσεων ({count})', { count: list.length }))}</button></section>
-    <section class="panel" id="transport-recurring"><div class="panel-heading"><div><h2>Μηνιαία πάγια</h2><p>π.χ. κάρτα απεριορίστων διαδρομών ή μηνιαία στάθμευση· καταχωρούνται μόνα τους κάθε μήνα.</p></div></div>
+      <button class="button button-quiet history-open" type="button" data-action="transport-history" id="transport-history-open" aria-haspopup="dialog">📋 ${escapeHtml(t('Ιστορικό ({count})', { count: list.length }))}</button></section>
+    <details class="panel collapsible" id="transport-recurring" ${openAttr('transport-recurring')}><summary><h2>Μηνιαία πάγια</h2><span class="field-hint">${escapeHtml(t('{count} ενεργά', { count: rules.length }))}</span></summary><p class="field-hint">π.χ. κάρτα απεριορίστων διαδρομών ή μηνιαία στάθμευση· καταχωρούνται μόνα τους κάθε μήνα.</p>
       <form id="transport-recurring-form" class="shopping-add-form recurring-form" novalidate><select class="field-input" name="type" aria-label="Κατηγορία">${transportTypeOptions('transit')}</select><input class="field-input" name="amount" type="number" min="0" step="0.01" inputmode="decimal" placeholder="€" aria-label="Ποσό (€)"><input class="field-input" name="day" type="number" min="1" max="28" value="1" aria-label="Ημέρα του μήνα"><input class="field-input" name="note" maxlength="80" placeholder="π.χ. Κάρτα ΜΜΜ" aria-label="Σημείωση"><button class="button button-quiet" type="submit">＋ Προσθήκη</button></form>
       <p class="form-error" id="transport-recurring-error" role="alert" hidden></p>
-      <ul class="waste-top" id="transport-rules">${rules.map((r) => `<li><span class="product-name">${TRANSPORT_ICONS[r.type]} ${escapeHtml(t(TRANSPORT_LABELS[r.type]))}${r.note ? ` · <span data-no-i18n>${escapeHtml(r.note)}</span>` : ''} · <span>${escapeHtml(t('κάθε μήνα στις {day}', { day: r.day }))}</span></span><strong>${escapeHtml(money(r.amount))}</strong><button class="icon-button" type="button" data-action="transport-rule-delete" data-id="${escapeHtml(r.id)}" aria-label="${escapeHtml(t('Διαγραφή'))}">🗑️</button></li>`).join('')}</ul></section>
-    <section class="panel" id="transport-vehicles"><div class="panel-heading"><div><h2>Οχήματα</h2><p>Προαιρετικά, αν έχεις πάνω από ένα όχημα (για χωριστή κατανάλωση).</p></div></div>
+      <ul class="waste-top" id="transport-rules">${rules.map((r) => `<li><span class="product-name">${TRANSPORT_ICONS[r.type]} ${escapeHtml(t(TRANSPORT_LABELS[r.type]))}${r.note ? ` · <span data-no-i18n>${escapeHtml(r.note)}</span>` : ''} · <span>${escapeHtml(t('κάθε μήνα στις {day}', { day: r.day }))}</span></span><strong>${escapeHtml(money(r.amount))}</strong><button class="icon-button" type="button" data-action="transport-rule-delete" data-id="${escapeHtml(r.id)}" aria-label="${escapeHtml(t('Διαγραφή'))}">🗑️</button></li>`).join('')}</ul></details>
+    <details class="panel collapsible" id="transport-vehicles" ${openAttr('transport-vehicles')}><summary><h2>Οχήματα</h2><span class="field-hint">${escapeHtml(t('{count} οχήματα', { count: vehicles.length }))}</span></summary><p class="field-hint">Προαιρετικά, αν έχεις πάνω από ένα όχημα (για χωριστή κατανάλωση).</p>
       <form id="vehicle-form" class="store-form" novalidate><input class="field-input" name="name" maxlength="40" placeholder="π.χ. Αυτοκίνητο, Μηχανάκι" aria-label="Όνομα οχήματος"><button class="button button-quiet" type="submit">＋ Προσθήκη</button></form>
-      <ul class="waste-top" id="vehicle-list">${vehicles.map((v) => `<li><span class="product-name" data-no-i18n>${escapeHtml(v.name)}</span><button class="icon-button" type="button" data-action="vehicle-delete" data-id="${escapeHtml(v.id)}" aria-label="${escapeHtml(t('Διαγραφή'))}">🗑️</button></li>`).join('')}</ul></section>`;
+      <ul class="waste-top" id="vehicle-list">${vehicles.map((v) => `<li><span class="product-name" data-no-i18n>${escapeHtml(v.name)}</span><button class="icon-button" type="button" data-action="vehicle-delete" data-id="${escapeHtml(v.id)}" aria-label="${escapeHtml(t('Διαγραφή'))}">🗑️</button></li>`).join('')}</ul></details>`;
 }
 
 // Entries of the selected month, in a modal (same month as the summary; its own month switch stays in sync).
@@ -1369,13 +1415,19 @@ function renderTransportCard() {
     ${month.count ? renderBars(month.byType.map((row) => ({ label: `${TRANSPORT_ICONS[row.type]} ${t(TRANSPORT_LABELS[row.type])}`, value: row.total })), money) : '<p class="subtle-empty">Κανένα έξοδο μετακίνησης αυτόν τον μήνα.</p>'}</section>`;
 }
 
-function renderMonthTotals(spending) {
-  const transport = transportMonth(state.transport || [], insightsMonth).total;
-  const extras = extrasMonth(state.extras || [], insightsMonth).total;
-  const bills = (state.bills || []).filter((b) => String(b.due).startsWith(`${insightsMonth}-`)).reduce((s, b) => s + b.amount, 0);
-  const total = Math.round((spending.total + transport + extras + bills) * 100) / 100;
+// Everything spent in a month: purchases + bills due + transport + small expenses (separate data, no overlap).
+function monthTotals(month) {
+  const shopping = monthlySpending(state.purchases || [], month).total;
+  const transport = transportMonth(state.transport || [], month).total;
+  const extras = extrasMonth(state.extras || [], month).total;
+  const bills = Math.round((state.bills || []).filter((b) => String(b.due).startsWith(`${month}-`)).reduce((s, b) => s + b.amount, 0) * 100) / 100;
+  const rows = [{ label: `🛒 ${t('Αγορές')}`, value: shopping }, { label: `📄 ${t('Λογαριασμοί')}`, value: bills }, { label: `🚗 ${t('Μετακινήσεις')}`, value: transport }, { label: `☕ ${t('Μικροέξοδα')}`, value: extras }];
+  return { rows, total: Math.round((shopping + transport + extras + bills) * 100) / 100 };
+}
+function renderMonthTotals() {
+  const { rows, total } = monthTotals(insightsMonth);
   return `<section class="panel settings-card" id="month-totals-card"><span class="stat-icon blue">∑</span><h2>Σύνολο εξόδων μήνα</h2><p class="big-number" id="month-grand-total">${escapeHtml(money(total))}</p>
-    ${renderBars([{ label: `🛒 ${t('Αγορές')}`, value: spending.total }, { label: `📄 ${t('Λογαριασμοί')}`, value: Math.round(bills * 100) / 100 }, { label: `🚗 ${t('Μετακινήσεις')}`, value: transport }, { label: `☕ ${t('Μικροέξοδα')}`, value: extras }], money)}</section>`;
+    ${renderBars(rows, money)}</section>`;
 }
 
 // ---------- Small daily expenses (coffee, snacks, tobacco…) ----------
@@ -1449,7 +1501,7 @@ function renderExtrasCategories() {
   const row = (c) => (extrasCatEdit === c.id
     ? `<li><form class="extras-cat-form" id="extras-cat-edit-form" novalidate><input type="hidden" name="id" value="${escapeHtml(c.id)}"><input class="field-input extras-emoji-input" name="emoji" maxlength="16" value="${escapeHtml(c.emoji)}" aria-label="${escapeHtml(t('Εικονίδιο (προαιρετικό)'))}"><input class="field-input" name="name" maxlength="40" value="${escapeHtml(extraCatLabel(c))}" aria-label="${escapeHtml(t('Όνομα κατηγορίας'))}" data-no-i18n><button class="button button-primary" type="submit">${escapeHtml(t('Αποθήκευση'))}</button><button class="button button-quiet" type="button" data-action="extras-cat-cancel">${escapeHtml(t('Άκυρο'))}</button></form></li>`
     : `<li><span class="product-name">${escapeHtml(c.emoji || EXTRA_DEFAULT_EMOJI)} ${escapeHtml(extraCatLabel(c))}</span><span class="extras-cat-actions"><button class="icon-button" type="button" data-action="extras-cat-edit" data-id="${escapeHtml(c.id)}" aria-label="${escapeHtml(t('Μετονομασία'))}">✎</button><button class="icon-button" type="button" data-action="extras-cat-delete" data-id="${escapeHtml(c.id)}" aria-label="${escapeHtml(t('Διαγραφή'))}">🗑️</button></span></li>`);
-  return `<details class="panel extras-cats" id="extras-categories" ${extrasCatEdit ? 'open' : ''}><summary><h2>${escapeHtml(t('Οι κατηγορίες μου'))}</h2><span class="field-hint">${escapeHtml(t('Πρόσθεσε, μετονόμασε ή αφαίρεσε κουμπιά.'))}</span></summary>
+  return `<details class="panel collapsible extras-cats" id="extras-categories" ${extrasCatEdit || openPanels.has('extras-categories') ? 'open' : ''}><summary><h2>${escapeHtml(t('Οι κατηγορίες μου'))}</h2><span class="field-hint">${escapeHtml(t('Πρόσθεσε, μετονόμασε ή αφαίρεσε κουμπιά.'))}</span></summary>
     <ul class="waste-top" id="extras-cat-list">${cats.map(row).join('')}</ul>
     <form class="extras-cat-form" id="extras-cat-form" novalidate><input class="field-input extras-emoji-input" name="emoji" maxlength="16" placeholder="🍺" aria-label="${escapeHtml(t('Εικονίδιο (προαιρετικό)'))}"><input class="field-input" name="name" maxlength="40" placeholder="${escapeHtml(t('π.χ. Περίπτερο, Λαχεία'))}" aria-label="${escapeHtml(t('Όνομα κατηγορίας'))}"><button class="button button-quiet" type="submit">${escapeHtml(t('＋ Προσθήκη'))}</button></form>
     <p class="form-error" id="extras-cat-error" role="alert" hidden></p></details>`;
@@ -1599,7 +1651,7 @@ function renderBills() {
   const due = billsDue(bills, today);
   const overdue = due.filter((bill) => bill.overdue);
   const toPay = unpaid.reduce((sum, bill) => sum + bill.amount, 0);
-  return `<header class="page-heading"><div><p class="eyebrow">ΣΠΙΤΟΘΗΚΗ</p><h1>Λογαριασμοί</h1><p>ΔΕΗ, νερό, ενοίκιο, συνδρομές: τι πληρώνεις και πότε.</p></div><div class="page-actions"><label class="button button-quiet file-button" id="bill-import"><span>📥 Εισαγωγή PDF</span><input type="file" accept="application/pdf,.pdf,image/*" class="visually-hidden" data-bill-file id="bill-file"></label><button class="button button-primary" type="button" data-action="add-bill"><span aria-hidden="true">＋</span>Προσθήκη λογαριασμού</button></div></header>
+  return `<header class="page-heading"><div>${renderCrumbs()}<h1>Λογαριασμοί</h1><p>ΔΕΗ, νερό, ενοίκιο, συνδρομές: τι πληρώνεις και πότε.</p></div><div class="page-actions"><label class="button button-quiet file-button" id="bill-import"><span>📥 Εισαγωγή PDF</span><input type="file" accept="application/pdf,.pdf,image/*" class="visually-hidden" data-bill-file id="bill-file"></label><button class="button button-primary" type="button" data-action="add-bill"><span aria-hidden="true">＋</span>Προσθήκη λογαριασμού</button></div></header>
     ${due.length ? `<div class="alert-banner${overdue.length ? ' is-danger' : ''}" role="status" id="bills-alert">${escapeHtml(overdue.length ? t(overdue.length === 1 ? '1 ληξιπρόθεσμος λογαριασμός · σύνολο {sum}' : '{count} ληξιπρόθεσμοι λογαριασμοί · σύνολο {sum}', { count: overdue.length, sum: money(overdue.reduce((s, b) => s + b.amount, 0)) }) : t(due.length === 1 ? '1 λογαριασμός λήγει σύντομα · σύνολο {sum}' : '{count} λογαριασμοί λήγουν σύντομα · σύνολο {sum}', { count: due.length, sum: money(due.reduce((s, b) => s + b.amount, 0)) }))}</div>` : ''}
     ${bills.length ? `<section class="panel"><div class="panel-heading"><div><h2>Προς πληρωμή</h2><p>${escapeHtml(t('{count} απλήρωτοι · {sum}', { count: unpaid.length, sum: money(toPay) }))}</p></div></div><div class="product-list" id="bills-unpaid">${unpaid.length ? unpaid.map(renderBillRow).join('') : '<p class="subtle-empty">Όλα πληρωμένα! 🎉</p>'}</div></section>
     ${renderBillsHistory(history)}
@@ -1758,7 +1810,7 @@ function renderInsights() {
   const previous = monthlySpending(state.purchases || [], shiftMonth(insightsMonth, -1));
   const waste = wasteStats(state.waste || [], insightsMonth);
   const isCurrent = insightsMonth >= monthKey(localDateKey());
-  return `${renderHeader('Στατιστικά', 'Πόσα ξοδεύεις και τι πετιέται, ανά μήνα.')}
+  return `${renderHeader('Σύνολο εξόδων', 'Πόσα ξοδεύεις και τι πετιέται, ανά μήνα.')}
     <div class="month-switch" role="group" aria-label="Μήνας"><button class="icon-button" type="button" data-action="insights-month" data-delta="-1" aria-label="Προηγούμενος μήνας">‹</button><strong id="insights-month" data-no-i18n>${escapeHtml(monthLabel(insightsMonth))}</strong><button class="icon-button" type="button" data-action="insights-month" data-delta="1" aria-label="Επόμενος μήνας" ${isCurrent ? 'disabled' : ''}>›</button></div>
     <div class="settings-grid insights-grid">${renderMonthTotals(spending)}
     <section class="panel settings-card" id="spending-card"><span class="stat-icon blue">€</span><h2>Έξοδα</h2>
@@ -1832,6 +1884,8 @@ function handleAction(button) {
     if (trip) showConfirm('Το καλάθι θα διαγραφεί χωρίς να καταγραφεί τίποτα.', () => { state.trips = state.trips.filter((entry) => entry.id !== trip.id); cartScanning = false; if (persist()) renderApp(); }, 'Ακύρωση καλαθιού;');
   } else if (action === 'open-menu') { const sheet = document.querySelector('#menu-sheet'); sheet.querySelectorAll('[data-view]').forEach((b) => b.classList.toggle('is-active', b.dataset.view === activeView)); sheet.showModal(); }
   else if (action === 'close-menu') document.querySelector('#menu-sheet').close();
+  else if (action === 'quick') runQuickAction(button.dataset.quick);
+  else if (action === 'close-quick') document.querySelector('#quick-sheet').close();
   else if (action === 'menu-receipt') { document.querySelector('#menu-sheet').close(); openReceiptDialog(); }
   else if (action === 'menu-mealplan') { document.querySelector('#menu-sheet').close(); navigate('cook'); setTimeout(() => document.querySelector('#plan-grid')?.scrollIntoView({ block: 'start' }), 50); }
   else if (action === 'transport-month') { transportMonthKey = shiftMonth(transportMonthKey, Number(button.dataset.delta)); renderApp(); if (transportHistoryDialog()?.open) renderTransportHistory(); }
@@ -1993,7 +2047,7 @@ function handleAction(button) {
 document.addEventListener('click', (event) => {
   const viewButton = event.target.closest('[data-view]');
   if (viewButton) { event.preventDefault(); if (viewButton.closest('#menu-sheet')) document.querySelector('#menu-sheet').close(); navigate(viewButton.dataset.view); return; }
-  if (event.target.id === 'menu-sheet') { event.target.close(); return; }
+  if (event.target.id === 'menu-sheet' || event.target.id === 'quick-sheet') { event.target.close(); return; }
   const button = event.target.closest('[data-action]');
   if (button && button.type !== 'checkbox') handleAction(button);
 });

@@ -17,7 +17,7 @@ const stored = () => page.evaluate(() => JSON.parse(localStorage.getItem('spitot
 async function tap(sel) { await page.$eval(sel, (el) => el.scrollIntoView({ block: 'center', behavior: 'instant' })); await wait(150); await page.click(sel); await wait(); }
 async function check(name, fn) { try { const ok = await fn(); console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}`); if (!ok) errors.push(name); } catch (e) { console.log(`FAIL ${name}: ${e.message}`); errors.push(name); } }
 const shot = async (name, full = true) => { if (shots) await page.screenshot({ path: `${shots}/${name}`, fullPage: full }); };
-async function nav(view) { const direct = await page.$eval(`.nav-item[data-view="${view}"]`, (e) => e.offsetParent !== null).catch(() => false); if (direct) await page.click(`.nav-item[data-view="${view}"]`); else { await page.click('[data-action="open-menu"]:not([hidden])').catch(() => page.evaluate(() => document.querySelector('[data-action="open-menu"]').click())); await wait(200); await page.click(`#menu-sheet [data-view="${view}"]`); } await wait(); }
+async function nav(view) { const direct = await page.$eval(`.nav-item[data-view="${view}"]`, (e) => e.offsetParent !== null).catch(() => false); if (direct) await page.click(`.nav-item[data-view="${view}"]`); else { await page.evaluate(() => document.querySelector('[data-action="open-menu"]').click()); await wait(200); await page.click(`#menu-sheet [data-view="${view}"]`); } await wait(); }
 const sfx = lang === 'en' ? '-en' : '';
 
 await page.goto(url, { waitUntil: 'networkidle0' });

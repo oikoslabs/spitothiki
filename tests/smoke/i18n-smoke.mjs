@@ -19,7 +19,7 @@ async function check(name, fn) {
   try { const ok = await fn(); console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}`); if (!ok) errors.push(name); }
   catch (e) { console.log(`FAIL ${name}: ${e.message}`); errors.push(`${name}: ${e.message}`); }
 }
-async function nav(view) { const direct = await page.$eval(`.nav-item[data-view="${view}"]`, (e) => e.offsetParent !== null).catch(() => false); if (direct) await page.click(`.nav-item[data-view="${view}"]`); else { await page.click('.nav-item[data-action="open-menu"]'); await wait(200); await page.click(`#menu-sheet [data-view="${view}"]`); } await wait(); }
+async function nav(view) { const direct = await page.$eval(`.nav-item[data-view="${view}"]`, (e) => e.offsetParent !== null).catch(() => false); if (direct) await page.click(`.nav-item[data-view="${view}"]`); else { await page.click('.menu-button'); await wait(200); await page.click(`#menu-sheet [data-view="${view}"]`); } await wait(); }
 
 await page.goto(url, { waitUntil: 'networkidle0' });
 await page.evaluate(() => localStorage.clear());
@@ -34,6 +34,7 @@ await check('toggle switches to English', async () => {
 });
 await check('load samples from settings (English confirm)', async () => {
   await nav('settings');
+  await page.$eval('#settings-advanced', (e) => { e.open = true; }); await wait();
   await page.$eval('[data-action="load-demo"]', (e) => e.scrollIntoView({ block: 'center' })); await wait();
   await page.click('[data-action="load-demo"]'); await wait();
   return (await page.evaluate(() => JSON.parse(localStorage.getItem('spitothiki:v1')).items.length)) === 5;

@@ -21,7 +21,7 @@ await page.evaluateOnNewDocument((lang) => {
   window.__speech = lang === 'en' ? 'bread and 2 eggs' : 'ψωμί και 2 αυγά';
   window.SpeechRecognition = class { start() { setTimeout(() => { this.onresult?.({ results: [[{ transcript: window.__speech }]] }); this.onend?.(); }, 50); } stop() { this.onend?.(); } };
   // Fake QR detector: "sees" the receipt link on the (fake) camera.
-  window.BarcodeDetector = class { static async getSupportedFormats() { return ['qr_code', 'ean_13', 'data_matrix', 'pdf417']; } constructor(o) { this.formats = o.formats; } async detect() { const product = this.formats.includes('data_matrix') && !this.formats.includes('pdf417'); if (product || !this.formats.includes('qr_code')) { const code = window.__fakeBarcode; window.__fakeBarcode = ''; return code ? [{ rawValue: code }] : []; } return [{ rawValue: window.__fakeCode || 'https://test-shop.epsilonnet.gr/fd/abc123:1' }]; } };
+  window.BarcodeDetector = class { static async getSupportedFormats() { return ['qr_code', 'ean_13', 'data_matrix', 'pdf417']; } constructor(o) { this.formats = o.formats; } async detect(src) { if (window.__spitoOcrMock && !(src instanceof HTMLVideoElement)) return []; /* photo tests: no QR in the picture, so OCR runs */ const product = this.formats.includes('data_matrix') && !this.formats.includes('pdf417'); if (product || !this.formats.includes('qr_code')) { const code = window.__fakeBarcode; window.__fakeBarcode = ''; return code ? [{ rawValue: code }] : []; } return [{ rawValue: window.__fakeCode || 'https://test-shop.epsilonnet.gr/fd/abc123:1' }]; } };
   window.__notifications = [];
   if (window.ServiceWorkerRegistration) ServiceWorkerRegistration.prototype.showNotification = (title, o) => { window.__notifications.push({ title, body: o?.body }); return Promise.resolve(); };
 }, lang);
@@ -51,7 +51,7 @@ page.on('response', (r) => { if (r.status() >= 400 && !r.url().endsWith('favicon
 const wait = (ms = 300) => new Promise((r) => setTimeout(r, ms));
 const stored = () => page.evaluate(() => JSON.parse(localStorage.getItem('spitothiki:v1') || '{}'));
 async function tap(selector) { await page.$eval(selector, (el) => el.scrollIntoView({ block: 'center', behavior: 'instant' })); await wait(250); await page.click(selector); }
-async function nav(view) { const direct = await page.$eval(`.nav-item[data-view="${view}"]`, (e) => e.offsetParent !== null).catch(() => false); if (direct) await page.click(`.nav-item[data-view="${view}"]`); else { await page.click('.nav-item[data-action="open-menu"]'); await wait(200); await page.click(`#menu-sheet [data-view="${view}"]`); } await wait(); }
+async function nav(view) { const direct = await page.$eval(`.nav-item[data-view="${view}"]`, (e) => e.offsetParent !== null).catch(() => false); if (direct) await page.click(`.nav-item[data-view="${view}"]`); else { await page.click('.menu-button'); await wait(200); await page.click(`#menu-sheet [data-view="${view}"]`); } await wait(); }
 async function check(name, fn) {
   try { const ok = await fn(); console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}`); if (!ok) errors.push(name); }
   catch (e) { console.log(`FAIL ${name}: ${e.message}`); errors.push(`${name}: ${e.message}`); }
@@ -259,7 +259,7 @@ await check('scan receipt: paste link, review, edit, import to pantry + spending
   });
   await page.reload({ waitUntil: 'networkidle0' });
   await nav('overview');
-  await tap('.quick-action[data-action="open-receipt"]'); await wait();
+  await tap('.quick-action[data-quick="receipt"]'); await wait();
   await page.type('#receipt-link-form input[name=link]', `${RECEIPT}/`);
   await page.click('#receipt-link-form button[type=submit]'); await wait(1200);
   const lines = (await page.$$('#receipt-lines .receipt-line')).length;
@@ -281,7 +281,7 @@ await check('scan receipt: paste link, review, edit, import to pantry + spending
 });
 await check('scan receipt: same receipt via QR camera is refused as duplicate', async () => {
   await nav('pantry');
-  await tap('[data-action="open-receipt"]'); await wait();
+  await tap('#view-content [data-action="open-receipt"], #view-content [data-quick="receipt"]'); await wait();
   await page.click('[data-action="receipt-scan"]'); await wait(2500);
   const dup = await page.$('#receipt-duplicate');
   const disabled = await page.$eval('#receipt-review-form button[type=submit]', (b) => b.disabled);
@@ -290,7 +290,7 @@ await check('scan receipt: same receipt via QR camera is refused as duplicate', 
   return dup !== null && disabled && (await stored()).receipts.length === 1;
 });
 await check('scan receipt: AADE summary link records only the total', async () => {
-  await tap('[data-action="open-receipt"]'); await wait();
+  await tap('#view-content [data-action="open-receipt"], #view-content [data-quick="receipt"]'); await wait();
   await page.type('#receipt-link-form input[name=link]', 'https://mydatapi.aade.gr/TimologioQR/QRInfo?issuerVat=999999999&issueDate=12/10/2026&mark=4001&totalGrossValue=12.30');
   await page.click('#receipt-link-form button[type=submit]'); await wait(600);
   const note = await page.$('#receipt-aade-note');
@@ -304,7 +304,7 @@ await check('receipt photo: mocked OCR -> review with flagged line, import, dupl
   const ocrText = fixture('receipt-photo-ocr.txt');
   await page.evaluate((text) => { window.__spitoOcrMock = async () => ({ text, confidence: 91 }); }, ocrText);
   const icon = new URL('../../icons/icon-192.png', import.meta.url).pathname;
-  await tap('[data-action="open-receipt"]'); await wait();
+  await tap('#view-content [data-action="open-receipt"], #view-content [data-quick="receipt"]'); await wait();
   const startLeft = await greekLeft();
   await (await page.$('#receipt-photo-file')).uploadFile(icon);
   await page.waitForSelector('#receipt-lines', { timeout: 15000 });
@@ -318,7 +318,7 @@ await check('receipt photo: mocked OCR -> review with flagged line, import, dupl
   await page.click('#receipt-review-form button[type=submit]'); await wait();
   const s = await stored();
   const mine = s.purchases.filter((p) => p.storeName === 'ΧΑΣΙΩΤΗ');
-  await tap('[data-action="open-receipt"]'); await wait();
+  await tap('#view-content [data-action="open-receipt"], #view-content [data-quick="receipt"]'); await wait();
   await (await page.$('#receipt-photo-camera')).uploadFile(icon);
   await page.waitForSelector('#receipt-lines', { timeout: 15000 });
   const dup = await page.$('#receipt-duplicate');
@@ -330,12 +330,13 @@ await check('receipt photo: mocked OCR -> review with flagged line, import, dupl
     && s.items.some((i) => i.name === 'Καρυδοψιχα ελληνικη' && i.unit === 'κιλά' && i.category === 'Ξηρά τρόφιμα');
 });
 await check('scan receipt: http link rejected, proxy setting validated', async () => {
-  await tap('[data-action="open-receipt"]'); await wait();
+  await tap('#view-content [data-action="open-receipt"], #view-content [data-quick="receipt"]'); await wait();
   await page.type('#receipt-link-form input[name=link]', 'http://test-shop.epsilonnet.gr/fd/x');
   await page.click('#receipt-link-form button[type=submit]'); await wait(400);
   const err = await page.$eval('#receipt-error', (e) => e.textContent);
   await page.click('[data-action="close-receipt"]'); await wait();
   await nav('settings');
+  await page.$eval('#settings-advanced', (e) => { e.open = true; }); await wait();
   await page.type('#proxy-form input[name=proxy]', 'https://proxy.example.workers.dev/');
   await tap('#proxy-form button[type=submit]'); await wait();
   const saved = await page.evaluate(() => localStorage.getItem('spitothiki:receiptProxy'));
@@ -572,7 +573,7 @@ await check('cart: start trip, scan with remembered price, OFF lookup, weighed i
   await page.reload({ waitUntil: 'networkidle0' });
   await page.evaluate((text) => { window.__spitoOcrMock = async () => ({ text, confidence: 91 }); }, fixture('receipt-photo-ocr.txt'));
   await nav('pantry');
-  await tap('[data-action="open-receipt"]'); await wait();
+  await tap('#view-content [data-action="open-receipt"], #view-content [data-quick="receipt"]'); await wait();
   await (await page.$('#receipt-photo-file')).uploadFile(new URL('../../icons/icon-192.png', import.meta.url).pathname);
   await page.waitForSelector('#receipt-lines', { timeout: 15000 });
   const linkBanner = await page.$('#receipt-trip');
@@ -681,6 +682,7 @@ await check('transport: quick-add fuel with €/l + consumption, toll, recurring
   const fuelHidden = await page.$eval('#transport-fuel', (e) => e.hidden);
   await fill('#transport-amount', '2.80'); await fill('#transport-note', 'Αττική Οδός');
   await tap('#transport-save'); await wait();
+  await page.$$eval('#transport-recurring, #transport-vehicles', (els) => els.forEach((e) => { e.open = true; })); await wait();
   await page.select('#transport-recurring-form select[name="type"]', 'transit');
   await page.type('#transport-recurring-form input[name="amount"]', '27');
   await tap('#transport-recurring-form button[type="submit"]'); await wait();
@@ -705,9 +707,9 @@ await check('transport: quick-add fuel with €/l + consumption, toll, recurring
   // Fuel receipt via photo OCR, from the general receipt import: offer to save as transport.
   await page.evaluate(() => { window.__spitoOcrMock = async () => ({ text: 'SHELL ΠΡΑΤΗΡΙΟ ΚΑΥΣΙΜΩΝ\n15/10/2026\nDIESEL 25,00 L x 1,659 €/L 41,48 24%\nΣΥΝΟΛΟ 41,48', confidence: 91 }); });
   await nav('overview');
-  await tap('[data-action="open-receipt"]'); await wait();
+  await tap('#view-content [data-action="open-receipt"], #view-content [data-quick="receipt"]'); await wait();
   const icon = new URL('../../icons/icon-192.png', import.meta.url).pathname;
-  await (await page.$('#receipt-photo-file')).uploadFile(icon); await wait(1500);
+  await (await page.$('#receipt-photo-file')).uploadFile(icon); await page.waitForSelector('#receipt-transport', { timeout: 15000 }).catch(() => {});
   const offer = await page.$eval('#receipt-transport', (e) => e.textContent).catch(() => '');
   await shot('transport-receipt-offer');
   await tap('[data-action="receipt-to-transport"]'); await wait();

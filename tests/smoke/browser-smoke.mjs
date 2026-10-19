@@ -37,7 +37,7 @@ const count = async (selector) => (await page.$$(selector)).length;
 const text = (selector) => page.$eval(selector, (el) => el.textContent);
 // Scroll to the middle first so the fixed mobile bottom navigation doesn't cover the target.
 async function tap(selector) { await page.$eval(selector, (el) => el.scrollIntoView({ block: 'center', behavior: 'instant' })); await wait(400); await page.click(selector); }
-async function nav(view) { const direct = await page.$eval(`.nav-item[data-view="${view}"]`, (e) => e.offsetParent !== null).catch(() => false); if (direct) await page.click(`.nav-item[data-view="${view}"]`); else { await page.click('.nav-item[data-action="open-menu"]'); await wait(200); await page.click(`#menu-sheet [data-view="${view}"]`); } await wait(); }
+async function nav(view) { const direct = await page.$eval(`.nav-item[data-view="${view}"]`, (e) => e.offsetParent !== null).catch(() => false); if (direct) await page.click(`.nav-item[data-view="${view}"]`); else { await page.click('.menu-button'); await wait(200); await page.click(`#menu-sheet [data-view="${view}"]`); } await wait(); }
 async function check(name, fn) {
   try { const ok = await fn(); console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}`); if (!ok) errors.push(`assert: ${name}`); }
   catch (error) { console.log(`FAIL ${name}: ${error.message}`); errors.push(`assert: ${name}: ${error.message}`); }
@@ -178,7 +178,8 @@ const steps = [
     const view = await page.evaluate(() => document.body.dataset.screen);
     const closed = !(await page.$eval('#menu-sheet', (e) => e.open));
     const header = await page.$eval('#current-section', (e) => e.textContent);
-    const bottom = width < 700 ? await page.$$eval('.primary-nav .nav-item', (els) => els.filter((e) => e.offsetParent !== null).length) : 4;
+    // Phones: one menu button (☰ in the top bar) and a quick-actions bar instead of a second section menu.
+    const bottom = width < 700 ? await page.evaluate(() => { const vis = (sel) => [...document.querySelectorAll(sel)].filter((e) => e.offsetParent !== null).length; return vis('.quick-bar .quick-bar-item') === 5 && vis('.primary-nav .nav-item') === 0 && vis('[data-action="open-menu"]') === 1 ? 4 : -1; }) : 4;
     await page.evaluate(() => document.querySelector('#menu-sheet').open && document.querySelector('#menu-sheet').close());
     await nav('pantry');
     const ok = open && items.length === 12 && items.includes('extras') && items.includes('menu-mealplan') && items.includes('menu-receipt') && view === 'transport' && closed && header === 'Μετακινήσεις' && bottom === 4;
