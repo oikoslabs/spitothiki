@@ -2572,7 +2572,11 @@ state.shopping = state.shopping.map((item) => ({ ...item, unit: normalizeUnit(it
 renderApp();
 
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
-  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
+  // updateViaCache 'none' + update() on load/return: a new version reaches the phone without reinstalling.
+  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then((reg) => { reg.update().catch(() => {}); document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') reg.update().catch(() => {}); }); }).catch(() => {}));
+  // New worker took over: reload once so the new code runs, unless a dialog with unsaved work is open.
+  let swReloaded = false; const hadController = Boolean(navigator.serviceWorker.controller);
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (!hadController || swReloaded || document.querySelector('dialog[open]')) return; swReloaded = true; location.reload(); });
 }
 
 takeSharedFile();

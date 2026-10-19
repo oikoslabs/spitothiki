@@ -40,8 +40,10 @@ export function renderDietSection() {
   const plan = active();
   const scan = `<label class="button ${plan ? 'button-quiet' : 'button-primary'} file-button"><span>📷 ${esc(t('Σκάναρε πρόγραμμα διατροφής'))}</span><input type="file" accept="image/*,application/pdf" multiple class="visually-hidden" data-diet-file id="diet-file"></label><button class="button button-quiet" type="button" data-diet="paste">✍️ ${esc(t('Επικόλληση κειμένου'))}</button>`;
   const undo = '';
+  const addSaved = plan ? `<label class="button button-quiet file-button" id="diet-add-saved"><span>➕ ${esc(t('Πρόσθεσε σελίδα (πίσω όψη)'))}</span><input type="file" accept="image/*,application/pdf" class="visually-hidden" data-diet-file data-add-saved></label>` : '';
+  const twoHint = `<p class="field-hint" id="diet-two-hint">${esc(t('Μπορείς να διαλέξεις και τις 2 όψεις μαζί, ή να προσθέσεις τη 2η αργότερα με το ➕.'))}</p>`;
   if (!plan) {
-    return `<section class="panel diet-section" id="diet-section"><div class="panel-heading"><div><h2>🥗 ${esc(t('Πρόγραμμα διατροφής'))}</h2><p>${esc(t('Φωτογράφισε το χαρτί του διαιτολόγου και η εβδομάδα γεμίζει μόνη της.'))}</p></div></div><div class="settings-actions">${scan}</div>${busy ? `<p class="field-hint" role="status" id="diet-busy">${esc(busy)}</p>` : ''}${undo}</section>`;
+    return `<section class="panel diet-section" id="diet-section"><div class="panel-heading"><div><h2>🥗 ${esc(t('Πρόγραμμα διατροφής'))}</h2><p>${esc(t('Φωτογράφισε το χαρτί του διαιτολόγου και η εβδομάδα γεμίζει μόνη της.'))}</p></div></div><div class="settings-actions">${scan}</div>${twoHint}${busy ? `<p class="field-hint" role="status" id="diet-busy">${esc(busy)}</p>` : ''}${undo}</section>`;
   }
   const start = ctx.getWeek();
   const week = plan.weeks?.[start];
@@ -56,7 +58,7 @@ export function renderDietSection() {
   return `<section class="panel diet-section" id="diet-section"><div class="panel-heading"><div><h2>🥗 ${esc(t('Πρόγραμμα διατροφής'))}${plan.person ? ` · <span data-no-i18n>${esc(plan.person)}</span>` : ''}</h2><p>${esc(t('Πάτα ένα γεύμα για να το αλλάξεις με άλλη επιλογή του προγράμματος.'))}</p></div></div>
     ${chips}${plan.appointment ? `<p class="field-hint" id="diet-appointment">📅 ${esc(t('Επόμενο ραντεβού: {when}', { when: plan.appointment }))}</p>` : ''}
     ${warn.length ? `<p class="field-hint diet-warn" role="status">⚠ ${esc(t('Κάποιες επιλογές μπήκαν περισσότερες φορές από όσο λέει το πρόγραμμα.'))}</p>` : ''}
-    <div class="settings-actions"><button class="button button-primary" type="button" data-diet="list" ${week ? '' : 'disabled'} id="diet-to-list">🛒 ${esc(t('Στείλε υλικά στη λίστα'))}</button><button class="button button-quiet" type="button" data-diet="regen" id="diet-regen">🔄 ${esc(t(week ? 'Νέα εβδομάδα' : 'Φτιάξε την εβδομάδα'))}</button></div>
+    <div class="settings-actions"><button class="button button-primary" type="button" data-diet="list" ${week ? '' : 'disabled'} id="diet-to-list">🛒 ${esc(t('Στείλε υλικά στη λίστα'))}</button><button class="button button-quiet" type="button" data-diet="regen" id="diet-regen">🔄 ${esc(t(week ? 'Νέα εβδομάδα' : 'Φτιάξε την εβδομάδα'))}</button>${addSaved}</div>
     ${grid}
     <details class="diet-more"><summary>${esc(t('Περισσότερα'))}</summary><div class="settings-actions"><button class="button button-quiet" type="button" data-diet="edit">✎ ${esc(t('Διόρθωση προγράμματος'))}</button>${scan}<button class="button button-quiet" type="button" data-diet="delete">🗑 ${esc(t('Διαγραφή προγράμματος'))}</button></div></details>
     ${busy ? `<p class="field-hint" role="status" id="diet-busy">${esc(busy)}</p>` : ''}${undo}</section>`;
@@ -79,10 +81,10 @@ function renderReview() {
   const html = `<p class="field-hint">${esc(t('Έλεγξε τι διάβασε η εφαρμογή. Διόρθωσε ό,τι χρειάζεται: τίποτα δεν αποθηκεύεται πριν πατήσεις «Αποθήκευση».'))}</p>
     <label class="field-label" for="diet-person">${esc(t('Για ποιον είναι; (προαιρετικά)'))}</label><input class="field-input" id="diet-person" data-diet-field="person" maxlength="40" value="${esc(draft.person)}" placeholder="${esc(t('π.χ. Νίκος'))}">
     <p class="field-hint" id="diet-count">${esc(t('{slots} γεύματα, {options} επιλογές', { slots: draft.slots.length, options: count }))}</p>
+    <div class="settings-actions diet-add-page"><label class="button button-quiet file-button" id="diet-add-page"><span>➕ ${esc(t('Πρόσθεσε κι άλλη σελίδα (πίσω όψη)'))}</span><input type="file" accept="image/*,application/pdf" class="visually-hidden" data-diet-file data-add-page></label>${draft.pages ? `<span class="field-hint" id="diet-pages">${esc(t(draft.pages === 1 ? '{n} σελίδα' : '{n} σελίδες', { n: draft.pages }))}</span>` : ''}</div>${busy ? `<p class="field-hint" role="status" id="diet-busy">${esc(busy)}</p>` : ''}
     <div id="diet-review">${draft.slots.map((s, si) => `<fieldset class="diet-slot" data-s="${si}"><div class="field-row"><div><label class="field-label">${esc(t('Γεύμα'))}</label><input class="field-input" data-diet-field="name" data-s="${si}" maxlength="40" value="${esc(s.name)}" data-no-i18n></div><div class="diet-time"><label class="field-label">${esc(t('Ώρα'))}</label><input class="field-input" inputmode="numeric" maxlength="5" placeholder="12:00" data-diet-field="time" data-s="${si}" value="${esc(s.time)}"></div></div>
       <ol class="diet-options">${s.options.map((o, oi) => `<li class="diet-option"><textarea class="field-input" rows="2" data-diet-field="text" data-s="${si}" data-o="${oi}" aria-label="${esc(t('Επιλογή'))}">${esc(o.text)}</textarea><div class="diet-option-tools">${freqSelect(o, si, oi)}${oi ? `<button class="text-button" type="button" data-diet="merge" data-s="${si}" data-o="${oi}" title="${esc(t('Ένωση με την από πάνω'))}">⤒ ${esc(t('Ένωση'))}</button>` : ''}<button class="text-button" type="button" data-diet="del-option" data-s="${si}" data-o="${oi}" aria-label="${esc(t('Διαγραφή επιλογής'))}">✕ ${esc(t('Διαγραφή'))}</button></div></li>`).join('')}</ol>
       <div class="settings-actions"><button class="button button-quiet" type="button" data-diet="add-option" data-s="${si}">＋ ${esc(t('Επιλογή'))}</button><button class="text-button" type="button" data-diet="del-slot" data-s="${si}">${esc(t('Διαγραφή γεύματος'))}</button></div></fieldset>`).join('')}</div>
-    ${draft.pages ? `<div class="settings-actions diet-add-page"><label class="button button-quiet file-button" id="diet-add-page"><span>➕ ${esc(t('Πρόσθεσε κι άλλη σελίδα (πίσω όψη)'))}</span><input type="file" accept="image/*,application/pdf" class="visually-hidden" data-diet-file data-add-page></label><span class="field-hint" id="diet-pages">${esc(t(draft.pages === 1 ? '{n} σελίδα' : '{n} σελίδες', { n: draft.pages }))}</span></div>${busy ? `<p class="field-hint" role="status" id="diet-busy">${esc(busy)}</p>` : ''}` : ''}
     <div class="settings-actions"><button class="button button-quiet" type="button" data-diet="add-slot">＋ ${esc(t('Γεύμα'))}</button></div>
     <p class="form-error" id="diet-error" role="alert" hidden></p>
     <div class="dialog-actions diet-sticky"><button class="button button-quiet" type="button" data-diet="close">${esc(t('Άκυρο'))}</button><button class="button button-primary" type="button" data-diet="save" id="diet-save">${esc(t('Αποθήκευση'))}</button></div>`;
@@ -268,7 +270,9 @@ function syncField(el) {
 function onInput(event) { if (event.target.closest?.('#diet-dialog')) syncField(event.target); }
 function onChange(event) {
   const el = event.target;
-  if (el.matches?.('[data-diet-file]')) { const files = [...el.files]; const add = el.hasAttribute('data-add-page'); el.value = ''; importFiles(files, add); return; }
+  if (el.matches?.('[data-diet-file]')) { const files = [...el.files]; const add = el.hasAttribute('data-add-page'); const saved = el.hasAttribute('data-add-saved'); el.value = '';
+    if (saved && active()) { const p = active(); draft = { person: p.person || '', title: p.title, appointment: p.appointment || '', slots: p.slots.map((s) => ({ ...s, options: s.options.map((o) => ({ ...o })) })), editingId: p.id, pages: 1 }; importFiles(files, true); return; }
+    importFiles(files, add); return; }
   if (el.matches?.('[data-diet-check]')) { listRows[Number(el.dataset.dietCheck)].on = el.checked; const b = document.querySelector('#diet-list-add'); if (b) b.textContent = t('Πρόσθεσε στη λίστα ({count})', { count: listRows.filter((r) => r.on).length }); return; }
   if (el.closest?.('#diet-dialog')) syncField(el);
 }
