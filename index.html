@@ -115,7 +115,8 @@
 
   <dialog id="scan-dialog" class="confirm-dialog" aria-labelledby="scan-title">
     <div class="dialog-heading"><div><p class="eyebrow">BARCODE</p><h2 id="scan-title">Σάρωση προϊόντος</h2></div><button class="icon-button" type="button" data-action="close-scan" aria-label="Κλείσιμο">×</button></div>
-    <video id="scan-video" class="scan-video" playsinline muted></video>
+    <div class="scan-wrap"><video id="scan-video" class="scan-video" playsinline muted></video><div class="scan-box" aria-hidden="true"></div></div>
+    <div class="settings-actions"><button class="button button-quiet" type="button" id="scan-torch" data-action="scan-torch" aria-pressed="false" hidden>🔦 Φακός</button></div>
     <p class="field-hint" id="scan-status" role="status">Στόχευσε τον barcode με την κάμερα.</p>
   </dialog>
 

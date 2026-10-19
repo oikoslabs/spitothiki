@@ -1,5 +1,6 @@
 import { MAX_QUANTITY, createPantryItem, createShoppingItem, expiringWithin, expiryStatus, expiryWarning, normalizeSearch, normalizeUnit, pantrySummary, receiveShoppingItem, returnShoppingItem, shoppingListText, syncShoppingWithItem, toggleShoppingItem } from './domain.js';
 import { lookupBarcode, normalizeBarcode, startScanner } from './barcode.js';
+import { isUrlCode, lastTollAmount, parseTollBarcode } from './toll-barcode.js';
 import { authProviders, firebaseConfig } from './firebase-config.js';
 import { loadState, parseBackup, saveState } from './storage.js';
 import { fetchReceipt, receiptId } from './receipt.js';
@@ -458,6 +459,8 @@ async function openScanner({ onCode = fillFromBarcode, qr = false } = {}) {
   const status = document.querySelector('#scan-status');
   status.textContent = t('Άνοιγμα κάμερας…');
   document.querySelector('#scan-title').textContent = t(qr === 'any' ? 'Σάρωση κωδικού λογαριασμού' : qr ? 'Σάρωση QR απόδειξης' : 'Σάρωση προϊόντος');
+  const torch = document.querySelector('#scan-torch');
+  torch.hidden = true; torch.setAttribute('aria-pressed', 'false');
   dialog.showModal();
   try {
     stopScanner = await startScanner(document.querySelector('#scan-video'), (code) => {
@@ -465,7 +468,8 @@ async function openScanner({ onCode = fillFromBarcode, qr = false } = {}) {
       dialog.close();
       onCode(code);
     }, { qr });
-    if (dialog.open) status.textContent = t(qr === 'any' ? 'Στόχευσε το QR ή τον barcode του λογαριασμού.' : qr ? 'Στόχευσε το QR code της απόδειξης.' : 'Στόχευσε τον barcode με την κάμερα.');
+    if (stopScanner?.hasTorch) torch.hidden = false;
+    if (dialog.open) status.textContent = t(qr === 'any' ? 'Στόχευσε το QR ή τον barcode του λογαριασμού.' : qr ? 'Στόχευσε το QR ή τον barcode της απόδειξης μέσα στο πλαίσιο.' : 'Στόχευσε τον barcode με την κάμερα.');
     else closeScanner();
   } catch (error) {
     status.textContent = t(error?.name === 'NotAllowedError' ? 'Δεν δόθηκε άδεια για την κάμερα. Μπορείς να γράψεις τον barcode με το χέρι.'
@@ -744,6 +748,30 @@ async function loadReceiptPhoto(file) {
     receiptState = { step: 'start', error: t(error.message || 'Η αναγνώριση απέτυχε.') };
   }
   renderReceipt();
+}
+
+// A code read in receipt mode: provider/AADE link → fetch; known toll barcode → transport entry; else explain.
+function receiptCode(code) {
+  const value = String(code || '').trim();
+  if (isUrlCode(value)) { loadReceipt(value); return; }
+  const toll = parseTollBarcode(value);
+  if (toll) { tollToTransport(toll); return; }
+  receiptState = { step: 'start', error: t('Ο barcode αυτής της απόδειξης δεν περιέχει τα στοιχεία της. Σκάναρε το QR code (αν υπάρχει) ή βγάλε φωτογραφία την απόδειξη για αναγνώριση κειμένου.') };
+  renderReceipt();
+}
+
+function tollToTransport(toll) {
+  if ((state.receipts || []).some((r) => r.id === toll.id) || (state.transport || []).some((e) => e.receiptId === toll.id)) {
+    receiptState = { step: 'start', error: t('Αυτή η απόδειξη διοδίων ({no}) έχει ήδη καταχωρηθεί.', { no: toll.receiptNo }) };
+    renderReceipt();
+    return;
+  }
+  transportDraft = { type: 'tolls', amount: lastTollAmount(state.transport || [], toll.prefix), date: toll.date, note: `${toll.operator} · ${toll.time.slice(0, 5)} · #${toll.receiptNo}`, receiptId: toll.id, fromReceipt: true, tollBarcode: true };
+  receiptState = { step: 'start' };
+  renderReceipt();
+  document.querySelector('#receipt-dialog')?.close();
+  navigate('transport');
+  requestAnimationFrame(() => { const el = document.querySelector('#transport-amount'); el?.focus(); el?.select?.(); document.querySelector('#transport-add')?.scrollIntoView({ block: 'center' }); });
 }
 
 function openReceiptDialog(target = '') {
@@ -1216,7 +1244,7 @@ function renderTransportForm() {
   const d = transportDraft || {};
   const type = d.type || 'fuel';
   const vehicles = state.vehicles || [];
-  return `<section class="panel" id="transport-add"><div class="panel-heading"><div><h2>${escapeHtml(t(d.id ? 'Επεξεργασία εξόδου' : 'Νέο έξοδο μετακίνησης'))}</h2>${d.fromReceipt ? `<p id="transport-from-receipt">${escapeHtml(t('Από απόδειξη — έλεγξε τα στοιχεία και πάτα Αποθήκευση.'))}</p>` : ''}</div></div>
+  return `<section class="panel" id="transport-add"><div class="panel-heading"><div><h2>${escapeHtml(t(d.id ? 'Επεξεργασία εξόδου' : 'Νέο έξοδο μετακίνησης'))}</h2>${d.fromReceipt ? `<p id="transport-from-receipt">${escapeHtml(t(d.tollBarcode ? 'Απόδειξη διοδίων από barcode — το ποσό δεν υπάρχει στον barcode: γράψε το ποσό και πάτα Αποθήκευση.' : 'Από απόδειξη — έλεγξε τα στοιχεία και πάτα Αποθήκευση.'))}</p>` : ''}</div></div>
     <form id="transport-form" novalidate><input type="hidden" name="entryId" value="${escapeHtml(d.id || '')}"><input type="hidden" name="receiptId" value="${escapeHtml(d.receiptId || '')}">
       <div class="field-row field-row-three">
         <div><label class="field-label" for="transport-type">Κατηγορία</label><select class="field-input" id="transport-type" name="type">${transportTypeOptions(type)}</select></div>
@@ -1636,7 +1664,7 @@ function handleAction(button) {
   } else if (action === 'plan-shopping') planToShopping();
   else if (action === 'open-receipt') openReceiptDialog();
   else if (action === 'close-receipt') document.querySelector('#receipt-dialog').close();
-  else if (action === 'receipt-scan') openScanner({ qr: true, onCode: (code) => loadReceipt(code) });
+  else if (action === 'receipt-scan') openScanner({ qr: true, onCode: receiptCode });
   else if (action === 'receipt-reset') { receiptState = { step: 'start' }; renderReceipt(); }
   else if (action === 'delete-item') {
     const item = state.items.find((entry) => entry.id === id);
@@ -1669,6 +1697,7 @@ function handleAction(button) {
   });
   else if (action === 'sync-leave') showConfirm('Θα επιστρέψεις στο δικό σου νοικοκυριό. Τα κοινά προϊόντα θα μείνουν στο κοινό νοικοκυριό.', () => syncAction(() => sync.leaveHousehold(), 'Αποχώρησες από το νοικοκυριό.'), 'Αποχώρηση;');
   else if (action === 'scan-barcode') openScanner();
+  else if (action === 'scan-torch') { const on = button.getAttribute('aria-pressed') !== 'true'; stopScanner?.torch?.(on).then((ok) => { if (ok) button.setAttribute('aria-pressed', String(on)); }); }
   else if (action === 'close-scan') { cartScanning = false; closeScanner(); }
   else if (action === 'lookup-barcode') fillFromBarcode(itemForm.elements.barcode.value);
   else if (action === 'enable-notifications') enableNotifications();

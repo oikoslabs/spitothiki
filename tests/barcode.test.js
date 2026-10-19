@@ -30,3 +30,13 @@ test('looks up a barcode with an injected fetch and handles misses', async () =>
   assert.equal(await lookupBarcode('5201004000014', async () => ({ ok: false, status: 404 })), null);
   await assert.rejects(() => lookupBarcode('12'), /barcode/);
 });
+
+import { scanFormats, scanMode, zxingFormats } from '../src/barcode.js';
+test('scanner modes enable the right formats', () => {
+  assert.equal(scanMode(false), 'product'); assert.equal(scanMode('any'), 'bill'); assert.equal(scanMode(true), 'receipt');
+  for (const f of ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128']) assert.ok(scanFormats('product').includes(f), f);
+  for (const f of ['code_128', 'itf', 'code_39', 'pdf417', 'qr_code']) assert.ok(scanFormats('bill').includes(f), f);
+  for (const f of ['qr_code', 'code_128', 'itf', 'code_39', 'ean_13', 'pdf417']) assert.ok(scanFormats('receipt').includes(f), f);
+  assert.deepEqual(zxingFormats('receipt'), [11, 4, 8, 2, 7, 10]);
+  assert.deepEqual(zxingFormats('product').slice(0, 5), [7, 6, 14, 15, 4]);
+});
