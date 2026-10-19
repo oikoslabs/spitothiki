@@ -2,10 +2,13 @@
 // so `el` maps each key to itself and `en` holds the English translation of every key.
 // Stored data (categories, units, locations) stays Greek; it is translated only when displayed.
 
+import { DIET_EN } from './diet-i18n.js';
+
 export const LANG_KEY = 'spitothiki:lang';
 export const LANGS = ['el', 'en'];
 
 const EN = {
+  ...DIET_EN,
   // Shell / navigation
   'Σπιτοθήκη — Το σπίτι σε τάξη': 'Spitothiki — Your home in order',
   'Οργάνωσε το σπίτι και τα έξοδά σου: απόθεμα και λήξεις, λίστα αγορών, λογαριασμοί, μετακινήσεις και μικροέξοδα.': 'Organise your home and spending: pantry and expiry dates, shopping list, bills, transport and small expenses.',
