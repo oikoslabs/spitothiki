@@ -120,6 +120,11 @@
     <p class="field-hint" id="scan-status" role="status">Στόχευσε τον barcode με την κάμερα.</p>
   </dialog>
 
+  <dialog id="transport-history-dialog" class="confirm-dialog history-dialog" aria-labelledby="transport-history-title">
+    <div class="dialog-heading"><div><p class="eyebrow">ΜΕΤΑΚΙΝΗΣΕΙΣ</p><h2 id="transport-history-title">Ιστορικό μετακινήσεων</h2></div><button class="icon-button" type="button" data-action="close-transport-history" aria-label="Κλείσιμο">×</button></div>
+    <div id="transport-history-body"></div>
+  </dialog>
+
   <dialog id="share-dialog" class="confirm-dialog" aria-labelledby="share-title">
     <div class="dialog-heading"><div><p class="eyebrow">ΛΙΣΤΑ ΑΓΟΡΩΝ</p><h2 id="share-title">Κοινοποίηση λίστας</h2></div><button class="icon-button" type="button" data-action="close-share" aria-label="Κλείσιμο">×</button></div>
     <textarea id="share-text" class="field-input share-text" rows="7" readonly aria-label="Κείμενο λίστας"></textarea>

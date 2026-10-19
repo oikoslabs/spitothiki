@@ -686,8 +686,15 @@ await check('transport: quick-add fuel with €/l + consumption, toll, recurring
   await tap('#transport-recurring-form button[type="submit"]'); await wait();
   await page.type('#vehicle-form input[name="name"]', 'Μηχανάκι'); await tap('#vehicle-form button[type="submit"]'); await wait();
   const total = await page.$eval('#transport-total', (e) => e.textContent);
-  const rows = (await page.$$('#transport-list .transport-row')).length;
+  const inlineList = Boolean(await page.$('#transport-view-list, #view-root #transport-list'));
+  const historyLabel = await page.$eval('#transport-history-open', (e) => e.textContent);
+  await tap('#transport-history-open'); await wait();
+  const modalOpen = await page.$eval('#transport-history-dialog', (e) => e.open);
+  const rows = (await page.$$('#transport-history-dialog #transport-list .transport-row')).length;
   const listText = await page.$eval('#transport-list', (e) => e.textContent);
+  await shot('transport-history');
+  await page.keyboard.press('Escape'); await wait();
+  const modalClosed = await page.$eval('#transport-history-dialog', (e) => !e.open);
   const vehicleOpts = await page.$$eval('#transport-vehicle option', (els) => els.length);
   await shot('transport');
   const left = await greekLeft();
@@ -708,11 +715,11 @@ await check('transport: quick-add fuel with €/l + consumption, toll, recurring
   await tap('#transport-save'); await wait();
   await page.evaluate(() => { delete window.__spitoOcrMock; });
   const s = await stored();
-  const ok = s.transport.length === 5 && s.transportRecurring.length === 1 && s.vehicles.length === 1 && rows === 4 && fuelHidden && vehicleOpts === 2
+  const ok = s.transport.length === 5 && s.transportRecurring.length === 1 && s.vehicles.length === 1 && rows === 4 && !inlineList && /\(4\)/.test(historyLabel) && modalOpen && modalClosed && fuelHidden && vehicleOpts === 2
     && /134[.,]80/.test(total) && /1[.,]5\d* €\/l/.test(listText) && /6 l\/100km/.test(listText) && /134[.,]80/.test(card) && grand.length > 0
     && /καυσίμων|fuel/.test(offer) && pre.type === 'fuel' && pre.amount === '41.48' && pre.liters === '25' && pre.date === '2026-10-15' && /1[.,]659/.test(pre.hint)
     && s.receipts.some((r) => r.format === 'transport') && !left.length;
-  if (!ok) console.log('  transport:', { n: s.transport.length, rows, fuelHidden, vehicleOpts, total, listText, card, grand, offer, pre, left });
+  if (!ok) console.log('  transport:', { n: s.transport.length, rows, inlineList, historyLabel, modalOpen, modalClosed, fuelHidden, vehicleOpts, total, listText, card, grand, offer, pre, left });
   return ok;
 });
 

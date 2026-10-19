@@ -1292,7 +1292,7 @@ function renderTransport() {
     <section class="panel"><div class="panel-heading"><div><h2>Σύνολο μήνα</h2><p class="big-number" id="transport-total">${escapeHtml(money(month.total))}</p></div></div>
       ${month.count ? renderBars(month.byType.map((row) => ({ label: `${TRANSPORT_ICONS[row.type]} ${t(TRANSPORT_LABELS[row.type])}`, value: row.total })), money) : '<p class="subtle-empty">Κανένα έξοδο μετακίνησης αυτόν τον μήνα.</p>'}
       ${fuelAvg.length ? `<p class="field-hint" id="transport-consumption" data-no-i18n>${fuelAvg.map((x) => `⛽ ${escapeHtml(x.v.name)}: ${escapeHtml(t('μέση κατανάλωση {l} l/100km', { l: fmtNum(x.s.average, 1) }))}`).join(' · ')}</p>` : ''}
-      <div class="product-list" id="transport-list">${list.map(renderTransportEntry).join('')}</div></section>
+      <button class="button button-quiet history-open" type="button" data-action="transport-history" id="transport-history-open" aria-haspopup="dialog">📋 ${escapeHtml(t('Ιστορικό μετακινήσεων ({count})', { count: list.length }))}</button></section>
     <section class="panel" id="transport-recurring"><div class="panel-heading"><div><h2>Μηνιαία πάγια</h2><p>π.χ. κάρτα απεριορίστων διαδρομών ή μηνιαία στάθμευση· καταχωρούνται μόνα τους κάθε μήνα.</p></div></div>
       <form id="transport-recurring-form" class="shopping-add-form recurring-form" novalidate><select class="field-input" name="type" aria-label="Κατηγορία">${transportTypeOptions('transit')}</select><input class="field-input" name="amount" type="number" min="0" step="0.01" inputmode="decimal" placeholder="€" aria-label="Ποσό (€)"><input class="field-input" name="day" type="number" min="1" max="28" value="1" aria-label="Ημέρα του μήνα"><input class="field-input" name="note" maxlength="80" placeholder="π.χ. Κάρτα ΜΜΜ" aria-label="Σημείωση"><button class="button button-quiet" type="submit">＋ Προσθήκη</button></form>
       <p class="form-error" id="transport-recurring-error" role="alert" hidden></p>
@@ -1301,6 +1301,28 @@ function renderTransport() {
       <form id="vehicle-form" class="store-form" novalidate><input class="field-input" name="name" maxlength="40" placeholder="π.χ. Αυτοκίνητο, Μηχανάκι" aria-label="Όνομα οχήματος"><button class="button button-quiet" type="submit">＋ Προσθήκη</button></form>
       <ul class="waste-top" id="vehicle-list">${vehicles.map((v) => `<li><span class="product-name" data-no-i18n>${escapeHtml(v.name)}</span><button class="icon-button" type="button" data-action="vehicle-delete" data-id="${escapeHtml(v.id)}" aria-label="${escapeHtml(t('Διαγραφή'))}">🗑️</button></li>`).join('')}</ul></section>`;
 }
+
+// Entries of the selected month, in a modal (same month as the summary; its own month switch stays in sync).
+function renderTransportHistory() {
+  const body = document.querySelector('#transport-history-body');
+  if (!body) return;
+  const list = (state.transport || []).filter((e) => e.date.startsWith(`${transportMonthKey}-`)).sort((a, b) => b.date.localeCompare(a.date) || String(b.createdAt).localeCompare(String(a.createdAt)));
+  const isCurrent = transportMonthKey >= monthKey(localDateKey());
+  const total = list.reduce((sum, e) => sum + e.amount, 0);
+  body.innerHTML = `<div class="month-switch" role="group" aria-label="${escapeHtml(t('Μήνας'))}"><button class="icon-button" type="button" data-action="transport-month" data-delta="-1" aria-label="${escapeHtml(t('Προηγούμενος μήνας'))}">‹</button><strong id="transport-history-month" data-no-i18n>${escapeHtml(monthLabel(transportMonthKey))}</strong><button class="icon-button" type="button" data-action="transport-month" data-delta="1" aria-label="${escapeHtml(t('Επόμενος μήνας'))}" ${isCurrent ? 'disabled' : ''}>›</button></div>
+    ${list.length ? `<p class="field-hint" id="transport-history-total">${escapeHtml(t('{count} έξοδα · σύνολο {total}', { count: list.length, total: money(Math.round(total * 100) / 100) }))}</p><div class="product-list" id="transport-list">${list.map(renderTransportEntry).join('')}</div>` : `<p class="subtle-empty">${escapeHtml(t('Κανένα έξοδο μετακίνησης αυτόν τον μήνα.'))}</p>`}`;
+}
+
+const transportHistoryDialog = () => document.querySelector('#transport-history-dialog');
+function openTransportHistory() {
+  const dialog = transportHistoryDialog();
+  renderTransportHistory();
+  if (dialog.open) return;
+  dialog.showModal();
+  // Android back button: an extra history entry that closes the modal instead of leaving the screen.
+  history.pushState({ ...(history.state || {}), transportHistory: true }, '', location.href);
+}
+function closeTransportHistory() { const dialog = transportHistoryDialog(); if (dialog?.open) dialog.close(); }
 
 function saveTransportForm(form) {
   const error = document.querySelector('#transport-error');
@@ -1635,12 +1657,14 @@ function handleAction(button) {
   else if (action === 'close-menu') document.querySelector('#menu-sheet').close();
   else if (action === 'menu-receipt') { document.querySelector('#menu-sheet').close(); openReceiptDialog(); }
   else if (action === 'menu-mealplan') { document.querySelector('#menu-sheet').close(); navigate('cook'); setTimeout(() => document.querySelector('#plan-grid')?.scrollIntoView({ block: 'start' }), 50); }
-  else if (action === 'transport-month') { transportMonthKey = shiftMonth(transportMonthKey, Number(button.dataset.delta)); renderApp(); }
+  else if (action === 'transport-month') { transportMonthKey = shiftMonth(transportMonthKey, Number(button.dataset.delta)); renderApp(); if (transportHistoryDialog()?.open) renderTransportHistory(); }
+  else if (action === 'transport-history') openTransportHistory();
+  else if (action === 'close-transport-history') closeTransportHistory();
   else if (action === 'transport-receipt') openReceiptDialog('transport');
   else if (action === 'receipt-to-transport') receiptToTransport();
   else if (action === 'transport-cancel') { transportDraft = null; renderApp(); }
-  else if (action === 'transport-edit') { const e = (state.transport || []).find((x) => x.id === id); if (e) { transportDraft = { ...e }; renderApp(); document.querySelector('#transport-add')?.scrollIntoView({ behavior: 'smooth' }); } }
-  else if (action === 'transport-delete') showConfirm('Θα διαγραφεί αυτό το έξοδο μετακίνησης.', () => { state.transport = (state.transport || []).filter((e) => e.id !== id); if (persist()) renderApp(); }, 'Διαγραφή εξόδου;');
+  else if (action === 'transport-edit') { const e = (state.transport || []).find((x) => x.id === id); if (e) { closeTransportHistory(); transportDraft = { ...e }; renderApp(); document.querySelector('#transport-add')?.scrollIntoView({ behavior: 'smooth' }); } }
+  else if (action === 'transport-delete') showConfirm('Θα διαγραφεί αυτό το έξοδο μετακίνησης.', () => { state.transport = (state.transport || []).filter((e) => e.id !== id); if (persist()) { renderApp(); if (transportHistoryDialog()?.open) renderTransportHistory(); } }, 'Διαγραφή εξόδου;');
   else if (action === 'transport-rule-delete') { state.transportRecurring = (state.transportRecurring || []).filter((r) => r.id !== id); if (persist()) renderApp(); }
   else if (action === 'vehicle-delete') { state.vehicles = (state.vehicles || []).filter((v) => v.id !== id); if (persist()) renderApp(); }
   else if (action === 'add-bill') openBillDialog();
@@ -2018,6 +2042,8 @@ document.addEventListener('submit', (event) => {
   }
 });
 
+transportHistoryDialog().addEventListener('close', () => { if (history.state?.transportHistory) history.back(); });
+window.addEventListener('popstate', () => { if (transportHistoryDialog().open && !history.state?.transportHistory) transportHistoryDialog().close(); });
 document.querySelector('#scan-dialog').addEventListener('close', () => { stopScanner?.(); stopScanner = null; });
 itemForm.elements.barcode.addEventListener('keydown', (event) => {
   if (event.key === 'Enter') { event.preventDefault(); fillFromBarcode(event.target.value); }
