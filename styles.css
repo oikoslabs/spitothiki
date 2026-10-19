@@ -671,3 +671,7 @@ button.stat-card:hover { border-color: #bfd4c1; }
 .choice-actions .button { min-height: 48px; width: 100%; }
 .choice-raw { max-height: 140px; overflow: auto; white-space: pre-wrap; word-break: break-all; padding: 10px; border-radius: 10px; background: var(--surface-soft); border: 1px solid var(--line); font-size: calc(13px * var(--text-scale)); }
 .bill-badge { display: inline-block; margin-left: 6px; padding: 2px 8px; border-radius: 20px; background: var(--blue-soft); color: var(--ink); font-size: calc(11px * var(--text-scale)); font-weight: 700; vertical-align: middle; }
+.onboard-dialog { width: min(560px, calc(100vw - 24px)); }
+.onboard-bills { flex-wrap: wrap; }
+.bill-presets .theme-options { flex-wrap: wrap; }
+#onboard-dialog, #choice-dialog, #scan-dialog { padding: 22px 20px 20px; }

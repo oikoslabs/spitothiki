@@ -8,6 +8,7 @@ import { fetchMealDbSuggestions, ingredientName, pantryIngredients, suggestBuilt
 import { CATEGORIES, WASTE_REASONS, applyWaste, createStore, createWaste, groupByStore, monthKey, rowCategory, monthlySpending, moveCategory, purchaseFor, shiftMonth, storeOrder, wasteStats } from './features.js';
 import { showSigninCard } from './features.js';
 import { routeCode } from './scan-router.js';
+import { BILL_PRESETS, ONBOARD_KEY, PRESETS_KEY, pendingPresets, shouldOnboard } from './onboarding.js';
 import { applyDisplayPrefs, highContrast, setHighContrast, setTextSize, textSize } from './prefs.js';
 import { RECURRING_INTERVALS, applyRecurring, createRecurring, dueFromSnapshot, expirySnapshot, parseVoiceItems } from './features.js';
 import { MEAL_SLOTS, copyPreviousWeek, createMeal, recipeFromMealDb, shiftDays, weekDays, weekShoppingNeeds, weekStart } from './mealplan.js';
@@ -345,6 +346,7 @@ function renderSettings() {
       <h3 class="settings-sub" id="text-size-label">Μέγεθος γραμμάτων</h3><div class="theme-options size-options" role="group" aria-labelledby="text-size-label">${[['normal', 'Κανονικά'], ['large', 'Μεγάλα'], ['xlarge', 'Πολύ μεγάλα']].map(([value, label]) => `<button type="button" class="filter-chip ${textSize() === value ? 'is-active' : ''}" data-action="set-text-size" data-size="${value}" aria-pressed="${textSize() === value}">${label}</button>`).join('')}</div>
       <label class="check-row"><input type="checkbox" id="high-contrast" ${highContrast() ? 'checked' : ''}> <span>Υψηλή αντίθεση (πιο έντονα γράμματα και περιγράμματα)</span></label></section>
     ${renderLanguageCard()}
+    <section class="panel settings-card"><span class="stat-icon amber">👋</span><h2>Αρχικές ερωτήσεις</h2><p>Γλώσσα, οι λογαριασμοί που έχεις και μέγεθος γραμμάτων, σε ένα λεπτό.</p><div class="settings-actions"><button class="button button-quiet" type="button" data-action="onboard-again">Κάνε τις ερωτήσεις ξανά</button></div></section>
     ${renderSyncCard()}
     ${renderNotificationCard()}
     <section class="panel settings-card"><span class="stat-icon blue">↗</span><h2>Αντίγραφο ασφαλείας</h2><p>Αποθήκευσε όλα τα δεδομένα σου (απόθεμα, λίστες, έξοδα) σε ένα αρχείο, ή φέρε τα πίσω από ένα αρχείο.</p><div class="settings-actions"><button class="button button-primary" type="button" data-action="export-backup">⬇ Εξαγωγή αντιγράφου</button><button class="button button-quiet" type="button" data-action="import-backup">⬆ Εισαγωγή αντιγράφου</button></div></section></div>
@@ -622,6 +624,57 @@ async function handleScanFile(file) {
     { label: 'Λογαριασμός', run: () => { navigate('bills'); importBillFile(file); } },
     { label: 'Κλείσιμο', run: () => {} }
   ] });
+}
+
+// ---------- First-run setup (3 questions) ----------
+const readKey = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
+const writeKey = (k, v) => { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch {} };
+const billPresetIds = () => { try { return JSON.parse(readKey(PRESETS_KEY) || '[]'); } catch { return []; } };
+let onboardPicks = new Set();
+function renderOnboard() {
+  const lang = getLang(); const size = textSize();
+  document.querySelector('#onboard-body').innerHTML = `<div class="dialog-heading"><div><p class="eyebrow">${escapeHtml(t('ΚΑΛΩΣ ΗΡΘΕΣ'))}</p><h2 id="onboard-title">${escapeHtml(t('Τρεις γρήγορες ερωτήσεις'))}</h2></div><button class="icon-button" type="button" data-action="onboard-skip" aria-label="${escapeHtml(t('Παράλειψη'))}">×</button></div>
+    <p class="field-hint">${escapeHtml(t('Όλα αλλάζουν αργότερα από τις Ρυθμίσεις.'))}</p>
+    <h3 class="settings-sub" id="ob-lang">1. ${escapeHtml(t('Γλώσσα'))}</h3><div class="theme-options" role="group" aria-labelledby="ob-lang" data-no-i18n>${[['el', 'Ελληνικά'], ['en', 'English']].map(([v, l]) => `<button type="button" class="filter-chip ${lang === v ? 'is-active' : ''}" data-action="onboard-lang" data-lang="${v}" lang="${v}" aria-pressed="${lang === v}">${l}</button>`).join('')}</div>
+    <h3 class="settings-sub" id="ob-bills">2. ${escapeHtml(t('Ποιους λογαριασμούς έχεις;'))}</h3><div class="theme-options onboard-bills" role="group" aria-labelledby="ob-bills">${BILL_PRESETS.map((p) => `<button type="button" class="filter-chip ${onboardPicks.has(p.id) ? 'is-active' : ''}" data-action="onboard-bill" data-id="${p.id}" aria-pressed="${onboardPicks.has(p.id)}">${p.icon} ${escapeHtml(t(p.name))}</button>`).join('')}</div>
+    <h3 class="settings-sub" id="ob-size">3. ${escapeHtml(t('Μέγεθος γραμμάτων'))}</h3><div class="theme-options size-options" role="group" aria-labelledby="ob-size">${[['normal', 'Κανονικά'], ['large', 'Μεγάλα'], ['xlarge', 'Πολύ μεγάλα']].map(([v, l]) => `<button type="button" class="filter-chip ${size === v ? 'is-active' : ''}" data-action="onboard-size" data-size="${v}" aria-pressed="${size === v}">${escapeHtml(t(l))}</button>`).join('')}</div>
+    <div class="choice-actions"><button class="button button-primary" type="button" data-action="onboard-done" id="onboard-done">${escapeHtml(t('Ξεκίνα'))}</button><button class="button button-quiet" type="button" data-action="onboard-skip">${escapeHtml(t('Παράλειψη'))}</button></div>`;
+}
+function openOnboard() {
+  onboardPicks = new Set(billPresetIds());
+  renderOnboard();
+  const dialog = document.querySelector('#onboard-dialog');
+  if (!dialog.open) dialog.showModal();
+  dialog.querySelector('#onboard-done')?.focus();
+}
+function finishOnboard(save) {
+  if (save) writeKey(PRESETS_KEY, JSON.stringify([...onboardPicks]));
+  writeKey(ONBOARD_KEY, '1');
+  document.querySelector('#onboard-dialog').close();
+  renderApp();
+  if (save) showToast(onboardPicks.size ? t('Έτοιμο! Οι λογαριασμοί σου είναι στους Λογαριασμούς, για να τους προσθέσεις με ένα πάτημα.') : t('Έτοιμο!'));
+}
+function maybeOnboard() {
+  if (navigator.webdriver && !window.__spitoOnboarding) return; // automated tests opt in explicitly
+  const flag = readKey(ONBOARD_KEY);
+  if (!flag && !shouldOnboard(state, flag)) { writeKey(ONBOARD_KEY, '1'); return; } // existing user with data: never
+  if (shouldOnboard(state, flag)) openOnboard();
+}
+function renderBillPresets() {
+  const pending = pendingPresets(billPresetIds(), state.bills || []);
+  if (!pending.length) return '';
+  return `<section class="panel bill-presets" id="bill-presets"><div class="panel-heading"><div><h2>Οι λογαριασμοί σου</h2><p>Πάτα για να προσθέσεις τον επόμενο με ποσό και λήξη.</p></div></div><div class="theme-options">${pending.map((p) => `<button type="button" class="filter-chip" data-action="bill-preset" data-id="${p.id}">＋ ${p.icon} ${escapeHtml(t(p.name))}</button>`).join('')}</div></section>`;
+}
+function openBillPreset(id) {
+  const preset = BILL_PRESETS.find((p) => p.id === id);
+  if (!preset) return;
+  openBillDialog();
+  const form = document.querySelector('#bill-form');
+  form.elements.name.value = t(preset.name); form.elements.type.value = preset.type; form.dataset.typeTouched = '1';
+  form.elements.period.value = String(preset.period);
+  form.dataset.preset = preset.id;
+  rememberAutoPay(form);
+  form.elements.amount.focus();
 }
 
 function closeScanner() {
@@ -1787,6 +1840,7 @@ function renderBills() {
   const overdue = due.filter((bill) => bill.overdue);
   const toPay = unpaid.reduce((sum, bill) => sum + bill.amount, 0);
   return `<header class="page-heading"><div>${renderCrumbs()}<h1>Λογαριασμοί</h1><p>ΔΕΗ, νερό, ενοίκιο, συνδρομές: τι πληρώνεις και πότε.</p></div><div class="page-actions"><label class="button button-quiet file-button" id="bill-import"><span>📥 Εισαγωγή PDF</span><input type="file" accept="application/pdf,.pdf,image/*" class="visually-hidden" data-bill-file id="bill-file"></label><button class="button button-primary" type="button" data-action="add-bill"><span aria-hidden="true">＋</span>Προσθήκη λογαριασμού</button></div></header>
+    ${renderBillPresets()}
     ${due.length ? `<div class="alert-banner${overdue.length ? ' is-danger' : ''}" role="status" id="bills-alert">${escapeHtml(overdue.length ? t(overdue.length === 1 ? '1 ληξιπρόθεσμος λογαριασμός · σύνολο {sum}' : '{count} ληξιπρόθεσμοι λογαριασμοί · σύνολο {sum}', { count: overdue.length, sum: money(overdue.reduce((s, b) => s + b.amount, 0)) }) : t(due.length === 1 ? '1 λογαριασμός λήγει σύντομα · σύνολο {sum}' : '{count} λογαριασμοί λήγουν σύντομα · σύνολο {sum}', { count: due.length, sum: money(due.reduce((s, b) => s + b.amount, 0)) }))}</div>` : ''}
     ${bills.length ? `<section class="panel"><div class="panel-heading"><div><h2>Προς πληρωμή</h2><p>${escapeHtml(t(unpaid.length === 1 ? '1 απλήρωτος · {sum}' : '{count} απλήρωτοι · {sum}', { count: unpaid.length, sum: money(toPay) }))}</p></div></div><div class="product-list" id="bills-unpaid">${unpaid.length ? unpaid.map(renderBillRow).join('') : `<p class="subtle-empty">${escapeHtml(t(debits.length ? 'Τίποτα να πληρώσεις με το χέρι. 🎉' : 'Όλα πληρωμένα! 🎉'))}</p>`}</div></section>
     ${debits.length ? `<section class="panel" id="bills-debits"><div class="panel-heading"><div><h2>Με πάγια εντολή</h2><p>${escapeHtml(t('Χρεώνονται αυτόματα · {sum}', { sum: money(debits.reduce((sum, bill) => sum + bill.amount, 0)) }))}</p></div></div><div class="product-list">${debits.map(renderBillRow).join('')}</div></section>` : ''}
@@ -1814,6 +1868,7 @@ function openBillDialog(id = '') {
   form.elements.billingTo.value = bill?.billingTo || '';
   form.elements.autoPay.checked = Boolean(bill?.autoPay);
   form.dataset.autoPayTouched = bill ? '1' : '';
+  form.dataset.preset = bill?.presetId || '';
   setBillDuplicate(null);
   document.querySelector('#bill-error').hidden = true;
   document.querySelector('#bill-scan-status').textContent = t('Σκάναρε το QR ή τον barcode του λογαριασμού για να συμπληρωθεί ο κωδικός πληρωμής και, αν υπάρχει, το ποσό.');
@@ -1927,7 +1982,7 @@ function saveBillForm(form) {
   const id = form.elements.billId.value;
   const existing = (state.bills || []).find((bill) => bill.id === id);
   try {
-    const bill = createBill({ ...(existing || {}), id: id || undefined, name: form.elements.name.value, type: form.elements.type.value, amount: form.elements.amount.value === '' ? NaN : form.elements.amount.value, due: form.elements.due.value, period: form.elements.period.value, remind: form.elements.remind.value, reference: form.elements.reference.value, billingFrom: form.elements.billingFrom.value, billingTo: form.elements.billingTo.value, autoPay: form.elements.autoPay.checked });
+    const bill = createBill({ ...(existing || {}), id: id || undefined, name: form.elements.name.value, type: form.elements.type.value, amount: form.elements.amount.value === '' ? NaN : form.elements.amount.value, due: form.elements.due.value, period: form.elements.period.value, remind: form.elements.remind.value, reference: form.elements.reference.value, billingFrom: form.elements.billingFrom.value, billingTo: form.elements.billingTo.value, autoPay: form.elements.autoPay.checked, presetId: form.dataset.preset || '' });
     state.bills = existing ? state.bills.map((entry) => (entry.id === id ? bill : entry)) : [...(state.bills || []), bill];
   } catch (err) { error.textContent = t(err.message); error.hidden = false; return; }
   if (!persist()) return;
@@ -2158,6 +2213,13 @@ function handleAction(button) {
   else if (action === 'enable-notifications') enableNotifications();
   else if (action === 'disable-notifications') { saveNotifySettings({ enabled: false }); updateBackgroundCheck(); renderApp(); showToast('Οι ειδοποιήσεις απενεργοποιήθηκαν.'); }
   else if (action === 'set-theme') setTheme(button.dataset.theme);
+  else if (action === 'onboard-lang') { changeLanguage(button.dataset.lang); renderOnboard(); document.querySelector(`[data-action="onboard-lang"][data-lang="${button.dataset.lang}"]`)?.focus(); }
+  else if (action === 'onboard-bill') { const id = button.dataset.id; if (onboardPicks.has(id)) onboardPicks.delete(id); else onboardPicks.add(id); renderOnboard(); document.querySelector(`[data-action="onboard-bill"][data-id="${id}"]`)?.focus(); }
+  else if (action === 'onboard-size') { setTextSize(button.dataset.size); renderOnboard(); document.querySelector(`[data-action="onboard-size"][data-size="${button.dataset.size}"]`)?.focus(); }
+  else if (action === 'onboard-done') finishOnboard(true);
+  else if (action === 'onboard-skip') finishOnboard(false);
+  else if (action === 'onboard-again') openOnboard();
+  else if (action === 'bill-preset') openBillPreset(button.dataset.id);
   else if (action === 'choice') { const run = choiceHandlers[Number(button.dataset.index)]; document.querySelector('#choice-dialog').close(); run?.(); }
   else if (action === 'close-choice') document.querySelector('#choice-dialog').close();
   else if (action === 'set-text-size') { const size = setTextSize(button.dataset.size); renderApp(); document.querySelector(`[data-action="set-text-size"][data-size="${size}"]`)?.focus(); showToast(t('Το μέγεθος γραμμάτων άλλαξε.')); }
@@ -2527,6 +2589,7 @@ if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.
 }
 
 takeSharedFile();
+maybeOnboard();
 
 function runDailyChecks() {
   runRecurring();

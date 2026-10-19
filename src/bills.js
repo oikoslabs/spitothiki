@@ -50,6 +50,7 @@ export function createBill(input = {}, now = new Date().toISOString()) {
     paid: Boolean(input.paid), paidAt: input.paid ? String(input.paidAt || '') : '',
     billingFrom: DATE.test(String(input.billingFrom || '')) ? input.billingFrom : '', billingTo: DATE.test(String(input.billingTo || '')) ? input.billingTo : '',
     autoPay: Boolean(input.autoPay),
+    ...(input.presetId ? { presetId: String(input.presetId).slice(0, 20) } : {}),
     seriesId: input.seriesId || input.id || '', updatedAt: now
   };
 }

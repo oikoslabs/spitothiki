@@ -685,6 +685,27 @@ const EN = {
   '1 λογαριασμός χρεώθηκε με πάγια εντολή.': '1 bill was debited by direct debit.',
   '{count} λογαριασμοί χρεώθηκαν με πάγια εντολή.': '{count} bills were debited by direct debit.',
   '1 απλήρωτος · {sum}': '1 unpaid · {sum}',
+  // First-run setup
+  'ΚΑΛΩΣ ΗΡΘΕΣ': 'WELCOME',
+  'Τρεις γρήγορες ερωτήσεις': 'Three quick questions',
+  'Όλα αλλάζουν αργότερα από τις Ρυθμίσεις.': 'You can change everything later in Settings.',
+  'Ποιους λογαριασμούς έχεις;': 'Which bills do you have?',
+  'Ξεκίνα': 'Start',
+  'Παράλειψη': 'Skip',
+  'Έτοιμο!': 'Done!',
+  'Έτοιμο! Οι λογαριασμοί σου είναι στους Λογαριασμούς, για να τους προσθέσεις με ένα πάτημα.': 'Done! Your bills are waiting in Bills, ready to add with one tap.',
+  'Αρχικές ερωτήσεις': 'Setup questions',
+  'Γλώσσα, οι λογαριασμοί που έχεις και μέγεθος γραμμάτων, σε ένα λεπτό.': 'Language, the bills you have and text size, in a minute.',
+  'Κάνε τις ερωτήσεις ξανά': 'Ask me again',
+  'Οι λογαριασμοί σου': 'Your bills',
+  'Πάτα για να προσθέσεις τον επόμενο με ποσό και λήξη.': 'Tap to add the next one with its amount and due date.',
+  'Φυσικό αέριο': 'Natural gas',
+  'Κινητό': 'Mobile phone',
+  'Σταθερό / internet': 'Landline / internet',
+  'Ενοίκιο': 'Rent',
+  'ΕΝΦΙΑ': 'Property tax (ENFIA)',
+  'Τέλη κυκλοφορίας': 'Road tax',
+  'Ασφάλιση': 'Insurance',
 };
 
 export const dictionaries = { el: Object.fromEntries(Object.keys(EN).map((key) => [key, key])), en: EN };
