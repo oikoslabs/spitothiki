@@ -640,6 +640,14 @@ const EN = {
   'ποσό (από εικόνα)': 'amount (from image)',
   'λήξη (από εικόνα)': 'due date (from image)',
   'Αναζήτηση για: {fields}…': 'Looking for: {fields}…',
+  // Display preferences
+  'Μέγεθος γραμμάτων': 'Text size',
+  'Κανονικά': 'Normal',
+  'Μεγάλα': 'Large',
+  'Πολύ μεγάλα': 'Extra large',
+  'Υψηλή αντίθεση (πιο έντονα γράμματα και περιγράμματα)': 'High contrast (stronger text and borders)',
+  'Θέμα, μέγεθος γραμμάτων και αντίθεση. Ισχύουν σε όλη την εφαρμογή, σε αυτή τη συσκευή.': 'Theme, text size and contrast. They apply to the whole app on this device.',
+  'Το μέγεθος γραμμάτων άλλαξε.': 'Text size changed.',
 };
 
 export const dictionaries = { el: Object.fromEntries(Object.keys(EN).map((key) => [key, key])), en: EN };

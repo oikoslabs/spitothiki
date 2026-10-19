@@ -1,0 +1,23 @@
+// Text size + high contrast: chips change the root font scale app-wide, persist after reload, bilingual.
+import puppeteer from 'puppeteer-core';
+const url = process.argv[2] || 'http://127.0.0.1:8080/';
+const shots = process.argv[3];
+const browser = await puppeteer.launch({ executablePath: process.env.CHROME_PATH || '/usr/bin/google-chrome', args: ['--no-sandbox'], headless: true });
+const page = await browser.newPage(); await page.setBypassServiceWorker(true);
+await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+const errors = []; page.on('pageerror', (e) => errors.push(e.message));
+await page.goto(`${url}#settings`, { waitUntil: 'networkidle0' });
+await page.evaluate(() => { localStorage.clear(); localStorage.setItem('spitothiki:onboarded', '1'); }); await page.reload({ waitUntil: 'networkidle0' });
+const size = () => page.evaluate(() => parseFloat(getComputedStyle(document.querySelector('.view-content h1, h1')).fontSize));
+const base = await size();
+await page.click('[data-action="set-text-size"][data-size="xlarge"]'); await new Promise((r) => setTimeout(r, 300));
+const big = await size();
+await page.click('#high-contrast'); await new Promise((r) => setTimeout(r, 300));
+await page.reload({ waitUntil: 'networkidle0' });
+const after = await page.evaluate(() => ({ text: document.documentElement.dataset.text, contrast: document.documentElement.dataset.contrast, checked: document.querySelector('#high-contrast')?.checked, overflow: document.documentElement.scrollWidth > innerWidth + 1 }));
+if (shots) await page.screenshot({ path: `${shots}/v11-after-settings-xlarge-phone.png` });
+await page.evaluate(() => { localStorage.setItem('spitothiki:lang', 'en'); }); await page.reload({ waitUntil: 'networkidle0' });
+const en = await page.evaluate(() => document.querySelector('#text-size-label')?.textContent);
+const ok = big > base * 1.25 && after.text === 'xlarge' && after.contrast === 'high' && after.checked && !after.overflow && en === 'Text size' && !errors.length;
+console.log(ok ? 'prefs smoke: all ok' : 'prefs smoke: FAILED', { base, big, after, en, errors });
+await browser.close(); process.exit(ok ? 0 : 1);

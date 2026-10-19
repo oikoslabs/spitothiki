@@ -7,6 +7,7 @@ import { fetchReceipt, receiptId } from './receipt.js';
 import { fetchMealDbSuggestions, ingredientName, pantryIngredients, suggestBuiltin } from './recipes.js';
 import { CATEGORIES, WASTE_REASONS, applyWaste, createStore, createWaste, groupByStore, monthKey, rowCategory, monthlySpending, moveCategory, purchaseFor, shiftMonth, storeOrder, wasteStats } from './features.js';
 import { showSigninCard } from './features.js';
+import { applyDisplayPrefs, highContrast, setHighContrast, setTextSize, textSize } from './prefs.js';
 import { RECURRING_INTERVALS, applyRecurring, createRecurring, dueFromSnapshot, expirySnapshot, parseVoiceItems } from './features.js';
 import { MEAL_SLOTS, copyPreviousWeek, createMeal, recipeFromMealDb, shiftDays, weekDays, weekShoppingNeeds, weekStart } from './mealplan.js';
 import { BUILTIN_RECIPES } from './recipes.js';
@@ -337,7 +338,9 @@ function renderShopping() {
 function renderSettings() {
   return `${renderHeader('Ρυθμίσεις', 'Διαχείριση και αντίγραφο ασφαλείας των δεδομένων σου.')}
     <div class="settings-grid"><section class="panel settings-card"><span class="stat-icon">🔒</span><h2>Απόρρητο πρώτα</h2><p>Το απόθεμα, οι λίστες και τα έξοδά σου αποθηκεύονται στη συσκευή σου και η εφαρμογή δουλεύει και χωρίς internet. Αν συνδεθείς, συγχρονίζονται ιδιωτικά μέσω Firebase μόνο με τα μέλη του νοικοκυριού σου. Δεν υπάρχουν διαφημίσεις ούτε παρακολούθηση.</p><div class="privacy-note">Η αναζήτηση barcode στέλνει μόνο τον αριθμό του barcode στο Open Food Facts. Αν δεν έχεις συνδεθεί και καθαρίσεις τα δεδομένα του browser ή αλλάξεις συσκευή, χρησιμοποίησε αντίγραφο ασφαλείας.</div></section>
-    <section class="panel settings-card"><span class="stat-icon">◐</span><h2>Εμφάνιση</h2><p>Διάλεξε φωτεινό ή σκούρο θέμα, ή άφησέ το να ακολουθεί τη συσκευή.</p><div class="theme-options" role="group" aria-label="Θέμα">${[['auto', 'Αυτόματο'], ['light', 'Φωτεινό'], ['dark', 'Σκούρο']].map(([value, label]) => `<button type="button" class="filter-chip ${currentTheme() === value ? 'is-active' : ''}" data-action="set-theme" data-theme="${value}" aria-pressed="${currentTheme() === value}">${label}</button>`).join('')}</div></section>
+    <section class="panel settings-card"><span class="stat-icon">◐</span><h2>Εμφάνιση</h2><p>Θέμα, μέγεθος γραμμάτων και αντίθεση. Ισχύουν σε όλη την εφαρμογή, σε αυτή τη συσκευή.</p><div class="theme-options" role="group" aria-label="Θέμα">${[['auto', 'Αυτόματο'], ['light', 'Φωτεινό'], ['dark', 'Σκούρο']].map(([value, label]) => `<button type="button" class="filter-chip ${currentTheme() === value ? 'is-active' : ''}" data-action="set-theme" data-theme="${value}" aria-pressed="${currentTheme() === value}">${label}</button>`).join('')}</div>
+      <h3 class="settings-sub" id="text-size-label">Μέγεθος γραμμάτων</h3><div class="theme-options size-options" role="group" aria-labelledby="text-size-label">${[['normal', 'Κανονικά'], ['large', 'Μεγάλα'], ['xlarge', 'Πολύ μεγάλα']].map(([value, label]) => `<button type="button" class="filter-chip ${textSize() === value ? 'is-active' : ''}" data-action="set-text-size" data-size="${value}" aria-pressed="${textSize() === value}">${label}</button>`).join('')}</div>
+      <label class="check-row"><input type="checkbox" id="high-contrast" ${highContrast() ? 'checked' : ''}> <span>Υψηλή αντίθεση (πιο έντονα γράμματα και περιγράμματα)</span></label></section>
     ${renderLanguageCard()}
     ${renderSyncCard()}
     ${renderNotificationCard()}
@@ -716,6 +719,7 @@ function applyTheme(theme = currentTheme()) {
   if (theme === 'auto') delete document.documentElement.dataset.theme;
   else document.documentElement.dataset.theme = theme;
   const dark = theme === 'dark' || (theme === 'auto' && window.matchMedia?.('(prefers-color-scheme: dark)').matches);
+  document.documentElement.dataset.dark = dark ? '1' : '';
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#121a16' : '#f5f6f0');
 }
 
@@ -2067,6 +2071,7 @@ function handleAction(button) {
   else if (action === 'enable-notifications') enableNotifications();
   else if (action === 'disable-notifications') { saveNotifySettings({ enabled: false }); updateBackgroundCheck(); renderApp(); showToast('Οι ειδοποιήσεις απενεργοποιήθηκαν.'); }
   else if (action === 'set-theme') setTheme(button.dataset.theme);
+  else if (action === 'set-text-size') { const size = setTextSize(button.dataset.size); renderApp(); document.querySelector(`[data-action="set-text-size"][data-size="${size}"]`)?.focus(); showToast(t('Το μέγεθος γραμμάτων άλλαξε.')); }
   else if (action === 'set-store') { try { if (button.dataset.store) localStorage.setItem(STORE_KEY, button.dataset.store); else localStorage.removeItem(STORE_KEY); } catch {} renderApp(); }
   else if (action === 'vm-switch') {
     const trip = activeTrip();
@@ -2149,6 +2154,7 @@ document.addEventListener('input', (event) => {
 });
 
 document.addEventListener('change', (event) => {
+  if (event.target.id === 'high-contrast') { setHighContrast(event.target.checked); renderApp(); document.querySelector('#high-contrast')?.focus(); return; }
   if (event.target.id === 'transport-type') { const fuel = event.target.value === 'fuel'; document.querySelector('#transport-fuel').hidden = !fuel; document.querySelector('#transport-ppl').hidden = !fuel; }
   if (event.target.id === 'bill-type') event.target.form.dataset.typeTouched = '1';
   if (event.target.id === 'cart-item-unit') updateCartQtyLabel();
@@ -2415,6 +2421,7 @@ confirmDialog.addEventListener('close', () => {
 });
 
 applyLanguage();
+applyDisplayPrefs();
 applyTheme();
 window.matchMedia?.('(prefers-color-scheme: dark)').addEventListener?.('change', () => applyTheme());
 window.addEventListener('hashchange', () => navigate(location.hash.slice(1)));

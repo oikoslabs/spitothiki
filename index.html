@@ -7,6 +7,7 @@
   <meta name="description" content="Οργάνωσε το σπίτι και τα έξοδά σου: απόθεμα και λήξεις, λίστα αγορών, λογαριασμοί, μετακινήσεις και μικροέξοδα.">
   <title>Σπιτοθήκη — Το σπίτι σε τάξη</title>
   <script>try { const l = localStorage.getItem('spitothiki:lang') || ((navigator.language || '').toLowerCase().startsWith('en') ? 'en' : 'el'); document.documentElement.lang = l === 'en' ? 'en' : 'el'; } catch {}</script>
+  <script>try { const z = localStorage.getItem('spitothiki:text-size'); if (z === 'large' || z === 'xlarge') document.documentElement.dataset.text = z; if (localStorage.getItem('spitothiki:contrast') === 'high') document.documentElement.dataset.contrast = 'high'; } catch {}</script>
   <script>try { const t = localStorage.getItem('spitothiki:theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch {}</script>
   <link rel="stylesheet" href="styles.css">
   <link rel="manifest" href="manifest.webmanifest">
