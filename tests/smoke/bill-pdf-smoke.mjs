@@ -16,7 +16,7 @@ await page.goto(`${url}#bills`, { waitUntil: 'networkidle0' });
 let failed = 0;
 async function importPdf(name, expectName) {
   await (await page.$('#bill-file')).uploadFile(pdf(name));
-  await page.waitForFunction((v) => document.querySelector('#bill-name')?.value === v && /Έλεγξε|Συμπλήρωσε/.test(document.querySelector('#bill-scan-status').textContent), { timeout: 60000 }, expectName);
+  await page.waitForFunction((v) => document.querySelector('#bill-name')?.value === v && /Έλεγξε|Συμπλήρωσε/.test(document.querySelector('#bill-scan-status').textContent) && !/Αναζήτηση για/.test(document.querySelector('#bill-scan-status').textContent), { timeout: 60000 }, expectName);
   return page.evaluate(() => ({ amount: document.querySelector('#bill-amount').value, due: document.querySelector('#bill-due').value, ref: document.querySelector('#bill-reference').value, status: document.querySelector('#bill-scan-status').textContent }));
 }
 const v = await importPdf('vodafone-columns.pdf', 'Vodafone');

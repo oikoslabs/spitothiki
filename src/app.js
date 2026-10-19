@@ -1724,7 +1724,7 @@ function renderBills() {
 
 function openBillDialog(id = '') {
   const form = document.querySelector('#bill-form');
-  form.reset();
+  form.reset(); form.dataset.importToken = '';
   const bill = (state.bills || []).find((entry) => entry.id === id);
   form.elements.type.innerHTML = BILL_TYPES.map((type) => `<option value="${type}">${BILL_ICONS[type]} ${escapeHtml(t(BILL_TYPE_LABELS[type]))}</option>`).join('');
   form.elements.period.innerHTML = BILL_PERIODS.map((period) => `<option value="${period}">${escapeHtml(t(BILL_PERIOD_LABELS[period]))}</option>`).join('');
@@ -1776,25 +1776,41 @@ async function importBillFile(file) {
   const form = document.querySelector('#bill-form');
   const status = document.querySelector('#bill-scan-status');
   status.textContent = t('Ανάγνωση λογαριασμού…');
+  let early = null; let fill = () => {};
+  const token = String(Date.now() + Math.random()); form.dataset.importToken = token;
+  const current = () => form.dataset.importToken === token && document.querySelector('#bill-dialog').open;
   try {
+    // Fields are filled as soon as the PDF text is read; QR/OCR may add more later, but never overwrite
+    // a field the user has already edited.
+    const filled = {};
+    const put = (name, value) => {
+      const el = form.elements[name];
+      if (value == null || value === '' || !el) return;
+      if (el.value !== '' && filled[name] !== el.value) return;
+      el.value = value; filled[name] = el.value;
+    };
+    fill = (parsed, source, final) => {
+      if (!current()) return; // a newer import or a closed dialog: drop late results
+      if (parsed.name) { put('name', parsed.name); if (filled.name === parsed.name) { form.elements.type.value = parsed.type; form.dataset.typeTouched = '1'; } }
+      put('amount', parsed.amount); put('due', parsed.due); put('reference', parsed.reference);
+      if (!filled.period) { form.elements.period.value = parsed.type === 'water' ? '4' : parsed.type === 'electricity' ? '1' : form.elements.period.value; filled.period = true; }
+      put('billingFrom', parsed.period?.from || ''); put('billingTo', parsed.period?.to || '');
+      const found = [parsed.name && t('πάροχος'), parsed.amount != null && (parsed.sources?.amount === 'code' ? t('ποσό (από QR)') : parsed.sources?.amount === 'ocr' ? t('ποσό (από εικόνα)') : t('ποσό')), parsed.due && (parsed.sources?.due === 'ocr' ? t('λήξη (από εικόνα)') : t('λήξη')), parsed.reference && (parsed.rfValid ? t('κωδικός RF ✓') : t('κωδικός RF (έλεγξέ τον)')), parsed.period && t('περίοδος {from} – {to}', { from: formatDate(parsed.period.from), to: formatDate(parsed.period.to) })].filter(Boolean);
+      const missing = [!parsed.name && t('πάροχος'), parsed.amount == null && t('ποσό'), !parsed.due && t('λήξη')].filter(Boolean);
+      status.textContent = found.length
+        ? `${t(source === 'ocr' ? 'Από αναγνώριση εικόνας' : 'Από το PDF')}: ${found.join(', ')}.${missing.length ? ` ${final ? t('Συμπλήρωσε: {fields}.', { fields: missing.join(', ') }) : t('Αναζήτηση για: {fields}…', { fields: missing.join(', ') })}` : ''} ${t('Έλεγξε και πάτα Αποθήκευση.')}`
+        : final ? t('Δεν βρέθηκαν στοιχεία λογαριασμού στο αρχείο. Συμπλήρωσε τα στοιχεία με το χέρι.') : status.textContent;
+      setBillDuplicate(parsed.name || parsed.reference ? findDuplicateBill(state.bills || [], { ...parsed, amount: parsed.amount ?? 0 }) : null);
+    };
     const { parsed, source } = await readBillFile(file, {
-      recognizeImpl: window.__spitoOcrMock,
-      onProgress: (m) => { status.textContent = m.status === 'recognizing text' ? t('Αναγνώριση κειμένου… {pct}%', { pct: Math.round((m.progress || 0) * 100) }) : m.status === 'ocr' ? t('Το PDF δεν έχει κείμενο· αναγνώριση από εικόνα…') : t('Ανάγνωση λογαριασμού…'); }
+      recognizeImpl: window.__spitoOcrMock, decodeImpl: window.__spitoBillCodesMock,
+      onParsed: (p) => { early = p; fill(p, 'pdf', false); },
+      onProgress: (m) => { if (early) return; status.textContent = m.status === 'recognizing text' ? t('Αναγνώριση κειμένου… {pct}%', { pct: Math.round((m.progress || 0) * 100) }) : m.status === 'ocr' ? t('Το PDF δεν έχει κείμενο· αναγνώριση από εικόνα…') : t('Ανάγνωση λογαριασμού…'); }
     });
-    if (parsed.name) { form.elements.name.value = parsed.name; form.elements.type.value = parsed.type; form.dataset.typeTouched = '1'; }
-    if (parsed.amount != null) form.elements.amount.value = parsed.amount;
-    if (parsed.due) form.elements.due.value = parsed.due;
-    if (parsed.reference) form.elements.reference.value = parsed.reference;
-    form.elements.period.value = parsed.type === 'water' ? '4' : parsed.type === 'electricity' ? '1' : form.elements.period.value;
-    form.elements.billingFrom.value = parsed.period?.from || '';
-    form.elements.billingTo.value = parsed.period?.to || '';
-    const found = [parsed.name && t('πάροχος'), parsed.amount != null && (parsed.sources?.amount === 'code' ? t('ποσό (από QR)') : parsed.sources?.amount === 'ocr' ? t('ποσό (από εικόνα)') : t('ποσό')), parsed.due && (parsed.sources?.due === 'ocr' ? t('λήξη (από εικόνα)') : t('λήξη')), parsed.reference && (parsed.rfValid ? t('κωδικός RF ✓') : t('κωδικός RF (έλεγξέ τον)')), parsed.period && t('περίοδος {from} – {to}', { from: formatDate(parsed.period.from), to: formatDate(parsed.period.to) })].filter(Boolean);
-    const missing = [!parsed.name && t('πάροχος'), parsed.amount == null && t('ποσό'), !parsed.due && t('λήξη')].filter(Boolean);
-    status.textContent = found.length
-      ? `${t(source === 'ocr' ? 'Από αναγνώριση εικόνας' : 'Από το PDF')}: ${found.join(', ')}.${missing.length ? ` ${t('Συμπλήρωσε: {fields}.', { fields: missing.join(', ') })}` : ''} ${t('Έλεγξε και πάτα Αποθήκευση.')}`
-      : t('Δεν βρέθηκαν στοιχεία λογαριασμού στο αρχείο. Συμπλήρωσε τα στοιχεία με το χέρι.');
-    setBillDuplicate(parsed.name || parsed.reference ? findDuplicateBill(state.bills || [], { ...parsed, amount: parsed.amount ?? 0 }) : null);
+    fill(parsed, source, true);
   } catch (error) {
+    if (early) { fill(early, 'pdf', true); return; }
+    if (!current()) return;
     status.textContent = t('Δεν ήταν δυνατή η ανάγνωση του αρχείου. Συμπλήρωσε τα στοιχεία με το χέρι.');
   }
 }

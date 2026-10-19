@@ -229,35 +229,40 @@ async function ocrCanvas(canvas, onProgress, recognizeImpl) {
 
 // File (PDF or image) -> { text, source: 'pdf' | 'ocr', parsed } with parsed.sources = { amount: 'code'|'text'|'ocr', … }.
 // Never guesses: what isn't found stays empty for manual entry.
-export async function readBillFile(file, { onProgress, recognizeImpl, decodeImpl } = {}) {
+export const withTimeout = (promise, ms, fallback) => Promise.race([Promise.resolve(promise).catch(() => fallback), new Promise((resolve) => setTimeout(() => resolve(fallback), ms))]);
+// onParsed(parsed, stage) is called as soon as the text is parsed ('text'), then again if QR/OCR add anything.
+// QR and OCR are best effort with their own timeouts: a failure or hang there never loses the text fields.
+export async function readBillFile(file, { onProgress, onParsed, recognizeImpl, decodeImpl, codeTimeoutMs = 8000, ocrTimeoutMs = 60000 } = {}) {
   const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name || '');
   if (!isPdf) {
     const { preprocess } = await import('./receipt-photo.js');
     const img = await new Promise((resolve, reject) => { const url = URL.createObjectURL(file); const el = new Image(); el.onload = () => resolve(el); el.onerror = () => reject(new Error('Δεν ήταν δυνατό να ανοίξει το αρχείο.')); el.src = url; });
     onProgress?.({ status: 'ocr' });
     const text = await ocrCanvas(preprocess(img), onProgress, recognizeImpl);
-    return { text, source: 'ocr', parsed: mergeBill(parseBillText(text)) };
+    const parsed = mergeBill(parseBillText(text));
+    return { text, source: 'ocr', parsed };
   }
   onProgress?.({ status: 'pdf' });
   const lib = await loadPdfjs();
   const doc = await lib.getDocument({ data: new Uint8Array(await file.arrayBuffer()), isEvalSupported: false }).promise;
   let text = await pdfText(doc);
   let source = 'pdf';
-  // QR / barcodes printed on the first pages (EPC QR carries the amount).
-  const codes = []; const canvases = [];
-  for (let n = 1; n <= Math.min(doc.numPages, 2); n++) {
-    try { const canvas = await renderPage(doc, n, 2.5); canvases.push(canvas); codes.push(...await pageCodes(canvas, decodeImpl)); } catch {}
-  }
   const scanned = text.replace(/\s/g, '').length < 40;
-  let parsed = mergeBill(parseBillText(text), [], codes);
+  let parsed = mergeBill(parseBillText(text));
+  if (!scanned) { try { onParsed?.(parsed, 'text'); } catch {} }
+  let canvas = null;
+  const page1 = async () => (canvas ||= await renderPage(doc, 1, 2));
+  // QR / barcodes on page 1 (EPC QR carries the amount).
+  const codes = await withTimeout((async () => pageCodes(await page1(), decodeImpl))(), codeTimeoutMs, []);
+  if (codes.length) { parsed = mergeBill(parsed, [], codes); if (!scanned) { try { onParsed?.(parsed, 'code'); } catch {} } }
   if (scanned || parsed.amount == null || !parsed.due) {
     // Scanned PDF, or the text layer lacks amount/due (often printed as an image): OCR page 1 for what's missing.
-    try {
-      onProgress?.({ status: 'ocr' });
-      const ocrText = await ocrCanvas(canvases[0] || await renderPage(doc, 1, 2.5), onProgress, recognizeImpl);
+    onProgress?.({ status: 'ocr' });
+    const ocrText = await withTimeout((async () => ocrCanvas(await page1(), onProgress, recognizeImpl))(), ocrTimeoutMs, '');
+    if (ocrText) {
       if (scanned) { text = ocrText; source = 'ocr'; parsed = mergeBill(parseBillText(ocrText), [], codes); for (const k of Object.keys(parsed.sources)) if (parsed.sources[k] === 'text') parsed.sources[k] = 'ocr'; }
       else parsed = mergeBill(parsed, [parseBillText(ocrText)]);
-    } catch {}
+    }
   }
   return { text, source, parsed };
 }

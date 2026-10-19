@@ -639,6 +639,7 @@ const EN = {
   'ποσό (από QR)': 'amount (from QR)',
   'ποσό (από εικόνα)': 'amount (from image)',
   'λήξη (από εικόνα)': 'due date (from image)',
+  'Αναζήτηση για: {fields}…': 'Looking for: {fields}…',
 };
 
 export const dictionaries = { el: Object.fromEntries(Object.keys(EN).map((key) => [key, key])), en: EN };
