@@ -21,6 +21,8 @@ import { VM_MODES, interpretCode } from './gs1.js';
 import { TRANSPORT_ICONS, TRANSPORT_TYPES, applyTransportRecurring, classifyReceipt, consumptionFor, createTransport, createTransportRecurring, fuelStats, pricePerLiter, transportMonth } from './transport.js';
 import { EXTRA_DEFAULT_EMOJI, EXTRA_SUGGESTIONS, LEGACY_EXTRA_CATEGORIES, createExtra, createExtraCategory, deleteExtraCategory, extraCategories, findExtraCategory, suggestEmoji, extrasMonth, extrasSummary, lastUnitPrice, quickExtra, setExtraQty, unitPrice } from './extras.js';
 import { getLang, locale, setLang, t, translateDom, untranslatedGreek } from './i18n.js';
+import { daysUntil, escapeHtml, expiryLabel, formatDate, localDateKey, readKey, writeKey } from './format.js';
+import { THEME_KEY, applyTheme, currentTheme } from './theme.js';
 
 const viewRoot = document.querySelector('#view-content');
 const itemDialog = document.querySelector('#item-dialog');
@@ -43,46 +45,6 @@ const CATEGORY_ICONS = {
   'Ξηρά τρόφιμα': '🌾', 'Κατεψυγμένα': '🧊', 'Ροφήματα': '☕',
   'Καθαριότητα': '🧽', 'Άλλο': '🧺'
 };
-
-function localDateKey(date = new Date()) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-}
-
-function escapeHtml(value) {
-  return String(value ?? '').replace(/[&<>"']/g, (char) => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-  })[char]);
-}
-
-function formatDate(value) {
-  if (!value) return '';
-  const date = new Date(`${value}T00:00:00`);
-  if (Number.isNaN(date.getTime())) return '';
-  const options = { day: 'numeric', month: 'short' };
-  if (date.getFullYear() !== new Date().getFullYear()) options.year = 'numeric';
-  return new Intl.DateTimeFormat(locale(), options).format(date);
-}
-
-function daysUntil(value) {
-  if (!value) return null;
-  const [y, m, d] = value.split('-').map(Number);
-  const [ty, tm, td] = localDateKey().split('-').map(Number);
-  const target = Date.UTC(y, m - 1, d);
-  const today = Date.UTC(ty, tm - 1, td);
-  if (!Number.isFinite(target) || !Number.isFinite(today)) return null;
-  return Math.round((target - today) / 86_400_000);
-}
-
-function expiryLabel(value) {
-  const status = expiryStatus(value, localDateKey());
-  const days = daysUntil(value);
-  if (status === 'none') return '';
-  if (status === 'expired') return t('Έληξε {date}', { date: formatDate(value) });
-  if (days === 0) return t('Λήγει σήμερα');
-  if (days === 1) return t('Λήγει αύριο');
-  if (status === 'soon') return t('Λήγει σε {days} ημέρες', { days });
-  return t('Λήξη {date}', { date: formatDate(value) });
-}
 
 function showToast(message, { undo = null } = {}) {
   toast.textContent = t(message);
@@ -662,8 +624,6 @@ async function handleScanFile(file) {
 }
 
 // ---------- First-run setup (3 questions) ----------
-const readKey = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
-const writeKey = (k, v) => { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch {} };
 const billPresetIds = () => { try { return JSON.parse(readKey(PRESETS_KEY) || '[]'); } catch { return []; } };
 let onboardPicks = new Set();
 function renderOnboard() {
@@ -862,20 +822,6 @@ function changeLanguage(lang) {
 
 // Exposed for the smoke test.
 window.__i18n = { getLang, untranslatedGreek };
-
-const THEME_KEY = 'spitothiki:theme';
-
-function currentTheme() {
-  try { const theme = localStorage.getItem(THEME_KEY); return theme === 'light' || theme === 'dark' ? theme : 'auto'; } catch { return 'auto'; }
-}
-
-function applyTheme(theme = currentTheme()) {
-  if (theme === 'auto') delete document.documentElement.dataset.theme;
-  else document.documentElement.dataset.theme = theme;
-  const dark = theme === 'dark' || (theme === 'auto' && window.matchMedia?.('(prefers-color-scheme: dark)').matches);
-  document.documentElement.dataset.dark = dark ? '1' : '';
-  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#121a16' : '#f5f6f0');
-}
 
 function setTheme(theme) {
   try { if (theme === 'auto') localStorage.removeItem(THEME_KEY); else localStorage.setItem(THEME_KEY, theme); } catch {}

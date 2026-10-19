@@ -15,8 +15,8 @@ test('placeholders match between el and en', () => {
   for (const key of Object.keys(dictionaries.el)) assert.equal(vars(dictionaries.en[key]), vars(dictionaries.el[key]), key);
 });
 
-test('every t() literal in app.js has a translation', () => {
-  const source = readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');
+test('every t() literal in app.js and its split-out modules has a translation', () => {
+  const source = ['app.js', 'format.js', 'theme.js'].map((f) => readFileSync(new URL(`../src/${f}`, import.meta.url), 'utf8')).join('\n');
   const keys = [...source.matchAll(/\bt\('((?:[^'\\]|\\.)*)'/g)].map((m) => m[1]).filter((k) => /[\u0370-\u03ff]/.test(k));
   assert.ok(keys.length > 30);
   for (const key of keys) assert.ok(Object.hasOwn(dictionaries.en, key), `missing en: ${key}`);

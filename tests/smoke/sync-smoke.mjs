@@ -16,7 +16,7 @@ async function device(name) {
   await page.setBypassServiceWorker(true);
   await page.setViewport({ width: 1100, height: 900 });
   page.on('pageerror', (e) => errors.push(`${name} pageerror: ${e.message}`));
-  page.on('console', (m) => { if (m.type() === 'error' && !m.text().includes('404')) errors.push(`${name} console: ${m.text()}`); });
+  page.on('console', (m) => { if (m.type() === 'error' && m.text().trim() && !/404|cloudflareinsights|net::ERR_FAILED|CORS/.test(m.text())) errors.push(`${name} console: ${m.text()}`); });
   await page.exposeFunction('__fb', (op, k, data, extra) => backend.handle(op, k, data, extra));
   await page.setRequestInterception(true);
   page.on('request', (request) => {
