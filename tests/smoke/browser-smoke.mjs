@@ -181,7 +181,7 @@ const steps = [
     const bottom = width < 700 ? await page.$$eval('.primary-nav .nav-item', (els) => els.filter((e) => e.offsetParent !== null).length) : 4;
     await page.evaluate(() => document.querySelector('#menu-sheet').open && document.querySelector('#menu-sheet').close());
     await nav('pantry');
-    const ok = open && items.length === 11 && items.includes('menu-mealplan') && items.includes('menu-receipt') && view === 'transport' && closed && header === 'Μετακινήσεις' && bottom === 4;
+    const ok = open && items.length === 12 && items.includes('extras') && items.includes('menu-mealplan') && items.includes('menu-receipt') && view === 'transport' && closed && header === 'Μετακινήσεις' && bottom === 4;
     if (!ok) console.log('  menu:', { open, items, view, closed, header, bottom });
     return ok;
   }],

@@ -32,6 +32,7 @@
         <button class="nav-item nav-secondary" type="button" data-view="cook"><span class="nav-icon" aria-hidden="true">🍳</span><span>Μαγείρεμα</span></button>
         <button class="nav-item nav-secondary" type="button" data-view="bills"><span class="nav-icon" aria-hidden="true">📄</span><span>Λογαριασμοί</span><span class="nav-count" id="nav-bills-count" hidden>0</span></button>
         <button class="nav-item nav-secondary" type="button" data-view="transport"><span class="nav-icon" aria-hidden="true">🚗</span><span>Μετακινήσεις</span></button>
+        <button class="nav-item nav-secondary" type="button" data-view="extras"><span class="nav-icon" aria-hidden="true">☕</span><span>Μικροέξοδα</span></button>
         <button class="nav-item nav-secondary" type="button" data-view="insights"><span class="nav-icon" aria-hidden="true">◔</span><span>Στατιστικά</span></button>
         <button class="nav-item nav-menu-item" type="button" data-action="open-menu" aria-haspopup="dialog"><span class="nav-icon" aria-hidden="true">☰</span><span>Μενού</span></button>
         <button class="nav-item nav-secondary" type="button" data-view="settings"><span class="nav-icon" aria-hidden="true">⚙</span><span>Ρυθμίσεις</span></button>
@@ -71,6 +72,7 @@
       <p class="menu-group">ΕΞΟΔΑ</p>
       <button class="menu-item" type="button" data-view="bills"><span class="menu-icon" aria-hidden="true">📄</span><span>Λογαριασμοί</span></button>
       <button class="menu-item" type="button" data-view="transport"><span class="menu-icon" aria-hidden="true">🚗</span><span>Μετακινήσεις</span></button>
+      <button class="menu-item" type="button" data-view="extras"><span class="menu-icon" aria-hidden="true">☕</span><span>Μικροέξοδα</span></button>
       <button class="menu-item" type="button" data-view="insights"><span class="menu-icon" aria-hidden="true">◔</span><span>Στατιστικά</span></button>
       <p class="menu-group">ΕΦΑΡΜΟΓΗ</p>
       <button class="menu-item" type="button" data-view="settings"><span class="menu-icon" aria-hidden="true">⚙</span><span>Ρυθμίσεις</span></button>
@@ -123,6 +125,11 @@
   <dialog id="transport-history-dialog" class="confirm-dialog history-dialog" aria-labelledby="transport-history-title">
     <div class="dialog-heading"><div><p class="eyebrow">ΜΕΤΑΚΙΝΗΣΕΙΣ</p><h2 id="transport-history-title">Ιστορικό μετακινήσεων</h2></div><button class="icon-button" type="button" data-action="close-transport-history" aria-label="Κλείσιμο">×</button></div>
     <div id="transport-history-body"></div>
+  </dialog>
+
+  <dialog id="extras-history-dialog" class="confirm-dialog history-dialog" aria-labelledby="extras-history-title">
+    <div class="dialog-heading"><div><p class="eyebrow">ΜΙΚΡΟΕΞΟΔΑ</p><h2 id="extras-history-title">Ιστορικό μικροεξόδων</h2></div><button class="icon-button" type="button" data-action="close-extras-history" aria-label="Κλείσιμο">×</button></div>
+    <div id="extras-history-body"></div>
   </dialog>
 
   <dialog id="share-dialog" class="confirm-dialog" aria-labelledby="share-title">
