@@ -9,6 +9,15 @@ export const LANGS = ['el', 'en'];
 
 const EN = {
   ...DIET_EN,
+  "Αποδείξεις": "Receipts",
+  "Καμία απόδειξη αυτόν τον μήνα.": "No receipts this month.",
+  "Δεν έχεις σκανάρει αποδείξεις ακόμα. Πάτα «📷 Σάρωση» και στόχευσε το QR της απόδειξης.": "You have not scanned any receipts yet. Tap “📷 Scan” and point at the receipt’s QR code.",
+  "Όσες αποδείξεις έχεις σκανάρει, οι πιο πρόσφατες πρώτα.": "Every receipt you have scanned, newest first.",
+  "{count} αποδείξεις · σύνολο {total}": "{count} receipts · total {total}",
+  "Τα είδη δεν κρατήθηκαν για αυτή την απόδειξη (καταγράφηκε μόνο το σύνολο).": "The items were not kept for this receipt (only the total was recorded).",
+  "Χωρίς αναλυτικά είδη.": "No itemised lines.",
+  "Άνοιγμα ηλεκτρονικής απόδειξης": "Open the e-receipt",
+  "Η απόδειξη διαγράφηκε μαζί με τα έξοδά της.": "Receipt deleted together with its expenses.",
   "Στη συσκευή σου: απόθεμα, λίστες, έξοδα, λογαριασμοί, μετακινήσεις, πρόγραμμα διατροφής και ρυθμίσεις. Δεν φεύγουν από εκεί αν δεν συνδεθείς.": "On your device: pantry, lists, expenses, bills, trips, diet plan and settings. They stay there unless you sign in.",
   "Αν συνδεθείς: τα ίδια δεδομένα συγχρονίζονται στο Firebase (Google) και τα βλέπουν μόνο τα μέλη του νοικοκυριού σου. Μπορείς να αποσυνδεθείς ή να τα διαγράψεις όποτε θες.": "If you sign in: the same data syncs to Firebase (Google) and only members of your household can see it. You can sign out or delete it any time.",
   "Αποδείξεις με QR: ο σύνδεσμος της απόδειξης περνά από έναν μικρό διακομιστή μας (Cloudflare) μόνο για να διαβαστεί. Δεν κρατάμε τα είδη, τα ποσά ή τη διεύθυνση IP σου, μόνο ανώνυμη μέτρηση (π.χ. «σούπερ μάρκετ, επιτυχία»).": "QR receipts: the receipt link passes through our small server (Cloudflare) only to be read. We do not keep the items, amounts or your IP address, only an anonymous count (e.g. “supermarket, success”).",

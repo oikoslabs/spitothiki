@@ -8,6 +8,7 @@ import { fetchMealDbSuggestions, ingredientName, pantryIngredients, suggestBuilt
 import { CATEGORIES, WASTE_REASONS, applyWaste, createStore, createWaste, groupByStore, monthKey, rowCategory, monthlySpending, moveCategory, purchaseFor, shiftMonth, storeOrder, wasteStats } from './features.js';
 import { showSigninCard } from './features.js';
 import { routeCode } from './scan-router.js';
+import { deleteReceipt, listReceipts, receiptCategory, receiptItems, receiptMonths } from './receipts.js';
 import { BILL_PRESETS, ONBOARD_KEY, PRESETS_KEY, pendingPresets, shouldOnboard } from './onboarding.js';
 import { applyDisplayPrefs, highContrast, setHighContrast, setTextSize, textSize } from './prefs.js';
 import { RECURRING_INTERVALS, applyRecurring, createRecurring, dueFromSnapshot, expirySnapshot, parseVoiceItems } from './features.js';
@@ -32,7 +33,7 @@ const backupFile = document.querySelector('#backup-file');
 const toast = document.querySelector('#toast');
 
 let state = loadState();
-const VIEWS = ['overview', 'pantry', 'shopping', 'cart', 'cook', 'bills', 'transport', 'extras', 'insights', 'settings'];
+const VIEWS = ['overview', 'pantry', 'shopping', 'cart', 'cook', 'bills', 'transport', 'extras', 'insights', 'receipts', 'settings'];
 let activeView = VIEWS.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'overview';
 let pantryQuery = '';
 let pantryCategory = 'Όλα';
@@ -100,7 +101,7 @@ function pendingLabel(count) {
   return t(count === 1 ? '{count} εκκρεμές προϊόν' : '{count} εκκρεμή προϊόντα', { count });
 }
 
-const SECTION_LABELS = { overview: 'Σπιτοθήκη', pantry: 'Το απόθεμά μου', shopping: 'Λίστα αγορών', cart: 'Καλάθι στο κατάστημα', cook: 'Μαγείρεμα', bills: 'Λογαριασμοί', transport: 'Μετακινήσεις', extras: 'Μικροέξοδα', insights: 'Σύνολο εξόδων', settings: 'Ρυθμίσεις' };
+const SECTION_LABELS = { overview: 'Σπιτοθήκη', pantry: 'Το απόθεμά μου', shopping: 'Λίστα αγορών', cart: 'Καλάθι στο κατάστημα', cook: 'Μαγείρεμα', bills: 'Λογαριασμοί', transport: 'Μετακινήσεις', extras: 'Μικροέξοδα', insights: 'Σύνολο εξόδων', receipts: 'Αποδείξεις', settings: 'Ρυθμίσεις' };
 function setActiveNavigation() {
   document.body.dataset.screen = activeView;
   const current = document.querySelector('#current-section');
@@ -121,7 +122,7 @@ const openAttr = (id) => (openPanels.has(id) ? 'open' : '');
 document.addEventListener('toggle', (event) => { const d = event.target; if (d.matches?.('details.collapsible[id]')) { if (d.open) openPanels.add(d.id); else openPanels.delete(d.id); } }, true);
 
 // Which menu group each section belongs to (shown as a breadcrumb under the top bar: ⌂ Αρχική › ΕΞΟΔΑ).
-const SECTION_GROUPS = { pantry: 'ΣΠΙΤΙ', shopping: 'ΣΠΙΤΙ', cart: 'ΣΠΙΤΙ', cook: 'ΣΠΙΤΙ', bills: 'ΕΞΟΔΑ', transport: 'ΕΞΟΔΑ', extras: 'ΕΞΟΔΑ', insights: 'ΕΞΟΔΑ', settings: 'ΕΦΑΡΜΟΓΗ' };
+const SECTION_GROUPS = { pantry: 'ΣΠΙΤΙ', shopping: 'ΣΠΙΤΙ', cart: 'ΣΠΙΤΙ', cook: 'ΣΠΙΤΙ', bills: 'ΕΞΟΔΑ', transport: 'ΕΞΟΔΑ', extras: 'ΕΞΟΔΑ', insights: 'ΕΞΟΔΑ', receipts: 'ΕΞΟΔΑ', settings: 'ΕΦΑΡΜΟΓΗ' };
 function renderCrumbs() {
   const group = SECTION_GROUPS[activeView];
   return `<nav class="eyebrow crumbs" aria-label="${escapeHtml(t('Πού βρίσκομαι'))}"><button class="crumb-home" type="button" data-view="overview">⌂ ${escapeHtml(t('Αρχική'))}</button>${group ? `<span aria-hidden="true">›</span><span>${escapeHtml(t(group))}</span>` : ''}</nav>`;
@@ -354,6 +355,7 @@ function renderApp() {
   else if (activeView === 'pantry') viewRoot.innerHTML = renderPantry();
   else if (activeView === 'shopping') viewRoot.innerHTML = renderShopping();
   else if (activeView === 'insights') viewRoot.innerHTML = renderInsights();
+  else if (activeView === 'receipts') viewRoot.innerHTML = renderReceipts();
   else if (activeView === 'bills') viewRoot.innerHTML = renderBills();
   else if (activeView === 'transport') viewRoot.innerHTML = renderTransport();
   else if (activeView === 'extras') viewRoot.innerHTML = renderExtras();
@@ -1090,7 +1092,7 @@ function importReceipt(form) {
     state.purchases = state.purchases.filter((purchase) => purchase.tripId !== linkTrip.id);
     state.trips = (state.trips || []).map((trip) => (trip.id === linkTrip.id ? { ...trip, receiptId: id, receiptTotal: receipt.total, updatedAt: now } : trip));
   }
-  state.receipts = [...(state.receipts || []), { id, date, total: receipt.total, store: storeName, issuerVat: receipt.issuerVat || '', format: receipt.format, lines: receipt.lines.length, importedAt: now }];
+  state.receipts = [...(state.receipts || []), { id, date, total: receipt.total, store: storeName, issuerVat: receipt.issuerVat || '', format: receipt.format, lines: receipt.lines.length, items: receipt.lines.slice(0, 80).map((l) => ({ name: l.name, quantity: l.quantity, unit: l.unit, price: l.price })), ...(receipt.sourceUrl ? { url: receipt.sourceUrl } : {}), importedAt: now }];
   if (!persist()) return;
   document.querySelector('#receipt-dialog').close();
   renderApp();
@@ -2021,12 +2023,42 @@ function renderBars(rows, format) {
   return `<div class="bar-list">${rows.map((row) => `<div class="bar-row"><span class="bar-label">${escapeHtml(row.label)}</span><span class="bar-track"><span class="bar-fill" style="width:${Math.max(3, Math.round((row.value / max) * 100))}%"></span></span><strong class="bar-value">${escapeHtml(format(row.value))}</strong></div>`).join('')}</div>`;
 }
 
+// ---------- «🧾 Αποδείξεις»: saved receipts, newest first, by month ----------
+let receiptsMonth = '';
+function renderReceipts() {
+  const all = state.receipts || [];
+  const months = receiptMonths(all);
+  if (receiptsMonth && !months.includes(receiptsMonth)) receiptsMonth = '';
+  const rows = listReceipts(all, receiptsMonth);
+  const total = rows.reduce((s, r) => s + (Number(r.total) || 0), 0);
+  const filter = months.length > 1 ? `<div class="segmented receipts-months" role="group" aria-label="${escapeHtml(t('Μήνας'))}"><button type="button" class="filter-chip${receiptsMonth ? '' : ' is-active'}" data-action="receipts-month" data-month="">${escapeHtml(t('Όλοι'))}</button>${months.map((m) => `<button type="button" class="filter-chip${m === receiptsMonth ? ' is-active' : ''}" data-action="receipts-month" data-month="${m}" data-no-i18n>${escapeHtml(monthLabel(m))}</button>`).join('')}</div>` : '';
+  const list = rows.length ? `<ul class="receipts-list" id="receipts-list">${rows.map((r) => `<li><button type="button" class="receipt-row" data-action="receipt-open" data-id="${escapeHtml(r.id)}"><span class="receipt-main"><strong data-no-i18n>${escapeHtml(r.store || t('Απόδειξη'))}</strong><small>${escapeHtml(formatDate(r.date))} · ${escapeHtml(t(receiptCategory(r, state.purchases)))}</small></span><span class="receipt-total" data-no-i18n>${escapeHtml(money(r.total))}</span><span class="arrow" aria-hidden="true">›</span></button></li>`).join('')}</ul>`
+    : `<p class="subtle-empty">${escapeHtml(t(all.length ? 'Καμία απόδειξη αυτόν τον μήνα.' : 'Δεν έχεις σκανάρει αποδείξεις ακόμα. Πάτα «📷 Σάρωση» και στόχευσε το QR της απόδειξης.'))}</p>`;
+  return `${renderHeader('Αποδείξεις', 'Όσες αποδείξεις έχεις σκανάρει, οι πιο πρόσφατες πρώτα.')}
+    <div class="settings-actions"><button class="button button-primary" type="button" data-action="menu-receipt">📷 ${escapeHtml(t('Σάρωση απόδειξης'))}</button></div>
+    <section class="panel" id="receipts-panel">${filter}${rows.length ? `<p class="field-hint" id="receipts-summary">${escapeHtml(t('{count} αποδείξεις · σύνολο {total}', { count: rows.length, total: money(total) }))}</p>` : ''}${list}</section>`;
+}
+
+function openReceiptDetails(id) {
+  const r = (state.receipts || []).find((x) => x.id === id); if (!r) return;
+  const items = receiptItems(r, state.purchases);
+  const dialog = document.querySelector('#receipt-detail-dialog');
+  dialog.querySelector('#receipt-detail-title').textContent = r.store || t('Απόδειξη');
+  dialog.querySelector('#receipt-detail-body').innerHTML = `<p class="field-hint">${escapeHtml(formatDate(r.date))} · ${escapeHtml(t(receiptCategory(r, state.purchases)))} · <strong data-no-i18n>${escapeHtml(money(r.total))}</strong></p>
+    ${items.length ? `<ul class="receipt-items" id="receipt-items">${items.map((it) => `<li><span data-no-i18n>${escapeHtml(it.name)}${it.quantity && it.quantity !== 1 ? ` ×${escapeHtml(String(it.quantity))}` : ''}</span><span data-no-i18n>${it.price ? escapeHtml(money(it.price)) : ''}</span></li>`).join('')}</ul>` : `<p class="subtle-empty">${escapeHtml(t(r.lines ? 'Τα είδη δεν κρατήθηκαν για αυτή την απόδειξη (καταγράφηκε μόνο το σύνολο).' : 'Χωρίς αναλυτικά είδη.'))}</p>`}
+    ${r.url ? `<p><a class="panel-link" href="${escapeHtml(r.url)}" target="_blank" rel="noopener noreferrer" id="receipt-link">${escapeHtml(t('Άνοιγμα ηλεκτρονικής απόδειξης'))} ↗</a></p>` : ''}
+    <div class="dialog-actions"><button class="button button-danger" type="button" data-action="receipt-delete" data-id="${escapeHtml(r.id)}">🗑 ${escapeHtml(t('Διαγραφή'))}</button><button class="button button-quiet" type="button" data-action="receipt-detail-close">${escapeHtml(t('Κλείσιμο'))}</button></div>`;
+  translateDom(dialog);
+  dialog.showModal();
+}
+
 function renderInsights() {
   const spending = monthlySpending(state.purchases || [], insightsMonth);
   const previous = monthlySpending(state.purchases || [], shiftMonth(insightsMonth, -1));
   const waste = wasteStats(state.waste || [], insightsMonth);
   const isCurrent = insightsMonth >= monthKey(localDateKey());
   return `${renderHeader('Σύνολο εξόδων', 'Πόσα ξοδεύεις και τι πετιέται, ανά μήνα.')}
+    <div class="settings-actions"><button class="button button-quiet" type="button" data-view="receipts" id="insights-receipts">🧾 ${escapeHtml(t('Αποδείξεις'))} (${(state.receipts || []).length})</button></div>
     <div class="month-switch" role="group" aria-label="Μήνας"><button class="icon-button" type="button" data-action="insights-month" data-delta="-1" aria-label="Προηγούμενος μήνας">‹</button><strong id="insights-month" data-no-i18n>${escapeHtml(monthLabel(insightsMonth))}</strong><button class="icon-button" type="button" data-action="insights-month" data-delta="1" aria-label="Επόμενος μήνας" ${isCurrent ? 'disabled' : ''}>›</button></div>
     <div class="settings-grid insights-grid">${renderMonthTotals(spending)}
     <section class="panel settings-card" id="spending-card"><span class="stat-icon blue">€</span><h2>Έξοδα</h2>
@@ -2241,6 +2273,13 @@ function handleAction(button) {
   }
   else if (action === 'waste-item') openWasteDialog(id);
   else if (action === 'close-waste') document.querySelector('#waste-dialog').close();
+  else if (action === 'receipts-month') { receiptsMonth = button.dataset.month || ''; renderApp(); }
+  else if (action === 'receipt-open') openReceiptDetails(button.dataset.id);
+  else if (action === 'receipt-detail-close') document.querySelector('#receipt-detail-dialog').close();
+  else if (action === 'receipt-delete') {
+    const id = button.dataset.id; document.querySelector('#receipt-detail-dialog').close();
+    undoable('Η απόδειξη διαγράφηκε μαζί με τα έξοδά της.', () => { Object.assign(state, deleteReceipt(state, id)); persist(); renderApp(); });
+  }
   else if (action === 'insights-month') { insightsMonth = shiftMonth(insightsMonth, Number(button.dataset.delta)); renderApp(); }
   else if (action === 'add-missing') addMissingToList(button.dataset.recipe);
   else if (action === 'retry-recipes') { onlineRecipes = { key: '', state: 'idle', list: [] }; renderApp(); }
