@@ -86,7 +86,7 @@ async function tuneCamera(track) {
 // Native BarcodeDetector where it supports the mode's formats, otherwise ZXing (TRY_HARDER).
 // Scans ~8 times/s, alternating a central crop (the on-screen scan box) and the full frame.
 // Returns stop(); stop.torch(on) toggles the flashlight when supported (stop.hasTorch).
-export async function startScanner(video, onCode, { qr = false } = {}) {
+export async function startScanner(video, onCode, { qr = false, confident = null } = {}) {
   if (!navigator.mediaDevices?.getUserMedia) throw new Error('Η κάμερα δεν είναι διαθέσιμη σε αυτόν τον browser.');
   const mode = scanMode(qr);
   const wanted = scanFormats(mode);
@@ -97,8 +97,13 @@ export async function startScanner(video, onCode, { qr = false } = {}) {
   const accept = (value) => mode !== 'product' || interpretCode(value).barcode;
   let decode;
   if (nativeFormats.length) {
-    const detector = new globalThis.BarcodeDetector({ formats: nativeFormats });
-    decode = async (canvas) => (await detector.detect(canvas))[0]?.rawValue || '';
+    // «Σκάναρε οτιδήποτε»: one detector with every format is much slower per frame on phones (ML Kit),
+    // so alternate a 2D detector (QR/DataMatrix/PDF417) and a 1D detector, each as light as the inner scanners.
+    const TWO_D = ['qr_code', 'data_matrix', 'pdf417'];
+    const groups = mode === 'all' ? [nativeFormats.filter((f) => TWO_D.includes(f)), nativeFormats.filter((f) => !TWO_D.includes(f))].filter((g) => g.length) : [nativeFormats];
+    const detectors = groups.map((formats) => new globalThis.BarcodeDetector({ formats }));
+    let turn = 0;
+    decode = async (canvas) => (await detectors[turn++ % detectors.length].detect(canvas))[0]?.rawValue || '';
   } else {
     const ZXing = await loadZxing();
     const hints = new Map([[2, zxingFormats(mode)], [3, true]]); // POSSIBLE_FORMATS, TRY_HARDER
@@ -127,7 +132,10 @@ export async function startScanner(video, onCode, { qr = false } = {}) {
       try {
         const value = await decode(canvas);
         // Receipt mode: a non-link code must be read the same way twice in a row (avoids partial 1D reads).
-        const stable = mode !== 'receipt' || /^https?:\/\//i.test(value) || value === last;
+        // «All» mode: accept at once only a value that routes somewhere (link, toll, RF/EPC, valid product code);
+        // anything else must also be read twice in a row, so a partial 1D read can't hijack the scan.
+        const stable = mode === 'all' ? Boolean(confident?.(value)) || value === last
+          : mode !== 'receipt' || /^https?:\/\//i.test(value) || value === last;
         last = value;
         if (value && accept(value) && stable && !stopped) { stop(); onCode(value); return; }
       } catch {}

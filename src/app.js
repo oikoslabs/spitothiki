@@ -543,7 +543,7 @@ async function fillFromBarcode(code) {
   }
 }
 
-async function openScanner({ onCode = fillFromBarcode, qr = false } = {}) {
+async function openScanner({ onCode = fillFromBarcode, qr = false, confident = null } = {}) {
   const dialog = document.querySelector('#scan-dialog');
   const status = document.querySelector('#scan-status');
   status.textContent = t('Άνοιγμα κάμερας…');
@@ -557,7 +557,7 @@ async function openScanner({ onCode = fillFromBarcode, qr = false } = {}) {
       stopScanner = null;
       dialog.close();
       onCode(code);
-    }, { qr });
+    }, { qr, confident });
     if (stopScanner?.hasTorch) torch.hidden = false;
     if (dialog.open) status.textContent = t(qr === 'all' ? 'Στόχευσε QR ή barcode: απόδειξη, λογαριασμό, διόδια ή προϊόν.' : qr === 'any' ? 'Στόχευσε το QR ή τον barcode του λογαριασμού.' : qr ? 'Στόχευσε το QR ή τον barcode της απόδειξης μέσα στο πλαίσιο.' : 'Στόχευσε τον barcode με την κάμερα.');
     else closeScanner();
@@ -569,7 +569,7 @@ async function openScanner({ onCode = fillFromBarcode, qr = false } = {}) {
 }
 
 // ---------- «Σκάναρε οτιδήποτε» ----------
-function openUniversalScan() { openScanner({ qr: 'all', onCode: handleScanned }); }
+function openUniversalScan() { openScanner({ qr: 'all', onCode: handleScanned, confident: (v) => routeCode(v).route !== 'unknown' }); }
 
 function showChoice({ title, message = '', raw = '', choices }) {
   const dialog = document.querySelector('#choice-dialog');
@@ -2100,6 +2100,7 @@ function handleAction(button) {
     if (trip) undoable('Το καλάθι ακυρώθηκε.', () => { state.trips = state.trips.filter((entry) => entry.id !== trip.id); cartScanning = false; if (persist()) renderApp(); });
   } else if (action === 'open-menu') { const sheet = document.querySelector('#menu-sheet'); sheet.querySelectorAll('[data-view]').forEach((b) => b.classList.toggle('is-active', b.dataset.view === activeView)); sheet.showModal(); }
   else if (action === 'close-menu') document.querySelector('#menu-sheet').close();
+  else if (action === 'quick' && button.dataset.quick === 'scan') { pressFeedback(button); runQuickAction('scan'); }
   else if (action === 'quick') { const id = button.dataset.quick; if (button.closest('#quick-sheet')) document.querySelector('#quick-sheet')?.close(); pressFeedback(button); afterPaint(() => runQuickAction(id)); }
   else if (action === 'close-quick') document.querySelector('#quick-sheet').close();
   else if (action === 'menu-receipt') { document.querySelector('#menu-sheet').close(); openReceiptDialog(); }
