@@ -65,19 +65,34 @@ export default {
     const t0 = Date.now();
     const info = { type: 'other', store: '', host: '' };
     let res;
-    try { res = await handle(request, info); } catch { res = new Response('Upstream error', { status: 502, headers: cors(request.headers.get('origin') || '') }); }
+    try { res = await handle(request, info, env); } catch { res = new Response('Upstream error', { status: 502, headers: cors(request.headers.get('origin') || '') }); }
     if (request.method === 'GET') log(env, { ...info, ms: Date.now() - t0, status: res.status });
     return res;
   }
 };
 
-async function handle(request, info) {
+// Backstop limiter inside one Worker instance (the binding is eventually consistent): 30 requests/minute per IP.
+const hits = new Map();
+export function isolateAllow(ip, now = Date.now()) {
+  const w = Math.floor(now / 60000); const h = hits.get(ip);
+  if (!h || h.w !== w) { if (hits.size > 5000) hits.clear(); hits.set(ip, { w, n: 1 }); return true; }
+  return ++h.n <= 30;
+}
+
+async function handle(request, info, env) {
   {
     const origin = request.headers.get('origin') || '';
     const headers = cors(origin);
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers });
     if (request.method !== 'GET') return new Response('Method not allowed', { status: 405, headers });
-    if (origin && !ALLOWED_ORIGINS.includes(origin)) return new Response('Origin not allowed', { status: 403, headers });
+    // Browsers always send Origin on the app's cross-origin fetch; requests without one are scripts, not the app.
+    if (!ALLOWED_ORIGINS.includes(origin)) return new Response('Origin not allowed', { status: 403, headers });
+    // Per-IP rate limit (Workers Rate Limiting binding): stops one client from burning the free daily quota.
+    if (!isolateAllow(request.headers.get('cf-connecting-ip') || 'unknown')) { info.host = 'rate-limited'; return new Response('Too many requests', { status: 429, headers: { ...headers, 'retry-after': '60' } }); }
+    if (env?.LIMITER) {
+      const { success } = await env.LIMITER.limit({ key: request.headers.get('cf-connecting-ip') || 'unknown' });
+      if (!success) { info.host = 'rate-limited'; return new Response('Too many requests', { status: 429, headers: { ...headers, 'retry-after': '60' } }); }
+    }
     let target;
     try { target = new URL(new URL(request.url).searchParams.get('url') || ''); } catch { return new Response('Bad url', { status: 400, headers }); }
     if (target.protocol !== 'https:' || target.username || target.password || target.port) return new Response('Only plain https URLs', { status: 400, headers });

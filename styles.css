@@ -727,3 +727,4 @@ button.stat-card:hover { border-color: #bfd4c1; }
 .view-content:empty { min-height: 100vh; }
 .app-footer { content-visibility: auto; contain-intrinsic-size: auto 40px; }
 .plan-day { content-visibility: auto; contain-intrinsic-size: auto 220px; }
+.privacy-details { margin: 6px 0 10px; } .privacy-details summary { cursor: pointer; font-weight: 600; } .privacy-list { margin: 8px 0 0; padding-left: 18px; display: grid; gap: 6px; font-size: calc(13px * var(--text-scale)); }

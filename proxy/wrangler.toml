@@ -7,3 +7,12 @@ workers_dev = true
 [[analytics_engine_datasets]]
 binding = "RECEIPTS"
 dataset = "spitothiki_receipts"
+
+# 20 lookups per minute per IP (one receipt = up to 2 lookups). Free on all plans.
+[[ratelimits]]
+name = "LIMITER"
+namespace_id = "1001"
+
+  [ratelimits.simple]
+  limit = 20
+  period = 60

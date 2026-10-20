@@ -190,6 +190,8 @@ export async function fetchReceipt(input, { fetchImpl = fetch, proxy = '' } = {}
   if (!receipt?.lines.length && ubl?.lines.length) receipt = ubl;
   else if (receipt && ubl?.issuerName) receipt.issuerName = ubl.issuerName;
   if (!receipt) {
+    if (lastError?.status === 429) throw Object.assign(new Error('Πολλές αναζητήσεις αυτή τη στιγμή. Δοκίμασε ξανά σε λίγα λεπτά ή σκάναρε τη φωτογραφία της απόδειξης.'), { cors: true });
+    if (lastError?.status >= 500) throw Object.assign(new Error('Η υπηρεσία αποδείξεων δεν απαντά αυτή τη στιγμή. Δοκίμασε ξανά αργότερα ή σκάναρε τη φωτογραφία της απόδειξης.'), { cors: true });
     if (lastError && !lastError.status) throw Object.assign(new Error('Δεν ήταν δυνατή η λήψη της απόδειξης (ο πάροχος δεν επιτρέπει πρόσβαση από την εφαρμογή ή δεν υπάρχει σύνδεση).'), { cors: true });
     throw new Error('Δεν βρέθηκαν είδη σε αυτή την απόδειξη.');
   }

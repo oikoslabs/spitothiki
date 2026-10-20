@@ -9,6 +9,22 @@ export const LANGS = ['el', 'en'];
 
 const EN = {
   ...DIET_EN,
+  "Στη συσκευή σου: απόθεμα, λίστες, έξοδα, λογαριασμοί, μετακινήσεις, πρόγραμμα διατροφής και ρυθμίσεις. Δεν φεύγουν από εκεί αν δεν συνδεθείς.": "On your device: pantry, lists, expenses, bills, trips, diet plan and settings. They stay there unless you sign in.",
+  "Αν συνδεθείς: τα ίδια δεδομένα συγχρονίζονται στο Firebase (Google) και τα βλέπουν μόνο τα μέλη του νοικοκυριού σου. Μπορείς να αποσυνδεθείς ή να τα διαγράψεις όποτε θες.": "If you sign in: the same data syncs to Firebase (Google) and only members of your household can see it. You can sign out or delete it any time.",
+  "Αποδείξεις με QR: ο σύνδεσμος της απόδειξης περνά από έναν μικρό διακομιστή μας (Cloudflare) μόνο για να διαβαστεί. Δεν κρατάμε τα είδη, τα ποσά ή τη διεύθυνση IP σου, μόνο ανώνυμη μέτρηση (π.χ. «σούπερ μάρκετ, επιτυχία»).": "QR receipts: the receipt link passes through our small server (Cloudflare) only to be read. We do not keep the items, amounts or your IP address, only an anonymous count (e.g. “supermarket, success”).",
+  "Φωτογραφίες και PDF (αποδείξεις, λογαριασμοί, πρόγραμμα διατροφής) διαβάζονται μέσα στο κινητό σου και δεν ανεβαίνουν πουθενά.": "Photos and PDFs (receipts, bills, diet plan) are read on your phone and are not uploaded anywhere.",
+  "Barcode: στέλνεται μόνο ο αριθμός στο Open Food Facts. Συνταγές από το internet: μόνο η αναζήτηση στο TheMealDB.": "Barcodes: only the number is sent to Open Food Facts. Online recipes: only the search goes to TheMealDB.",
+  "Δεν υπάρχουν διαφημίσεις ούτε cookies παρακολούθησης. Χρησιμοποιούμε μόνο το ανώνυμο Cloudflare Web Analytics (χωρίς cookies) για να ξέρουμε πόσοι μπαίνουν και αν η εφαρμογή είναι γρήγορη.": "There are no ads and no tracking cookies. We only use anonymous Cloudflare Web Analytics (no cookies) to know how many people visit and whether the app is fast.",
+  "Τα δεδομένα σου μένουν στη συσκευή σου και η εφαρμογή δουλεύει και χωρίς internet. Δεν υπάρχουν διαφημίσεις.": "Your data stays on your device and the app works offline. There are no ads.",
+  "Τι ακριβώς αποθηκεύεται και πού": "What exactly is stored, and where",
+  "Αν δεν έχεις συνδεθεί και καθαρίσεις τα δεδομένα του browser ή αλλάξεις συσκευή, χρησιμοποίησε αντίγραφο ασφαλείας.": "If you are not signed in and you clear browser data or change device, use a backup.",
+  "Πολλές αναζητήσεις αυτή τη στιγμή. Δοκίμασε ξανά σε λίγα λεπτά ή σκάναρε τη φωτογραφία της απόδειξης.": "Too many lookups right now. Try again in a few minutes or scan a photo of the receipt.",
+  "Η υπηρεσία αποδείξεων δεν απαντά αυτή τη στιγμή. Δοκίμασε ξανά αργότερα ή σκάναρε τη φωτογραφία της απόδειξης.": "The receipt service is not responding right now. Try again later or scan a photo of the receipt.",
+  "Ο συγχρονισμός έφτασε το ημερήσιο όριο. Τα δεδομένα σου μένουν στη συσκευή και θα συγχρονιστούν αργότερα.": "Sync reached its daily limit. Your data stays on the device and will sync later.",
+  "Ο συγχρονισμός δεν είναι διαθέσιμος τώρα. Τα δεδομένα σου μένουν στη συσκευή.": "Sync is not available right now. Your data stays on the device.",
+  "Ο συγχρονισμός άργησε να απαντήσει. Θα ξαναδοκιμάσει μόνος του.": "Sync took too long to answer. It will retry by itself.",
+  "Πολλές προσπάθειες. Περίμενε λίγο και δοκίμασε ξανά.": "Too many attempts. Wait a little and try again.",
+  "Η σύνδεση έφτασε το όριο για σήμερα. Δοκίμασε αργότερα: η εφαρμογή δουλεύει κανονικά και χωρίς σύνδεση.": "Sign-in reached its limit for today. Try later: the app works normally without signing in.",
   // Shell / navigation
   'Σπιτοθήκη — Το σπίτι σε τάξη': 'Spitothiki — Your home in order',
   'Οργάνωσε το σπίτι και τα έξοδά σου: απόθεμα και λήξεις, λίστα αγορών, λογαριασμοί, μετακινήσεις και μικροέξοδα.': 'Organise your home and spending: pantry and expiry dates, shopping list, bills, transport and small expenses.',
