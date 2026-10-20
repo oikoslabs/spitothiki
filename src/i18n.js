@@ -630,6 +630,7 @@ const EN = {
   'Τα έξοδα του μήνα': "This month's spending",
   'Αναλυτικά →': 'Details →',
   'Αναλυτικά': 'Details',
+  '1 λογαριασμός λήγει σύντομα ή έχει λήξει': '1 bill due soon or overdue',
   '{count} λογαριασμοί λήγουν σύντομα ή έχουν λήξει': '{count} bills due soon or overdue',
   '{count} ενεργά': '{count} active',
   '{count} οχήματα': '{count} vehicles',
