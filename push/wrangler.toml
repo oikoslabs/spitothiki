@@ -9,9 +9,12 @@ workers_dev = true
 binding = "PUSH_SUBS"
 id = "908a19e47cc44884b25dd51797fbf330"
 
-# Every day 06:00 UTC = 09:00 Athens (summer) / 08:00 (winter).
+# 09:00 Athens all year: 06:00 UTC (summer) or 07:00 UTC (winter); the worker checks the Athens hour.
+[observability]
+enabled = true
+
 [triggers]
-crons = ["0 6 * * *"]
+crons = ["0 6 * * *", "0 7 * * *"]
 
 [vars]
 VAPID_PUBLIC = "BIdTZDXO2Xq81aSHMGLX1znbzY3u1aH9MGKqG-IavVGpz2MyP8BQ8lbfAUulAQu_ZFJWN1slv4tj6xPKb4uesLg"

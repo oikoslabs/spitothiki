@@ -14,6 +14,7 @@ export function cleanDates(dates, today) {
   if (!Array.isArray(dates)) return [];
   return [...new Set(dates.filter((d) => typeof d === 'string' && DATE.test(d) && d >= today))].sort().slice(0, 120);
 }
+export const athensHour = (now = new Date()) => Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Athens', hour: '2-digit', hourCycle: 'h23' }).format(now));
 export const athensToday = (now = new Date()) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Athens' }).format(now);
 
 const b64url = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -60,14 +61,17 @@ export default {
       const dates = cleanDates(body.dates, athensToday());
       const old = await env.PUSH_SUBS.get(key, 'json');
       await env.PUSH_SUBS.put(key, JSON.stringify({ endpoint, dates, lastSent: old?.lastSent || '' }), { expirationTtl: TTL });
-      if (body.test) { const r = await sendTickle(endpoint, env); return json({ ok: r.ok, status: r.status, count: dates.length }, 200, headers); }
+      if (body.test) { const r = await sendTickle(endpoint, env); console.log(`push test: ${r.status}`); return json({ ok: r.ok, status: r.status, count: dates.length }, 200, headers); }
       return json({ ok: true, count: dates.length }, 200, headers);
     }
     return json({ error: 'path' }, 404, headers);
   },
 
   async scheduled(event, env, ctx) {
-    const today = athensToday(new Date(event.scheduledTime));
+    const when = new Date(event.scheduledTime);
+    // Two crons (06:00 and 07:00 UTC); only the one that is 09:00 in Athens runs (summer: 06 UTC, winter: 07 UTC).
+    if (athensHour(when) !== 9) return;
+    const today = athensToday(when);
     let cursor; let sent = 0;
     do {
       const page = await env.PUSH_SUBS.list({ cursor });

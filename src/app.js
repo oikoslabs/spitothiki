@@ -739,26 +739,51 @@ function scheduleBackgroundSnapshot() {
 // ---------- Push (app closed): Cloudflare Worker wakes the SW on the dates that need a reminder ----------
 const PUSH_KEY = 'spitothiki:push-dates';
 let pushState = ''; // '', 'on', 'off', 'error'
+let pushError = ''; // Greek, human-readable reason of the last failure (shown in Settings)
 let pushFailedSig = '';
+const pushErrorText = (error) => {
+  if (typeof Notification !== 'undefined' && Notification.permission === 'denied') return t('Οι ειδοποιήσεις είναι μπλοκαρισμένες για την εφαρμογή στο Android/Chrome.');
+  const name = error?.name || '';
+  const msg = String(error?.message || error || '');
+  if (error?.serverStatus) return t('Σφάλμα server ({code}).', { code: error.serverStatus });
+  if (error?.pushStatus) return t('Η υπηρεσία ειδοποιήσεων της Google απάντησε {code}.', { code: error.pushStatus });
+  if (name === 'NotAllowedError') return t('Το Android/Chrome δεν επέτρεψε την εγγραφή στις ειδοποιήσεις.');
+  if (name === 'AbortError' || /push service/i.test(msg)) return t('Αποτυχία εγγραφής στην υπηρεσία ειδοποιήσεων (Google). Έλεγξε σύνδεση και Google Play Services.');
+  if (name === 'TypeError' && /fetch/i.test(msg)) return t('Χωρίς σύνδεση με τον server ειδοποιήσεων.');
+  return t('Άγνωστο σφάλμα: {msg}', { msg: `${name} ${msg}`.trim().slice(0, 80) });
+};
+// Makes sure this device has a push subscription (created silently once permission is granted) and that the
+// server knows the reminder dates. Older installs that had notifications on before v1.2 get subscribed here too.
 async function refreshPush({ force = false, test = false } = {}) {
-  if (!pushSupported() || !notifySettings().enabled || Notification.permission !== 'granted') return null;
+  if (!pushSupported() || !notifySettings().enabled || Notification.permission !== 'granted') { if (test) pushError = pushErrorText(null); return null; }
   try {
     const dates = pushDates({ bills: state.bills || [], items: state.items || [] }, { days: notifySettings().days, today: localDateKey() });
     const sig = `${localDateKey()}|${dates.join(',')}`;
     let last = ''; try { last = localStorage.getItem(PUSH_KEY) || ''; } catch {}
-    if (!force && !test && sig === last) { pushState = 'on'; return null; }
+    const existing = await pushSubscription(false);
+    if (existing && !force && !test && sig === last) { pushState = 'on'; return null; }
     if (!force && !test && sig === pushFailedSig) return null; // failed once for these dates: retry on next app open
     pushFailedSig = sig;
+    if (!existing) await pushSubscription(true);
     const res = await syncPush(dates, { test });
-    if (!res) { pushState = 'off'; return null; }
+    if (!res) throw new Error('no subscription');
+    if (test && !res.ok) throw Object.assign(new Error('push'), { pushStatus: res.status });
     try { localStorage.setItem(PUSH_KEY, sig); } catch {}
-    pushFailedSig = ''; pushState = 'on';
+    pushFailedSig = ''; pushError = ''; pushState = 'on';
     return res;
-  } catch { pushState = 'error'; return null; }
+  } catch (error) { pushState = 'error'; pushError = pushErrorText(error); return null; }
 }
 async function enablePush() {
   if (!pushSupported()) return false;
-  try { await pushSubscription(true); try { localStorage.removeItem(PUSH_KEY); } catch {} return Boolean(await refreshPush({ force: true })); } catch { pushState = 'error'; return false; }
+  try { localStorage.removeItem(PUSH_KEY); } catch {}
+  return Boolean(await refreshPush({ force: true }));
+}
+async function testPush() {
+  showToast('Στέλνω δοκιμαστική ειδοποίηση…');
+  try { const cache = await caches.open(DATA_CACHE); await cache.put('./__push-test.json', new Response(JSON.stringify({ until: Date.now() + 5 * 60_000, title: t('✅ Οι ειδοποιήσεις λειτουργούν'), body: t('Θα σου θυμίζουμε λογαριασμούς και λήξεις κάθε πρωί στις 9:00.') }))); } catch {}
+  const res = await refreshPush({ test: true });
+  if (activeView === 'settings') renderApp();
+  showToast(res?.ok ? 'Στάλθηκε. Αν δεν εμφανιστεί σε 1 λεπτό, δες τις οδηγίες κάτω από το κουμπί.' : `${t('Η δοκιμή απέτυχε:')} ${pushError}`);
 }
 
 function notifySettings() {
@@ -835,8 +860,8 @@ function renderNotificationCard() {
     <label class="field-label" for="notify-days">Ειδοποίηση για λήξη μέσα σε (ημέρες)</label><input class="field-input notify-days" id="notify-days" type="number" min="0" max="30" step="1" value="${settings.days}" inputmode="numeric">
     <div class="settings-actions">${active ? '<button class="button button-quiet" type="button" data-action="disable-notifications">Απενεργοποίηση</button>' : `<button class="button button-primary" type="button" data-action="enable-notifications" ${permission === 'unsupported' || permission === 'denied' ? 'disabled' : ''}>Ενεργοποίηση ειδοποιήσεων</button>`}</div>
     <p class="field-hint" id="notify-background">${backgroundSyncSupported() ? 'Έλεγχος στο παρασκήνιο: διαθέσιμος. Με την εφαρμογή εγκατεστημένη, ο browser ελέγχει περίπου μία φορά τη μέρα, όποτε κρίνει.' : 'Έλεγχος στο παρασκήνιο: δεν υποστηρίζεται από αυτόν τον browser. Ο έλεγχος γίνεται όταν ανοίγεις την εφαρμογή.'}</p>
-    <p class="field-hint" id="notify-push">${escapeHtml(t(!pushSupported() ? 'Με κλειστή εφαρμογή: δεν υποστηρίζεται από αυτόν τον browser.' : !active ? 'Με κλειστή εφαρμογή: ενεργοποίησε τις ειδοποιήσεις για να έρχονται και με κλειστή εφαρμογή (κάθε πρωί, ~9:00).' : pushState === 'error' ? 'Με κλειστή εφαρμογή: δεν συνδέθηκε. Θα ξαναδοκιμάσει όταν ανοίξεις την εφαρμογή.' : 'Με κλειστή εφαρμογή: ενεργές. Κάθε πρωί (~9:00) για λογαριασμούς και λήξεις.'))}</p>
-    ${active && pushSupported() ? '<div class="settings-actions"><button class="button button-quiet" type="button" data-action="push-test">Δοκιμαστική ειδοποίηση</button></div>' : ''}</section>`;
+    <p class="field-hint" id="notify-push">${escapeHtml(t(!pushSupported() ? 'Με κλειστή εφαρμογή: δεν υποστηρίζεται από αυτόν τον browser.' : permission === 'denied' ? 'Με κλειστή εφαρμογή: μπλοκαρισμένες. Άνοιξε Ρυθμίσεις Android → Εφαρμογές → Σπιτοθήκη (ή Chrome) → Ειδοποιήσεις → Να επιτρέπονται.' : !active ? 'Με κλειστή εφαρμογή: ενεργοποίησε τις ειδοποιήσεις για να έρχονται και με κλειστή εφαρμογή (κάθε πρωί στις 9:00).' : pushState === 'error' ? 'Με κλειστή εφαρμογή: πρόβλημα.' : pushState === 'on' ? 'Με κλειστή εφαρμογή: ενεργές. Κάθε πρωί στις 9:00 για λογαριασμούς και λήξεις.' : 'Με κλειστή εφαρμογή: έλεγχος…'))}${pushState === 'error' && pushError ? ` <strong class="form-error" id="notify-push-error">${escapeHtml(pushError)}</strong>` : ''}</p>
+    ${active && pushSupported() ? `<div class="settings-actions"><button class="button button-primary" type="button" data-action="push-test">🔔 Δοκιμαστική ειδοποίηση</button></div><p class="field-hint">${escapeHtml(t('Αν δεν έρθει: Ρυθμίσεις Android → Εφαρμογές → Σπιτοθήκη (ή Chrome) → Ειδοποιήσεις → ενεργές, και απενεργοποίησε την «Εξοικονόμηση μπαταρίας» για την εφαρμογή.'))}</p>` : ''}</section>`;
 }
 
 function renderLanguageCard() {
@@ -2316,7 +2341,7 @@ function handleAction(button) {
   else if (action === 'close-scan') { cartScanning = false; closeScanner(); }
   else if (action === 'lookup-barcode') fillFromBarcode(itemForm.elements.barcode.value);
   else if (action === 'enable-notifications') enableNotifications();
-  else if (action === 'push-test') { refreshPush({ test: true }).then((r) => showToast(r?.ok ? 'Στάλθηκε δοκιμαστική ειδοποίηση.' : 'Η δοκιμή απέτυχε. Έλεγξε τη σύνδεση.')); }
+  else if (action === 'push-test') testPush();
   else if (action === 'disable-notifications') { stopPush(); pushState = 'off'; try { localStorage.removeItem(PUSH_KEY); } catch {} saveNotifySettings({ enabled: false }); updateBackgroundCheck(); renderApp(); showToast('Οι ειδοποιήσεις απενεργοποιήθηκαν.'); }
   else if (action === 'set-theme') setTheme(button.dataset.theme);
   else if (action === 'toast-undo') { const run = toastUndo; toastUndo = null; clearTimeout(toastTimer); toast.classList.remove('is-visible'); run?.(); }
@@ -2733,7 +2758,7 @@ function runDailyChecks() {
 runDailyChecks();
 updateBackgroundCheck();
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { runDailyChecks(); pushFailedSig = ''; refreshPush(); } });
-setTimeout(() => refreshPush(), 3000);
+setTimeout(() => refreshPush().then(() => { if (activeView === 'settings') renderApp(); }), 3000);
 // While the app stays open (e.g. a tablet in the kitchen), re-check every hour so a new day is noticed.
 setInterval(runDailyChecks, 60 * 60 * 1000);
 

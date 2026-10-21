@@ -2,7 +2,7 @@
 // Strategy: network-first for everything from this site (HTML, JS, CSS, manifest), so a new
 // deploy shows up on the next load; the cache is only used when the network is unavailable.
 // Bump CACHE_VERSION when the list of shell files changes; old caches are deleted on activate.
-const CACHE_VERSION = 'v50';
+const CACHE_VERSION = 'v51';
 const CACHE = `spitothiki-${CACHE_VERSION}`;
 const OCR_CACHE = 'spitothiki-ocr';
 const SHARE_CACHE = 'spitothiki-share'; // a file shared to the app (Web Share Target), picked up by the page // Tesseract.js script/worker/core/language files, kept across versions
@@ -116,13 +116,22 @@ async function backgroundExpiryCheck({ force = false } = {}) {
 }
 
 // Push from the «spitothiki-push» Worker: an empty wake-up on a reminder date; the text is built from local data.
+// Always shows a notification (Chrome penalises silent pushes), whatever fails on the way.
 self.addEventListener('push', (event) => {
   event.waitUntil((async () => {
-    const shown = await backgroundExpiryCheck({ force: true }).catch(() => 0);
-    if (shown) return;
-    const res = await (await caches.open(DATA_CACHE)).match('./__expiry.json').catch(() => null);
-    const snap = res ? await res.json().catch(() => ({})) : {};
-    await self.registration.showNotification(snap.pushTitle || 'Σπιτοθήκη', { body: snap.pushBody || 'Άνοιξε για λεπτομέρειες.', tag: 'spitothiki-push', icon: 'icons/icon-192.png', badge: 'icons/icon-192.png' });
+    let title = 'Σπιτοθήκη'; let body = 'Άνοιξε για λεπτομέρειες.'; let tag = 'spitothiki-push';
+    try {
+      const data = await caches.open(DATA_CACHE);
+      const test = await (await data.match('./__push-test.json'))?.json().catch(() => null);
+      if (test && test.until > Date.now()) {
+        await data.delete('./__push-test.json');
+        return self.registration.showNotification(test.title || '✅ Οι ειδοποιήσεις λειτουργούν', { body: test.body || '', tag: 'spitothiki-test', icon: 'icons/icon-192.png', badge: 'icons/icon-192.png' });
+      }
+      if (await backgroundExpiryCheck({ force: true })) return;
+      const snap = await (await data.match('./__expiry.json'))?.json().catch(() => null);
+      if (snap?.pushTitle) { title = snap.pushTitle; body = snap.pushBody || body; }
+    } catch {}
+    return self.registration.showNotification(title, { body, tag, icon: 'icons/icon-192.png', badge: 'icons/icon-192.png' });
   })());
 });
 self.addEventListener('periodicsync', (event) => { if (event.tag === 'spitothiki-expiry') event.waitUntil(backgroundExpiryCheck()); });

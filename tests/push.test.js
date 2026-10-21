@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { pushDates } from '../src/push.js';
-import { cleanDates, validEndpoint, athensToday } from '../push/worker.js';
+import { cleanDates, validEndpoint, athensToday, athensHour } from '../push/worker.js';
 
 test('push dates: bills day-before/on due, skips paid & direct debit; expiries N days before', () => {
   const bills = [
@@ -18,4 +18,11 @@ test('push worker: endpoint allowlist, date cleanup, Athens day', () => {
   assert.ok(!validEndpoint('http://fcm.googleapis.com/x'));
   assert.deepEqual(cleanDates(['2026-10-20', '2026-10-22', 'x', '2026-10-22', 5], '2026-10-21'), ['2026-10-22']);
   assert.equal(athensToday(new Date('2026-10-21T22:30:00Z')), '2026-10-22');
+});
+
+test('push worker: 09:00 Athens all year (DST)', () => {
+  assert.equal(athensHour(new Date('2026-07-01T06:00:00Z')), 9);
+  assert.equal(athensHour(new Date('2026-07-01T07:00:00Z')), 10);
+  assert.equal(athensHour(new Date('2026-12-01T07:00:00Z')), 9);
+  assert.equal(athensHour(new Date('2026-12-01T06:00:00Z')), 8);
 });
