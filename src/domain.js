@@ -90,6 +90,7 @@ export function createShoppingItem(input = {}, now = new Date().toISOString()) {
     quantity,
     unit: normalizeUnit(input.unit),
     ...(input.itemId ? { itemId: String(input.itemId) } : {}),
+    ...(input.auto ? { auto: true } : {}),
     checked: false,
     createdAt: now
   };

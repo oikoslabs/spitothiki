@@ -745,3 +745,21 @@ button.stat-card:hover { border-color: #bfd4c1; }
 .shelf-button { min-height: 48px; justify-content: center; }
 .price-tools[hidden] { display: none; }
 .month-trend.up { color: var(--danger, #b3261e); } .month-trend.down { color: var(--accent, #2f7d4f); }
+
+.auto-tag { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px; font-size: calc(12px * var(--text-scale)); font-weight: 700; background: color-mix(in srgb, var(--accent, #2f7d4f) 15%, transparent); color: var(--accent, #2f7d4f); vertical-align: middle; }
+.big-check { min-height: 48px; font-size: calc(17px * var(--text-scale)); }
+.big-check input { width: 24px; height: 24px; }
+
+/* Price comparison */
+.compare-dialog { width: min(640px, calc(100vw - 24px)); }
+.compare-best { padding: 12px 14px; border-radius: 14px; background: color-mix(in srgb, var(--accent, #2f7d4f) 14%, transparent); font-weight: 700; margin: 8px 0 12px; }
+.compare-product { border-top: 1px solid var(--line, #e3e7e3); padding: 10px 0; }
+.compare-product h3 { margin: 0 0 6px; font-size: calc(17px * var(--text-scale)); }
+.compare-stores { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 4px; }
+.compare-stores li { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: baseline; padding: 6px 8px; border-radius: 10px; }
+.compare-stores li.is-cheapest { background: color-mix(in srgb, var(--accent, #2f7d4f) 12%, transparent); font-weight: 700; }
+.compare-poso { min-height: 44px; }
+.recipe-filter { margin: 4px 0 12px; }
+.recipe-filter .filter-chip { min-height: 44px; font-size: calc(16px * var(--text-scale)); }
+.all-recipes { margin-top: 16px; }
+.all-recipes > summary { min-height: 48px; display: flex; align-items: center; font-weight: 700; cursor: pointer; font-size: calc(17px * var(--text-scale)); }

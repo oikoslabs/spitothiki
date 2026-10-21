@@ -4,7 +4,7 @@ import { isUrlCode, lastTollAmount, parseTollBarcode, parseTollText, tollAmountF
 import { authProviders, firebaseConfig } from './firebase-config.js';
 import { loadState, parseBackup, saveState } from './storage.js';
 import { fetchReceipt, receiptId } from './receipt.js';
-import { fetchMealDbSuggestions, ingredientName, pantryIngredients, suggestBuiltin } from './recipes.js';
+import { ingredientName, pantryIngredients, recipeCat, scoreRecipe, suggestBuiltin } from './recipes.js';
 import { CATEGORIES, WASTE_REASONS, applyWaste, createStore, createWaste, groupByStore, monthKey, rowCategory, monthlySpending, moveCategory, purchaseFor, shiftMonth, storeOrder, wasteStats } from './features.js';
 import { showSigninCard } from './features.js';
 import { routeCode } from './scan-router.js';
@@ -13,11 +13,13 @@ import { BILL_PRESETS, ONBOARD_KEY, PRESETS_KEY, pendingPresets, shouldOnboard }
 import { applyDisplayPrefs, highContrast, setHighContrast, setTextSize, textSize } from './prefs.js';
 import { RECURRING_INTERVALS, applyRecurring, createRecurring, dueFromSnapshot, expirySnapshot, parseVoiceItems } from './features.js';
 import { MEAL_SLOTS, copyPreviousWeek, createMeal, recipeFromMealDb, shiftDays, weekDays, weekShoppingNeeds, weekStart } from './mealplan.js';
-import { BUILTIN_RECIPES } from './recipes.js';
+import { BUILTIN_RECIPES, RECIPE_CATS } from './recipes.js';
 import { BILL_ICONS, BILL_PERIODS, BILL_TYPES, applyAutoPay, autoPayFor, scheduledDebits, billStats, billsDue, createBill, guessBillType, paidHistory, parseBillCode, unpaidBills, payBill, unpayBill } from './bills.js';
 import { findDuplicateBill, readBillFile } from './bill-pdf.js';
 import { initDietUi, renderDietSection } from './diet-ui.js';
 import { pushDates, pushSupported, pushSubscription, syncPush, stopPush } from './push.js';
+import { autoListAdds } from './auto-list.js';
+import { comparePrices, listComparison } from './price-compare.js';
 import { extractShelfPrice, lastReceiptPrice } from './shelf-price.js';
 import { addCartItem, budgetState, createTrip, finishTrip, lastPrice, lineTotal, remainingShopping, removeCartItem, tripForReceipt, updateCartItem } from './cart.js';
 import { VM_MODES, interpretCode } from './gs1.js';
@@ -79,9 +81,42 @@ function undoable(message, mutate) {
   } });
 }
 
+// ---------- Price comparison (own receipts) ----------
+function openCompare(single = '') {
+  const names = single ? [single] : state.shopping.filter((row) => !row.checked).map((row) => row.name);
+  const r = listComparison(state.receipts || [], names);
+  const storeRows = (p) => p.stores.length ? `<ul class="compare-stores">${p.stores.map((s, i) => `<li class="${i === 0 && p.stores.length > 1 ? 'is-cheapest' : ''}"><span data-no-i18n>${i === 0 && p.stores.length > 1 ? '⭐ ' : ''}${escapeHtml(s.store)}</span><strong>${escapeHtml(money(s.price))}</strong><small>${escapeHtml(formatDate(s.date))}</small></li>`).join('')}</ul>`
+    : `<p class="field-hint">${escapeHtml(t('Δεν υπάρχει στις αποδείξεις σου.'))}</p>`;
+  const body = document.querySelector('#compare-body');
+  body.innerHTML = `<p class="field-hint">${escapeHtml(t('Από τις αποδείξεις που έχεις σκανάρει: η τελευταία τιμή ανά κατάστημα.'))}</p>
+    ${!single && r.best ? `<div class="compare-best" id="compare-best">🏆 ${escapeHtml(t('Φθηνότερο για τη λίστα σου: {store} ({total} για όσα προϊόντα έχουν τιμή σε πολλά καταστήματα)', { store: r.best.store, total: money(r.best.total) }))}</div>` : ''}
+    ${!single && !r.known ? `<p class="subtle-empty">${escapeHtml(t('Δεν βρέθηκαν τιμές. Σκάναρε αποδείξεις από διάφορα καταστήματα και η σύγκριση θα γεμίσει μόνη της.'))}</p>` : ''}
+    <div class="compare-list" id="compare-list">${r.products.map((p) => `<section class="compare-product"><h3 data-no-i18n>${escapeHtml(p.name)}</h3>${storeRows(p)}<button class="button button-quiet compare-poso" type="button" data-action="posokanei" data-name="${escapeHtml(p.name)}">🔎 ${escapeHtml(t('Δες στο posokanei.gov.gr'))}</button></section>`).join('')}</div>
+    <p class="field-hint">${escapeHtml(t('Για τις τιμές όλων των αλυσίδων, το κουμπί ανοίγει το επίσημο posokanei.gov.gr (ενδεικτικές τιμές).'))}</p>`;
+  translateDom(body);
+  document.querySelector('#compare-dialog').showModal();
+}
+
+// ---------- Auto shopping list (out of stock / expired → list, tagged «αυτόματα») ----------
+const AUTO_LIST_KEY = 'spitothiki:auto-list'; // '0' = off
+const AUTO_BASE_KEY = 'spitothiki:auto-list-base'; // first run only marks what is already out/expired
+const autoListOn = () => { try { return localStorage.getItem(AUTO_LIST_KEY) !== '0'; } catch { return true; } };
+function runAutoList() {
+  if (!autoListOn()) return { changed: false, added: [] };
+  const r = autoListAdds(state.items || [], state.shopping || [], localDateKey());
+  if (r.items === state.items) return { changed: false, added: [] };
+  state.items = r.items;
+  let base = ''; try { base = localStorage.getItem(AUTO_BASE_KEY) || ''; localStorage.setItem(AUTO_BASE_KEY, '1'); } catch {}
+  if (!base) return { changed: true, added: [] };
+  state.shopping = r.shopping;
+  return { changed: true, added: r.added };
+}
+
 function persist() {
   try {
+    const auto = runAutoList();
     saveState(state);
+    if (auto.added.length) setTimeout(() => showToast(t('Μπήκαν αυτόματα στη λίστα: {names}', { names: auto.added.map((row) => row.name).join(', ') })), 50);
     renderNavCounts();
     sync?.push();
     scheduleBackgroundSnapshot();
@@ -279,7 +314,7 @@ function renderPantry() {
 }
 
 function renderShoppingRow(item) {
-  return `<div class="shopping-row ${item.checked ? 'checked has-price' : ''}"><input class="shopping-check" type="checkbox" data-action="toggle-shopping" data-id="${escapeHtml(item.id)}" ${item.checked ? 'checked' : ''} aria-label="${escapeHtml(t(item.checked ? 'Ολοκληρώθηκε: {name}' : 'Σημείωση ως αγορασμένο: {name}', { name: item.name }))}"><div><strong class="shopping-row-name">${escapeHtml(item.name)}</strong><div class="shopping-row-detail">${escapeHtml(item.quantity)} ${escapeHtml(t(item.unit))}</div></div><span class="shopping-state">${item.checked ? (item.pantryAdded ? 'Μπήκε στο απόθεμα' : 'Μπήκε στο καλάθι') : ''}</span>${item.checked ? renderPriceField(item) : ''}<button class="icon-button danger" type="button" data-action="remove-shopping" data-id="${escapeHtml(item.id)}" aria-label="${escapeHtml(t('Αφαίρεση {name} από τη λίστα', { name: item.name }))}">×</button></div>`;
+  return `<div class="shopping-row ${item.checked ? 'checked has-price' : ''}"><input class="shopping-check" type="checkbox" data-action="toggle-shopping" data-id="${escapeHtml(item.id)}" ${item.checked ? 'checked' : ''} aria-label="${escapeHtml(t(item.checked ? 'Ολοκληρώθηκε: {name}' : 'Σημείωση ως αγορασμένο: {name}', { name: item.name }))}"><div><strong class="shopping-row-name">${escapeHtml(item.name)}</strong>${item.auto && !item.checked ? ` <span class="auto-tag">${escapeHtml(t('αυτόματα'))}</span>` : ''}<div class="shopping-row-detail">${escapeHtml(item.quantity)} ${escapeHtml(t(item.unit))}</div></div><span class="shopping-state">${item.checked ? (item.pantryAdded ? 'Μπήκε στο απόθεμα' : 'Μπήκε στο καλάθι') : ''}</span>${item.checked ? renderPriceField(item) : ''}<button class="icon-button danger" type="button" data-action="remove-shopping" data-id="${escapeHtml(item.id)}" aria-label="${escapeHtml(t('Αφαίρεση {name} από τη λίστα', { name: item.name }))}">×</button></div>`;
 }
 
 function renderPriceField(row) {
@@ -319,7 +354,7 @@ function renderShopping() {
   const trip = activeTrip();
   return `${renderHeader('Λίστα αγορών', 'Σημείωσε όσα χρειάζεσαι και πάρε τη λίστα μαζί σου.')}
     <div class="page-actions cart-entry"><button class="button ${trip ? 'button-primary' : 'button-quiet'}" type="button" data-view="cart" id="open-cart">🛒 ${escapeHtml(trip ? t('Συνέχεια καλαθιού · {total}', { total: money(trip.total) }) : t('Καλάθι στο κατάστημα'))}</button></div>
-    <div class="shopping-layout"><section class="panel"><div class="panel-heading"><div><h2>Τι χρειάζεται το σπίτι;</h2><p>${pending.length ? pendingLabel(pending.length) : 'Κανένα εκκρεμές προϊόν'}</p></div><div class="panel-links">${pending.length ? '<button class="panel-link" type="button" data-action="share-shopping">↗ Κοινοποίηση</button>' : ''}${checked.length ? '<button class="panel-link" type="button" data-action="clear-completed">Καθάρισε τα αγορασμένα</button>' : ''}</div></div>
+    <div class="shopping-layout"><section class="panel"><div class="panel-heading"><div><h2>Τι χρειάζεται το σπίτι;</h2><p>${pending.length ? pendingLabel(pending.length) : 'Κανένα εκκρεμές προϊόν'}</p></div><div class="panel-links">${pending.length ? '<button class="panel-link" type="button" data-action="compare-list">💶 Σύγκριση τιμών</button><button class="panel-link" type="button" data-action="share-shopping">↗ Κοινοποίηση</button>' : ''}${checked.length ? '<button class="panel-link" type="button" data-action="clear-completed">Καθάρισε τα αγορασμένα</button>' : ''}</div></div>
     <form id="shopping-form" class="shopping-add-form shopping-main-form" novalidate><input class="field-input" name="name" required maxlength="80" placeholder="π.χ. Φέτα" aria-label="Προϊόν για αγορά"><input class="field-input" name="quantity" type="number" min="0.1" max="${MAX_QUANTITY}" step="0.1" value="1" aria-label="Ποσότητα"><select class="field-input unit-select" name="unit" aria-label="Μονάδα">${unitOptions()}</select><select class="field-input category-select" name="category" aria-label="Κατηγορία"><option value="">Κατηγορία: αυτόματα</option>${CATEGORIES.map((category) => `<option value="${escapeHtml(category)}">${escapeHtml(categoryLabel(category))}</option>`).join('')}</select><button class="button button-primary" type="submit">＋ Προσθήκη</button>${SpeechRecognitionApi ? '<button class="button button-quiet voice-button" type="button" data-action="voice-add" aria-label="Προσθήκη με φωνή" title="Προσθήκη με φωνή">🎤</button>' : ''}</form>
     <p class="form-error" id="shopping-error" role="alert" hidden></p>
     ${renderStoreBar()}
@@ -338,6 +373,8 @@ function renderSettings() {
     <section class="panel settings-card"><span class="stat-icon amber">👋</span><h2>Αρχικές ερωτήσεις</h2><p>Γλώσσα, οι λογαριασμοί που έχεις και μέγεθος γραμμάτων, σε ένα λεπτό.</p><div class="settings-actions"><button class="button button-quiet" type="button" data-action="onboard-again">Κάνε τις ερωτήσεις ξανά</button></div></section>
     ${renderSyncCard()}
     ${renderNotificationCard()}
+    <section class="panel settings-card" id="auto-list-card"><span class="stat-icon">🛒</span><h2>${escapeHtml(t('Αυτόματη λίστα αγορών'))}</h2><p>${escapeHtml(t('Ό,τι τελειώνει (ποσότητα 0) ή λήγει στο απόθεμα μπαίνει μόνο του στη λίστα, με την ένδειξη «αυτόματα».'))}</p>
+      <label class="check-row big-check"><input type="checkbox" id="auto-list-toggle" ${autoListOn() ? 'checked' : ''}> <span>${escapeHtml(t('Ενεργή'))}</span></label></section>
     <section class="panel settings-card"><span class="stat-icon blue">↗</span><h2>Αντίγραφο ασφαλείας</h2><p>Αποθήκευσε όλα τα δεδομένα σου (απόθεμα, λίστες, έξοδα) σε ένα αρχείο, ή φέρε τα πίσω από ένα αρχείο.</p><div class="settings-actions"><button class="button button-primary" type="button" data-action="export-backup">⬇ Εξαγωγή αντιγράφου</button><button class="button button-quiet" type="button" data-action="import-backup">⬆ Εισαγωγή αντιγράφου</button></div></section></div>
     <details class="panel collapsible settings-more" id="settings-advanced" ${openAttr('settings-advanced')}><summary><h2>Για προχωρημένους</h2><span class="field-hint">Ρύθμιση αποδείξεων, δοκιμαστικά δεδομένα, διαγραφή όλων</span></summary>
     <div class="settings-grid">
@@ -1167,19 +1204,25 @@ let shownRecipes = [];
 
 const recipeKey = () => Object.entries(pantryIngredients(state.items, localDateKey())).map(([id, entry]) => `${id}:${entry.urgency}`).sort().join(',');
 
-function loadOnlineRecipes() {
-  const key = recipeKey();
-  if (!key || onlineRecipes.key === key || navigator.onLine === false) return;
-  onlineRecipes = { key, state: 'loading', list: [] };
-  fetchMealDbSuggestions(state.items, localDateKey())
-    .then((list) => { if (onlineRecipes.key === key) onlineRecipes = { key, state: 'done', list: list.filter((r) => r.matched.length).slice(0, 4) }; })
-    .catch(() => { if (onlineRecipes.key === key) onlineRecipes = { key, state: 'error', list: [] }; })
-    .finally(() => { if (activeView === 'cook') { viewRoot.innerHTML = renderCook(); translateDom(viewRoot); } });
-}
+function loadOnlineRecipes() {} // v1.3: only built-in Greek & raw recipes (no foreign online source)
 
 function missingNames(recipe) {
   const lang = getLang();
   return [...recipe.missing.map((id) => ingredientName(id, lang)), ...(recipe.missingRaw || [])];
+}
+
+// «📅 Στο πρόγραμμα»: pick a day (next 7 days); goes to lunch, else dinner, else breakfast.
+function recipeToPlan(recipeId) {
+  const recipe = BUILTIN_RECIPES.find((entry) => entry.id === recipeId);
+  if (!recipe) return;
+  const today = localDateKey();
+  const days = Array.from({ length: 7 }, (_, i) => shiftDays(today, i));
+  const taken = new Set((state.meals || []).map((meal) => meal.id));
+  showChoice({ title: 'Σε ποια μέρα;', message: recipe.name[getLang()] || recipe.name.el, choices: days.map((date, i) => ({ label: i === 0 ? `${t('Σήμερα')} · ${dayLabel(date)}` : dayLabel(date), primary: i === 0, run: () => {
+    const slot = ['lunch', 'dinner', 'breakfast'].find((s) => !taken.has(`meal-${date}-${s}`)) || 'lunch';
+    saveMeal(createMeal({ date, slot, recipe: { source: 'builtin', ...recipe } }));
+    showToast(t('Μπήκε στο πρόγραμμα: {day} · {slot}', { day: dayLabel(date), slot: t(SLOT_LABELS[slot]) }));
+  } })) });
 }
 
 function addMissingToList(recipeId) {
@@ -1204,10 +1247,11 @@ function renderRecipeCard(recipe, pantry) {
     <p class="recipe-label">${escapeHtml(t('Έχεις ({count})', { count: recipe.matched.length }))}</p><div class="ingredient-chips">${recipe.matched.map((id) => chip(id, 'have')).join('')}</div>
     ${missingCount ? `<p class="recipe-label">${escapeHtml(t('Λείπουν ({count})', { count: missingCount }))}</p><div class="ingredient-chips" data-no-i18n>${recipe.missing.map((id) => chip(id, 'need')).join('')}${(recipe.missingRaw || []).map((name) => `<span class="ingredient-chip need" lang="en">+ ${escapeHtml(name)}</span>`).join('')}</div>` : `<p class="recipe-label ok">${escapeHtml(t('Τα έχεις όλα!'))}</p>`}
     ${recipe.steps ? `<details class="recipe-steps"><summary>${escapeHtml(t('Πώς γίνεται'))}</summary><p>${escapeHtml(recipe.steps[lang] || recipe.steps.el)}</p></details>` : ''}
-    <div class="settings-actions">${missingCount ? `<button class="button button-primary" type="button" data-action="add-missing" data-recipe="${escapeHtml(recipe.id)}">${escapeHtml(t('＋ Τα υπόλοιπα στη λίστα'))}</button>` : ''}${recipe.url ? `<a class="button button-quiet" href="${escapeHtml(recipe.url)}" target="_blank" rel="noopener">${escapeHtml(t('Συνταγή ↗'))}</a>` : ''}</div></article>`;
+    <div class="settings-actions">${missingCount ? `<button class="button button-primary" type="button" data-action="add-missing" data-recipe="${escapeHtml(recipe.id)}">${escapeHtml(t('＋ Τα υπόλοιπα στη λίστα'))}</button>` : ''}<button class="button button-quiet" type="button" data-action="recipe-to-plan" data-recipe="${escapeHtml(recipe.id)}">${escapeHtml(t('📅 Στο πρόγραμμα'))}</button></div></article>`;
 }
 
 let cookTab = 'ideas';
+let recipeFilter = 'greek';
 const cookTabs = () => `<div class="segmented cook-tabs" role="tablist"><button type="button" role="tab" class="filter-chip${cookTab === 'ideas' ? ' is-active' : ''}" aria-selected="${cookTab === 'ideas'}" data-action="cook-tab" data-tab="ideas">💡 Ιδέες</button><button type="button" role="tab" class="filter-chip${cookTab === 'plan' ? ' is-active' : ''}" aria-selected="${cookTab === 'plan'}" data-action="cook-tab" data-tab="plan" id="tab-plan">📅 Πρόγραμμα εβδομάδας</button></div>`;
 
 // ---------- Weekly meal plan ----------
@@ -1257,10 +1301,7 @@ function renderMealDialog() {
     <form id="meal-text-form" class="store-form" novalidate><input class="field-input" name="text" maxlength="80" placeholder="Γράψε ελεύθερα, π.χ. Φακές με ρύζι" aria-label="Γεύμα" value="${current?.source === 'text' ? escapeHtml(mealTitle(current)) : ''}"><button class="button button-primary" type="submit">Αποθήκευση</button></form>
     <h3 class="insights-subtitle">Συνταγές της Σπιτοθήκης</h3>
     <div class="meal-options" id="meal-builtin">${order.map((recipe) => `<button type="button" class="meal-option" data-action="plan-pick" data-recipe="${escapeHtml(recipe.id)}" data-no-i18n><span>${escapeHtml(recipe.name[lang] || recipe.name.el)}</span>${(recipe.matched || []).length ? `<small>${escapeHtml(t('έχεις {have}/{all}', { have: recipe.matched.length, all: recipe.matched.length + recipe.missing.length }))}</small>` : ''}</button>`).join('')}</div>
-    <h3 class="insights-subtitle">Αναζήτηση στο TheMealDB</h3>
-    <form id="meal-search-form" class="store-form" novalidate><input class="field-input" name="q" maxlength="60" placeholder="π.χ. chicken, pasta, soup" aria-label="Αναζήτηση συνταγής" value="${escapeHtml(mealEdit.query)}" lang="en"><button class="button button-quiet" type="submit">Αναζήτηση</button></form>
-    ${status ? `<p class="field-hint" id="meal-search-status">${escapeHtml(t(status))}</p>` : ''}
-    ${mealEdit.results.length ? `<div class="meal-options" id="meal-results">${mealEdit.results.map((recipe) => `<button type="button" class="meal-option" data-action="plan-pick" data-recipe="${escapeHtml(recipe.id)}" data-no-i18n lang="en"><span>${escapeHtml(recipe.name.en)}</span><small>${escapeHtml(t('έχεις {have}/{all}', { have: recipe.ingredients.filter((id) => pantry[id]).length, all: recipe.ingredients.length + recipe.extra.length }))}</small></button>`).join('')}</div>` : ''}`;
+  `;
   translateDom(body);
 }
 
@@ -1294,16 +1335,16 @@ function renderCook() {
   if (cookTab === 'plan') return `${renderHeader('Πρόγραμμα γευμάτων', 'Σχεδίασε την εβδομάδα και πάρε έτοιμη τη λίστα αγορών.')}${cookTabs()}${renderPlan()}`;
   const today = localDateKey();
   const pantry = pantryIngredients(state.items, today);
-  const builtin = suggestBuiltin(state.items, today);
-  const online = onlineRecipes.key === recipeKey() ? onlineRecipes : { state: navigator.onLine === false ? 'offline' : 'loading', list: [] };
-  shownRecipes = [...builtin, ...online.list];
+  const inCat = (r) => recipeCat(r) === recipeFilter;
+  const builtin = suggestBuiltin(state.items, today, 200).filter(inCat).slice(0, 12);
+  const rest = BUILTIN_RECIPES.filter((r) => inCat(r) && !builtin.some((b) => b.id === r.id)).map((r) => ({ ...r, source: 'builtin', ...scoreRecipe(r.ingredients, pantry, r.optional) })).sort((x, y) => x.name.el.localeCompare(y.name.el, 'el'));
+  shownRecipes = [...builtin, ...rest];
   const urgentNames = state.items.filter((item) => pantry[Object.keys(pantry).find((id) => pantry[id].items.includes(item))]?.urgency >= 1).map((item) => item.name);
-  const onlineStatus = { loading: 'Ψάχνω κι άλλες ιδέες στο TheMealDB…', offline: 'Χωρίς σύνδεση: δείχνω μόνο τις συνταγές της εφαρμογής.', error: 'Το TheMealDB δεν απάντησε. Δείχνω τις συνταγές της εφαρμογής.', done: online.list.length ? '' : 'Το TheMealDB δεν βρήκε κάτι ταιριαστό.' }[online.state] || '';
-  return `${renderHeader('Τι να μαγειρέψω;', 'Ιδέες με ό,τι έχεις στο σπίτι, πρώτα όσα λήγουν σύντομα.')}${cookTabs()}
+  const chips = `<div class="segmented recipe-filter" role="group" aria-label="${escapeHtml(t('Είδος συνταγών'))}">${Object.entries(RECIPE_CATS).map(([id, label]) => `<button type="button" class="filter-chip${recipeFilter === id ? ' is-active' : ''}" aria-pressed="${recipeFilter === id}" data-action="recipe-filter" data-cat="${id}">${id === 'greek' ? '🇬🇷' : '🍓'} ${escapeHtml(t(label))}</button>`).join('')}</div>`;
+  return `${renderHeader('Τι μαγειρεύω με ό,τι έχω', 'Ιδέες με ό,τι έχεις στο σπίτι, πρώτα όσα λήγουν σύντομα.')}${cookTabs()}${chips}
     ${urgentNames.length ? `<div class="alert-banner" role="status">◷ ${escapeHtml(t('Λήγουν σύντομα: {names}', { names: urgentNames.join(', ') }))}</div>` : ''}
-    ${builtin.length || online.list.length ? `<div class="recipe-grid" id="recipe-list">${builtin.map((recipe) => renderRecipeCard(recipe, pantry)).join('')}</div>` : renderEmpty('Δεν βρήκα συνταγές', 'Πρόσθεσε στο απόθεμα βασικά υλικά (π.χ. αυγά, ντομάτες, ρύζι) για να δεις ιδέες.', 'add-item', 'Προσθήκη προϊόντος', '🍳')}
-    ${online.list.length ? `<h2 class="section-title">Περισσότερες ιδέες από TheMealDB</h2><div class="recipe-grid" id="recipe-online">${online.list.map((recipe) => renderRecipeCard(recipe, pantry)).join('')}</div>` : ''}
-    ${onlineStatus ? `<p class="field-hint" id="recipe-online-status">${escapeHtml(t(onlineStatus))}${online.state === 'error' ? ` <button class="text-button" type="button" data-action="retry-recipes">${escapeHtml(t('Ξανά'))}</button>` : ''}</p>` : ''}`;
+    ${builtin.length ? `<div class="recipe-grid" id="recipe-list">${builtin.map((recipe) => renderRecipeCard(recipe, pantry)).join('')}</div>` : renderEmpty('Δεν βρήκα συνταγές με ό,τι έχεις', 'Πρόσθεσε στο απόθεμα βασικά υλικά (π.χ. αυγά, ντομάτες, ρύζι, φρούτα) ή δες όλες τις συνταγές παρακάτω.')}
+    <details class="all-recipes" id="all-recipes"><summary>${escapeHtml(t('Όλες οι συνταγές ({count})', { count: rest.length }))}</summary><div class="recipe-grid">${rest.map((recipe) => renderRecipeCard(recipe, pantry)).join('')}</div></details>`;
 }
 
 // ---------- In-store cart ----------
@@ -2389,12 +2430,18 @@ function handleAction(button) {
   }
   else if (action === 'insights-month') { insightsMonth = shiftMonth(insightsMonth, Number(button.dataset.delta)); renderApp(); }
   else if (action === 'add-missing') addMissingToList(button.dataset.recipe);
+  else if (action === 'recipe-filter') { recipeFilter = button.dataset.cat === 'raw' ? 'raw' : 'greek'; renderApp(); }
+  else if (action === 'recipe-to-plan') recipeToPlan(button.dataset.recipe);
   else if (action === 'retry-recipes') { onlineRecipes = { key: '', state: 'idle', list: [] }; renderApp(); }
   else if (action === 'voice-add') startVoiceAdd(button);
   else if (action === 'remove-recurring') { state.recurring = (state.recurring || []).filter((rule) => rule.id !== id); persist(); renderApp(); showToast('Το επαναλαμβανόμενο αφαιρέθηκε.'); }
   else if (action === 'set-lang') changeLanguage(button.dataset.lang);
   else if (action === 'toggle-lang') changeLanguage(getLang() === 'en' ? 'el' : 'en');
   else if (action === 'share-shopping') shareShoppingList();
+  else if (action === 'compare-list') openCompare();
+  else if (action === 'compare-one') openCompare(button.dataset.name);
+  else if (action === 'close-compare') document.querySelector('#compare-dialog').close();
+  else if (action === 'posokanei') { const name = button.dataset.name || ''; navigator.clipboard?.writeText(name).catch(() => {}); window.open('https://posokanei.gov.gr/', '_blank', 'noopener'); if (name) showToast(t('Αντιγράφηκε «{name}»: επικόλλησέ το στην αναζήτηση.', { name })); }
   else if (action === 'copy-share') copyShareText();
   else if (action === 'close-share') document.querySelector('#share-dialog').close();
   else if (action === 'clear-completed') {
@@ -2466,6 +2513,7 @@ document.addEventListener('change', (event) => {
     return;
   }
   if (event.target.matches?.('[data-bill-file]')) { importBillFile(event.target.files?.[0]); event.target.value = ''; return; }
+  if (event.target.id === 'auto-list-toggle') { try { localStorage.setItem(AUTO_LIST_KEY, event.target.checked ? '1' : '0'); } catch {} showToast(event.target.checked ? 'Η αυτόματη λίστα ενεργοποιήθηκε.' : 'Η αυτόματη λίστα απενεργοποιήθηκε.'); if (event.target.checked) persist(); return; }
   if (event.target.matches?.('[data-shelf-photo]')) { loadShelfPhoto(event.target.files?.[0]); event.target.value = ''; return; }
   if (event.target.id === 'cart-item-name') { refreshCartPriceChips(); return; }
   if (event.target.matches?.('[data-receipt-photo]')) { loadReceiptPhoto(event.target.files?.[0]); return; }
@@ -2750,6 +2798,7 @@ takeSharedFile();
 maybeOnboard();
 
 function runDailyChecks() {
+  if (runAutoList().changed) persist();
   runRecurring();
   runAutoPay();
   runTransportRecurring();

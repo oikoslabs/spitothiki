@@ -1,6 +1,7 @@
 // "What do I cook?": suggestions from the pantry, preferring items that expire soon.
 // Built-in Greek recipes work offline; TheMealDB (free, no key) adds more ideas when online.
 import { expiryStatus, normalizeSearch } from './domain.js';
+import { GREEK_MORE, RAW_RECIPES } from './recipe-data.js';
 
 // Canonical ingredients: Greek/English names (first = display) and aliases matched against pantry names.
 export const INGREDIENTS = {
@@ -42,6 +43,42 @@ export const INGREDIENTS = {
   oats: { el: ['βρώμη'], en: ['oats', 'rolled oats'], db: 'oats' },
   mushrooms: { el: ['μανιτάρια'], en: ['mushrooms'], db: 'mushrooms' },
   cream: { el: ['κρέμα γάλακτος'], en: ['double cream', 'cream', 'heavy cream', 'single cream'], db: 'double cream' },
+  greenBeans: { el: ['φασολάκια', 'φασόλια πράσινα'], en: ['green beans'] },
+  peas: { el: ['αρακάς', 'μπιζέλια'], en: ['peas'] },
+  okra: { el: ['μπάμιες', 'μπάμια'], en: ['okra'] },
+  artichoke: { el: ['αγκινάρες', 'αγκινάρα'], en: ['artichokes', 'artichoke'] },
+  cabbage: { el: ['λάχανο'], en: ['cabbage'] },
+  cauliflower: { el: ['κουνουπίδι'], en: ['cauliflower'] },
+  leek: { el: ['πράσο', 'πράσα'], en: ['leek', 'leeks'] },
+  celery: { el: ['σέλινο', 'σελινόριζα'], en: ['celery'] },
+  dill: { el: ['άνηθος', 'άνηθο'], en: ['dill'] },
+  parsley: { el: ['μαϊντανός', 'μαϊντανό'], en: ['parsley'] },
+  mint: { el: ['δυόσμος', 'μέντα'], en: ['mint'] },
+  greens: { el: ['χόρτα', 'βλίτα', 'ραδίκια', 'σέσκουλα'], en: ['greens', 'chard'] },
+  springOnion: { el: ['φρέσκο κρεμμυδάκι', 'κρεμμυδάκια', 'φρέσκα κρεμμύδια'], en: ['spring onion', 'scallion'] },
+  lamb: { el: ['αρνί', 'αρνάκι', 'κατσίκι'], en: ['lamb'] },
+  shrimp: { el: ['γαρίδες', 'γαρίδα'], en: ['shrimp', 'prawns'] },
+  phyllo: { el: ['φύλλο κρούστας', 'φύλλο πίτας', 'φύλλα κρούστας'], en: ['filo', 'phyllo'] },
+  trahanas: { el: ['τραχανάς', 'τραχανά'], en: ['trahana'] },
+  fava: { el: ['φάβα', 'κίτρινη φάβα'], en: ['yellow split peas', 'fava'] },
+  vineLeaves: { el: ['αμπελόφυλλα', 'κληματόφυλλα'], en: ['vine leaves', 'grape leaves'] },
+  orange: { el: ['πορτοκάλι', 'πορτοκάλια'], en: ['orange', 'oranges'] },
+  strawberries: { el: ['φράουλες', 'φράουλα'], en: ['strawberries'] },
+  grapes: { el: ['σταφύλι', 'σταφύλια'], en: ['grapes'] },
+  watermelon: { el: ['καρπούζι'], en: ['watermelon'] },
+  melon: { el: ['πεπόνι'], en: ['melon'] },
+  figs: { el: ['σύκα', 'σύκο', 'ξερά σύκα'], en: ['figs'] },
+  dates: { el: ['χουρμάδες', 'χουρμάς'], en: ['dates'] },
+  walnuts: { el: ['καρύδια', 'καρυδόψιχα'], en: ['walnuts'] },
+  almonds: { el: ['αμύγδαλα', 'αμύγδαλο'], en: ['almonds'] },
+  avocado: { el: ['αβοκάντο'], en: ['avocado'] },
+  peach: { el: ['ροδάκινο', 'ροδάκινα', 'νεκταρίνια'], en: ['peach', 'peaches', 'nectarines'] },
+  pear: { el: ['αχλάδι', 'αχλάδια'], en: ['pear', 'pears'] },
+  kiwi: { el: ['ακτινίδιο', 'ακτινίδια'], en: ['kiwi'] },
+  raisins: { el: ['σταφίδες', 'σταφίδα'], en: ['raisins'] },
+  tahini: { el: ['ταχίνι'], en: ['tahini'] },
+  pomegranate: { el: ['ρόδι', 'ρόδια'], en: ['pomegranate'] },
+  cinnamon: { el: ['κανέλα'], en: ['cinnamon'], staple: true },
   // Staples: assumed to be at home, never listed as missing.
   oil: { el: ['ελαιόλαδο', 'λάδι'], en: ['olive oil', 'oil', 'vegetable oil', 'sunflower oil'], staple: true },
   salt: { el: ['αλάτι'], en: ['salt', 'sea salt'], staple: true },
@@ -69,6 +106,7 @@ export function matchIngredient(name) {
   return best;
 }
 
+export const RECIPE_CATS = { greek: 'Ελληνικές', raw: 'Ωμοφαγικές & φρούτα' };
 export const BUILTIN_RECIPES = [
   { id: 'omelette', name: { el: 'Ομελέτα με τυρί', en: 'Cheese omelette' }, ingredients: ['eggs', 'cheese', 'oil', 'salt'], steps: { el: 'Χτύπα 3 αυγά με αλάτι, ρίξ’ τα σε λάδι, πρόσθεσε τριμμένο τυρί και δίπλωσε.', en: 'Beat 3 eggs with salt, pour into hot oil, add grated cheese and fold.' } },
   { id: 'strapatsada', name: { el: 'Στραπατσάδα', en: 'Strapatsada (eggs with tomato)' }, ingredients: ['eggs', 'tomato', 'feta', 'oil', 'salt'], steps: { el: 'Σωτάρισε τριμμένη ντομάτα 10′, ρίξε χτυπημένα αυγά και θρυμματισμένη φέτα, ανακάτευε μέχρι να πήξουν.', en: 'Cook grated tomato 10 min, add beaten eggs and crumbled feta, stir until set.' } },
@@ -87,6 +125,9 @@ export const BUILTIN_RECIPES = [
   { id: 'pancakes', name: { el: 'Τηγανίτες', en: 'Pancakes' }, ingredients: ['flour', 'milk', 'eggs', 'sugar', 'butter'], steps: { el: 'Ανακάτεψε αλεύρι, γάλα, αυγά και λίγη ζάχαρη. Ψήσε κουταλιές σε βουτυρωμένο τηγάνι.', en: 'Mix flour, milk, eggs and a little sugar. Cook spoonfuls in a buttered pan.' } },
   { id: 'yogurt-honey', name: { el: 'Γιαούρτι με μέλι και φρούτα', en: 'Yogurt with honey and fruit' }, ingredients: ['yogurt', 'honey', 'banana', 'apple'], optional: ['banana', 'apple'], steps: { el: 'Βάλε γιαούρτι σε μπολ, μέλι από πάνω και κομμένα φρούτα.', en: 'Yogurt in a bowl, honey on top and sliced fruit.' } },
   { id: 'apple-pie', name: { el: 'Μηλόπιτα στο ταψί', en: 'Easy apple cake' }, ingredients: ['apple', 'flour', 'sugar', 'butter', 'eggs'], steps: { el: 'Ανακάτεψε αλεύρι, ζάχαρη, αυγά, λιωμένο βούτυρο, πρόσθεσε κομμένα μήλα και ψήσε 45′ στους 180°.', en: 'Mix flour, sugar, eggs and melted butter, fold in sliced apples, bake 45 min at 180 °C.' } },
+  // v1.3: more Greek home cooking (texts written for Spitothiki)
+  ...GREEK_MORE,
+  ...RAW_RECIPES,
   { id: 'fish-plaki', name: { el: 'Ψάρι πλακί', en: 'Baked fish plaki' }, ingredients: ['fish', 'tomato', 'onion', 'garlic', 'potato', 'oil', 'salt'], optional: ['potato'], steps: { el: 'Στρώσε κρεμμύδι, σκόρδο και ντομάτα σε ταψί, βάλε το ψάρι από πάνω με λάδι και ψήσε 35′ στους 190°.', en: 'Layer onion, garlic and tomato in a tray, put the fish on top with olive oil, bake 35 min at 190 °C.' } }
 ];
 
@@ -122,6 +163,7 @@ export function scoreRecipe(ingredientIds, pantry, optional = []) {
   return { matched, missing, urgent, score };
 }
 
+export const recipeCat = (recipe) => recipe.cat || 'greek';
 export function suggestBuiltin(items = [], today, limit = 6) {
   const pantry = pantryIngredients(items, today);
   return BUILTIN_RECIPES.map((recipe) => ({ ...recipe, source: 'builtin', ...scoreRecipe(recipe.ingredients, pantry, recipe.optional) }))

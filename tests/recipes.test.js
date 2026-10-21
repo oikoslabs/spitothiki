@@ -16,7 +16,9 @@ test('pantry names map to ingredients in Greek and English, with accents/plurals
 
 test('every built-in recipe uses known ingredients and has both languages', () => {
   for (const r of BUILTIN_RECIPES) {
-    assert.ok(r.name.el && r.name.en && r.steps.el && r.steps.en, r.id);
+    // v1.3 recipes (with `cat`) are Greek-first: English name, Greek steps (UI falls back to Greek).
+    assert.ok(r.name.el && r.name.en && r.steps.el && (r.cat || r.steps.en), r.id);
+    for (const id of r.optional || []) assert.ok(r.ingredients.includes(id), `${r.id} optional ${id}`);
     for (const id of r.ingredients) assert.ok(INGREDIENTS[id], `${r.id}: ${id}`);
   }
 });
@@ -49,4 +51,11 @@ test('TheMealDB meals are scored and unknown ingredients kept', async () => {
   const list = await fetchMealDbSuggestions([{ name: 'Κοτόπουλο', quantity: 1, expiry: '2026-10-19' }], '2026-10-18', { fetchImpl });
   assert.equal(list[0].name.en, 'Chicken X');
   assert.ok(calls[0].includes('filter.php?i=chicken'));
+});
+
+test('v1.3 recipe set: Greek + raw/fruit sections, unique ids', () => {
+  const ids = BUILTIN_RECIPES.map((r) => r.id);
+  assert.equal(new Set(ids).size, ids.length);
+  assert.ok(BUILTIN_RECIPES.filter((r) => (r.cat || 'greek') === 'greek').length >= 40);
+  assert.ok(BUILTIN_RECIPES.filter((r) => r.cat === 'raw').length >= 15);
 });

@@ -230,16 +230,14 @@ await check('what do I cook: soon-to-expire first, add missing to list, TheMealD
   await page.reload({ waitUntil: 'networkidle0' });
   await nav('cook'); await wait(1200);
   const first = await page.$eval('#recipe-list .recipe-card', (e) => ({ id: e.dataset.recipe, text: e.textContent }));
-  const online = await page.$$eval('#recipe-online .recipe-card', (els) => els.map((e) => e.textContent));
+  const online = await page.$$eval('#recipe-online .recipe-card', (els) => els.length); // v1.3: no online (foreign) source
   await shot('cook');
   await tap('#recipe-list .recipe-card [data-action="add-missing"]'); await wait();
   const s = await stored();
   const names = s.shopping.map((r) => r.name);
-  await tap('#recipe-online .recipe-card [data-action="add-missing"]'); await wait();
-  const names2 = (await stored()).shopping.map((r) => r.name);
-  if (first.id !== 'strapatsada' || !online.length) console.log('  cook:', first, online, names, names2);
+  if (first.id !== 'strapatsada' || online) console.log('  cook:', first, online, names);
   return first.id === 'strapatsada' && first.text.includes(L('Στραπατσάδα', 'Strapatsada')) && first.text.includes('◷')
-    && names.includes(L('Φέτα', 'Feta')) && online.length === 1 && online[0].includes('Shakshuka') && names2.includes('Cumin');
+    && names.includes(L('Φέτα', 'Feta')) && online === 0;
 });
 await check('what do I cook works offline with built-in recipes', async () => {
   await page.setOfflineMode(true);
@@ -343,7 +341,7 @@ await check('scan receipt: http link rejected, proxy setting validated', async (
   return /https/.test(err) && saved === 'https://proxy.example.workers.dev';
 });
 
-await check('meal plan: pick built-in, free text and TheMealDB, week list, copy week', async () => {
+await check('meal plan: pick built-in, free text, week list, week list, copy week', async () => {
   await page.evaluate(() => {
     const st = JSON.parse(localStorage.getItem('spitothiki:v1'));
     st.items = [{ id: 'eggs1', name: 'Αυγά', quantity: 6, unit: 'τεμ.', minimum: 0, category: 'Γαλακτοκομικά', location: '', expiry: '' }];
@@ -362,9 +360,7 @@ await check('meal plan: pick built-in, free text and TheMealDB, week list, copy 
   await page.type('#meal-text-form input[name=text]', 'Φακές με ρύζι');
   await tap('#meal-text-form button[type=submit]'); await wait();
   await tap(`[data-action="plan-meal"][data-date="${days[1]}"][data-slot="dinner"]`); await wait();
-  await page.type('#meal-search-form input[name=q]', 'shakshuka');
-  await tap('#meal-search-form button[type=submit]'); await wait(800);
-  await tap('#meal-results [data-recipe="mealdb-777"]'); await wait();
+  await tap('#meal-builtin [data-recipe="kritharoto"]'); await wait();
   const left = await greekLeft();
   await shot('mealplan-week');
   const s1 = await stored();
@@ -375,8 +371,8 @@ await check('meal plan: pick built-in, free text and TheMealDB, week list, copy 
   const s2 = await stored();
   await tap('[data-action="plan-week"][data-delta="0"]'); await wait();
   const ok = cells === 21 && s1.meals.length === 3 && !left.length
-    && names.some((n) => /τυρί|cheese/.test(n)) && names.some((n) => /φακ|lentil/.test(n)) && names.some((n) => /ρύζι|rice/.test(n)) && names.includes('cumin') && !names.some((n) => /αυγ|egg/.test(n))
-    && s2.meals.length === 6 && s2.meals.some((m) => m.recipeId === 'mealdb-777' && m.date > days[6]);
+    && names.some((n) => /τυρί|cheese/.test(n)) && names.some((n) => /φακ|lentil/.test(n)) && names.some((n) => /ρύζι|rice/.test(n)) && names.some((n) => /μανιτ|mushroom/.test(n)) && !names.some((n) => /αυγ|egg/.test(n))
+    && s2.meals.length === 6 && s2.meals.some((m) => m.recipeId === 'kritharoto' && m.date > days[6]);
   if (!ok) console.log('  plan:', { cells, meals: s1.meals.length, names, after: s2.meals.length, left });
   return ok;
 });
