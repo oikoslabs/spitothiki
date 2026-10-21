@@ -1,7 +1,7 @@
 {
   "hosting": {
     "public": ".",
-    "ignore": ["firebase.json", ".firebaserc", "**/.*", "**/node_modules/**", "tests/**", "package.json", "package-lock.json", "*.md", "firestore.rules", "docs/**"],
+    "ignore": ["firebase.json", ".firebaserc", "**/.*", "**/node_modules/**", "tests/**", "package.json", "package-lock.json", "*.md", "firestore.rules", "docs/**", "push/**"],
     "cleanUrls": false,
     "headers": [
       { "source": "**", "headers": [

@@ -17,6 +17,7 @@ import { BUILTIN_RECIPES } from './recipes.js';
 import { BILL_ICONS, BILL_PERIODS, BILL_TYPES, applyAutoPay, autoPayFor, scheduledDebits, billStats, billsDue, createBill, guessBillType, paidHistory, parseBillCode, unpaidBills, payBill, unpayBill } from './bills.js';
 import { findDuplicateBill, readBillFile } from './bill-pdf.js';
 import { initDietUi, renderDietSection } from './diet-ui.js';
+import { pushDates, pushSupported, pushSubscription, syncPush, stopPush } from './push.js';
 import { extractShelfPrice, lastReceiptPrice } from './shelf-price.js';
 import { addCartItem, budgetState, createTrip, finishTrip, lastPrice, lineTotal, remainingShopping, removeCartItem, tripForReceipt, updateCartItem } from './cart.js';
 import { VM_MODES, interpretCode } from './gs1.js';
@@ -710,7 +711,7 @@ async function writeBackgroundSnapshot() {
     if (!settings.enabled) { await cache.delete(SNAPSHOT_URL); return; }
     const snapshot = expirySnapshot(state.items, { days: settings.days, lang: getLang(), lastNotified: settings.lastNotified,
       titleOne: t('1 προϊόν λήγει σύντομα'), titleMany: t('{count} προϊόντα λήγουν σύντομα', { count: '{count}' }), more: t(' και {count} ακόμη', { count: '{count}' }) });
-    Object.assign(snapshot, { lastBillNotified: settings.lastBillNotified, billTitleOne: t('1 λογαριασμός προς πληρωμή'), billTitleMany: t('{count} λογαριασμοί προς πληρωμή', { count: '{count}' }),
+    Object.assign(snapshot, { pushTitle: t('Έχεις υπενθυμίσεις στη Σπιτοθήκη'), pushBody: t('Άνοιξε για λεπτομέρειες.'), lastBillNotified: settings.lastBillNotified, billTitleOne: t('1 λογαριασμός προς πληρωμή'), billTitleMany: t('{count} λογαριασμοί προς πληρωμή', { count: '{count}' }),
       bills: (state.bills || []).filter((bill) => !bill.paid && !bill.autoPay).map((bill) => ({ name: bill.name, due: bill.due, remind: bill.remind ?? 3, amount: money(bill.amount) })) });
     await cache.put(SNAPSHOT_URL, new Response(JSON.stringify(snapshot), { headers: { 'content-type': 'application/json' } }));
   } catch {}
@@ -732,7 +733,32 @@ async function updateBackgroundCheck() {
 let snapshotTimer;
 function scheduleBackgroundSnapshot() {
   clearTimeout(snapshotTimer);
-  snapshotTimer = setTimeout(() => { if (notifySettings().enabled) writeBackgroundSnapshot(); }, 500);
+  snapshotTimer = setTimeout(() => { if (notifySettings().enabled) { writeBackgroundSnapshot(); refreshPush(); } }, 500);
+}
+
+// ---------- Push (app closed): Cloudflare Worker wakes the SW on the dates that need a reminder ----------
+const PUSH_KEY = 'spitothiki:push-dates';
+let pushState = ''; // '', 'on', 'off', 'error'
+let pushFailedSig = '';
+async function refreshPush({ force = false, test = false } = {}) {
+  if (!pushSupported() || !notifySettings().enabled || Notification.permission !== 'granted') return null;
+  try {
+    const dates = pushDates({ bills: state.bills || [], items: state.items || [] }, { days: notifySettings().days, today: localDateKey() });
+    const sig = `${localDateKey()}|${dates.join(',')}`;
+    let last = ''; try { last = localStorage.getItem(PUSH_KEY) || ''; } catch {}
+    if (!force && !test && sig === last) { pushState = 'on'; return null; }
+    if (!force && !test && sig === pushFailedSig) return null; // failed once for these dates: retry on next app open
+    pushFailedSig = sig;
+    const res = await syncPush(dates, { test });
+    if (!res) { pushState = 'off'; return null; }
+    try { localStorage.setItem(PUSH_KEY, sig); } catch {}
+    pushFailedSig = ''; pushState = 'on';
+    return res;
+  } catch { pushState = 'error'; return null; }
+}
+async function enablePush() {
+  if (!pushSupported()) return false;
+  try { await pushSubscription(true); try { localStorage.removeItem(PUSH_KEY); } catch {} return Boolean(await refreshPush({ force: true })); } catch { pushState = 'error'; return false; }
 }
 
 function notifySettings() {
@@ -793,6 +819,7 @@ async function enableNotifications() {
   updateBackgroundCheck();
   renderApp();
   showToast('Οι ειδοποιήσεις ενεργοποιήθηκαν.');
+  enablePush().then((push) => { if (activeView === 'settings') renderApp(); if (push) showToast('Οι ειδοποιήσεις ενεργοποιήθηκαν, και με κλειστή εφαρμογή.'); });
   checkExpiryNotifications();
 }
 
@@ -808,7 +835,8 @@ function renderNotificationCard() {
     <label class="field-label" for="notify-days">Ειδοποίηση για λήξη μέσα σε (ημέρες)</label><input class="field-input notify-days" id="notify-days" type="number" min="0" max="30" step="1" value="${settings.days}" inputmode="numeric">
     <div class="settings-actions">${active ? '<button class="button button-quiet" type="button" data-action="disable-notifications">Απενεργοποίηση</button>' : `<button class="button button-primary" type="button" data-action="enable-notifications" ${permission === 'unsupported' || permission === 'denied' ? 'disabled' : ''}>Ενεργοποίηση ειδοποιήσεων</button>`}</div>
     <p class="field-hint" id="notify-background">${backgroundSyncSupported() ? 'Έλεγχος στο παρασκήνιο: διαθέσιμος. Με την εφαρμογή εγκατεστημένη, ο browser ελέγχει περίπου μία φορά τη μέρα, όποτε κρίνει.' : 'Έλεγχος στο παρασκήνιο: δεν υποστηρίζεται από αυτόν τον browser. Ο έλεγχος γίνεται όταν ανοίγεις την εφαρμογή.'}</p>
-    <p class="field-hint">Ειδοποιήσεις push με την εφαρμογή εντελώς κλειστή θα χρειάζονταν server (Cloud Functions), που αυτή η έκδοση δεν έχει.</p></section>`;
+    <p class="field-hint" id="notify-push">${escapeHtml(t(!pushSupported() ? 'Με κλειστή εφαρμογή: δεν υποστηρίζεται από αυτόν τον browser.' : !active ? 'Με κλειστή εφαρμογή: ενεργοποίησε τις ειδοποιήσεις για να έρχονται και με κλειστή εφαρμογή (κάθε πρωί, ~9:00).' : pushState === 'error' ? 'Με κλειστή εφαρμογή: δεν συνδέθηκε. Θα ξαναδοκιμάσει όταν ανοίξεις την εφαρμογή.' : 'Με κλειστή εφαρμογή: ενεργές. Κάθε πρωί (~9:00) για λογαριασμούς και λήξεις.'))}</p>
+    ${active && pushSupported() ? '<div class="settings-actions"><button class="button button-quiet" type="button" data-action="push-test">Δοκιμαστική ειδοποίηση</button></div>' : ''}</section>`;
 }
 
 function renderLanguageCard() {
@@ -1608,16 +1636,23 @@ function renderTransportCard() {
 // Everything spent in a month: purchases + bills due + transport + small expenses (separate data, no overlap).
 function monthTotals(month) {
   const shopping = monthlySpending(state.purchases || [], month).total;
-  const transport = transportMonth(state.transport || [], month).total;
+  const tm = transportMonth(state.transport || [], month);
+  const tolls = tm.byType.find((x) => x.type === 'tolls')?.total || 0;
+  const transport = Math.round((tm.total - tolls) * 100) / 100;
   const extras = extrasMonth(state.extras || [], month).total;
   const bills = Math.round((state.bills || []).filter((b) => String(b.due).startsWith(`${month}-`)).reduce((s, b) => s + b.amount, 0) * 100) / 100;
-  const rows = [{ label: `🛒 ${t('Αγορές')}`, value: shopping }, { label: `📄 ${t('Λογαριασμοί')}`, value: bills }, { label: `🚗 ${t('Μετακινήσεις')}`, value: transport }, { label: `☕ ${t('Μικροέξοδα')}`, value: extras }];
-  return { rows, total: Math.round((shopping + transport + extras + bills) * 100) / 100 };
+  const rows = [{ label: `🛒 ${t('Αγορές')}`, value: shopping }, { label: `📄 ${t('Λογαριασμοί')}`, value: bills }, { label: `🛣️ ${t('Διόδια')}`, value: tolls }, { label: `🚗 ${t('Μετακινήσεις')}`, value: transport }, { label: `☕ ${t('Μικροέξοδα')}`, value: extras }];
+  return { rows, total: Math.round((shopping + tolls + transport + extras + bills) * 100) / 100 };
 }
 function renderMonthTotals() {
   const { rows, total } = monthTotals(insightsMonth);
+  const prev = monthTotals(shiftMonth(insightsMonth, -1));
+  const diff = Math.round((total - prev.total) * 100) / 100;
+  const trend = !prev.total ? '' : diff > 0 ? t('▲ {amount} από τον προηγούμενο μήνα', { amount: money(diff) }) : diff < 0 ? t('▼ {amount} από τον προηγούμενο μήνα', { amount: money(-diff) }) : t('Ίδιο με τον προηγούμενο μήνα');
+  const shown = rows.map((row, i) => ({ ...row, label: prev.rows[i].value ? `${row.label} · ${t('πριν: {amount}', { amount: money(prev.rows[i].value) })}` : row.label }));
   return `<section class="panel settings-card" id="month-totals-card"><span class="stat-icon blue">∑</span><h2>Σύνολο εξόδων μήνα</h2><p class="big-number" id="month-grand-total">${escapeHtml(money(total))}</p>
-    ${renderBars(rows, money)}</section>`;
+    <p class="field-hint month-trend ${diff > 0 ? 'up' : 'down'}" id="month-trend">${escapeHtml(trend || t('Προηγούμενος μήνας: {amount}', { amount: money(prev.total) }))}</p>
+    ${renderBars(shown, money)}</section>`;
 }
 
 // ---------- Small daily expenses (coffee, snacks, tobacco…) ----------
@@ -2281,7 +2316,8 @@ function handleAction(button) {
   else if (action === 'close-scan') { cartScanning = false; closeScanner(); }
   else if (action === 'lookup-barcode') fillFromBarcode(itemForm.elements.barcode.value);
   else if (action === 'enable-notifications') enableNotifications();
-  else if (action === 'disable-notifications') { saveNotifySettings({ enabled: false }); updateBackgroundCheck(); renderApp(); showToast('Οι ειδοποιήσεις απενεργοποιήθηκαν.'); }
+  else if (action === 'push-test') { refreshPush({ test: true }).then((r) => showToast(r?.ok ? 'Στάλθηκε δοκιμαστική ειδοποίηση.' : 'Η δοκιμή απέτυχε. Έλεγξε τη σύνδεση.')); }
+  else if (action === 'disable-notifications') { stopPush(); pushState = 'off'; try { localStorage.removeItem(PUSH_KEY); } catch {} saveNotifySettings({ enabled: false }); updateBackgroundCheck(); renderApp(); showToast('Οι ειδοποιήσεις απενεργοποιήθηκαν.'); }
   else if (action === 'set-theme') setTheme(button.dataset.theme);
   else if (action === 'toast-undo') { const run = toastUndo; toastUndo = null; clearTimeout(toastTimer); toast.classList.remove('is-visible'); run?.(); }
   else if (action === 'onboard-lang') { changeLanguage(button.dataset.lang); renderOnboard(); document.querySelector(`[data-action="onboard-lang"][data-lang="${button.dataset.lang}"]`)?.focus(); }
@@ -2696,7 +2732,8 @@ function runDailyChecks() {
 }
 runDailyChecks();
 updateBackgroundCheck();
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') runDailyChecks(); });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { runDailyChecks(); pushFailedSig = ''; refreshPush(); } });
+setTimeout(() => refreshPush(), 3000);
 // While the app stays open (e.g. a tablet in the kitchen), re-check every hour so a new day is noticed.
 setInterval(runDailyChecks, 60 * 60 * 1000);
 

@@ -2,14 +2,14 @@
 // Strategy: network-first for everything from this site (HTML, JS, CSS, manifest), so a new
 // deploy shows up on the next load; the cache is only used when the network is unavailable.
 // Bump CACHE_VERSION when the list of shell files changes; old caches are deleted on activate.
-const CACHE_VERSION = 'v49';
+const CACHE_VERSION = 'v50';
 const CACHE = `spitothiki-${CACHE_VERSION}`;
 const OCR_CACHE = 'spitothiki-ocr';
 const SHARE_CACHE = 'spitothiki-share'; // a file shared to the app (Web Share Target), picked up by the page // Tesseract.js script/worker/core/language files, kept across versions
 const DATA_CACHE = 'spitothiki-data'; // written by the app: expiry snapshot for background checks
 const SHELL = [
   './', './index.html', './styles.css', './manifest.webmanifest',
-  './src/app.js', './src/format.js', './src/theme.js', './src/i18n.js', './src/features.js', './src/recipes.js', './src/receipt.js', './src/receipt-photo.js', './src/mealplan.js', './src/diet-plan.js', './src/receipts.js', './src/diet-ui.js', './src/diet-i18n.js', './src/bills.js', './src/transport.js', './src/extras.js', './src/bill-pdf.js', './src/prefs.js', './src/scan-router.js', './src/onboarding.js', './src/cart.js', './src/shelf-price.js', './src/gs1.js', './src/domain.js', './src/storage.js', './src/barcode.js', './src/toll-barcode.js', './src/firebase-config.js', './src/sync-core.js', './src/sync-firebase.js',
+  './src/app.js', './src/format.js', './src/theme.js', './src/i18n.js', './src/features.js', './src/recipes.js', './src/receipt.js', './src/receipt-photo.js', './src/mealplan.js', './src/diet-plan.js', './src/receipts.js', './src/diet-ui.js', './src/diet-i18n.js', './src/bills.js', './src/transport.js', './src/extras.js', './src/bill-pdf.js', './src/prefs.js', './src/scan-router.js', './src/onboarding.js', './src/cart.js', './src/shelf-price.js', './src/push.js', './src/gs1.js', './src/domain.js', './src/storage.js', './src/barcode.js', './src/toll-barcode.js', './src/firebase-config.js', './src/sync-core.js', './src/sync-firebase.js',
   './icons/icon-192.png', './icons/icon-512.png', './icons/icon.svg'
 ];
 
@@ -76,9 +76,10 @@ self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   event.waitUntil((async () => {
     const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    const view = event.notification.tag === 'spitothiki-bills' ? 'bills' : event.notification.tag === 'spitothiki-push' ? 'overview' : 'pantry';
     const existing = windows.find((client) => client.url.startsWith(self.registration.scope));
-    if (existing) { await existing.focus(); return existing.navigate(`${self.registration.scope}#pantry`).catch(() => {}); }
-    return self.clients.openWindow(`${self.registration.scope}#pantry`);
+    if (existing) { await existing.focus(); return existing.navigate(`${self.registration.scope}#${view}`).catch(() => {}); }
+    return self.clients.openWindow(`${self.registration.scope}#${view}`);
   })());
 });
 
@@ -86,28 +87,43 @@ self.addEventListener('notificationclick', (event) => {
 // Reads the snapshot the app keeps in the data cache; notifies at most once per day (shared with the app).
 function todayKey() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
 function addDaysKey(key, days) { const [y, m, d] = key.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10); }
-async function backgroundExpiryCheck() {
+async function backgroundExpiryCheck({ force = false } = {}) {
+  let shown = 0;
   const cache = await caches.open(DATA_CACHE);
   const res = await cache.match('./__expiry.json');
-  if (!res) return;
+  if (!res) return 0;
   const snap = await res.json();
   const today = todayKey();
   const bills = (snap.bills || []).filter((b) => addDaysKey(today, Number(b.remind ?? 3)) >= b.due).sort((a, b) => a.due.localeCompare(b.due));
-  if (bills.length && snap.lastBillNotified !== today) {
+  if (bills.length && (force || snap.lastBillNotified !== today)) {
+    shown += 1;
     const title = bills.length === 1 ? snap.billTitleOne : String(snap.billTitleMany).replace('{count}', bills.length);
     await self.registration.showNotification(title, { body: `${bills.slice(0, 3).map((b) => `${b.name} ${b.amount}`).join(', ')}.`, tag: 'spitothiki-bills', icon: 'icons/icon-192.png', badge: 'icons/icon-192.png', lang: snap.lang || 'el' });
     snap.lastBillNotified = today;
     await cache.put('./__expiry.json', new Response(JSON.stringify(snap), { headers: { 'content-type': 'application/json' } }));
   }
-  if (snap.lastNotified === today) return;
+  if (snap.lastNotified === today && !force) return shown;
   const limit = addDaysKey(today, Number(snap.days ?? 3));
   const due = (snap.items || []).filter((i) => i.expiry >= today && i.expiry <= limit).sort((a, b) => a.expiry.localeCompare(b.expiry));
-  if (!due.length) return;
+  if (!due.length) return shown;
+  shown += 1;
   const title = due.length === 1 ? snap.titleOne : String(snap.titleMany).replace('{count}', due.length);
   const more = due.length > 3 ? String(snap.more).replace('{count}', due.length - 3) : '';
   await self.registration.showNotification(title, { body: `${due.slice(0, 3).map((i) => i.name).join(', ')}${more}.`, tag: 'spitothiki-expiry', icon: 'icons/icon-192.png', badge: 'icons/icon-192.png', lang: snap.lang || 'el' });
   snap.lastNotified = today;
   await cache.put('./__expiry.json', new Response(JSON.stringify(snap), { headers: { 'content-type': 'application/json' } }));
+  return shown;
 }
+
+// Push from the «spitothiki-push» Worker: an empty wake-up on a reminder date; the text is built from local data.
+self.addEventListener('push', (event) => {
+  event.waitUntil((async () => {
+    const shown = await backgroundExpiryCheck({ force: true }).catch(() => 0);
+    if (shown) return;
+    const res = await (await caches.open(DATA_CACHE)).match('./__expiry.json').catch(() => null);
+    const snap = res ? await res.json().catch(() => ({})) : {};
+    await self.registration.showNotification(snap.pushTitle || 'Σπιτοθήκη', { body: snap.pushBody || 'Άνοιξε για λεπτομέρειες.', tag: 'spitothiki-push', icon: 'icons/icon-192.png', badge: 'icons/icon-192.png' });
+  })());
+});
 self.addEventListener('periodicsync', (event) => { if (event.tag === 'spitothiki-expiry') event.waitUntil(backgroundExpiryCheck()); });
 self.addEventListener('message', (event) => { if (event.data === 'spitothiki-expiry-check') event.waitUntil?.(backgroundExpiryCheck()); });

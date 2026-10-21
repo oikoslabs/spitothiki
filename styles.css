@@ -744,3 +744,4 @@ button.stat-card:hover { border-color: #bfd4c1; }
 .price-chip { min-height: 44px; padding: 8px 14px; border-radius: 999px; border: 2px solid var(--accent, #2f7d4f); background: transparent; color: inherit; font-weight: 700; font-size: calc(15px * var(--text-scale)); cursor: pointer; }
 .shelf-button { min-height: 48px; justify-content: center; }
 .price-tools[hidden] { display: none; }
+.month-trend.up { color: var(--danger, #b3261e); } .month-trend.down { color: var(--accent, #2f7d4f); }
