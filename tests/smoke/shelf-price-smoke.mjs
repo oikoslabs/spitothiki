@@ -1,0 +1,34 @@
+// Cart: «Τελευταία τιμή» chip from receipts + «📷 Τιμή από ράφι» (mock OCR). Usage: node tests/smoke/shelf-price-smoke.mjs <url> <image> [screenshot]
+import puppeteer from 'puppeteer-core';
+const [url = 'http://127.0.0.1:8080/', image, shot = ''] = process.argv.slice(2);
+const b = await puppeteer.launch({ executablePath: process.env.CHROME_PATH || '/usr/bin/google-chrome', args: ['--no-sandbox'] });
+const page = await b.newPage();
+await page.setViewport({ width: 412, height: 915, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+await page.evaluateOnNewDocument(() => Object.defineProperty(navigator, 'language', { get: () => 'el-GR' }));
+const errors = []; page.on('pageerror', (e) => errors.push(e.message));
+const fail = (m) => { console.error('FAIL:', m); process.exitCode = 1; };
+const W = (ms) => new Promise((r) => setTimeout(r, ms));
+await page.goto(url, { waitUntil: 'networkidle0' });
+await page.evaluate(() => {
+  const now = new Date().toISOString();
+  const receipts = [{ id: 'r1', date: '2026-10-15', total: 3.78, store: 'Σκλαβενίτης', format: 'mydata', lines: 1, importedAt: now, items: [{ name: 'ΓΑΛΑ ΦΡΕΣ ΔΕΛΤΑ 1L', quantity: 2, unit: 'τεμ.', price: 3.78 }] }];
+  const trips = [{ id: 'trip-1', storeId: '', storeName: 'Σκλαβενίτης', budget: 0, status: 'active', startedAt: now, date: now.slice(0, 10), items: [], total: 0, updatedAt: now }];
+  localStorage.setItem('spitothiki:onboarded', '1');
+  localStorage.setItem('spitothiki:v1', JSON.stringify({ items: [], shopping: [], receipts, trips }));
+});
+await page.goto(url.replace(/#.*$/, '') + '#cart', { waitUntil: 'networkidle0' }); await page.reload({ waitUntil: 'networkidle0' });
+await page.waitForSelector('[data-action="cart-add-manual"]'); await page.tap('[data-action="cart-add-manual"]');
+await page.waitForSelector('#cart-item-dialog[open]');
+await page.type('#cart-item-name', 'Γάλα φρέσκο Δέλτα 1l');
+await page.evaluate(() => document.querySelector('#cart-item-name').dispatchEvent(new Event('change', { bubbles: true })));
+const chip = await page.$eval('#cart-price-chips', (e) => e.textContent).catch(() => '');
+if (!/1,89/.test(chip) || !/Σκλαβενίτης/.test(chip)) fail(`chip ${chip}`);
+await page.tap('#cart-price-chips .price-chip');
+let price = await page.$eval('#cart-item-price', (e) => e.value); if (price !== '1,89') fail(`chip fill ${price}`);
+await page.evaluate(() => { window.__spitoOcrMock = async () => ({ text: 'ΓΑΛΑ ΦΡΕΣΚΟ 1L\nΤιμή κιλού: 3,90 €\n1,95€', confidence: 80 }); });
+const input = await page.$('[data-shelf-photo]'); await input.uploadFile(image); await W(1500);
+price = await page.$eval('#cart-item-price', (e) => e.value); if (price !== '1,95') fail(`shelf fill ${price}`);
+if (shot) await page.screenshot({ path: shot });
+if (errors.length) fail(errors.join(' | '));
+console.log(process.exitCode ? 'FAILED' : 'shelf-price smoke OK');
+await b.close();

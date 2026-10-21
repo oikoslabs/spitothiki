@@ -17,6 +17,7 @@ import { BUILTIN_RECIPES } from './recipes.js';
 import { BILL_ICONS, BILL_PERIODS, BILL_TYPES, applyAutoPay, autoPayFor, scheduledDebits, billStats, billsDue, createBill, guessBillType, paidHistory, parseBillCode, unpaidBills, payBill, unpayBill } from './bills.js';
 import { findDuplicateBill, readBillFile } from './bill-pdf.js';
 import { initDietUi, renderDietSection } from './diet-ui.js';
+import { extractShelfPrice, lastReceiptPrice } from './shelf-price.js';
 import { addCartItem, budgetState, createTrip, finishTrip, lastPrice, lineTotal, remainingShopping, removeCartItem, tripForReceipt, updateCartItem } from './cart.js';
 import { VM_MODES, interpretCode } from './gs1.js';
 import { TRANSPORT_ICONS, TRANSPORT_TYPES, applyTransportRecurring, classifyReceipt, consumptionFor, createTransport, createTransportRecurring, fuelStats, pricePerLiter, transportMonth } from './transport.js';
@@ -1326,8 +1327,49 @@ function openCartItem(prefill = {}) {
   document.querySelector('#cart-item-error').hidden = true;
   document.querySelector('#cart-item-title').textContent = t(existing ? 'Επεξεργασία' : 'Προϊόν στο καλάθι');
   updateCartQtyLabel();
+  document.querySelector('#cart-price-tools').hidden = Boolean(existing);
+  document.querySelector('#cart-shelf-status').textContent = '';
+  refreshCartPriceChips();
   document.querySelector('#cart-item-dialog').showModal();
   (data.name ? form.elements.price : form.elements.name).focus();
+}
+
+const priceText = (n) => String(n.toFixed(2)).replace('.', ',');
+function priceChip(price, label) { return `<button class="price-chip" type="button" data-action="cart-use-price" data-price="${price}">${escapeHtml(label)}</button>`; }
+
+// «Τελευταία τιμή» chip from the newest scanned receipt line that matches the product (one tap fills the price).
+function refreshCartPriceChips(shelf = null) {
+  const form = document.querySelector('#cart-item-form');
+  const box = document.querySelector('#cart-price-chips');
+  if (!form || !box) return;
+  const chips = [];
+  if (shelf) for (const c of shelf) chips.push(priceChip(c.price, t('Ράφι: {price}', { price: money(c.price) })));
+  const memory = form.elements.key.value ? null : lastReceiptPrice(state.receipts || [], { barcode: form.elements.barcode.value, name: form.elements.name.value });
+  if (memory) chips.push(priceChip(memory.price, `${t('Τελευταία τιμή {price}', { price: money(memory.price) })}${memory.store ? ` · ${memory.store}` : ''}${memory.date ? ` ${formatDate(memory.date)}` : ''}`));
+  const html = chips.join('');
+  if (box.dataset.html !== html) { box.dataset.html = html; box.innerHTML = html; } // unchanged → keep the buttons (a tap may be in progress)
+}
+
+async function loadShelfPhoto(file) {
+  if (!file) return;
+  const status = document.querySelector('#cart-shelf-status');
+  status.textContent = t('Διαβάζω την ετικέτα…');
+  try {
+    const { ocrShelfLabel } = await import('./receipt-photo.js');
+    const text = await ocrShelfLabel(file, {
+      recognizeImpl: window.__spitoOcrMock,
+      onProgress: (m) => { status.textContent = m.status === 'recognizing text' ? t('Αναγνώριση κειμένου… {pct}%', { pct: Math.round((m.progress || 0) * 100) }) : t('Φόρτωση αναγνώρισης κειμένου (μόνο την πρώτη φορά)…'); }
+    });
+    const result = extractShelfPrice(text);
+    const input = document.querySelector('#cart-item-price');
+    if (!result.best) { status.textContent = t('Δεν βρέθηκε τιμή στην ετικέτα. Γράψ’ την εσύ.'); refreshCartPriceChips(); return; }
+    if (result.ambiguous) { status.textContent = t('Βρήκα περισσότερες τιμές. Πάτα τη σωστή:'); refreshCartPriceChips(result.candidates); return; }
+    input.value = priceText(result.best);
+    status.textContent = t('Τιμή από ράφι: {price}. Έλεγξέ την πριν την προσθήκη.', { price: money(result.best) });
+    refreshCartPriceChips(result.candidates.slice(1));
+  } catch (error) {
+    status.textContent = t(navigator.onLine === false ? 'Χωρίς σύνδεση: η αναγνώριση της ετικέτας χρειάζεται ίντερνετ την πρώτη φορά.' : 'Η αναγνώριση απέτυχε. Γράψε την τιμή.');
+  }
 }
 
 function updateCartQtyLabel() {
@@ -1373,6 +1415,7 @@ async function cartBarcode(code) {
     if (form.elements.barcode.value !== barcode) return;
     if (product?.name && !form.elements.name.value) { form.elements.name.value = product.name; if (product.category) form.elements.category.value = product.category; }
     document.querySelector('#cart-item-lookup').textContent = product?.name ? t('Βρέθηκε στο Open Food Facts.') : t('Δεν βρέθηκε όνομα. Γράψ’ το εσύ.');
+    refreshCartPriceChips();
     if (product?.name && info.price == null) {
       const memory = lastPrice(state.prices || [], trip, { barcode, name: product.name });
       if (memory && !form.elements.price.value) form.elements.price.value = String(memory.price.toFixed(2)).replace('.', ',');
@@ -2113,6 +2156,7 @@ function handleAction(button) {
     state.items = state.items.map((entry) => entry.id === id ? { ...entry, quantity: nextQuantity, updatedAt: new Date().toISOString() } : entry);
     persist(); renderApp();
   } else if (action === 'cart-scan') startCartScan();
+  else if (action === 'cart-use-price') { const input = document.querySelector('#cart-item-price'); input.value = priceText(Number(button.dataset.price)); input.focus(); }
   else if (action === 'cart-add-manual') { cartScanning = false; openCartItem({}); }
   else if (action === 'close-cart-item') { cartScanning = false; document.querySelector('#cart-item-dialog').close(); }
   else if (action === 'cart-from-list') { const row = state.shopping.find((entry) => entry.id === id); if (row) { cartScanning = false; openCartItem({ name: row.name, shoppingId: row.id, qty: normalizeUnit(row.unit) === 'κιλά' ? row.quantity : Math.max(1, Math.round(row.quantity)), unit: normalizeUnit(row.unit) === 'κιλά' ? 'κιλά' : 'τεμ.', category: rowCategory(row, state.items) }); } }
@@ -2361,6 +2405,8 @@ document.addEventListener('change', (event) => {
     return;
   }
   if (event.target.matches?.('[data-bill-file]')) { importBillFile(event.target.files?.[0]); event.target.value = ''; return; }
+  if (event.target.matches?.('[data-shelf-photo]')) { loadShelfPhoto(event.target.files?.[0]); event.target.value = ''; return; }
+  if (event.target.id === 'cart-item-name') { refreshCartPriceChips(); return; }
   if (event.target.matches?.('[data-receipt-photo]')) { loadReceiptPhoto(event.target.files?.[0]); return; }
   if (event.target.classList?.contains('price-input')) {
     const row = state.shopping.find((entry) => entry.id === event.target.dataset.id);

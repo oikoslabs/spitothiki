@@ -131,3 +131,20 @@ export async function ocrReceipt(file, { onProgress, recognizeImpl } = {}) {
   }
   return best;
 }
+
+// Shelf label: one upright read (then 90°/270° if no price-like text), returns the raw text.
+export async function ocrShelfLabel(file, { onProgress, recognizeImpl } = {}) {
+  const img = await loadImage(file);
+  const recognize = recognizeImpl || (async (canvas) => {
+    const worker = await getWorker(onProgress);
+    const { data } = await worker.recognize(canvas, { rotateAuto: true });
+    return { text: data.text, confidence: data.confidence };
+  });
+  let text = '';
+  for (const angle of [0, 90, 270]) {
+    const result = await recognize(preprocess(img, angle));
+    text = result.text || '';
+    if (/\d\s?[.,]\s?\d{2}/.test(text)) break;
+  }
+  return text;
+}
