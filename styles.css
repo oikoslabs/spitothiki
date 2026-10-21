@@ -763,3 +763,11 @@ button.stat-card:hover { border-color: #bfd4c1; }
 .recipe-filter .filter-chip { min-height: 44px; font-size: calc(16px * var(--text-scale)); }
 .all-recipes { margin-top: 16px; }
 .all-recipes > summary { min-height: 48px; display: flex; align-items: center; font-weight: 700; cursor: pointer; font-size: calc(17px * var(--text-scale)); }
+/* v1.3.2 «Στην αρχή» */
+.back-to-top { display: grid; place-items: center; width: 52px; height: 52px; padding: 0; border: 1px solid rgba(255,255,255,.35); border-radius: 50%; background: var(--green, #2d6b4c); color: #fff; font-size: calc(22px * var(--text-scale)); line-height: 1; box-shadow: 0 6px 18px rgba(24,44,32,.25); cursor: pointer; opacity: .92; }
+.back-to-top[hidden] { display: none; }
+.back-to-top:hover, .back-to-top:focus-visible { opacity: 1; }
+.back-to-top:focus-visible { outline: 3px solid #f3c64a; outline-offset: 2px; }
+.back-to-top-page { position: fixed; right: max(16px, env(safe-area-inset-right)); bottom: calc(24px + env(safe-area-inset-bottom)); z-index: 15; }
+.back-to-top-dialog { position: sticky; bottom: 12px; margin: 0 12px 12px auto; z-index: 2; }
+@media (max-width: 760px) { .back-to-top-page { bottom: calc(92px + env(safe-area-inset-bottom)); } }

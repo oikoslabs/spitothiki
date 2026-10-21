@@ -23,6 +23,7 @@ import { comparePrices, listComparison } from './price-compare.js';
 import { extractShelfPrice, lastReceiptPrice } from './shelf-price.js';
 import { addCartItem, budgetState, createTrip, finishTrip, lastPrice, lineTotal, remainingShopping, removeCartItem, tripForReceipt, updateCartItem } from './cart.js';
 import { VM_MODES, interpretCode } from './gs1.js';
+import { initBackToTop } from './back-to-top.js';
 import { TRANSPORT_ICONS, TRANSPORT_TYPES, applyTransportRecurring, classifyReceipt, consumptionFor, createTransport, createTransportRecurring, fuelStats, pricePerLiter, transportMonth } from './transport.js';
 import { EXTRA_DEFAULT_EMOJI, EXTRA_SUGGESTIONS, LEGACY_EXTRA_CATEGORIES, createExtra, createExtraCategory, deleteExtraCategory, extraCategories, findExtraCategory, suggestEmoji, extrasMonth, extrasSummary, lastUnitPrice, quickExtra, setExtraQty, unitPrice } from './extras.js';
 import { getLang, locale, setLang, t, translateDom, untranslatedGreek } from './i18n.js';
@@ -2812,3 +2813,4 @@ setTimeout(() => refreshPush().then(() => { if (activeView === 'settings') rende
 setInterval(runDailyChecks, 60 * 60 * 1000);
 
 startSync();
+initBackToTop();
