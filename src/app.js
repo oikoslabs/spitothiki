@@ -345,7 +345,7 @@ function renderSettings() {
 }
 
 // Let the browser paint the tap's feedback before running heavy work (keeps INP low on slow phones).
-function afterPaint(fn) { requestAnimationFrame(() => setTimeout(fn, 0)); }
+function afterPaint(fn) { return new Promise((resolve) => requestAnimationFrame(() => setTimeout(() => resolve(fn?.()), 0))); }
 function pressFeedback(el) { el.classList.add('is-pressed'); setTimeout(() => el.classList.remove('is-pressed'), 400); }
 
 function renderApp() {
@@ -554,6 +554,8 @@ async function openScanner({ onCode = fillFromBarcode, qr = false, confident = n
   const torch = document.querySelector('#scan-torch');
   torch.hidden = true; torch.setAttribute('aria-pressed', 'false');
   dialog.showModal();
+  await afterPaint(); // let the dialog paint before the heavy camera/detector setup (INP)
+  if (!dialog.open) return;
   try {
     stopScanner = await startScanner(document.querySelector('#scan-video'), (code) => {
       stopScanner = null;
@@ -2530,7 +2532,13 @@ document.addEventListener('submit', (event) => {
   }
   if (event.target.id === 'receipt-review-form') {
     event.preventDefault();
-    importReceipt(event.target);
+    const form = event.target;
+    const button = form.querySelector('button[type="submit"]');
+    if (button?.disabled) return;
+    const label = button?.textContent;
+    if (button) { button.disabled = true; button.setAttribute('aria-busy', 'true'); button.textContent = t('Αποθήκευση…'); }
+    // Paint the feedback first, then do the heavy save + re-render (INP).
+    afterPaint(() => { try { importReceipt(form); } finally { if (button?.isConnected) { button.disabled = false; button.removeAttribute('aria-busy'); button.textContent = label; } } });
     return;
   }
   if (event.target.id === 'proxy-form') {

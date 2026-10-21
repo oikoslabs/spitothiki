@@ -423,6 +423,7 @@ body[data-screen="pantry"] .topbar .button-add { display: none; }
 
 /* Scan receipt */
 .receipt-dialog { width: min(820px, calc(100vw - 24px)); }
+#receipt-body { min-height: min(420px, 60vh); }
 .receipt-summary { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 6px 0 10px; }
 .receipt-summary > div { display: grid; gap: 2px; }
 .receipt-lines { display: grid; gap: 6px; max-height: 50vh; overflow: auto; padding-right: 4px; }

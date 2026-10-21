@@ -262,7 +262,7 @@ const EN = {
   'ΑΦΜ {vat}': 'VAT no. {vat}', 'Άγνωστο κατάστημα': 'Unknown store', '{count} είδη': '{count} items',
   'Αυτή η απόδειξη έχει ήδη εισαχθεί ({date}).': 'This receipt was already imported ({date}).',
   'Αυτός ο σύνδεσμος της ΑΑΔΕ δείχνει μόνο το σύνολο, όχι τα είδη. Μπορείς να καταγράψεις το ποσό ως έξοδο. Για τα είδη, σκάναρε το QR του παρόχου (συνήθως στο κάτω μέρος της απόδειξης).': 'This AADE link only shows the total, not the items. You can record the amount as spending. For the items, scan the provider’s QR (usually at the bottom of the receipt).',
-  'Πίσω': 'Back', 'Καταγραφή εξόδου': 'Record spending', 'Εισαγωγή: {name}': 'Import: {name}',
+  'Πίσω': 'Back', 'Καταγραφή εξόδου': 'Record spending', 'Αποθήκευση…': 'Saving…', 'Εισαγωγή: {name}': 'Import: {name}',
   'Πρόσθεσε στο απόθεμα (ενώνεται με ίδια προϊόντα)': 'Add to pantry (merges with same products)', 'Κατέγραψε τα έξοδα στα Στατιστικά': 'Record spending in Insights',
   'Φωτογραφία απόδειξης': 'Receipt photo', 'Από τη συλλογή': 'From gallery',
   'Χωρίς QR παρόχου (π.χ. ταμειακή με QR της ΑΑΔΕ); Βγάλε φωτογραφία την απόδειξη και θα διαβαστούν τα είδη στη συσκευή σου.': 'No provider QR (e.g. a till receipt with an AADE QR)? Take a photo of the receipt and the items are read on your device.',
