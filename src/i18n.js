@@ -666,7 +666,7 @@ const EN = {
   'Διαγραφή εξόδου;': 'Delete expense?',
   'Μενού': 'Menu',
   'Όλες οι ενότητες': 'All sections',
-  'ΣΠΙΤΙ': 'HOME', 'ΤΙΜΕΣ': 'PRICES', 'Τιμή από ράφι': 'Price from shelf', 'Χωρίς σύνδεση': 'Offline',
+  'ΣΠΙΤΙ': 'HOME', 'ΤΙΜΕΣ': 'PRICES', 'Μπαίνει μόνο του κάθε μήνα': 'Added by itself every month', 'Τιμή από ράφι': 'Price from shelf', 'Χωρίς σύνδεση': 'Offline',
   'ΨΩΝΙΑ': 'SHOPPING',
   'ΦΑΓΗΤΟ': 'FOOD',
   'ΕΞΟΔΑ': 'SPENDING',

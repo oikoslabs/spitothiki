@@ -1,0 +1,22 @@
+// v1.5.3: «🏠 Ενοίκιο / κοινόχρηστα» quick action opens a prefilled monthly rent bill. Demo data only.
+import puppeteer from 'puppeteer-core';
+const [url = 'http://127.0.0.1:8080/', shots = ''] = process.argv.slice(2);
+const browser = await puppeteer.launch({ executablePath: process.env.CHROME_PATH || '/usr/bin/google-chrome', args: ['--no-sandbox'], headless: true });
+const wait = (ms = 600) => new Promise((r) => setTimeout(r, ms));
+let failed = 0; const check = (n, ok, i) => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${n}`); if (!ok) { failed++; if (i) console.log('  ', JSON.stringify(i)); } };
+const pg = await browser.newPage(); await pg.setBypassServiceWorker(true);
+await pg.setViewport({ width: 390, height: 844, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+await pg.evaluateOnNewDocument(() => { window.__spitoOnboarding = true; window.__spitoProtect = true; Object.defineProperty(navigator, 'language', { get: () => 'el-GR' }); });
+await pg.goto(url, { waitUntil: 'networkidle0' });
+await pg.evaluate(() => { localStorage.clear(); localStorage.setItem('spitothiki:onboarded', '1'); localStorage.setItem('spitothiki:protect-sheet-seen', '1'); localStorage.setItem('spitothiki:v1', JSON.stringify({ items: [], shopping: [], bills: [] })); });
+await pg.reload({ waitUntil: 'networkidle0' }); await wait(900);
+await pg.evaluate(() => document.querySelector('[data-quick="all"]').click()); await wait(800);
+const btn = await pg.$('#quick-sheet [data-quick="rent"]');
+check('Κινήσεις menu has the rent button right after bill', Boolean(btn) && await pg.evaluate(() => document.querySelector('#quick-sheet [data-quick="bill"]').nextElementSibling?.dataset.quick === 'rent'));
+await pg.evaluate(() => document.querySelector('#quick-sheet [data-quick="rent"]').scrollIntoView({ block: 'center' })); await wait(300);
+if (shots) await pg.screenshot({ path: `${shots}/v153-menu.png` });
+await btn.click(); await wait(900);
+const f = await pg.evaluate(() => { const e = document.querySelector('#bill-form').elements; return { open: document.querySelector('#bill-dialog').open, name: e.name.value, type: e.type.value, period: e.period.value, focus: document.activeElement === e.amount }; });
+check('prefilled rent bill, focus on amount', f.open && f.name === 'Ενοίκιο' && f.type === 'rent' && f.period === '1' && f.focus, f);
+if (shots) await pg.screenshot({ path: `${shots}/v153-form.png` });
+await browser.close(); process.exit(failed ? 1 : 0);
