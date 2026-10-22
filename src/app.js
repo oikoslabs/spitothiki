@@ -181,6 +181,7 @@ const QUICK_ACTIONS = [
   { id: 'extra', icon: '☕', label: 'Μικροέξοδο', hint: 'Καφές, σάντουιτς, καπνός με ένα πάτημα' },
   { id: 'transport', icon: '⛽', label: 'Καύσιμα / μετακίνηση', hint: 'Βενζίνη, διόδια, ΜΜΜ, ταξί' },
   { id: 'bill', icon: '📄', label: 'Νέος λογαριασμός', hint: 'ΔΕΗ, νερό, ενοίκιο, συνδρομές' },
+  { id: 'rent', icon: '🏠', label: 'Ενοίκιο / κοινόχρηστα', hint: 'Μπαίνει μόνο του κάθε μήνα' },
   { id: 'receipt', icon: '🧾', label: 'Σάρωση απόδειξης', hint: 'Ψώνια, καύσιμα ή διόδια με ένα QR/barcode' },
   { id: 'product', icon: '＋', label: 'Πρόσθεσε προϊόν', hint: 'Κάτι που έφερες σπίτι' },
   { id: 'cart', icon: '🛒', label: 'Καλάθι στο κατάστημα', hint: 'Σκάναρε ό,τι βάζεις στο καρότσι' },
@@ -197,6 +198,7 @@ function runQuickAction(id) {
   else if (id === 'product') openItemDialog();
   else if (id === 'list') { navigate('shopping'); focus('#shopping-form input[name="name"]'); }
   else if (id === 'extra') { navigate('extras'); focus('#extras-quick-panel', 'start'); }
+  else if (id === 'rent') openRentBill();
   else if (id === 'transport') { transportDraft = null; navigate('transport'); focus('#transport-amount'); }
   else if (id === 'bill') { navigate('bills'); openBillDialog(); }
   else if (id === 'cart' || id === 'cook') navigate(id);
@@ -2158,6 +2160,13 @@ function renderBills() {
     : renderEmpty('Κανένας λογαριασμός ακόμη', 'Πρόσθεσε ΔΕΗ, νερό, ενοίκιο ή συνδρομές για να θυμάσαι πότε λήγουν.', 'add-bill', 'Προσθήκη λογαριασμού', '📄')}`;
 }
 
+// Quick action: new rent bill prefilled (name, type, every month); the user only adds amount + day.
+function openRentBill() {
+  openBillDialog();
+  const form = document.querySelector('#bill-form');
+  form.elements.name.value = t('Ενοίκιο'); form.elements.type.value = 'rent'; form.dataset.typeTouched = '1'; form.elements.period.value = '1';
+  requestAnimationFrame(() => form.elements.amount.focus());
+}
 function openBillDialog(id = '') {
   const form = document.querySelector('#bill-form');
   form.reset(); form.dataset.importToken = '';

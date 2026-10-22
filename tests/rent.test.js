@@ -26,3 +26,8 @@ test('month totals show a separate rent row', () => {
   assert.match(src, /🏠 \$\{t\('Ενοίκιο \/ κοινόχρηστα'\)\}/);
   assert.match(src, /billsMonthSplit\(state\.bills/);
 });
+test('rent quick action follows bill', () => {
+  const src = readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');
+  assert.match(src, /id: 'bill'[^\n]*\n  \{ id: 'rent', icon: '🏠'/);
+  assert.match(src, /id === 'rent'\) openRentBill\(\)/);
+});
