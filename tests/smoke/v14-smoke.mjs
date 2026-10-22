@@ -31,7 +31,7 @@ await page.evaluate(() => {
 });
 await page.reload({ waitUntil: 'networkidle0' }); await W(800);
 // 1) reminder on home (not signed in, never backed up)
-if (!await page.$('#home-backup-card')) fail('no backup reminder'); await shot('v14-home-reminder');
+if (!await page.$('#home-protect-card')) fail('no protect card'); await shot('v14-home-reminder');
 // 2) settings: export encrypted
 await page.goto(url.replace(/#.*$/, '') + '#settings', { waitUntil: 'networkidle0' }); await W(500);
 if (!await page.$('#persist-status')) fail('no persist status');

@@ -795,3 +795,6 @@ button.stat-card:hover { border-color: #bfd4c1; }
 :root[data-theme="dark"] .storage-badge.is-synced { background: #173524; color: #9fe0b4; }
 :root[data-theme="dark"] .storage-badge.is-local { background: #3a2a10; color: #f3c77a; }
 .protect-sheet-actions { flex-wrap: wrap; }
+#protect-dialog { width: min(520px, calc(100vw - 24px)); padding: 22px 20px 20px; }
+#protect-dialog h2 { font-size: 1.35rem; line-height: 1.25; margin: 4px 0 10px; }
+#protect-dialog .protect-sheet-actions { display: grid; gap: 10px; margin-top: 16px; }
