@@ -8,6 +8,17 @@ export const LANG_KEY = 'spitothiki:lang';
 export const LANGS = ['el', 'en'];
 
 const EN = {
+  "Τα δεδομένα σου είναι μόνο σε αυτό το κινητό": "Your data is only on this phone",
+  "Τα δεδομένα σου είναι μόνο σε αυτό το κινητό.": "Your data is only on this phone.",
+  "Συνδέσου ή σύνδεσε Google Drive για να μη χαθούν.": "Sign in or connect Google Drive so it isn’t lost.",
+  "Σύνδεση Google Drive": "Connect Google Drive",
+  "Συγχρονισμένο": "Synced",
+  "Μόνο στο κινητό": "Only on this phone",
+  "Προστασία δεδομένων": "Protect your data",
+  "ΤΑ ΔΕΔΟΜΕΝΑ ΣΟΥ": "YOUR DATA",
+  "Αργότερα": "Later",
+  "Αν αλλάξεις κινητό ή σβηστούν τα δεδομένα του browser, χωρίς σύνδεση ή Drive χάνονται. Η σύνδεση κρατά τα πάντα και σε άλλες συσκευές· το Google Drive κρατά κρυπτογραφημένο αντίγραφο στο δικό σου Drive.": "If you change phone or the browser data is cleared, without sign-in or Drive it is lost. Signing in keeps everything on your other devices too; Google Drive keeps an encrypted copy in your own Drive.",
+  "Τα παραδείγματα φορτώθηκαν. Τα δεδομένα σου είναι μόνο σε αυτό το κινητό: συνδέσου ή σύνδεσε Google Drive για να μη χαθούν.": "Examples loaded. Your data is only on this phone: sign in or connect Google Drive so it isn’t lost.",
   ...DIET_EN,
   "Κράτα ένα αντίγραφο των δεδομένων σου": "Keep a backup of your data",
   "Το τελευταίο αντίγραφο έγινε {date}.": "Your last backup was on {date}.",

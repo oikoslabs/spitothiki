@@ -9,6 +9,7 @@ import { CATEGORIES, WASTE_REASONS, applyWaste, createStore, createWaste, groupB
 import { showSigninCard } from './features.js';
 import { routeCode } from './scan-router.js';
 import { deleteReceipt, listReceipts, receiptCategory, receiptItems, receiptMonths } from './receipts.js';
+import { PROTECT_SEEN_KEY, PROTECT_SNOOZE_KEY, authKnown, showProtectCard, showProtectSheet, snoozeUntilFrom, storageMode } from './protect.js';
 import { BILL_PRESETS, ONBOARD_KEY, PRESETS_KEY, pendingPresets, shouldOnboard } from './onboarding.js';
 import { applyDisplayPrefs, highContrast, setHighContrast, setTextSize, textSize } from './prefs.js';
 import { RECURRING_INTERVALS, applyRecurring, createRecurring, dueFromSnapshot, expirySnapshot, parseVoiceItems } from './features.js';
@@ -262,6 +263,48 @@ function renderBackupReminder() {
     <button class="icon-button signin-close" type="button" data-action="backup-snooze" aria-label="${escapeHtml(t('Υπενθύμιση σε 7 ημέρες'))}" title="${escapeHtml(t('Υπενθύμιση σε 7 ημέρες'))}">×</button></section>`;
 }
 
+// v1.5.1: one «protect your data» card, replacing the separate sign-in and backup cards. Shown only while the
+// user is neither signed in nor has Google Drive backup on; hidden entirely once either is active.
+const protectOpts = () => ({ signedIn: Boolean(syncStatus.user), driveOn: driveOn(), known: authKnown(syncStatus) });
+const PROTECT_LINE = 'Συνδέσου ή σύνδεσε Google Drive για να μη χαθούν.';
+function protectButtons(prefix) {
+  const signin = syncStatus.state === 'disabled' ? '' : `<button class="button button-primary" type="button" data-action="${prefix}-signin" id="${prefix}-signin">${escapeHtml(t('Σύνδεση'))}</button>`;
+  return `${signin}<button class="button ${signin ? 'button-quiet' : 'button-primary'}" type="button" data-action="${prefix}-drive" id="${prefix}-drive">${escapeHtml(t('Σύνδεση Google Drive'))}</button>`;
+}
+function renderProtectCard() {
+  if (!showProtectCard({ ...protectOpts(), snoozeUntil: numKey(PROTECT_SNOOZE_KEY) })) return '';
+  const last = numKey(LAST_BACKUP_KEY);
+  const extra = last ? ` ${t('Το τελευταίο αντίγραφο έγινε {date}.', { date: formatDate(localDateKey(new Date(last))) })}` : '';
+  return `<section class="signin-card protect-card" id="home-protect-card" aria-labelledby="home-protect-title"><span class="signin-icon" aria-hidden="true">📱</span>
+    <div class="signin-text"><h2 id="home-protect-title">${escapeHtml(t('Τα δεδομένα σου είναι μόνο σε αυτό το κινητό'))}</h2><p>${escapeHtml(t(PROTECT_LINE) + extra)}</p></div>
+    <div class="protect-actions">${protectButtons('protect')}</div>
+    <button class="icon-button signin-close" type="button" data-action="protect-snooze" aria-label="${escapeHtml(t('Απόκρυψη για 14 ημέρες'))}" title="${escapeHtml(t('Απόκρυψη για 14 ημέρες'))}">×</button></section>`;
+}
+function storageBadge() {
+  if (!authKnown(syncStatus) && !driveOn()) return '';
+  return storageMode(protectOpts()) === 'synced'
+    ? `<p class="storage-badge is-synced" id="storage-badge" role="status">☁️ ${escapeHtml(t('Συγχρονισμένο'))}</p>`
+    : `<p class="storage-badge is-local" id="storage-badge" role="status"><span>📱 ${escapeHtml(t('Μόνο στο κινητό'))}</span> <button class="text-button" type="button" data-action="protect-signin">${escapeHtml(t('Προστασία δεδομένων'))}</button></p>`;
+}
+function renderProtectSheet() {
+  document.querySelector('#protect-body').innerHTML = `<div class="dialog-heading"><div><p class="eyebrow">${escapeHtml(t('ΤΑ ΔΕΔΟΜΕΝΑ ΣΟΥ'))}</p><h2 id="protect-title">📱 ${escapeHtml(t('Τα δεδομένα σου είναι μόνο σε αυτό το κινητό'))}</h2></div></div>
+    <p>${escapeHtml(t(PROTECT_LINE))}</p>
+    <p class="field-hint">${escapeHtml(t('Αν αλλάξεις κινητό ή σβηστούν τα δεδομένα του browser, χωρίς σύνδεση ή Drive χάνονται. Η σύνδεση κρατά τα πάντα και σε άλλες συσκευές· το Google Drive κρατά κρυπτογραφημένο αντίγραφο στο δικό σου Drive.'))}</p>
+    <div class="choice-actions protect-sheet-actions">${protectButtons('sheet')}<button class="button button-quiet" type="button" data-action="sheet-later" id="sheet-later">${escapeHtml(t('Αργότερα'))}</button></div>`;
+}
+function maybeProtectSheet() {
+  if (navigator.webdriver && !window.__spitoProtect) return; // automated tests opt in explicitly
+  const dialog = document.querySelector('#protect-dialog');
+  if (!dialog || dialog.open) return;
+  const onboarding = Boolean(document.querySelector('#onboard-dialog')?.open);
+  if (!showProtectSheet({ ...protectOpts(), seen: Boolean(readKey(PROTECT_SEEN_KEY)), onboarding })) return;
+  writeKey(PROTECT_SEEN_KEY, String(Date.now()));
+  renderProtectSheet();
+  dialog.showModal();
+  dialog.querySelector('#sheet-signin, #sheet-drive')?.focus();
+}
+function closeProtectSheet() { document.querySelector('#protect-dialog')?.close(); }
+
 // v1.4: ask the browser not to clear our data (after first save / sign-in). Status shown in Ρυθμίσεις.
 let persistAsked = false;
 let storagePersisted = null;
@@ -388,7 +431,7 @@ function renderOverview() {
   const due = billsDue(state.bills || [], today);
   return `<section class="hero-panel home-hero"><div class="hero-copy"><p class="eyebrow">ΜΙΚΡΕΣ ΣΥΝΗΘΕΙΕΣ, ΠΙΟ ΗΡΕΜΟ ΣΠΙΤΙ</p><h1>Η Σπιτοθήκη σου<br>με μια ματιά</h1><p>Τι έχεις στο σπίτι, τι λήγει, τι χρειάζεται η λίστα και πόσα ξοδεύεις κάθε μήνα.</p></div><div class="hero-illustration" aria-hidden="true"><span>🫒</span></div></section>
     ${summary.expired ? `<div class="alert-banner" role="status">${t(summary.expired === 1 ? '⚠️ Έχεις {count} προϊόν που έχει λήξει. Έλεγξέ τα πριν τα χρησιμοποιήσεις.' : '⚠️ Έχεις {count} προϊόντα που έχουν λήξει. Έλεγξέ τα πριν τα χρησιμοποιήσεις.', { count: summary.expired })}</div>` : ''}
-    ${renderBackupReminder() || renderSigninCard()}
+    ${renderProtectCard()}
     <section class="stats-grid home-stats" aria-label="Σύνοψη αποθέματος">
       <button class="stat-card" type="button" data-action="home-card" data-card="all" id="home-card-all"><span class="stat-icon">🧺</span><div><strong>${summary.products}</strong><span>προϊόντα στο σπίτι</span></div></button>
       <button class="stat-card" type="button" data-action="home-card" data-card="expiring" id="home-card-expiring"><span class="stat-icon amber">◷</span><div><strong>${summary.expiringSoon + summary.expired}</strong><span>λήγουν ή έληξαν</span></div></button>
@@ -486,7 +529,7 @@ function renderShopping() {
 }
 
 function renderSettings() {
-  return `${renderHeader('Ρυθμίσεις', 'Διαχείριση και αντίγραφο ασφαλείας των δεδομένων σου.')}
+  return `${renderHeader('Ρυθμίσεις', 'Διαχείριση και αντίγραφο ασφαλείας των δεδομένων σου.')}${storageBadge()}
     <div class="settings-grid"><section class="panel settings-card" id="privacy"><span class="stat-icon">🔒</span><h2>Απόρρητο πρώτα</h2><p>Τα δεδομένα σου μένουν στη συσκευή σου και η εφαρμογή δουλεύει και χωρίς internet. Δεν υπάρχουν διαφημίσεις.</p><details class="privacy-details" id="privacy-details"><summary>Τι ακριβώς αποθηκεύεται και πού</summary><ul class="privacy-list"><li>Στη συσκευή σου: απόθεμα, λίστες, έξοδα, λογαριασμοί, μετακινήσεις, πρόγραμμα διατροφής και ρυθμίσεις. Δεν φεύγουν από εκεί αν δεν συνδεθείς.</li><li>Αν συνδεθείς: τα ίδια δεδομένα συγχρονίζονται στο Firebase (Google) και τα βλέπουν μόνο τα μέλη του νοικοκυριού σου. Μπορείς να αποσυνδεθείς ή να τα διαγράψεις όποτε θες.</li><li>Αποδείξεις με QR: ο σύνδεσμος της απόδειξης περνά από έναν μικρό διακομιστή μας (Cloudflare) μόνο για να διαβαστεί. Δεν κρατάμε τα είδη, τα ποσά ή τη διεύθυνση IP σου, μόνο ανώνυμη μέτρηση (π.χ. «σούπερ μάρκετ, επιτυχία»).</li><li>Φωτογραφίες και PDF (αποδείξεις, λογαριασμοί, πρόγραμμα διατροφής) διαβάζονται μέσα στο κινητό σου και δεν ανεβαίνουν πουθενά.</li><li>Barcode: στέλνεται μόνο ο αριθμός στο Open Food Facts. Οι συνταγές είναι μέσα στην εφαρμογή και δουλεύουν χωρίς internet. Ειδοποιήσεις με κλειστή εφαρμογή: ο διακομιστής μας (Cloudflare) κρατά μόνο τις ημερομηνίες υπενθύμισης, όχι ονόματα, ποσά ή προϊόντα.</li><li>Δεν υπάρχουν διαφημίσεις ούτε cookies παρακολούθησης. Χρησιμοποιούμε μόνο το ανώνυμο Cloudflare Web Analytics (χωρίς cookies) για να ξέρουμε πόσοι μπαίνουν και αν η εφαρμογή είναι γρήγορη.</li></ul></details><div class="privacy-note">Αν δεν έχεις συνδεθεί και καθαρίσεις τα δεδομένα του browser ή αλλάξεις συσκευή, χρησιμοποίησε αντίγραφο ασφαλείας.</div></section>
     <section class="panel settings-card"><span class="stat-icon">◐</span><h2>Εμφάνιση</h2><p>Θέμα, μέγεθος γραμμάτων και αντίθεση. Ισχύουν σε όλη την εφαρμογή, σε αυτή τη συσκευή.</p><div class="theme-options" role="group" aria-label="Θέμα">${[['auto', 'Αυτόματο'], ['light', 'Φωτεινό'], ['dark', 'Σκούρο']].map(([value, label]) => `<button type="button" class="filter-chip ${currentTheme() === value ? 'is-active' : ''}" data-action="set-theme" data-theme="${value}" aria-pressed="${currentTheme() === value}">${label}</button>`).join('')}</div>
       <h3 class="settings-sub" id="text-size-label">Μέγεθος γραμμάτων</h3><div class="theme-options size-options" role="group" aria-labelledby="text-size-label">${[['normal', 'Κανονικά'], ['large', 'Μεγάλα'], ['xlarge', 'Πολύ μεγάλα']].map(([value, label]) => `<button type="button" class="filter-chip ${textSize() === value ? 'is-active' : ''}" data-action="set-text-size" data-size="${value}" aria-pressed="${textSize() === value}">${label}</button>`).join('')}</div>
@@ -501,7 +544,7 @@ function renderSettings() {
     <details class="panel collapsible settings-more" id="settings-advanced" ${openAttr('settings-advanced')}><summary><h2>Για προχωρημένους</h2><span class="field-hint">Ρύθμιση αποδείξεων, δοκιμαστικά δεδομένα, διαγραφή όλων</span></summary>
     <div class="settings-grid">
     ${renderReceiptSettingsCard()}
-    <section class="panel settings-card"><span class="stat-icon amber">✨</span><h2>Δοκιμαστικά δεδομένα</h2><p>Γέμισε την εφαρμογή με ενδεικτικά προϊόντα για να δεις πώς λειτουργεί.</p><div class="settings-actions"><button class="button button-quiet" type="button" data-action="load-demo">Φόρτωση παραδειγμάτων</button></div></section>
+    <section class="panel settings-card"><span class="stat-icon amber">✨</span><h2>Δοκιμαστικά δεδομένα</h2><p>Γέμισε την εφαρμογή με ενδεικτικά προϊόντα για να δεις πώς λειτουργεί.</p>${storageMode(protectOpts()) === 'local' ? `<p class="field-hint" id="demo-protect-hint">📱 ${escapeHtml(t('Τα δεδομένα σου είναι μόνο σε αυτό το κινητό.'))} ${escapeHtml(t(PROTECT_LINE))}</p>` : ''}<div class="settings-actions"><button class="button button-quiet" type="button" data-action="load-demo">Φόρτωση παραδειγμάτων</button></div></section>
     <section class="panel settings-card danger-zone"><span class="stat-icon" style="background:var(--red-soft)">⌫</span><h2>Καθαρισμός δεδομένων</h2><p>Διέγραψε όλα τα δεδομένα (απόθεμα, λίστες, έξοδα) από αυτή τη συσκευή.</p><div class="settings-actions"><button class="button button-danger" type="button" data-action="clear-data">Διαγραφή όλων</button></div></section></div></details>`;
 }
 
@@ -615,7 +658,7 @@ async function startSync() {
       config: firebaseConfig,
       getState: () => state,
       setState: (next) => { state = next; try { saveState(state); } catch {} renderApp(); },
-      onStatus: (status) => { syncStatus = status; if (status.user) requestPersistentStorage(); if (activeView === 'settings' || activeView === 'overview') renderApp(); }
+      onStatus: (status) => { syncStatus = status; if (status.user) requestPersistentStorage(); if (activeView === 'settings' || activeView === 'overview') renderApp(); maybeProtectSheet(); }
     });
   } catch {
     syncStatus = { state: 'error', message: navigator.onLine === false ? 'Χωρίς σύνδεση: ο συγχρονισμός θα ξεκινήσει όταν επιστρέψει το internet.' : 'Δεν φόρτωσε το Firebase.' };
@@ -819,6 +862,7 @@ function finishOnboard(save) {
   writeKey(ONBOARD_KEY, '1');
   document.querySelector('#onboard-dialog').close();
   renderApp();
+  setTimeout(maybeProtectSheet, 300);
   if (save) showToast(onboardPicks.size ? t('Έτοιμο! Οι λογαριασμοί σου είναι στους Λογαριασμούς, για να τους προσθέσεις με ένα πάτημα.') : t('Έτοιμο!'));
 }
 function maybeOnboard() {
@@ -2707,7 +2751,12 @@ function handleAction(button) {
   } else if (action === 'clear-filters') {
     pantryCategory = 'Όλα'; pantryQuery = ''; pantryStatus = ''; renderApp();
   } else if (action === 'clear-pantry-status') { pantryStatus = ''; renderApp(); }
-  else if (action === 'home-signin') goToSignin();
+  else if (action === 'home-signin' || action === 'protect-signin') goToSignin();
+  else if (action === 'protect-drive') driveConnect();
+  else if (action === 'protect-snooze') { writeKey(PROTECT_SNOOZE_KEY, String(snoozeUntilFrom())); renderApp(); }
+  else if (action === 'sheet-signin') { closeProtectSheet(); goToSignin(); }
+  else if (action === 'sheet-drive') { closeProtectSheet(); driveConnect(); }
+  else if (action === 'sheet-later') closeProtectSheet();
   else if (action === 'home-signin-dismiss') { try { localStorage.setItem(SIGNIN_DISMISS_KEY, String(Date.now())); } catch {} renderApp(); }
   else if (action === 'home-card') {
     // Each home count card opens the matching view: all products / only expiring / the open shopping list.
@@ -2725,7 +2774,7 @@ function handleAction(button) {
   else if (action === 'drive-restore') driveRestore();
   else if (action === 'drive-disconnect') driveDisconnect();
   else if (action === 'load-demo') {
-    const loadDemo = () => { state = { ...state, items: makeDemoItems(), shopping: [] }; persist(); renderApp(); showToast('Τα παραδείγματα φορτώθηκαν.'); };
+    const loadDemo = () => { state = { ...state, items: makeDemoItems(), shopping: [] }; persist(); renderApp(); showToast(storageMode(protectOpts()) === 'local' ? t('Τα παραδείγματα φορτώθηκαν. Τα δεδομένα σου είναι μόνο σε αυτό το κινητό: συνδέσου ή σύνδεσε Google Drive για να μη χαθούν.') : t('Τα παραδείγματα φορτώθηκαν.')); };
     if (state.items.length || state.shopping.length) showConfirm('Τα τωρινά δεδομένα θα αντικατασταθούν από δοκιμαστικά προϊόντα.', loadDemo, 'Φόρτωση παραδειγμάτων;');
     else loadDemo();
   } else if (action === 'clear-data') {

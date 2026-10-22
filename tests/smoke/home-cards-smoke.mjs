@@ -73,35 +73,35 @@ const ON = `export const firebaseConfig = { apiKey: 'test', authDomain: 'test.fi
 const OFF = `export const firebaseConfig = null;\nexport const authProviders = [];`;
 await check('sign-in card: shown when signed out; «Σύνδεση» opens the sync card; × hides it for 14 days', async () => {
   const pg = await device(ON);
-  const shown = Boolean(await pg.$('#home-signin-card'));
-  const text = await pg.$eval('#home-signin-card', (e) => e.textContent).catch(() => '');
+  const shown = Boolean(await pg.$('#home-protect-card'));
+  const text = await pg.$eval('#home-protect-card', (e) => e.textContent).catch(() => '');
   if (shots) await pg.screenshot({ path: `${shots}/home-signin-card-phone.png` });
-  await pg.click('#home-signin'); await wait(800);
+  await pg.click('#protect-signin'); await wait(800);
   const landed = await pg.evaluate(() => ({ screen: document.body.dataset.screen, focus: document.activeElement?.dataset?.action || document.activeElement?.name, top: Math.round(document.querySelector('#sync-card').getBoundingClientRect().top) }));
   await pg.evaluate(() => { location.hash = '#overview'; }); await wait();
-  await pg.click('[data-action="home-signin-dismiss"]'); await wait();
-  const hidden = !(await pg.$('#home-signin-card'));
+  await pg.click('[data-action="protect-snooze"]'); await wait();
+  const hidden = !(await pg.$('#home-protect-card'));
   await pg.reload({ waitUntil: 'networkidle0' }); await wait(800);
-  const stillHidden = !(await pg.$('#home-signin-card'));
-  await pg.evaluate(() => localStorage.setItem('spitothiki:signin-card-dismissed', String(Date.now() - 15 * 86400000)));
+  const stillHidden = !(await pg.$('#home-protect-card'));
+  await pg.evaluate(() => localStorage.setItem('spitothiki:protect-card-snooze', String(Date.now() - 1000)));
   await pg.reload({ waitUntil: 'networkidle0' }); await wait(800);
-  const back = Boolean(await pg.$('#home-signin-card'));
+  const back = Boolean(await pg.$('#home-protect-card'));
   // Sign in (fake email account) → card never shown.
   await pg.evaluate(() => { location.hash = '#settings'; }); await wait();
   await pg.type('#sync-email-form input[name=email]', 'card@example.com'); await pg.type('#sync-email-form input[name=password]', 'secret123');
   await pg.click('#sync-email-form button[value=signup]'); await wait(1200);
   await pg.evaluate(() => { location.hash = '#overview'; }); await wait(800);
-  const signedInHidden = !(await pg.$('#home-signin-card'));
+  const signedInHidden = !(await pg.$('#home-protect-card'));
   await pg.browserContext().close();
-  const ok = shown && /Συνδέσου για να μη χάσεις/.test(text) && landed.screen === 'settings' && landed.focus === 'sync-google' && landed.top < 300 && hidden && stillHidden && back && signedInHidden;
+  const ok = shown && /μόνο σε αυτό το κινητό/.test(text) && landed.screen === 'settings' && landed.focus === 'sync-google' && landed.top < 300 && hidden && stillHidden && back && signedInHidden;
   if (!ok) console.log('  signin:', { shown, landed, hidden, stillHidden, back, signedInHidden });
   return ok;
 });
-await check('sign-in card: never shown when sync is not configured', async () => {
+await check('protect card: sync not configured → only the Google Drive button', async () => {
   const pg = await device(OFF);
-  const none = !(await pg.$('#home-signin-card'));
+  const r = await pg.evaluate(() => ({ card: Boolean(document.querySelector('#home-protect-card')), signin: Boolean(document.querySelector('#protect-signin')), drive: Boolean(document.querySelector('#protect-drive')) }));
   await pg.browserContext().close();
-  return none;
+  return r.card && !r.signin && r.drive;
 });
 await browser.close();
 if (errors.length) { console.log('errors:', errors); process.exit(1); }
