@@ -272,6 +272,12 @@
       <div class="dialog-actions"><button class="button button-quiet" value="cancel" formnovalidate>Άκυρο</button><button class="button button-quiet" type="button" id="backup-plain">Χωρίς κωδικό</button><button class="button button-primary" type="submit" id="backup-pass-ok">Κρυπτογράφηση & αποθήκευση</button></div></form>
   </dialog>
   <div id="offline-bar" title="Ό,τι κάνεις αποθηκεύεται στο κινητό" class="offline-bar" role="status" hidden>📴 Χωρίς σύνδεση</div>
+  <dialog id="drive-dialog" class="confirm-dialog" aria-labelledby="drive-dialog-title">
+    <form method="dialog"><div class="dialog-heading"><div><p class="eyebrow">GOOGLE DRIVE</p><h2 id="drive-dialog-title">Επαναφορά από Drive</h2></div></div>
+      <p class="field-hint">Διάλεξε ποιο αντίγραφο θέλεις. Θα σε ρωτήσω πριν αντικαταστήσω τα τωρινά δεδομένα.</p>
+      <ul class="drive-list" id="drive-list"></ul>
+      <div class="dialog-actions"><button class="button button-quiet" value="cancel">Άκυρο</button></div></form>
+  </dialog>
   <input id="backup-file" type="file" accept="application/json,.json,.spitobak" hidden>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script type="module" src="src/app.js"></script>

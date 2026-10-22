@@ -779,3 +779,8 @@ button.stat-card:hover { border-color: #bfd4c1; }
 @media (max-width:760px){.receipt-line.receipt-edit-line{grid-template-columns:22px minmax(0,1fr) minmax(0,1fr)}.receipt-edit-line .receipt-name{grid-column:2/-1}.receipt-line.receipt-edit-line .receipt-qty{grid-column:2}.receipt-line.receipt-edit-line .receipt-price{grid-column:3}}
 #receipt-edit-form .field-input{margin-bottom:8px}
 #backup-pass2-row[hidden],#backup-plain[hidden]{display:none}
+/* v1.5 Google Drive backup */
+.drive-box { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line, rgba(127,127,127,.25)); }
+.toggle-row { display: flex; gap: 8px; align-items: center; margin: 8px 0; font-size: .95rem; }
+.drive-list { list-style: none; padding: 0; margin: 10px 0; display: grid; gap: 8px; }
+.drive-list .button { width: 100%; justify-content: flex-start; }
