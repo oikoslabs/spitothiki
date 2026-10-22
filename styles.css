@@ -771,3 +771,11 @@ button.stat-card:hover { border-color: #bfd4c1; }
 .back-to-top-page { position: fixed; right: max(16px, env(safe-area-inset-right)); bottom: calc(24px + env(safe-area-inset-bottom)); z-index: 15; }
 .back-to-top-dialog { position: sticky; bottom: 12px; margin: 0 12px 12px auto; z-index: 2; }
 @media (max-width: 760px) { .back-to-top-page { bottom: calc(92px + env(safe-area-inset-bottom)); } }
+
+/* v1.4 */
+.offline-bar{position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top) + 68px);z-index:60;background:#3b3b3b;color:#fff;font-size:.85rem;padding:4px 12px;border-radius:999px;box-shadow:0 2px 8px rgba(0,0,0,.25);max-width:calc(100% - 24px);text-align:center}
+.offline-bar[hidden]{display:none}
+.receipt-line.receipt-edit-line{grid-template-columns:22px minmax(0,1fr) 70px 90px}
+@media (max-width:760px){.receipt-line.receipt-edit-line{grid-template-columns:22px minmax(0,1fr) minmax(0,1fr)}.receipt-edit-line .receipt-name{grid-column:2/-1}.receipt-line.receipt-edit-line .receipt-qty{grid-column:2}.receipt-line.receipt-edit-line .receipt-price{grid-column:3}}
+#receipt-edit-form .field-input{margin-bottom:8px}
+#backup-pass2-row[hidden],#backup-plain[hidden]{display:none}

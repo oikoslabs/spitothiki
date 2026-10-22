@@ -24,6 +24,9 @@ import { extractShelfPrice, lastReceiptPrice } from './shelf-price.js';
 import { addCartItem, budgetState, createTrip, finishTrip, lastPrice, lineTotal, remainingShopping, removeCartItem, tripForReceipt, updateCartItem } from './cart.js';
 import { VM_MODES, interpretCode } from './gs1.js';
 import { initBackToTop } from './back-to-top.js';
+import { encryptBackup, readBackup } from './backup-crypto.js';
+import { applyReceiptEdit } from './receipt-edit.js';
+import { BACKUP_SNOOZE_KEY, LAST_BACKUP_KEY, backupReminderDue, dequeue, enqueue, hasData, loadQueue, saveQueue } from './offline.js';
 import { TRANSPORT_ICONS, TRANSPORT_TYPES, applyTransportRecurring, classifyReceipt, consumptionFor, createTransport, createTransportRecurring, fuelStats, pricePerLiter, transportMonth } from './transport.js';
 import { EXTRA_DEFAULT_EMOJI, EXTRA_SUGGESTIONS, LEGACY_EXTRA_CATEGORIES, createExtra, createExtraCategory, deleteExtraCategory, extraCategories, findExtraCategory, suggestEmoji, extrasMonth, extrasSummary, lastUnitPrice, quickExtra, setExtraQty, unitPrice } from './extras.js';
 import { getLang, locale, setLang, t, translateDom, untranslatedGreek } from './i18n.js';
@@ -121,6 +124,7 @@ function persist() {
     renderNavCounts();
     sync?.push();
     scheduleBackgroundSnapshot();
+    requestPersistentStorage();
     return true;
   } catch {
     showToast('Δεν ήταν δυνατή η αποθήκευση στη συσκευή.');
@@ -244,6 +248,35 @@ function renderSigninCard() {
     <button class="button button-primary" type="button" data-action="home-signin" id="home-signin">${escapeHtml(t('Σύνδεση'))}</button>
     <button class="icon-button signin-close" type="button" data-action="home-signin-dismiss" aria-label="${escapeHtml(t('Απόκρυψη για 14 ημέρες'))}" title="${escapeHtml(t('Απόκρυψη για 14 ημέρες'))}">×</button></section>`;
 }
+// v1.4: small, dismissible «make a backup» nudge (only when not signed in and >30 days / never).
+const numKey = (key) => { try { return Number(localStorage.getItem(key)) || 0; } catch { return 0; } };
+function renderBackupReminder() {
+  if (!backupReminderDue({ signedIn: Boolean(syncStatus.user), hasData: hasData(state), lastBackup: numKey(LAST_BACKUP_KEY), snoozeUntil: numKey(BACKUP_SNOOZE_KEY) })) return '';
+  const last = numKey(LAST_BACKUP_KEY);
+  return `<section class="signin-card backup-reminder" id="home-backup-card" aria-labelledby="home-backup-title"><span class="signin-icon" aria-hidden="true">💾</span>
+    <div class="signin-text"><h2 id="home-backup-title">${escapeHtml(t('Κράτα ένα αντίγραφο των δεδομένων σου'))}</h2><p>${escapeHtml(last ? t('Το τελευταίο αντίγραφο έγινε {date}.', { date: formatDate(localDateKey(new Date(last))) }) : t('Δεν έχεις κάνει ακόμα αντίγραφο. Αν αλλάξεις κινητό, θα το χρειαστείς.'))}</p></div>
+    <button class="button button-primary" type="button" data-action="export-backup" id="home-backup-now">${escapeHtml(t('Αντίγραφο'))}</button>
+    <button class="icon-button signin-close" type="button" data-action="backup-snooze" aria-label="${escapeHtml(t('Υπενθύμιση σε 7 ημέρες'))}" title="${escapeHtml(t('Υπενθύμιση σε 7 ημέρες'))}">×</button></section>`;
+}
+
+// v1.4: ask the browser not to clear our data (after first save / sign-in). Status shown in Ρυθμίσεις.
+let persistAsked = false;
+let storagePersisted = null;
+function requestPersistentStorage() {
+  if (persistAsked || !navigator.storage?.persist) return;
+  persistAsked = true;
+  navigator.storage.persisted().then((done) => done || navigator.storage.persist()).then((ok) => { storagePersisted = Boolean(ok); }).catch(() => {});
+}
+navigator.storage?.persisted?.().then((ok) => { storagePersisted = ok; }).catch(() => {});
+function persistLine() {
+  if (!navigator.storage?.persist) return `<p class="field-hint" id="persist-status">${escapeHtml(t('Ο browser δεν υποστηρίζει μόνιμη αποθήκευση· κράτα αντίγραφο.'))}</p>`;
+  return `<p class="field-hint" id="persist-status">${escapeHtml(t(storagePersisted ? '🔒 Μόνιμη αποθήκευση: ενεργή (ο browser δεν θα σβήσει τα δεδομένα μόνος του).' : '⚠️ Μόνιμη αποθήκευση: όχι ακόμα. Ενεργοποιείται μόλις αποθηκεύσεις κάτι ή συνδεθείς.'))}</p>`;
+}
+function lastBackupLine() {
+  const last = numKey(LAST_BACKUP_KEY);
+  return `<p class="field-hint" id="last-backup">${escapeHtml(last ? t('Τελευταίο αντίγραφο: {date}', { date: formatDate(localDateKey(new Date(last))) }) : t('Δεν έχει γίνει αντίγραφο σε αυτή τη συσκευή.'))}</p>`;
+}
+
 function goToSignin() {
   navigate('settings');
   requestAnimationFrame(() => {
@@ -267,7 +300,7 @@ function renderOverview() {
   const due = billsDue(state.bills || [], today);
   return `<section class="hero-panel home-hero"><div class="hero-copy"><p class="eyebrow">ΜΙΚΡΕΣ ΣΥΝΗΘΕΙΕΣ, ΠΙΟ ΗΡΕΜΟ ΣΠΙΤΙ</p><h1>Η Σπιτοθήκη σου<br>με μια ματιά</h1><p>Τι έχεις στο σπίτι, τι λήγει, τι χρειάζεται η λίστα και πόσα ξοδεύεις κάθε μήνα.</p></div><div class="hero-illustration" aria-hidden="true"><span>🫒</span></div></section>
     ${summary.expired ? `<div class="alert-banner" role="status">${t(summary.expired === 1 ? '⚠️ Έχεις {count} προϊόν που έχει λήξει. Έλεγξέ τα πριν τα χρησιμοποιήσεις.' : '⚠️ Έχεις {count} προϊόντα που έχουν λήξει. Έλεγξέ τα πριν τα χρησιμοποιήσεις.', { count: summary.expired })}</div>` : ''}
-    ${renderSigninCard()}
+    ${renderBackupReminder() || renderSigninCard()}
     <section class="stats-grid home-stats" aria-label="Σύνοψη αποθέματος">
       <button class="stat-card" type="button" data-action="home-card" data-card="all" id="home-card-all"><span class="stat-icon">🧺</span><div><strong>${summary.products}</strong><span>προϊόντα στο σπίτι</span></div></button>
       <button class="stat-card" type="button" data-action="home-card" data-card="expiring" id="home-card-expiring"><span class="stat-icon amber">◷</span><div><strong>${summary.expiringSoon + summary.expired}</strong><span>λήγουν ή έληξαν</span></div></button>
@@ -376,7 +409,7 @@ function renderSettings() {
     ${renderNotificationCard()}
     <section class="panel settings-card" id="auto-list-card"><span class="stat-icon">🛒</span><h2>${escapeHtml(t('Αυτόματη λίστα αγορών'))}</h2><p>${escapeHtml(t('Ό,τι τελειώνει (ποσότητα 0) ή λήγει στο απόθεμα μπαίνει μόνο του στη λίστα, με την ένδειξη «αυτόματα».'))}</p>
       <label class="check-row big-check"><input type="checkbox" id="auto-list-toggle" ${autoListOn() ? 'checked' : ''}> <span>${escapeHtml(t('Ενεργή'))}</span></label></section>
-    <section class="panel settings-card"><span class="stat-icon blue">↗</span><h2>Αντίγραφο ασφαλείας</h2><p>Αποθήκευσε όλα τα δεδομένα σου (απόθεμα, λίστες, έξοδα) σε ένα αρχείο, ή φέρε τα πίσω από ένα αρχείο.</p><div class="settings-actions"><button class="button button-primary" type="button" data-action="export-backup">⬇ Εξαγωγή αντιγράφου</button><button class="button button-quiet" type="button" data-action="import-backup">⬆ Εισαγωγή αντιγράφου</button></div></section></div>
+    <section class="panel settings-card"><span class="stat-icon blue">↗</span><h2>Αντίγραφο ασφαλείας</h2><p>Αποθήκευσε όλα τα δεδομένα σου (απόθεμα, λίστες, έξοδα) σε ένα αρχείο, ή φέρε τα πίσω από ένα αρχείο. Με κωδικό, το αρχείο κρυπτογραφείται και δεν διαβάζεται χωρίς αυτόν.</p>${lastBackupLine()}${persistLine()}<div class="settings-actions" id="backup-actions"><button class="button button-primary" type="button" data-action="export-backup">⬇ Εξαγωγή αντιγράφου</button><button class="button button-quiet" type="button" data-action="import-backup">⬆ Εισαγωγή αντιγράφου</button></div></section></div>
     <details class="panel collapsible settings-more" id="settings-advanced" ${openAttr('settings-advanced')}><summary><h2>Για προχωρημένους</h2><span class="field-hint">Ρύθμιση αποδείξεων, δοκιμαστικά δεδομένα, διαγραφή όλων</span></summary>
     <div class="settings-grid">
     ${renderReceiptSettingsCard()}
@@ -494,7 +527,7 @@ async function startSync() {
       config: firebaseConfig,
       getState: () => state,
       setState: (next) => { state = next; try { saveState(state); } catch {} renderApp(); },
-      onStatus: (status) => { syncStatus = status; if (activeView === 'settings' || activeView === 'overview') renderApp(); }
+      onStatus: (status) => { syncStatus = status; if (status.user) requestPersistentStorage(); if (activeView === 'settings' || activeView === 'overview') renderApp(); }
     });
   } catch {
     syncStatus = { state: 'error', message: navigator.onLine === false ? 'Χωρίς σύνδεση: ο συγχρονισμός θα ξεκινήσει όταν επιστρέψει το internet.' : 'Δεν φόρτωσε το Firebase.' };
@@ -1080,27 +1113,30 @@ function openReceiptDialog(target = '') {
   document.querySelector('#receipt-dialog').showModal();
 }
 
-async function loadReceipt(link) {
+async function loadReceipt(link, { fromQueue = false } = {}) {
   receiptState = { step: 'loading', link: String(link || '').trim() };
   renderReceipt();
   try {
+    if (navigator.onLine === false) throw Object.assign(new Error('Δεν υπάρχει σύνδεση στο internet.'), { cors: true });
     const receipt = await fetchReceipt(receiptState.link, { proxy: receiptProxy() });
+    if (fromQueue || loadQueue().some((e) => e.link === receiptState.link)) saveQueue(dequeue(loadQueue(), receiptState.link));
     const id = await receiptId(receipt, receipt.sourceUrl);
     const duplicate = (state.receipts || []).find((entry) => entry.id === id);
     receiptState = { step: 'review', receipt, id, duplicate, trip: tripForReceipt(state.trips || [], receipt), target: receiptTarget, guess: classifyReceipt(receipt) };
   } catch (error) {
-    receiptState = { step: 'start', link: receiptState.link, error: t(error.message || 'Η αναζήτηση απέτυχε.'), cors: Boolean(error.cors) };
+    receiptState = { step: 'start', link: receiptState.link, error: t(error.message || 'Η αναζήτηση απέτυχε.'), cors: Boolean(error.cors), canQueue: Boolean(error.cors) && !error.status && !/πολλές αναζητήσεις/i.test(error.message || '') };
   }
   renderReceipt();
 }
 
 function renderReceiptStart() {
-  const { link = '', error = '', cors = false } = receiptState;
-  return `<p class="field-hint">Σκάναρε το QR code της ηλεκτρονικής απόδειξης ή επικόλλησε τον σύνδεσμό του. Θα δεις τα είδη πριν μπουν οπουδήποτε.</p>
+  const { link = '', error = '', cors = false, canQueue = false } = receiptState;
+  return `${renderQueueNote()}<p class="field-hint">Σκάναρε το QR code της ηλεκτρονικής απόδειξης ή επικόλλησε τον σύνδεσμό του. Θα δεις τα είδη πριν μπουν οπουδήποτε.</p>
     <div class="settings-actions"><button class="button button-primary" type="button" data-action="receipt-scan">📷 Σάρωση QR</button></div>
     <p class="field-hint">Χωρίς QR παρόχου (π.χ. ταμειακή με QR της ΑΑΔΕ); Βγάλε φωτογραφία την απόδειξη και θα διαβαστούν τα είδη στη συσκευή σου.</p>${photoButtons()}
     <form id="receipt-link-form" class="store-form" novalidate><input class="field-input" name="link" type="url" inputmode="url" value="${escapeHtml(link)}" placeholder="https://… (σύνδεσμος απόδειξης)" aria-label="Σύνδεσμος απόδειξης" autocomplete="off"><button class="button button-quiet" type="submit">Άνοιγμα</button></form>
     ${error ? `<p class="form-error" id="receipt-error" role="alert">${escapeHtml(error)}</p>` : ''}${receiptState.raw ? `<p class="field-hint" id="receipt-raw-code"><small>${escapeHtml(t('Διαβάστηκε:'))} <code data-no-i18n>${escapeHtml(receiptState.raw)}</code> (${receiptState.raw.length})</small></p>` : ''}
+    ${error && canQueue && link ? `<div class="alert-banner" id="receipt-save-later-box"><p>${escapeHtml(t('Χωρίς σύνδεση; Κράτα την απόδειξη και θα ανοίξει μόνη της μόλις επιστρέψει το internet.'))}</p><div class="settings-actions"><button class="button button-primary" type="button" data-action="receipt-save-later" id="receipt-save-later">💾 ${escapeHtml(t('Αποθήκευση για αργότερα'))}</button></div></div>` : ''}
     ${cors && !receiptProxy() ? '<p class="field-hint">Αν δεν ανοίγει, δοκίμασε τη φωτογραφία της απόδειξης.</p>' : ''}`;
 }
 
@@ -2194,7 +2230,7 @@ function openReceiptDetails(id) {
   dialog.querySelector('#receipt-detail-body').innerHTML = `<p class="field-hint">${escapeHtml(formatDate(r.date))} · ${escapeHtml(t(receiptCategory(r, state.purchases)))} · <strong data-no-i18n>${escapeHtml(money(r.total))}</strong></p>
     ${items.length ? `<ul class="receipt-items" id="receipt-items">${items.map((it) => `<li><span data-no-i18n>${escapeHtml(it.name)}${it.quantity && it.quantity !== 1 ? ` ×${escapeHtml(String(it.quantity))}` : ''}</span><span data-no-i18n>${it.price ? escapeHtml(money(it.price)) : ''}</span></li>`).join('')}</ul>` : `<p class="subtle-empty">${escapeHtml(t(r.lines ? 'Τα είδη δεν κρατήθηκαν για αυτή την απόδειξη (καταγράφηκε μόνο το σύνολο).' : 'Χωρίς αναλυτικά είδη.'))}</p>`}
     ${r.url ? `<p><a class="panel-link" href="${escapeHtml(r.url)}" target="_blank" rel="noopener noreferrer" id="receipt-link">${escapeHtml(t('Άνοιγμα ηλεκτρονικής απόδειξης'))} ↗</a></p>` : ''}
-    <div class="dialog-actions"><button class="button button-danger" type="button" data-action="receipt-delete" data-id="${escapeHtml(r.id)}">🗑 ${escapeHtml(t('Διαγραφή'))}</button><button class="button button-quiet" type="button" data-action="receipt-detail-close">${escapeHtml(t('Κλείσιμο'))}</button></div>`;
+    <div class="dialog-actions"><button class="button button-danger" type="button" data-action="receipt-delete" data-id="${escapeHtml(r.id)}">🗑 ${escapeHtml(t('Διαγραφή'))}</button><button class="button button-quiet" type="button" data-action="receipt-edit" data-id="${escapeHtml(r.id)}" id="receipt-edit">✎ ${escapeHtml(t('Διόρθωση'))}</button><button class="button button-quiet" type="button" data-action="receipt-detail-close">${escapeHtml(t('Κλείσιμο'))}</button></div>`;
   translateDom(dialog);
   dialog.showModal();
 }
@@ -2231,17 +2267,140 @@ function makeDemoItems() {
   ];
 }
 
-function downloadBackup() {
-  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
+// v1.4: export asks for an optional password → encrypted .spitobak (else plain .json). Web Share on Android.
+function askBackupPassword(mode) {
+  return new Promise((resolve) => {
+    const dialog = document.querySelector('#backup-pass-dialog');
+    const form = dialog.querySelector('form');
+    form.reset();
+    dialog.querySelector('#backup-pass-title').textContent = t(mode === 'export' ? 'Κωδικός για το αντίγραφο' : 'Κωδικός αντιγράφου');
+    dialog.querySelector('#backup-pass-hint').textContent = t(mode === 'export' ? 'Προαιρετικό: με κωδικό το αρχείο κρυπτογραφείται (AES-256). Αν τον ξεχάσεις, το αντίγραφο δεν ανοίγει, γράψ\' τον κάπου.' : 'Το αρχείο είναι κρυπτογραφημένο. Γράψε τον κωδικό που έβαλες στην εξαγωγή.');
+    dialog.querySelector('#backup-pass2-row').hidden = mode !== 'export';
+    dialog.querySelector('#backup-plain').hidden = mode !== 'export';
+    dialog.querySelector('#backup-pass-error').hidden = true;
+    dialog.querySelector('#backup-pass-ok').textContent = t(mode === 'export' ? 'Κρυπτογράφηση & αποθήκευση' : 'Άνοιγμα');
+    let done = false;
+    const finish = (value) => { if (done) return; done = true; form.onsubmit = null; dialog.querySelector('#backup-plain').onclick = null; dialog.close(); resolve(value); };
+    form.onsubmit = (event) => {
+      event.preventDefault();
+      const pass = form.elements.pass.value;
+      const error = dialog.querySelector('#backup-pass-error');
+      if (pass.length < (mode === 'export' ? 6 : 1)) { error.textContent = t('Ο κωδικός θέλει τουλάχιστον 6 χαρακτήρες.'); error.hidden = false; return; }
+      if (mode === 'export' && pass !== form.elements.pass2.value) { error.textContent = t('Οι δύο κωδικοί δεν ταιριάζουν.'); error.hidden = false; return; }
+      finish(pass);
+    };
+    dialog.querySelector('#backup-plain').onclick = () => finish('');
+    dialog.onclose = () => finish(null);
+    translateDom(dialog);
+    dialog.showModal();
+    form.elements.pass.focus();
+  });
+}
+
+async function downloadBackup() {
+  const pass = await askBackupPassword('export');
+  if (pass === null) return;
+  let text; let name; let type;
+  try {
+    if (pass) { showToast('Κρυπτογράφηση…'); text = await encryptBackup(state, pass); name = `spitothiki-backup-${localDateKey()}.spitobak`; type = 'application/octet-stream'; }
+    else { text = JSON.stringify(state, null, 2); name = `spitothiki-backup-${localDateKey()}.json`; type = 'application/json'; }
+  } catch (error) { showToast(error.message || 'Δεν ήταν δυνατή η δημιουργία αντιγράφου.'); return; }
+  const markDone = () => { try { localStorage.setItem(LAST_BACKUP_KEY, String(Date.now())); localStorage.removeItem(BACKUP_SNOOZE_KEY); } catch {} renderApp(); };
+  const file = typeof File === 'function' ? new File([text], name, { type }) : null;
+  if (file && /Android/i.test(navigator.userAgent) && navigator.canShare?.({ files: [file] })) {
+    try { await navigator.share({ files: [file], title: t('Αντίγραφο Σπιτοθήκης') }); markDone(); showToast('Το αντίγραφο στάλθηκε.'); return; }
+    catch (error) { if (error?.name === 'AbortError') return; }
+  }
+  const url = URL.createObjectURL(new Blob([text], { type }));
   const link = document.createElement('a');
   link.href = url;
-  link.download = `spitothiki-backup-${localDateKey()}.json`;
+  link.download = name;
   document.body.append(link);
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
-  showToast('Το αντίγραφο ασφαλείας κατέβηκε.');
+  markDone();
+  showToast(pass ? 'Το κρυπτογραφημένο αντίγραφο κατέβηκε.' : 'Το αντίγραφο ασφαλείας κατέβηκε.');
+}
+
+async function importBackupText(text) {
+  let imported;
+  for (;;) {
+    try { imported = await readBackup(text, () => askBackupPassword('import')); break; }
+    catch (error) { showToast(error.message || 'Δεν ήταν δυνατή η εισαγωγή.'); if (!/Λάθος κωδικός/.test(error.message || '')) return; }
+  }
+  if (!imported) return;
+  showConfirm(t('Το αντίγραφο περιέχει {items} προϊόντα και {shopping} είδη στη λίστα. Θα αντικαταστήσει τα τωρινά δεδομένα.', { items: imported.items.length, shopping: imported.shopping.length }), () => {
+    state = { ...state, ...imported }; persist(); renderApp(); showToast('Το αντίγραφο εισήχθη.');
+  }, 'Εισαγωγή αντιγράφου;');
+}
+
+// ---------- v1.4: edit a saved receipt ----------
+function openReceiptEdit(id) {
+  const r = (state.receipts || []).find((x) => x.id === id); if (!r) return;
+  const items = Array.isArray(r.items) ? r.items : [];
+  const dialog = document.querySelector('#receipt-detail-dialog');
+  dialog.querySelector('#receipt-detail-body').innerHTML = `<form id="receipt-edit-form" data-id="${escapeHtml(r.id)}" novalidate>
+    <label class="field-label" for="re-store">${escapeHtml(t('Κατάστημα'))}</label><input class="field-input" id="re-store" name="store" value="${escapeHtml(r.store || '')}" maxlength="80">
+    <label class="field-label" for="re-date">${escapeHtml(t('Ημερομηνία'))}</label><input class="field-input" id="re-date" name="date" type="date" value="${escapeHtml(r.date || '')}">
+    ${items.length ? `<p class="field-hint">${escapeHtml(t('Ξετσέκαρε ό,τι θες να αφαιρεθεί. Το σύνολο υπολογίζεται από τα είδη.'))}</p><div class="receipt-lines" id="receipt-edit-lines">${items.map((it, i) => `<div class="receipt-line receipt-edit-line" data-line="${i}"><input class="shopping-check" type="checkbox" name="use" checked aria-label="${escapeHtml(t('Κράτα: {name}', { name: it.name }))}">
+      <input class="field-input receipt-name" name="name" value="${escapeHtml(it.name)}" maxlength="80" aria-label="${escapeHtml(t('Όνομα προϊόντος'))}">
+      <input class="field-input receipt-qty" name="quantity" type="number" min="0" step="0.001" value="${escapeHtml(String(it.quantity ?? 1))}" aria-label="${escapeHtml(t('Ποσότητα'))}">
+      <input class="field-input receipt-price" name="price" type="number" min="0" step="0.01" inputmode="decimal" value="${escapeHtml((Number(it.price) || 0).toFixed(2))}" aria-label="${escapeHtml(t('Τιμή'))}"></div>`).join('')}</div>
+      <p class="field-hint" id="receipt-edit-sum"></p>`
+      : `<label class="field-label" for="re-total">${escapeHtml(t('Σύνολο (€)'))}</label><input class="field-input" id="re-total" name="total" type="number" min="0" step="0.01" inputmode="decimal" value="${escapeHtml((Number(r.total) || 0).toFixed(2))}">`}
+    <div class="dialog-actions"><button class="button button-quiet" type="button" data-action="receipt-open" data-id="${escapeHtml(r.id)}">${escapeHtml(t('Άκυρο'))}</button><button class="button button-primary" type="submit" id="receipt-edit-save">${escapeHtml(t('Αποθήκευση αλλαγών'))}</button></div></form>`;
+  updateReceiptEditSum();
+  dialog.querySelector('#re-store')?.focus();
+}
+function readReceiptEdit(form) {
+  const rows = [...form.querySelectorAll('.receipt-edit-line')];
+  const items = rows.length ? rows.map((row) => { const f = (n) => row.querySelector(`[name="${n}"]`); return f('use').checked ? { name: f('name').value, quantity: f('quantity').value, price: f('price').value } : { name: '', price: 0 }; }) : undefined;
+  return { store: form.elements.store.value, date: form.elements.date.value, ...(items ? { items } : { total: form.elements.total.value }) };
+}
+function updateReceiptEditSum() {
+  const form = document.querySelector('#receipt-edit-form'); const out = document.querySelector('#receipt-edit-sum');
+  if (!form || !out) return;
+  const sum = (readReceiptEdit(form).items || []).reduce((s, it) => s + (it.name.trim() ? Math.max(0, Number(it.price) || 0) : 0), 0);
+  out.textContent = t('Νέο σύνολο: {total}', { total: money(Math.round(sum * 100) / 100) });
+}
+function saveReceiptEdit(form) {
+  const id = form.dataset.id;
+  const next = applyReceiptEdit(state, id, readReceiptEdit(form));
+  state.receipts = next.receipts; state.purchases = next.purchases;
+  if (!persist()) return;
+  renderApp();
+  openReceiptDetails(id);
+  showToast('Η απόδειξη διορθώθηκε.');
+}
+
+// ---------- v1.4: offline bar + receipts saved for later ----------
+function updateOfflineBar() {
+  const bar = document.querySelector('#offline-bar');
+  if (bar) bar.hidden = navigator.onLine !== false;
+}
+function queueReceipt(link) {
+  saveQueue(enqueue(loadQueue(), link));
+  receiptState = { step: 'start' };
+  document.querySelector('#receipt-dialog')?.close();
+  showToast(t('Αποθηκεύτηκε. Θα ανοίξει μόλις επιστρέψει η σύνδεση ({count} σε αναμονή).', { count: loadQueue().length }));
+}
+let queueBusy = false;
+async function processReceiptQueue() {
+  const queue = loadQueue();
+  if (!queue.length || navigator.onLine === false || queueBusy) return;
+  if (document.querySelector('dialog[open]')) { showToast(t('{count} αποδείξεις σε αναμονή: άνοιξε «Σάρωση απόδειξης».', { count: queue.length })); return; }
+  queueBusy = true;
+  try {
+    const { link } = queue[0];
+    openReceiptDialog();
+    await loadReceipt(link, { fromQueue: true });
+  } finally { queueBusy = false; }
+}
+function renderQueueNote() {
+  const queue = loadQueue();
+  if (!queue.length) return '';
+  return `<div class="alert-banner" id="receipt-queue" role="status"><p>${escapeHtml(t('⏳ {count} αποδείξεις περιμένουν σύνδεση.', { count: queue.length }))}</p>${navigator.onLine === false ? '' : `<div class="settings-actions"><button class="button button-quiet" type="button" data-action="receipt-queue-open" data-link="${escapeHtml(queue[0].link)}">${escapeHtml(t('Άνοιγμα της επόμενης'))}</button></div>`}<button class="button button-quiet small-action" type="button" data-action="receipt-queue-clear">${escapeHtml(t('Διαγραφή αναμονής'))}</button></div>`;
 }
 
 function handleAction(button) {
@@ -2425,6 +2584,11 @@ function handleAction(button) {
   else if (action === 'receipts-month') { receiptsMonth = button.dataset.month || ''; renderApp(); }
   else if (action === 'receipt-open') openReceiptDetails(button.dataset.id);
   else if (action === 'receipt-detail-close') document.querySelector('#receipt-detail-dialog').close();
+  else if (action === 'receipt-edit') openReceiptEdit(button.dataset.id);
+  else if (action === 'receipt-save-later') queueReceipt(receiptState.link);
+  else if (action === 'receipt-queue-open') loadReceipt(button.dataset.link, { fromQueue: true });
+  else if (action === 'receipt-queue-clear') { saveQueue([]); renderReceipt(); }
+  else if (action === 'backup-snooze') { try { localStorage.setItem(BACKUP_SNOOZE_KEY, String(Date.now() + 7 * 86400000)); } catch {} renderApp(); }
   else if (action === 'receipt-delete') {
     const id = button.dataset.id; document.querySelector('#receipt-detail-dialog').close();
     undoable('Η απόδειξη διαγράφηκε μαζί με τα έξοδά της.', () => { Object.assign(state, deleteReceipt(state, id)); persist(); renderApp(); });
@@ -2537,13 +2701,9 @@ document.addEventListener('change', (event) => {
     const file = backupFile.files[0];
     const reader = new FileReader();
     reader.onload = () => {
-      try {
-        const imported = parseBackup(reader.result);
-        showConfirm(t('Το αντίγραφο περιέχει {items} προϊόντα και {shopping} είδη στη λίστα. Θα αντικαταστήσει τα τωρινά δεδομένα.', { items: imported.items.length, shopping: imported.shopping.length }), () => {
-          state = { ...state, ...imported }; persist(); renderApp(); showToast('Το αντίγραφο εισήχθη.');
-        }, 'Εισαγωγή αντιγράφου;');
-      } catch (error) { showToast(error.message || 'Δεν ήταν δυνατή η εισαγωγή.'); }
+      const text = reader.result;
       backupFile.value = '';
+      importBackupText(text);
     };
     reader.onerror = () => showToast('Δεν ήταν δυνατή η ανάγνωση του αρχείου.');
     reader.readAsText(file);
@@ -2555,6 +2715,7 @@ document.addEventListener('input', (event) => {
     const days = Math.round(Number(event.target.value));
     if (Number.isFinite(days) && days >= 0 && days <= 30) { saveNotifySettings({ days, lastNotified: '' }); scheduleBackgroundSnapshot(); }
   }
+  if (event.target.closest?.('#receipt-edit-form')) updateReceiptEditSum();
   if (event.target.id === 'item-name') updateNameCounter();
   if (event.target.id === 'item-expiry') updateExpiryWarning();
   if (event.target.id === 'pantry-search') {
@@ -2567,6 +2728,7 @@ document.addEventListener('input', (event) => {
 });
 
 document.addEventListener('submit', (event) => {
+  if (event.target.id === 'receipt-edit-form') { event.preventDefault(); saveReceiptEdit(event.target); return; }
   if (event.target.id === 'bill-form') { event.preventDefault(); saveBillForm(event.target); return; }
   if (event.target.id === 'transport-form') { event.preventDefault(); saveTransportForm(event.target); return; }
   if (event.target.id === 'extras-form') { event.preventDefault(); saveExtrasForm(event.target); return; }
@@ -2814,3 +2976,7 @@ setInterval(runDailyChecks, 60 * 60 * 1000);
 
 startSync();
 initBackToTop();
+updateOfflineBar();
+window.addEventListener('offline', () => { updateOfflineBar(); });
+window.addEventListener('online', () => { updateOfflineBar(); if (loadQueue().length) setTimeout(processReceiptQueue, 1500); });
+if (navigator.onLine !== false && loadQueue().length) setTimeout(processReceiptQueue, 2500);
