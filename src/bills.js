@@ -176,3 +176,13 @@ export function autoPayFor(bills = [], name) {
   const same = bills.filter((b) => plain(b.name).replace(/[^A-ZΑ-Ω0-9]/g, '') === key).sort((a, b) => String(b.due).localeCompare(String(a.due)));
   return Boolean(same[0]?.autoPay);
 }
+
+// Bills due in a month, with rent/common charges split out so they show as their own expense row.
+export function billsMonthSplit(bills = [], month) {
+  let rent = 0; let other = 0;
+  for (const b of bills) {
+    if (!String(b.due).startsWith(`${month}-`)) continue;
+    if (b.type === 'rent') rent += b.amount; else other += b.amount;
+  }
+  return { rent: round2(rent), other: round2(other) };
+}

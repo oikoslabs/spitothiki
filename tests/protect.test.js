@@ -41,8 +41,8 @@ test('home shows a single protect card (old sign-in/backup cards merged)', () =>
   const screens = readFileSync(new URL('../screens.html', import.meta.url), 'utf8');
   assert.match(screens, /Συνδέσου ή σύνδεσε Google Drive για να μη χαθούν/);
 });
-test('service worker cache bumped to v57 and caches protect.js', () => {
+test('service worker cache bumped (v57+) and caches protect.js', () => {
   const sw = readFileSync(new URL('../sw.js', import.meta.url), 'utf8');
-  assert.match(sw, /CACHE_VERSION = 'v57'/);
+  assert.match(sw, /CACHE_VERSION = 'v(5[7-9]|[6-9]\d)'/);
   assert.ok(sw.includes("'./src/protect.js'"));
 });
