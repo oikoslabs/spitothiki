@@ -15,7 +15,7 @@ import { applyDisplayPrefs, highContrast, setHighContrast, setTextSize, textSize
 import { RECURRING_INTERVALS, applyRecurring, createRecurring, dueFromSnapshot, expirySnapshot, parseVoiceItems } from './features.js';
 import { MEAL_SLOTS, copyPreviousWeek, createMeal, recipeFromMealDb, shiftDays, weekDays, weekShoppingNeeds, weekStart } from './mealplan.js';
 import { BUILTIN_RECIPES, RECIPE_CATS } from './recipes.js';
-import { BILL_ICONS, BILL_PERIODS, BILL_TYPES, applyAutoPay, autoPayFor, scheduledDebits, billStats, billsDue, createBill, guessBillType, paidHistory, parseBillCode, unpaidBills, payBill, unpayBill } from './bills.js';
+import { BILL_ICONS, BILL_PERIODS, BILL_TYPES, applyAutoPay, autoPayFor, billsMonthSplit, scheduledDebits, billStats, billsDue, createBill, guessBillType, paidHistory, parseBillCode, unpaidBills, payBill, unpayBill } from './bills.js';
 import { findDuplicateBill, readBillFile } from './bill-pdf.js';
 import { initDietUi, renderDietSection } from './diet-ui.js';
 import { pushDates, pushSupported, pushSubscription, syncPush, stopPush } from './push.js';
@@ -1875,8 +1875,9 @@ function monthTotals(month) {
   const tolls = tm.byType.find((x) => x.type === 'tolls')?.total || 0;
   const transport = Math.round((tm.total - tolls) * 100) / 100;
   const extras = extrasMonth(state.extras || [], month).total;
-  const bills = Math.round((state.bills || []).filter((b) => String(b.due).startsWith(`${month}-`)).reduce((s, b) => s + b.amount, 0) * 100) / 100;
-  const rows = [{ label: `🛒 ${t('Αγορές')}`, value: shopping }, { label: `📄 ${t('Λογαριασμοί')}`, value: bills }, { label: `🛣️ ${t('Διόδια')}`, value: tolls }, { label: `🚗 ${t('Μετακινήσεις')}`, value: transport }, { label: `☕ ${t('Μικροέξοδα')}`, value: extras }];
+  const split = billsMonthSplit(state.bills || [], month);
+  const bills = Math.round((split.rent + split.other) * 100) / 100;
+  const rows = [{ label: `🛒 ${t('Αγορές')}`, value: shopping }, { label: `🏠 ${t('Ενοίκιο / κοινόχρηστα')}`, value: split.rent }, { label: `📄 ${t('Λογαριασμοί')}`, value: split.other }, { label: `🛣️ ${t('Διόδια')}`, value: tolls }, { label: `🚗 ${t('Μετακινήσεις')}`, value: transport }, { label: `☕ ${t('Μικροέξοδα')}`, value: extras }];
   return { rows, total: Math.round((shopping + tolls + transport + extras + bills) * 100) / 100 };
 }
 function renderMonthTotals() {
@@ -1884,7 +1885,7 @@ function renderMonthTotals() {
   const prev = monthTotals(shiftMonth(insightsMonth, -1));
   const diff = Math.round((total - prev.total) * 100) / 100;
   const trend = !prev.total ? '' : diff > 0 ? t('▲ {amount} από τον προηγούμενο μήνα', { amount: money(diff) }) : diff < 0 ? t('▼ {amount} από τον προηγούμενο μήνα', { amount: money(-diff) }) : t('Ίδιο με τον προηγούμενο μήνα');
-  const shown = rows.map((row, i) => ({ ...row, label: prev.rows[i].value ? `${row.label} · ${t('πριν: {amount}', { amount: money(prev.rows[i].value) })}` : row.label }));
+  const shown = rows.map((row, i) => ({ ...row, label: prev.rows[i].value ? `${row.label} · ${t('πριν: {amount}', { amount: money(prev.rows[i].value) })}` : row.label })).filter((row, i) => i !== 1 || row.value || prev.rows[i].value);
   return `<section class="panel settings-card" id="month-totals-card"><span class="stat-icon blue">∑</span><h2>Σύνολο εξόδων μήνα</h2><p class="big-number" id="month-grand-total">${escapeHtml(money(total))}</p>
     <p class="field-hint month-trend ${diff > 0 ? 'up' : 'down'}" id="month-trend">${escapeHtml(trend || t('Προηγούμενος μήνας: {amount}', { amount: money(prev.total) }))}</p>
     ${renderBars(shown, money)}</section>`;
@@ -2802,6 +2803,7 @@ document.addEventListener('click', (event) => {
 document.addEventListener('input', (event) => {
   if (event.target.id === 'extras-new-name') { const e = document.querySelector('#extras-new-emoji'); if (e) e.placeholder = suggestEmoji(event.target.value) || EXTRA_DEFAULT_EMOJI; }
   if (event.target.id === 'bill-name' && !event.target.form.dataset.typeTouched) event.target.form.elements.type.value = guessBillType(event.target.value);
+  if ((event.target.id === 'bill-name' || event.target.name === 'type') && event.target.form?.id === 'bill-form' && !event.target.form.elements.billId.value && event.target.form.elements.type.value === 'rent') event.target.form.elements.period.value = '1';
   if (event.target.id === 'bill-name') rememberAutoPay(event.target.form);
 });
 
