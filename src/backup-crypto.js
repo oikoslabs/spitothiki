@@ -46,3 +46,23 @@ export async function readBackup(text, askPassword) {
   if (password == null) return null;
   return decryptBackup(text, password);
 }
+
+// v1.5: remember the backup password on this device as a non-extractable AES key (IndexedDB),
+// never the password itself. The salt is stored with the key and written into every file,
+// so the same password still opens the file on another device.
+export async function deriveDeviceKey(password, { iterations = PBKDF2_ITERATIONS, salt = globalThis.crypto.getRandomValues(new Uint8Array(16)) } = {}) {
+  if (String(password || '').length < 1) throw new Error('Γράψε κωδικό για την κρυπτογράφηση.');
+  return { key: await deriveKey(password, salt, iterations), salt: toB64(salt), iterations };
+}
+export async function encryptWithKey(state, { key, salt, iterations }) {
+  const iv = globalThis.crypto.getRandomValues(new Uint8Array(12));
+  const data = new Uint8Array(await subtle().encrypt({ name: 'AES-GCM', iv }, key, enc.encode(JSON.stringify(state))));
+  return JSON.stringify({ format: BACKUP_MAGIC, version: 1, kdf: 'PBKDF2-SHA256', iterations, cipher: 'AES-256-GCM', salt, iv: toB64(iv), data: toB64(data), createdAt: new Date().toISOString() });
+}
+// Returns null when the file was made with a different salt (other device/password) or the key is wrong.
+export async function decryptWithKey(text, { key, salt }) {
+  let box;
+  try { box = JSON.parse(String(text)); } catch { return null; }
+  if (!box || box.format !== BACKUP_MAGIC || box.salt !== salt) return null;
+  try { return parseBackup(dec.decode(await subtle().decrypt({ name: 'AES-GCM', iv: fromB64(box.iv) }, key, fromB64(box.data)))); } catch { return null; }
+}

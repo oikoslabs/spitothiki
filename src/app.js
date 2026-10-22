@@ -24,7 +24,10 @@ import { extractShelfPrice, lastReceiptPrice } from './shelf-price.js';
 import { addCartItem, budgetState, createTrip, finishTrip, lastPrice, lineTotal, remainingShopping, removeCartItem, tripForReceipt, updateCartItem } from './cart.js';
 import { VM_MODES, interpretCode } from './gs1.js';
 import { initBackToTop } from './back-to-top.js';
-import { encryptBackup, readBackup } from './backup-crypto.js';
+import { decryptBackup, decryptWithKey, deriveDeviceKey, encryptBackup, encryptWithKey, readBackup } from './backup-crypto.js';
+import { DRIVE_AUTO_KEY, DRIVE_ENABLED_KEY, DRIVE_HASH_KEY, DRIVE_LAST_KEY, autoBackupDue, createDriveClient, stateHash } from './gdrive.js';
+import { forgetToken, getDriveToken } from './gdrive-auth.js';
+import { clearDriveKey, loadDriveKey, saveDriveKey } from './drive-key.js';
 import { applyReceiptEdit } from './receipt-edit.js';
 import { BACKUP_SNOOZE_KEY, LAST_BACKUP_KEY, backupReminderDue, dequeue, enqueue, hasData, loadQueue, saveQueue } from './offline.js';
 import { TRANSPORT_ICONS, TRANSPORT_TYPES, applyTransportRecurring, classifyReceipt, consumptionFor, createTransport, createTransportRecurring, fuelStats, pricePerLiter, transportMonth } from './transport.js';
@@ -277,6 +280,91 @@ function lastBackupLine() {
   return `<p class="field-hint" id="last-backup">${escapeHtml(last ? t('Τελευταίο αντίγραφο: {date}', { date: formatDate(localDateKey(new Date(last))) }) : t('Δεν έχει γίνει αντίγραφο σε αυτή τη συσκευή.'))}</p>`;
 }
 
+// ---------- v1.5: Google Drive backup (hidden app folder, no backend) ----------
+let driveKey = null; let driveBusy = false;
+loadDriveKey().then((k) => { driveKey = k || null; if (activeView === 'settings') renderApp(); maybeArmAutoBackup(); }).catch(() => {});
+const driveOn = () => readKey(DRIVE_ENABLED_KEY) === '1';
+const driveAuto = () => readKey(DRIVE_AUTO_KEY) !== '0';
+const drive = createDriveClient({ getToken: (force) => getDriveToken(force) });
+function driveSection() {
+  const last = numKey(DRIVE_LAST_KEY);
+  if (!driveOn()) return `<div class="drive-box" id="drive-box"><h3 class="settings-sub">☁️ ${escapeHtml(t('Google Drive'))}</h3><p class="field-hint">${escapeHtml(t('Αυτόματο κρυπτογραφημένο αντίγραφο σε έναν κρυφό φάκελο του δικού σου Drive. Η εφαρμογή δεν βλέπει τα άλλα αρχεία σου.'))}</p><div class="settings-actions"><button class="button button-primary" type="button" data-action="drive-connect" id="drive-connect">${escapeHtml(t('Σύνδεση με Google Drive'))}</button></div></div>`;
+  return `<div class="drive-box" id="drive-box"><h3 class="settings-sub">☁️ ${escapeHtml(t('Google Drive'))}</h3>
+    <p class="field-hint" id="drive-last">${escapeHtml(last ? t('Τελευταίο αντίγραφο στο Drive: {date}', { date: new Date(last).toLocaleString(locale(), { dateStyle: 'medium', timeStyle: 'short' }) }) : t('Δεν έχει γίνει ακόμα αντίγραφο στο Drive.'))}</p>
+    ${driveKey ? '' : `<p class="field-hint">${escapeHtml(t('🔑 Για το αυτόματο αντίγραφο χρειάζεται ο κωδικός μία φορά σε αυτή τη συσκευή.'))}</p>`}
+    <label class="toggle-row"><input type="checkbox" id="drive-auto" ${driveAuto() ? 'checked' : ''}> ${escapeHtml(t('Αυτόματο αντίγραφο μία φορά τη μέρα (κρατάει τα 5 τελευταία)'))}</label>
+    <div class="settings-actions"><button class="button button-primary" type="button" data-action="drive-backup" id="drive-backup">${escapeHtml(t('Αντίγραφο τώρα'))}</button><button class="button button-quiet" type="button" data-action="drive-restore" id="drive-restore">${escapeHtml(t('Επαναφορά από Drive'))}</button><button class="text-button" type="button" data-action="drive-disconnect" id="drive-disconnect">${escapeHtml(t('Αποσύνδεση Drive'))}</button></div></div>`;
+}
+async function ensureDriveKey() {
+  if (driveKey) return driveKey;
+  const pass = await askBackupPassword('drive');
+  if (!pass) return null;
+  showToast('Ετοιμάζω την κρυπτογράφηση…');
+  const derived = await deriveDeviceKey(pass);
+  driveKey = derived; await saveDriveKey(derived).catch(() => {});
+  return driveKey;
+}
+async function driveBackupNow({ silent = false } = {}) {
+  if (driveBusy) return; driveBusy = true;
+  try {
+    const key = silent ? driveKey : await ensureDriveKey();
+    if (!key) return;
+    if (!silent) showToast('Ανεβαίνει το αντίγραφο στο Drive…');
+    await drive.upload(await encryptWithKey(state, key));
+    await drive.prune().catch(() => {});
+    try { localStorage.setItem(DRIVE_LAST_KEY, String(Date.now())); localStorage.setItem(DRIVE_HASH_KEY, stateHash(state)); localStorage.setItem(LAST_BACKUP_KEY, String(Date.now())); localStorage.removeItem(BACKUP_SNOOZE_KEY); } catch {}
+    if (!silent) showToast('Το αντίγραφο αποθηκεύτηκε στο Google Drive.');
+    renderApp();
+  } catch (error) { if (!silent) showToast(error.message || 'Δεν ήταν δυνατό το αντίγραφο στο Drive.'); }
+  finally { driveBusy = false; }
+}
+async function driveConnect() {
+  try {
+    await getDriveToken(true, { interactive: true });
+    localStorage.setItem(DRIVE_ENABLED_KEY, '1');
+    await drive.list();
+    renderApp();
+    showToast('Συνδέθηκες με το Google Drive.');
+    await driveBackupNow();
+  } catch (error) { showToast(error.message || 'Η σύνδεση με το Google Drive δεν ολοκληρώθηκε.'); }
+}
+async function driveRestore() {
+  let files;
+  try { showToast('Φέρνω τα αντίγραφα από το Drive…'); files = await drive.list(); } catch (error) { showToast(error.message); return; }
+  if (!files.length) { showToast('Δεν υπάρχει αντίγραφο στο Drive ακόμα.'); return; }
+  const dialog = document.querySelector('#drive-dialog');
+  dialog.querySelector('#drive-list').innerHTML = files.map((f, i) => `<li><button class="button ${i === 0 ? 'button-primary' : 'button-quiet'} drive-version" type="button" data-file="${escapeHtml(f.id)}">${escapeHtml(new Date(f.createdTime).toLocaleString(locale(), { dateStyle: 'medium', timeStyle: 'short' }))}${i === 0 ? ` · ${escapeHtml(t('πιο πρόσφατο'))}` : ''}</button></li>`).join('');
+  dialog.querySelector('#drive-list').onclick = async (event) => {
+    const btn = event.target.closest('[data-file]'); if (!btn) return;
+    dialog.close();
+    let text; try { text = await drive.download(btn.dataset.file); } catch (error) { showToast(error.message); return; }
+    let imported = driveKey ? await decryptWithKey(text, driveKey) : null;
+    while (!imported) {
+      const pass = await askBackupPassword('import'); if (pass == null) return;
+      try { imported = await decryptBackup(text, pass); } catch (error) { showToast(error.message); }
+    }
+    showConfirm(t('Το αντίγραφο περιέχει {items} προϊόντα και {shopping} είδη στη λίστα. Θα αντικαταστήσει τα τωρινά δεδομένα.', { items: imported.items.length, shopping: imported.shopping.length }), () => {
+      state = { ...state, ...imported }; persist(); try { localStorage.setItem(DRIVE_HASH_KEY, stateHash(state)); } catch {} renderApp(); showToast('Τα δεδομένα επανήλθαν από το Drive.');
+    }, 'Επαναφορά από Drive;');
+  };
+  translateDom(dialog); dialog.showModal();
+}
+function driveDisconnect() {
+  showConfirm(t('Η εφαρμογή θα σταματήσει να κάνει αντίγραφα στο Drive και θα ξεχάσει τον κωδικό σε αυτή τη συσκευή. Τα αντίγραφα που ήδη υπάρχουν μένουν στο Drive σου.'), () => {
+    forgetToken(); clearDriveKey(); driveKey = null;
+    [DRIVE_ENABLED_KEY, DRIVE_LAST_KEY, DRIVE_HASH_KEY].forEach((k) => { try { localStorage.removeItem(k); } catch {} });
+    renderApp(); showToast('Αποσυνδέθηκες από το Google Drive.');
+  }, 'Αποσύνδεση από Drive;');
+}
+// The Google token window needs a tap, so a due auto-backup runs on the first tap after opening the app.
+let autoArmed = false;
+function maybeArmAutoBackup() {
+  if (autoArmed || !navigator.onLine) return;
+  if (!autoBackupDue({ enabled: driveOn(), auto: driveAuto(), hasKey: Boolean(driveKey), lastAt: numKey(DRIVE_LAST_KEY), lastHash: readKey(DRIVE_HASH_KEY) || '', hash: stateHash(state) })) return;
+  autoArmed = true;
+  document.addEventListener('pointerdown', () => { driveBackupNow({ silent: true }); }, { once: true, capture: true });
+}
+
 function goToSignin() {
   navigate('settings');
   requestAnimationFrame(() => {
@@ -409,7 +497,7 @@ function renderSettings() {
     ${renderNotificationCard()}
     <section class="panel settings-card" id="auto-list-card"><span class="stat-icon">🛒</span><h2>${escapeHtml(t('Αυτόματη λίστα αγορών'))}</h2><p>${escapeHtml(t('Ό,τι τελειώνει (ποσότητα 0) ή λήγει στο απόθεμα μπαίνει μόνο του στη λίστα, με την ένδειξη «αυτόματα».'))}</p>
       <label class="check-row big-check"><input type="checkbox" id="auto-list-toggle" ${autoListOn() ? 'checked' : ''}> <span>${escapeHtml(t('Ενεργή'))}</span></label></section>
-    <section class="panel settings-card"><span class="stat-icon blue">↗</span><h2>Αντίγραφο ασφαλείας</h2><p>Αποθήκευσε όλα τα δεδομένα σου (απόθεμα, λίστες, έξοδα) σε ένα αρχείο, ή φέρε τα πίσω από ένα αρχείο. Με κωδικό, το αρχείο κρυπτογραφείται και δεν διαβάζεται χωρίς αυτόν.</p>${lastBackupLine()}${persistLine()}<div class="settings-actions" id="backup-actions"><button class="button button-primary" type="button" data-action="export-backup">⬇ Εξαγωγή αντιγράφου</button><button class="button button-quiet" type="button" data-action="import-backup">⬆ Εισαγωγή αντιγράφου</button></div></section></div>
+    <section class="panel settings-card"><span class="stat-icon blue">↗</span><h2>Αντίγραφο ασφαλείας</h2><p>Αποθήκευσε όλα τα δεδομένα σου (απόθεμα, λίστες, έξοδα) σε ένα αρχείο, ή φέρε τα πίσω από ένα αρχείο. Με κωδικό, το αρχείο κρυπτογραφείται και δεν διαβάζεται χωρίς αυτόν.</p>${lastBackupLine()}${persistLine()}<div class="settings-actions" id="backup-actions"><button class="button button-primary" type="button" data-action="export-backup">⬇ Εξαγωγή αντιγράφου</button><button class="button button-quiet" type="button" data-action="import-backup">⬆ Εισαγωγή αντιγράφου</button></div>${driveSection()}</section></div>
     <details class="panel collapsible settings-more" id="settings-advanced" ${openAttr('settings-advanced')}><summary><h2>Για προχωρημένους</h2><span class="field-hint">Ρύθμιση αποδείξεων, δοκιμαστικά δεδομένα, διαγραφή όλων</span></summary>
     <div class="settings-grid">
     ${renderReceiptSettingsCard()}
@@ -2273,20 +2361,21 @@ function askBackupPassword(mode) {
     const dialog = document.querySelector('#backup-pass-dialog');
     const form = dialog.querySelector('form');
     form.reset();
-    dialog.querySelector('#backup-pass-title').textContent = t(mode === 'export' ? 'Κωδικός για το αντίγραφο' : 'Κωδικός αντιγράφου');
-    dialog.querySelector('#backup-pass-hint').textContent = t(mode === 'export' ? 'Προαιρετικό: με κωδικό το αρχείο κρυπτογραφείται (AES-256). Αν τον ξεχάσεις, το αντίγραφο δεν ανοίγει, γράψ\' τον κάπου.' : 'Το αρχείο είναι κρυπτογραφημένο. Γράψε τον κωδικό που έβαλες στην εξαγωγή.');
-    dialog.querySelector('#backup-pass2-row').hidden = mode !== 'export';
+    dialog.querySelector('#backup-pass-title').textContent = t(mode === 'drive' ? 'Κωδικός για το Google Drive' : mode === 'export' ? 'Κωδικός για το αντίγραφο' : 'Κωδικός αντιγράφου');
+    dialog.querySelector('#backup-pass-hint').textContent = t(mode === 'drive' ? 'Τα αντίγραφα στο Drive κρυπτογραφούνται πάντα. Η συσκευή θυμάται μόνο ένα κλειδί, όχι τον κωδικό. Αν τον ξεχάσεις, τα αντίγραφα δεν ανοίγουν, γράψ\' τον κάπου.' : mode === 'export' ? 'Προαιρετικό: με κωδικό το αρχείο κρυπτογραφείται (AES-256). Αν τον ξεχάσεις, το αντίγραφο δεν ανοίγει, γράψ\' τον κάπου.' : 'Το αρχείο είναι κρυπτογραφημένο. Γράψε τον κωδικό που έβαλες στην εξαγωγή.');
+    const isNew = mode === 'export' || mode === 'drive';
+    dialog.querySelector('#backup-pass2-row').hidden = !isNew;
     dialog.querySelector('#backup-plain').hidden = mode !== 'export';
     dialog.querySelector('#backup-pass-error').hidden = true;
-    dialog.querySelector('#backup-pass-ok').textContent = t(mode === 'export' ? 'Κρυπτογράφηση & αποθήκευση' : 'Άνοιγμα');
+    dialog.querySelector('#backup-pass-ok').textContent = t(isNew ? 'Κρυπτογράφηση & αποθήκευση' : 'Άνοιγμα');
     let done = false;
     const finish = (value) => { if (done) return; done = true; form.onsubmit = null; dialog.querySelector('#backup-plain').onclick = null; dialog.close(); resolve(value); };
     form.onsubmit = (event) => {
       event.preventDefault();
       const pass = form.elements.pass.value;
       const error = dialog.querySelector('#backup-pass-error');
-      if (pass.length < (mode === 'export' ? 6 : 1)) { error.textContent = t('Ο κωδικός θέλει τουλάχιστον 6 χαρακτήρες.'); error.hidden = false; return; }
-      if (mode === 'export' && pass !== form.elements.pass2.value) { error.textContent = t('Οι δύο κωδικοί δεν ταιριάζουν.'); error.hidden = false; return; }
+      if (pass.length < (isNew ? 6 : 1)) { error.textContent = t('Ο κωδικός θέλει τουλάχιστον 6 χαρακτήρες.'); error.hidden = false; return; }
+      if (isNew && pass !== form.elements.pass2.value) { error.textContent = t('Οι δύο κωδικοί δεν ταιριάζουν.'); error.hidden = false; return; }
       finish(pass);
     };
     dialog.querySelector('#backup-plain').onclick = () => finish('');
@@ -2631,6 +2720,10 @@ function handleAction(button) {
     document.querySelector('#shopping-form input[name="name"]')?.focus();
   } else if (action === 'export-backup') downloadBackup();
   else if (action === 'import-backup') backupFile.click();
+  else if (action === 'drive-connect') driveConnect();
+  else if (action === 'drive-backup') driveBackupNow();
+  else if (action === 'drive-restore') driveRestore();
+  else if (action === 'drive-disconnect') driveDisconnect();
   else if (action === 'load-demo') {
     const loadDemo = () => { state = { ...state, items: makeDemoItems(), shopping: [] }; persist(); renderApp(); showToast('Τα παραδείγματα φορτώθηκαν.'); };
     if (state.items.length || state.shopping.length) showConfirm('Τα τωρινά δεδομένα θα αντικατασταθούν από δοκιμαστικά προϊόντα.', loadDemo, 'Φόρτωση παραδειγμάτων;');
@@ -2664,6 +2757,7 @@ document.addEventListener('input', (event) => {
 });
 
 document.addEventListener('change', (event) => {
+  if (event.target.id === 'drive-auto') { try { localStorage.setItem(DRIVE_AUTO_KEY, event.target.checked ? '1' : '0'); } catch {} showToast(event.target.checked ? 'Το αυτόματο αντίγραφο ενεργοποιήθηκε.' : 'Το αυτόματο αντίγραφο σταμάτησε.'); return; }
   if (event.target.id === 'bill-autopay') event.target.form.dataset.autoPayTouched = '1';
   if (event.target.id === 'scan-file') { const file = event.target.files?.[0]; event.target.value = ''; handleScanFile(file); return; }
   if (event.target.id === 'high-contrast') { setHighContrast(event.target.checked); renderApp(); document.querySelector('#high-contrast')?.focus(); return; }
@@ -2948,6 +3042,7 @@ window.addEventListener('hashchange', () => navigate(location.hash.slice(1)));
 state.items = state.items.map((item) => ({ ...item, unit: normalizeUnit(item.unit) }));
 state.shopping = state.shopping.map((item) => ({ ...item, unit: normalizeUnit(item.unit) }));
 renderApp();
+maybeArmAutoBackup();
 
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
   // updateViaCache 'none' + update() on load/return: a new version reaches the phone without reinstalling.
