@@ -784,3 +784,17 @@ button.stat-card:hover { border-color: #bfd4c1; }
 .toggle-row { display: flex; gap: 8px; align-items: center; margin: 8px 0; font-size: .95rem; }
 .drive-list { list-style: none; padding: 0; margin: 10px 0; display: grid; gap: 8px; }
 .drive-list .button { width: 100%; justify-content: flex-start; }
+
+/* v1.5.1: protect-your-data card, sheet and Settings badge */
+.protect-card .protect-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+@media (max-width: 480px) { .protect-card .protect-actions { grid-column: 1 / -1; } .protect-card .protect-actions .button { flex: 1 1 140px; } }
+.storage-badge { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 14px; padding: 6px 12px; border-radius: 999px; font-weight: 700; font-size: .95rem; }
+.storage-badge.is-synced { background: #e6f4ea; color: #1e6b34; }
+.storage-badge.is-local { background: #fff4e0; color: #8a5300; }
+.storage-badge .text-button { font-weight: 700; }
+:root[data-theme="dark"] .storage-badge.is-synced { background: #173524; color: #9fe0b4; }
+:root[data-theme="dark"] .storage-badge.is-local { background: #3a2a10; color: #f3c77a; }
+.protect-sheet-actions { flex-wrap: wrap; }
+#protect-dialog { width: min(520px, calc(100vw - 24px)); padding: 22px 20px 20px; }
+#protect-dialog h2 { font-size: 1.35rem; line-height: 1.25; margin: 4px 0 10px; }
+#protect-dialog .protect-sheet-actions { display: grid; gap: 10px; margin-top: 16px; }
