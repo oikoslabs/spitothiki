@@ -1,6 +1,6 @@
 // Household bills: amount, due date, recurrence, paid/unpaid, reminders and stats. Synced as kind "bills".
-export const BILL_TYPES = ['electricity', 'water', 'gas', 'rent', 'phone', 'internet', 'subscription', 'insurance', 'tax', 'other'];
-export const BILL_ICONS = { electricity: '💡', water: '💧', gas: '🔥', rent: '🏠', phone: '📱', internet: '🌐', subscription: '📺', insurance: '🛡️', tax: '🏛️', other: '📄' };
+export const BILL_TYPES = ['electricity', 'water', 'gas', 'rent', 'phone', 'internet', 'subscription', 'insurance', 'tax', 'gym', 'education', 'childcare', 'loan', 'parking', 'other'];
+export const BILL_ICONS = { electricity: '💡', water: '💧', gas: '🔥', rent: '🏠', phone: '📱', internet: '🌐', subscription: '📺', insurance: '🛡️', tax: '🏛️', gym: '🏋️', education: '🎓', childcare: '🧸', loan: '🏦', parking: '🅿️', other: '📄' };
 export const BILL_PERIODS = [0, 1, 2, 3, 4, 6, 12]; // months; 0 = one-off
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;

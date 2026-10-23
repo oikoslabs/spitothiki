@@ -857,3 +857,32 @@ button.stat-card:hover { border-color: #bfd4c1; }
 :root[data-dark="1"] #onboard-dialog .filter-chip[aria-pressed="false"]:hover, :root[data-dark="1"] #onboard-dialog .button-quiet:hover, :root[data-dark="1"] #onboard-dialog .icon-button:hover { background: #22302a; color: var(--ink); }
 :root[data-dark="1"] #onboard-dialog .filter-chip[aria-pressed="true"]:hover { background: #7cc39d; border-color: #7cc39d; }
 @media (max-width: 760px) { #onboard-dialog .onboard-sub { font-size: calc(12px * var(--text-scale)); } }
+/* v1.6.5: the ✓ slot is always reserved, so picking/unpicking never moves the other pills. */
+#onboard-dialog .filter-chip::before { content: "✓"; display: inline-block; width: 1ch; text-align: center; font-weight: 800; visibility: hidden; }
+#onboard-dialog .filter-chip[aria-pressed="true"]::before { visibility: visible; }
+/* v1.6.5: one shared add form (shopping list + recurring) */
+.item-add-form { display: grid; grid-template-columns: minmax(0,1fr) 80px 110px 170px; gap: 8px; margin-bottom: 14px; }
+.item-add-form.has-extra { grid-template-columns: minmax(0,1fr) 80px 110px 170px 150px; }
+.item-add-form .field-input { min-width: 0; }
+.item-add-form .item-add-actions { grid-column: 1 / -1; display: flex; gap: 8px; }
+.item-add-form .item-add-actions .button-primary { flex: 1 1 auto; }
+@media (max-width: 760px) {
+  .item-add-form, .item-add-form.has-extra { grid-template-columns: 1fr 1fr; }
+  .item-add-form .item-add-name { grid-column: 1 / -1; }
+  .item-add-form .category-select { grid-column: 1 / -1; }
+  .item-add-form select[name="everyDays"] { grid-column: 1 / -1; }
+}
+/* v1.6.5: Μενού pinned at the right of the bottom bar */
+.quick-bar-menu { color: var(--green-dark) !important; }
+:root[data-dark="1"] .quick-bar-menu { color: #8fd0ab !important; }
+.bar-pinned { margin-top: 10px; }
+/* v1.6.5: meal plan day cards in dark theme (WCAG AA: text ≥4.5:1, card edges ≥3:1) */
+:root[data-dark="1"] .plan-day { background: var(--surface); border-color: #6f8a7b; color: var(--ink); }
+:root[data-dark="1"] .plan-day.is-today { border-color: #8fd0ab; box-shadow: 0 0 0 2px rgba(143,208,171,.35); }
+:root[data-dark="1"] .plan-cell { border-color: #6f8a7b; color: var(--ink); }
+:root[data-dark="1"] .plan-cell.has-meal { background: #22362b; }
+:root[data-dark="1"] .plan-slot, :root[data-dark="1"] .plan-day-name { color: #c4d3ca; }
+:root[data-dark="1"] .meal-option { border-color: #6f8a7b; }
+.bill-chips { margin: 6px 0 10px; }
+.bill-chips [aria-pressed="true"] { border-color: var(--green); background: var(--green-soft); color: var(--green-dark); }
+:root[data-dark="1"] .bill-chips [aria-pressed="true"] { background: #22362b; color: #e4ece6; }

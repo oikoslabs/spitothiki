@@ -1,4 +1,5 @@
 // v1.6.2: choose the bottom-bar shortcuts (up to 5), reorder, reset; default unchanged. Demo data only.
+// v1.6.5: the pinned «☰ Μενού» (always last) is not one of the user's shortcuts, so it is left out here.
 import puppeteer from 'puppeteer-core';
 const [url = 'http://127.0.0.1:8080/', shots = ''] = process.argv.slice(2);
 const browser = await puppeteer.launch({ executablePath: process.env.CHROME_PATH || '/usr/bin/google-chrome', args: ['--no-sandbox'], headless: true });
@@ -12,7 +13,7 @@ for (const width of [412, 360]) {
   await pg.goto(url, { waitUntil: 'networkidle0' });
   await pg.evaluate(() => { localStorage.clear(); localStorage.setItem('spitothiki:onboarded', '1'); localStorage.setItem('spitothiki:protect-sheet-seen', '1'); localStorage.setItem('spitothiki:v1', JSON.stringify({ items: [], shopping: [], bills: [] })); });
   await pg.reload({ waitUntil: 'networkidle0' }); await wait(800);
-  const bar = () => pg.$$eval('.quick-bar .quick-bar-item', (b) => b.map((x) => x.dataset.quick || `view:${x.dataset.view}`));
+  const bar = () => pg.$$eval('.quick-bar .quick-bar-item:not(.quick-bar-menu)', (b) => b.map((x) => x.dataset.quick || `view:${x.dataset.view}`));
   check(`${width}: default bar unchanged`, (await bar()).join() === 'scan,list,extra,transport,all', await bar());
   await pg.evaluate(() => { location.hash = '#settings'; }); await wait(700);
   await pg.evaluate(() => document.querySelector('#bar-card').scrollIntoView({ block: 'start' })); await wait(200); await shot('1-settings');
