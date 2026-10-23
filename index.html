@@ -78,7 +78,7 @@
 
       <div class="sidebar-bottom">
         <div class="privacy-card"><span class="privacy-icon" aria-hidden="true">🔒</span><div><strong>Τα δεδομένα σου είναι δικά σου</strong><p>Στη συσκευή σου και, αν συνδεθείς, ιδιωτικά μόνο με το νοικοκυριό σου.</p></div></div>
-        <span class="version-label">ΕΚΔΟΣΗ 1.6.3</span>
+        <span class="version-label">ΕΚΔΟΣΗ 1.6.4</span>
       </div>
     </aside>
 
@@ -90,7 +90,7 @@
         <button class="button button-primary button-add" type="button" data-action="add-item"><span aria-hidden="true">＋</span> Προσθήκη προϊόντος</button>
       </header>
       <div id="view-content" class="view-content" tabindex="-1"></div>
-      <footer class="app-footer"><span>Απλά, για το σπίτι. · <span id="app-version" data-no-i18n>Έκδοση 1.6.3</span></span><button type="button" class="text-button" data-view="settings">Αντίγραφο ασφαλείας & απόρρητο</button></footer>
+      <footer class="app-footer"><span>Απλά, για το σπίτι. · <span id="app-version" data-no-i18n>Έκδοση 1.6.4</span></span><button type="button" class="text-button" data-view="settings">Αντίγραφο ασφαλείας & απόρρητο</button></footer>
     </main>
   </div>
 
@@ -158,7 +158,7 @@
     <form method="dialog"><div class="dialog-heading"><div><p class="eyebrow">ΕΠΙΒΕΒΑΙΩΣΗ</p><h2 id="confirm-title">Να συνεχίσω;</h2></div></div><p id="confirm-message" class="confirm-message"></p><div class="dialog-actions"><button class="button button-quiet" value="cancel">Όχι, πίσω</button><button class="button button-danger" id="confirm-accept" value="confirm">Ναι, συνέχισε</button></div></form>
   </dialog>
 
-  <dialog id="receipt-detail-dialog" class="item-dialog" aria-labelledby="receipt-detail-title"><div class="dialog-heading"><div><p class="eyebrow">ΑΠΟΔΕΙΞΗ</p><h2 id="receipt-detail-title" data-no-i18n></h2></div><button class="icon-button" type="button" data-action="receipt-detail-close" aria-label="Κλείσιμο">×</button></div><div id="receipt-detail-body" style="padding:0 22px 22px"></div></dialog>
+  <dialog id="receipt-detail-dialog" class="item-dialog" aria-labelledby="receipt-detail-title"><div class="dialog-heading"><div><p class="eyebrow">ΑΠΟΔΕΙΞΗ</p><h2 id="receipt-detail-title" data-no-i18n>Απόδειξη</h2></div><button class="icon-button" type="button" data-action="receipt-detail-close" aria-label="Κλείσιμο">×</button></div><div id="receipt-detail-body" style="padding:0 22px 22px"></div></dialog>
   <dialog id="scan-dialog" class="confirm-dialog" aria-labelledby="scan-title">
     <div class="dialog-heading"><div><p class="eyebrow">BARCODE</p><h2 id="scan-title">Σάρωση προϊόντος</h2></div><button class="icon-button" type="button" data-action="close-scan" aria-label="Κλείσιμο">×</button></div>
     <div class="scan-wrap"><video id="scan-video" class="scan-video" playsinline muted></video><div class="scan-box" aria-hidden="true"></div></div>
@@ -285,7 +285,7 @@
       <ul class="drive-list" id="drive-list"></ul>
       <div class="dialog-actions"><button class="button button-quiet" value="cancel">Άκυρο</button></div></form>
   </dialog>
-  <input id="backup-file" type="file" accept="application/json,.json,.spitobak" hidden>
+  <input id="backup-file" type="file" aria-label="Αρχείο αντιγράφου ασφαλείας" accept="application/json,.json,.spitobak" hidden>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script type="module" src="src/app.js"></script>
 <!-- Cloudflare Web Analytics (cookieless) -->

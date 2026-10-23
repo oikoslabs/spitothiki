@@ -901,6 +901,7 @@ const EN = {
   // First-run setup
   'ΚΑΛΩΣ ΗΡΘΕΣ': 'WELCOME',
   'Τρεις γρήγορες ερωτήσεις': 'Three quick questions',
+  'Τέσσερις γρήγορες ερωτήσεις': 'Four quick questions',
   'Όλα αλλάζουν αργότερα από τις Ρυθμίσεις.': 'You can change everything later in Settings.',
   'Ποιους λογαριασμούς έχεις;': 'Which bills do you have?',
   'Ξεκίνα': 'Start',

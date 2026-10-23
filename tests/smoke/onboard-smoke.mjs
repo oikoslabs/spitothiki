@@ -17,7 +17,7 @@ async function fresh(seed) {
   return page;
 }
 const page = await fresh();
-await check('new user: the 3 questions appear', async () => page.$eval('#onboard-dialog', (d) => d.open && d.querySelectorAll('h3').length === 3));
+await check('new user: the 4 questions appear (v1.6.4 adds theme)', async () => page.$eval('#onboard-dialog', (d) => d.open && d.querySelectorAll('h3').length === 4));
 if (shots) await page.screenshot({ path: `${shots}/v11-after-firstrun-phone.png` });
 await check('choose English, ΔΕΗ + road tax, large text → Start', async () => {
   await page.click('[data-action="onboard-lang"][data-lang="en"]'); await wait();
@@ -26,7 +26,7 @@ await check('choose English, ΔΕΗ + road tax, large text → Start', async () 
   const title = await page.$eval('#onboard-title', (e) => e.textContent);
   await page.click('#onboard-done'); await wait();
   const st = await page.evaluate(() => ({ open: document.querySelector('#onboard-dialog').open, lang: document.documentElement.lang, text: document.documentElement.dataset.text, flag: localStorage.getItem('spitothiki:onboarded') }));
-  return title === 'Three quick questions' && !st.open && st.lang === 'en' && st.text === 'large' && st.flag === '1';
+  return title === 'Four quick questions' && !st.open && st.lang === 'en' && st.text === 'large' && st.flag === '1';
 });
 await check('bill shortcuts in Bills; tapping one opens a prefilled bill; it disappears once added', async () => {
   await page.evaluate(() => { location.hash = '#bills'; }); await wait(600);

@@ -1,0 +1,45 @@
+// v1.6.4: onboarding header matches the home header, room above buttons, theme question, hover/press/focus states. Demo data only.
+import puppeteer from 'puppeteer-core';
+const [url = 'http://127.0.0.1:8080/', shots = '', tag = 'after'] = process.argv.slice(2);
+const browser = await puppeteer.launch({ executablePath: process.env.CHROME_PATH || '/usr/bin/google-chrome', args: ['--no-sandbox', '--blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4'], headless: true });
+const wait = (ms = 500) => new Promise((r) => setTimeout(r, ms));
+let failed = 0; const check = (n, ok, i) => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${n}`); if (!ok) { failed++; if (i) console.log('  ', JSON.stringify(i)); } };
+for (const width of [412, 360]) {
+  const pg = await browser.newPage(); await pg.setBypassServiceWorker(true);
+  const shot = async (n) => { if (shots) await pg.screenshot({ path: `${shots}/v164-${tag}-${width}-${n}.png` }); };
+  await pg.setViewport({ width, height: 860, deviceScaleFactor: 2, isMobile: false, hasTouch: false });
+  await pg.evaluateOnNewDocument(() => { window.__spitoOnboarding = true; window.__spitoProtect = true; Object.defineProperty(navigator, 'language', { get: () => 'el-GR' }); });
+  await pg.goto(url, { waitUntil: 'networkidle0' });
+  const fresh = async (theme) => { await pg.evaluate((th) => { localStorage.clear(); localStorage.setItem('spitothiki:onboarded', '1'); localStorage.setItem('spitothiki:protect-sheet-seen', '1'); if (th) localStorage.setItem('spitothiki:theme', th); localStorage.setItem('spitothiki:v1', JSON.stringify({ items: [], shopping: [], bills: [] })); }, theme); await pg.reload({ waitUntil: 'networkidle0' }); await wait(800); };
+  await fresh('light'); await shot('home-light');
+  const home = await pg.evaluate(() => { document.querySelector('.home-hero')?.classList.remove('home-hero'); const e = document.querySelector('.hero-copy .eyebrow'), p = document.querySelector('.hero-copy h1 + p'); return { eb: getComputedStyle(e).marginBottom, pt: getComputedStyle(p).marginTop, ps: getComputedStyle(p).fontSize }; });
+  await fresh('dark'); await shot('home-dark');
+  await fresh(''); await pg.evaluate(() => localStorage.removeItem('spitothiki:onboarded')); await pg.reload({ waitUntil: 'networkidle0' }); await wait(900);
+  check(`${width}: onboarding opens`, await pg.evaluate(() => document.querySelector('#onboard-dialog')?.open));
+  const ob = await pg.evaluate(() => { const d = document.querySelector('#onboard-dialog'); const e = d.querySelector('.eyebrow'), p = d.querySelector('.onboard-sub'); return p ? { eb: getComputedStyle(e).marginBottom, pt: getComputedStyle(p).marginTop, ps: getComputedStyle(p).fontSize, inHead: !!p.closest('.dialog-heading') } : null; });
+  check(`${width}: onboarding header spacing = home header`, ob && ob.eb === home.eb && ob.pt === home.pt && ob.ps === home.ps && ob.inHead, { home, ob });
+  await shot('onboarding-1-top');
+  const gap = await pg.evaluate(() => { const a = document.querySelector('#onboard-dialog .choice-actions'); const prev = a.previousElementSibling; return a.getBoundingClientRect().top - prev.getBoundingClientRect().bottom; });
+  check(`${width}: at least 24px above the buttons`, gap >= 24, gap);
+  const tp = (v) => `[data-action="onboard-theme"][data-theme="${v}"]`;
+  check(`${width}: theme question, Αυτόματο by default`, await pg.$eval(tp('auto'), (b) => b.getAttribute('aria-pressed') === 'true').catch(() => false));
+  await pg.evaluate((s) => document.querySelector(s).click(), tp('dark')); await wait(300);
+  const dk = await pg.evaluate(() => ({ dark: document.documentElement.dataset.dark, saved: localStorage.getItem('spitothiki:theme'), p: document.querySelector('[data-action="onboard-theme"][data-theme="dark"]').getAttribute('aria-pressed') }));
+  check(`${width}: Σκούρο applies at once and is saved`, dk.dark === '1' && dk.saved === 'dark' && dk.p === 'true', dk);
+  await pg.evaluate(() => document.querySelector('#ob-theme').scrollIntoView({ block: 'center' })); await wait(200); await shot('onboarding-2-theme-dark');
+  await pg.evaluate((s) => document.querySelector(s).click(), tp('light')); await wait(300);
+  check(`${width}: Φωτεινό applies at once`, await pg.evaluate(() => document.documentElement.dataset.dark === '' && localStorage.getItem('spitothiki:theme') === 'light'));
+  await pg.focus('[data-action="onboard-bill"]'); await pg.keyboard.press('Tab'); await pg.keyboard.down('Shift'); await pg.keyboard.press('Tab'); await pg.keyboard.up('Shift'); await wait(200);
+  const ring = await pg.evaluate(() => { const c = getComputedStyle(document.activeElement); return c.outlineStyle !== 'none' && parseFloat(c.outlineWidth) >= 2; });
+  check(`${width}: keyboard focus ring visible on pills`, ring);
+  const hv = '[data-action="onboard-bill"]:nth-child(2)'; const bg0 = await pg.$eval(hv, (b) => getComputedStyle(b).backgroundColor);
+  await pg.hover(hv); await wait(250);
+  check(`${width}: hover tints an unpicked pill`, (await pg.$eval(hv, (b) => getComputedStyle(b).backgroundColor)) !== bg0);
+  await pg.evaluate((s) => document.querySelector(s).scrollIntoView({ block: 'center' }), hv); await pg.hover(hv); await wait(200); await shot('onboarding-3-hover-focus');
+  await pg.evaluate(() => document.querySelector('[data-action="onboard-done"]').click()); await wait(400);
+  await pg.evaluate(() => { location.hash = '#settings'; }); await wait(700);
+  check(`${width}: Ρυθμίσεις shows the same theme`, await pg.$eval('[data-action="set-theme"][data-theme="light"]', (b) => b.getAttribute('aria-pressed') === 'true'));
+  check(`${width}: nothing sticks out sideways`, await pg.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+  await pg.close();
+}
+await browser.close(); process.exit(failed ? 1 : 0);
