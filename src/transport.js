@@ -9,7 +9,7 @@ function makeId(prefix) {
   if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
-const isDate = (d) => /^\d{4}-\d{2}-\d{2}$/.test(String(d || ''));
+const isDate = (d) => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(d || '')); if (!m) return false; const dt = new Date(Date.UTC(+m[1], m[2] - 1, +m[3])); return +m[1] >= 2000 && +m[1] <= 2100 && dt.getUTCMonth() === m[2] - 1 && dt.getUTCDate() === +m[3]; };
 
 export function createTransport(input = {}, now = new Date().toISOString()) {
   const type = TRANSPORT_TYPES.includes(input.type) ? input.type : 'other';

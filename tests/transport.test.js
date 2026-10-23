@@ -71,3 +71,9 @@ test('receipts: fuel photo text with €/l, toll receipts, groceries ignored', (
   const groceries = parseReceiptText('ΣΚΛΑΒΕΝΙΤΗΣ\nΓΑΛΑ 1,89 13%\nΨΩΜΙ 1,20 13%\nΣΥΝΟΛΟ 3,09');
   assert.equal(classifyReceipt(groceries, 'ΣΚΛΑΒΕΝΙΤΗΣ ΓΑΛΑ ΨΩΜΙ'), null);
 });
+
+test('v1.5.6: impossible dates are refused with a message (no entry hidden in a non-existent month)', async () => {
+  const { createTransport } = await import('../src/transport.js');
+  assert.throws(() => createTransport({ type: 'tolls', amount: '2,55', date: '2026-14-10' }), /ημερομηνία/);
+  assert.equal(createTransport({ type: 'tolls', amount: '2,55', date: '2026-10-22' }).amount, 2.55);
+});

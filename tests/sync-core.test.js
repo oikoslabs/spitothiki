@@ -113,3 +113,16 @@ test('new record kinds sync between devices', async () => {
   assert.deepEqual(result.state.recurring, [{ id: 'r1', name: 'Γάλα' }]);
   assert.deepEqual(result.state.waste, [{ id: 'w1' }]);
 });
+
+test('v1.5.6: a manual toll entry syncs to the household and survives a later change on the other device', async () => {
+  const backend = memoryBackend(); const clock = { t: 1 };
+  const a = device(backend, { items: [], shopping: [], transport: [] }, clock);
+  const b = device(backend, { items: [], shopping: [], transport: [] }, clock);
+  a.engine.start(); b.engine.start(); await new Promise((r) => setTimeout(r, 5));
+  const toll = { id: 'tr-demo', type: 'tolls', amount: 2.55, date: '2026-10-22', note: 'Αττική Οδός', createdAt: 'x', updatedAt: 'x' };
+  await a.set({ ...a.state, transport: [toll] }); await new Promise((r) => setTimeout(r, 5));
+  assert.deepEqual(b.state.transport.map((e) => e.id), ['tr-demo']);
+  await b.set({ ...b.state, shopping: [{ id: 's1', name: 'Γάλα', checked: false }] }); await new Promise((r) => setTimeout(r, 5));
+  assert.deepEqual(a.state.transport.map((e) => e.id), ['tr-demo']);
+  assert.deepEqual(b.state.transport.map((e) => e.id), ['tr-demo']);
+});
