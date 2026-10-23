@@ -25,6 +25,7 @@ import { extractShelfPrice, lastReceiptPrice } from './shelf-price.js';
 import { addCartItem, budgetState, createTrip, finishTrip, lastPrice, lineTotal, remainingShopping, removeCartItem, tripForReceipt, updateCartItem } from './cart.js';
 import { VM_MODES, interpretCode } from './gs1.js';
 import { initBackToTop } from './back-to-top.js';
+import { BAR_KEY, BAR_MAX, BAR_OPTIONS, DEFAULT_BAR, barOption, moveBar, parseBar, toggleBar } from './bar.js';
 import { CHORE_SUGGESTIONS, choreDates, choreMembers, choreStatus, choresDueToday, choresSummary, createChore, historyCounts, lastDone, markDone, nextDue, sortChores, undoDone } from './chores.js';
 import { decryptBackup, decryptWithKey, deriveDeviceKey, encryptBackup, encryptWithKey, readBackup } from './backup-crypto.js';
 import { DRIVE_AUTO_KEY, DRIVE_ENABLED_KEY, DRIVE_HASH_KEY, DRIVE_LAST_KEY, autoBackupDue, createDriveClient, stateHash } from './gdrive.js';
@@ -189,6 +190,25 @@ const QUICK_ACTIONS = [
   { id: 'cook', icon: '🍳', label: 'Τι να μαγειρέψω;', hint: 'Ιδέες με ό,τι λήγει πρώτο' }
 ];
 const renderQuickActions = (ids) => QUICK_ACTIONS.filter((a) => !ids || ids.includes(a.id)).map((a) => `<button class="quick-action" type="button" data-action="quick" data-quick="${a.id}"><span class="quick-action-icon" aria-hidden="true">${a.icon}</span><span><strong>${escapeHtml(t(a.label))}</strong><small>${escapeHtml(t(a.hint))}</small></span><span class="arrow" aria-hidden="true">›</span></button>`).join('');
+// v1.6.2: user-chosen bottom bar (device-local).
+const barIds = () => { try { return parseBar(localStorage.getItem(BAR_KEY)); } catch { return [...DEFAULT_BAR]; } };
+function saveBar(ids) { try { if (JSON.stringify(ids) === JSON.stringify(DEFAULT_BAR)) localStorage.removeItem(BAR_KEY); else localStorage.setItem(BAR_KEY, JSON.stringify(ids)); } catch {} renderQuickBar(); }
+function renderQuickBar() {
+  const bar = document.querySelector('.quick-bar'); if (!bar) return;
+  const ids = barIds();
+  bar.style.gridTemplateColumns = `repeat(${ids.length}, minmax(0,1fr))`;
+  bar.innerHTML = ids.map((id) => { const o = barOption(id); const attrs = id.startsWith('view:') ? `data-view="${id.slice(5)}"` : `data-action="quick" data-quick="${id}"${id === 'all' ? ' aria-haspopup="dialog"' : ''}`;
+    return `<button class="quick-bar-item${id === 'all' ? ' quick-bar-more' : ''}" type="button" ${attrs}><span class="nav-icon" aria-hidden="true">${o.icon}</span><span>${escapeHtml(t(o.label))}</span></button>`; }).join('');
+}
+function renderBarCard() {
+  const ids = barIds(); const rest = BAR_OPTIONS.filter((o) => !ids.includes(o.id)); const full = ids.length >= BAR_MAX;
+  return `<section class="panel settings-card" id="bar-card"><span class="stat-icon">▭</span><h2>${escapeHtml(t('Κάτω μπάρα'))}</h2><p>${escapeHtml(t('Διάλεξε έως 5 συντομεύσεις για την κάτω μπάρα του κινητού και τη σειρά τους.'))}</p>
+    <ol class="bar-list" id="bar-list">${ids.map((id, i) => { const o = barOption(id); return `<li data-bar="${id}"><span class="bar-name"><span aria-hidden="true">${o.icon}</span> ${escapeHtml(t(o.label))}</span><span class="bar-btns"><button class="icon-button" type="button" data-action="bar-move" data-index="${i}" data-delta="-1" aria-label="${escapeHtml(t('Πιο αριστερά'))}" ${i === 0 ? 'disabled' : ''}>↑</button><button class="icon-button" type="button" data-action="bar-move" data-index="${i}" data-delta="1" aria-label="${escapeHtml(t('Πιο δεξιά'))}" ${i === ids.length - 1 ? 'disabled' : ''}>↓</button><button class="icon-button" type="button" data-action="bar-toggle" data-id="${id}" aria-label="${escapeHtml(t('Αφαίρεση'))}" ${ids.length === 1 ? 'disabled' : ''}>✕</button></span></li>`; }).join('')}</ol>
+    <h3 class="settings-sub">${escapeHtml(t(full ? 'Η μπάρα είναι γεμάτη (5). Βγάλε μία για να βάλεις άλλη.' : 'Πρόσθεσε:'))}</h3>
+    <div class="chore-chips" id="bar-add">${rest.map((o) => `<button class="extras-chip" type="button" data-action="bar-toggle" data-id="${o.id}" ${full ? 'disabled' : ''}><span aria-hidden="true">${o.icon}</span> ${escapeHtml(t(o.label))}</button>`).join('')}</div>
+    <div class="settings-actions"><button class="button button-quiet" type="button" data-action="bar-reset" id="bar-reset">↺ ${escapeHtml(t('Επαναφορά'))}</button></div></section>`;
+}
+
 function runQuickAction(id) {
   const sheet = document.querySelector('#quick-sheet');
   if (sheet?.open) sheet.close();
@@ -537,7 +557,7 @@ function renderSettings() {
     <section class="panel settings-card"><span class="stat-icon">◐</span><h2>Εμφάνιση</h2><p>Θέμα, μέγεθος γραμμάτων και αντίθεση. Ισχύουν σε όλη την εφαρμογή, σε αυτή τη συσκευή.</p><div class="theme-options" role="group" aria-label="Θέμα">${[['auto', 'Αυτόματο'], ['light', 'Φωτεινό'], ['dark', 'Σκούρο']].map(([value, label]) => `<button type="button" class="filter-chip ${currentTheme() === value ? 'is-active' : ''}" data-action="set-theme" data-theme="${value}" aria-pressed="${currentTheme() === value}">${label}</button>`).join('')}</div>
       <h3 class="settings-sub" id="text-size-label">Μέγεθος γραμμάτων</h3><div class="theme-options size-options" role="group" aria-labelledby="text-size-label">${[['normal', 'Κανονικά'], ['large', 'Μεγάλα'], ['xlarge', 'Πολύ μεγάλα']].map(([value, label]) => `<button type="button" class="filter-chip ${textSize() === value ? 'is-active' : ''}" data-action="set-text-size" data-size="${value}" aria-pressed="${textSize() === value}">${label}</button>`).join('')}</div>
       <label class="check-row"><input type="checkbox" id="high-contrast" ${highContrast() ? 'checked' : ''}> <span>Υψηλή αντίθεση (πιο έντονα γράμματα και περιγράμματα)</span></label></section>
-    ${renderLanguageCard()}
+    ${renderBarCard()}${renderLanguageCard()}
     <section class="panel settings-card"><span class="stat-icon amber">👋</span><h2>Αρχικές ερωτήσεις</h2><p>Γλώσσα, οι λογαριασμοί που έχεις και μέγεθος γραμμάτων, σε ένα λεπτό.</p><div class="settings-actions"><button class="button button-quiet" type="button" data-action="onboard-again">Κάνε τις ερωτήσεις ξανά</button></div></section>
     ${renderSyncCard()}
     ${renderNotificationCard()}
@@ -2686,6 +2706,12 @@ function handleAction(button) {
   else if (action === 'close-dialog') itemDialog.close();
   else if (action === 'edit-item') openItemDialog(id);
   else if (action === 'navigate') navigate(button.dataset.view);
+  else if (action === 'bar-move' || action === 'bar-toggle' || action === 'bar-reset') {
+    const ids = barIds();
+    saveBar(action === 'bar-reset' ? [...DEFAULT_BAR] : action === 'bar-move' ? moveBar(ids, Number(button.dataset.index), Number(button.dataset.delta)) : toggleBar(ids, button.dataset.id));
+    const card = document.querySelector('#bar-card'); if (card) { card.outerHTML = renderBarCard(); translateDom(document.querySelector('#bar-card')); }
+    if (action === 'bar-reset') showToast('Η κάτω μπάρα επανήλθε.');
+  }
   else if (action === 'adjust-quantity') {
     const item = state.items.find((entry) => entry.id === id);
     if (!item) return;
@@ -3271,6 +3297,14 @@ setInterval(runDailyChecks, 60 * 60 * 1000);
 
 startSync();
 initBackToTop();
+renderQuickBar();
+// Long-press on the bottom bar → its settings.
+{ let pressTimer = null;
+  const openBarSettings = () => { navigate('settings'); requestAnimationFrame(() => document.querySelector('#bar-card')?.scrollIntoView({ block: 'start' })); };
+  const bar = document.querySelector('.quick-bar');
+  bar?.addEventListener('contextmenu', (e) => { e.preventDefault(); openBarSettings(); });
+  bar?.addEventListener('touchstart', () => { clearTimeout(pressTimer); pressTimer = setTimeout(() => { pressTimer = 'fired'; openBarSettings(); }, 650); }, { passive: true });
+  ['touchend', 'touchmove', 'touchcancel'].forEach((ev) => bar?.addEventListener(ev, (e) => { if (pressTimer === 'fired' && ev === 'touchend') e.preventDefault(); if (pressTimer !== 'fired') clearTimeout(pressTimer); pressTimer = null; })); }
 updateOfflineBar();
 window.addEventListener('offline', () => { updateOfflineBar(); });
 window.addEventListener('online', () => { updateOfflineBar(); if (loadQueue().length) setTimeout(processReceiptQueue, 1500); });
