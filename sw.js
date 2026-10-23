@@ -2,14 +2,14 @@
 // Strategy: network-first for everything from this site (HTML, JS, CSS, manifest), so a new
 // deploy shows up on the next load; the cache is only used when the network is unavailable.
 // Bump CACHE_VERSION when the list of shell files changes; old caches are deleted on activate.
-const CACHE_VERSION = 'v63';
+const CACHE_VERSION = 'v64';
 const CACHE = `spitothiki-${CACHE_VERSION}`;
 const OCR_CACHE = 'spitothiki-ocr';
 const SHARE_CACHE = 'spitothiki-share'; // a file shared to the app (Web Share Target), picked up by the page // Tesseract.js script/worker/core/language files, kept across versions
 const DATA_CACHE = 'spitothiki-data'; // written by the app: expiry snapshot for background checks
 const SHELL = [
   './', './index.html', './styles.css', './manifest.webmanifest',
-  './src/app.js', './src/format.js', './src/theme.js', './src/i18n.js', './src/features.js', './src/recipes.js', './src/receipt.js', './src/receipt-photo.js', './src/mealplan.js', './src/diet-plan.js', './src/receipts.js', './src/diet-ui.js', './src/diet-i18n.js', './src/bills.js', './src/transport.js', './src/extras.js', './src/bill-pdf.js', './src/prefs.js', './src/scan-router.js', './src/onboarding.js', './src/cart.js', './src/shelf-price.js', './src/push.js', './src/auto-list.js', './src/price-compare.js', './src/recipe-data.js', './src/gs1.js', './src/back-to-top.js', './src/backup-crypto.js', './src/gdrive.js', './src/gdrive-auth.js', './src/drive-key.js', './src/receipt-edit.js', './src/offline.js', './src/protect.js', './src/domain.js', './src/storage.js', './src/barcode.js', './src/toll-barcode.js', './src/firebase-config.js', './src/sync-core.js', './src/sync-firebase.js',
+  './src/app.js', './src/format.js', './src/theme.js', './src/i18n.js', './src/features.js', './src/recipes.js', './src/receipt.js', './src/receipt-photo.js', './src/mealplan.js', './src/diet-plan.js', './src/receipts.js', './src/diet-ui.js', './src/diet-i18n.js', './src/bills.js', './src/transport.js', './src/extras.js', './src/chores.js', './src/bill-pdf.js', './src/prefs.js', './src/scan-router.js', './src/onboarding.js', './src/cart.js', './src/shelf-price.js', './src/push.js', './src/auto-list.js', './src/price-compare.js', './src/recipe-data.js', './src/gs1.js', './src/back-to-top.js', './src/backup-crypto.js', './src/gdrive.js', './src/gdrive-auth.js', './src/drive-key.js', './src/receipt-edit.js', './src/offline.js', './src/protect.js', './src/domain.js', './src/storage.js', './src/barcode.js', './src/toll-barcode.js', './src/firebase-config.js', './src/sync-core.js', './src/sync-firebase.js',
   './icons/icon-192.png', './icons/icon-512.png', './icons/icon.svg'
 ];
 
@@ -76,7 +76,7 @@ self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   event.waitUntil((async () => {
     const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-    const view = event.notification.tag === 'spitothiki-bills' ? 'bills' : event.notification.tag === 'spitothiki-push' ? 'overview' : 'pantry';
+    const view = event.notification.tag === 'spitothiki-bills' ? 'bills' : event.notification.tag === 'spitothiki-chores' ? 'chores' : event.notification.tag === 'spitothiki-push' ? 'overview' : 'pantry';
     const existing = windows.find((client) => client.url.startsWith(self.registration.scope));
     if (existing) { await existing.focus(); return existing.navigate(`${self.registration.scope}#${view}`).catch(() => {}); }
     return self.clients.openWindow(`${self.registration.scope}#${view}`);
@@ -101,6 +101,15 @@ async function backgroundExpiryCheck({ force = false } = {}) {
     await self.registration.showNotification(title, { body: `${bills.slice(0, 3).map((b) => `${b.name} ${b.amount}`).join(', ')}.`, tag: 'spitothiki-bills', icon: 'icons/icon-192.png', badge: 'icons/icon-192.png', lang: snap.lang || 'el' });
     snap.lastBillNotified = today;
     await cache.put('./__expiry.json', new Response(JSON.stringify(snap), { headers: { 'content-type': 'application/json' } }));
+  }
+  // v1.6.0: one chores reminder a day (due or late today), remembered apart from the snapshot so it never repeats.
+  const choresDue = (snap.chores || []).filter((c) => c.next && c.next <= today);
+  const choreMark = await cache.match('./__chores-notified');
+  const choreLast = choreMark ? await choreMark.text() : '';
+  if (choresDue.length && choreLast !== today) {
+    shown += 1;
+    await self.registration.showNotification(String(snap.choreTitle || 'Σήμερα: {list}').replace('{list}', choresDue.slice(0, 4).map((c) => c.name).join(', ') + (choresDue.length > 4 ? '…' : '')), { body: '', tag: 'spitothiki-chores', icon: 'icons/icon-192.png', badge: 'icons/icon-192.png', lang: snap.lang || 'el' });
+    await cache.put('./__chores-notified', new Response(today));
   }
   if (snap.lastNotified === today && !force) return shown;
   const limit = addDaysKey(today, Number(snap.days ?? 3));

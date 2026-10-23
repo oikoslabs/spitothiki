@@ -805,3 +805,20 @@ button.stat-card:hover { border-color: #bfd4c1; }
 .misfiled-list li { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; min-width: 0; }
 .misfiled-name { flex: 1 1 10rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .misfiled-list li .button { flex: 0 0 auto; margin-left: auto; }
+
+/* v1.6.0: «Δουλειές σπιτιού» — bright status colours */
+.chore-card { --c: #2e7d4f; display: grid; grid-template-columns: auto 1fr; gap: .35rem .75rem; align-items: center; padding: 14px; margin-bottom: 10px; border-radius: 18px; background: var(--surface, #fff); border: 1px solid rgba(0,0,0,.08); border-left: 6px solid var(--c); min-width: 0; }
+.chore-late { --c: #d63a2f; } .chore-today { --c: #ef7d1a; } .chore-ok { --c: #2e8b57; }
+.chore-emoji { font-size: 1.7rem; } .chore-main { min-width: 0; }
+.chore-main h3 { margin: 0; font-size: 1.05rem; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.chore-title { background: none; border: 0; padding: 0; font: inherit; color: inherit; text-align: left; cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
+.chore-pill, .chore-badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: .78rem; font-weight: 700; color: #fff; background: var(--c); }
+.chore-badge { font-size: .95rem; padding: 6px 12px; }
+.chores-sum-line { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; }
+.chore-meta { margin: .3rem 0 0; font-size: .88rem; line-height: 1.45; opacity: .85; overflow-wrap: anywhere; }
+.chore-done { grid-column: 1 / -1; width: 100%; min-height: 48px; font-size: 1.05rem; }
+.chores-add { width: 100%; min-height: 48px; margin-top: 6px; }
+.chore-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 12px; }
+.chore-stepper { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; } .chore-stepper .field-input { max-width: 90px; text-align: center; font-size: 1.2rem; }
+.chore-remind { margin-top: 6px; font-weight: 700; }
+.chore-hist { list-style: none; padding: 0; margin: 0; } .chore-hist li { display: flex; justify-content: space-between; gap: 8px; padding: 11px 0; border-bottom: 1px solid rgba(0,0,0,.07); }

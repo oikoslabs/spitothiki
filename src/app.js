@@ -25,6 +25,7 @@ import { extractShelfPrice, lastReceiptPrice } from './shelf-price.js';
 import { addCartItem, budgetState, createTrip, finishTrip, lastPrice, lineTotal, remainingShopping, removeCartItem, tripForReceipt, updateCartItem } from './cart.js';
 import { VM_MODES, interpretCode } from './gs1.js';
 import { initBackToTop } from './back-to-top.js';
+import { CHORE_SUGGESTIONS, choreDates, choreMembers, choreStatus, choresDueToday, choresSummary, createChore, historyCounts, lastDone, markDone, nextDue, sortChores, undoDone } from './chores.js';
 import { decryptBackup, decryptWithKey, deriveDeviceKey, encryptBackup, encryptWithKey, readBackup } from './backup-crypto.js';
 import { DRIVE_AUTO_KEY, DRIVE_ENABLED_KEY, DRIVE_HASH_KEY, DRIVE_LAST_KEY, autoBackupDue, createDriveClient, stateHash } from './gdrive.js';
 import { forgetToken, getDriveToken } from './gdrive-auth.js';
@@ -45,7 +46,7 @@ const backupFile = document.querySelector('#backup-file');
 const toast = document.querySelector('#toast');
 
 let state = loadState();
-const VIEWS = ['overview', 'pantry', 'shopping', 'cart', 'cook', 'bills', 'transport', 'extras', 'insights', 'receipts', 'settings'];
+const VIEWS = ['overview', 'pantry', 'shopping', 'cart', 'cook', 'bills', 'transport', 'extras', 'chores', 'insights', 'receipts', 'settings'];
 let activeView = VIEWS.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'overview';
 let pantryQuery = '';
 let pantryCategory = 'Όλα';
@@ -147,7 +148,7 @@ function pendingLabel(count) {
   return t(count === 1 ? '{count} εκκρεμές προϊόν' : '{count} εκκρεμή προϊόντα', { count });
 }
 
-const SECTION_LABELS = { overview: 'Σπιτοθήκη', pantry: 'Το απόθεμά μου', shopping: 'Λίστα αγορών', cart: 'Καλάθι στο κατάστημα', cook: 'Μαγείρεμα', bills: 'Λογαριασμοί', transport: 'Μετακινήσεις', extras: 'Μικροέξοδα', insights: 'Σύνολο εξόδων', receipts: 'Αποδείξεις', settings: 'Ρυθμίσεις' };
+const SECTION_LABELS = { overview: 'Σπιτοθήκη', pantry: 'Το απόθεμά μου', shopping: 'Λίστα αγορών', cart: 'Καλάθι στο κατάστημα', cook: 'Μαγείρεμα', bills: 'Λογαριασμοί', transport: 'Μετακινήσεις', extras: 'Μικροέξοδα', chores: 'Δουλειές σπιτιού', insights: 'Σύνολο εξόδων', receipts: 'Αποδείξεις', settings: 'Ρυθμίσεις' };
 function setActiveNavigation() {
   document.body.dataset.screen = activeView;
   const current = document.querySelector('#current-section');
@@ -168,7 +169,7 @@ const openAttr = (id) => (openPanels.has(id) ? 'open' : '');
 document.addEventListener('toggle', (event) => { const d = event.target; if (d.matches?.('details.collapsible[id]')) { if (d.open) openPanels.add(d.id); else openPanels.delete(d.id); } }, true);
 
 // Which menu group each section belongs to (shown as a breadcrumb under the top bar: ⌂ Αρχική › ΕΞΟΔΑ).
-const SECTION_GROUPS = { pantry: 'ΣΠΙΤΙ', shopping: 'ΣΠΙΤΙ', cart: 'ΣΠΙΤΙ', cook: 'ΣΠΙΤΙ', bills: 'ΕΞΟΔΑ', transport: 'ΕΞΟΔΑ', extras: 'ΕΞΟΔΑ', insights: 'ΕΞΟΔΑ', receipts: 'ΕΞΟΔΑ', settings: 'ΕΦΑΡΜΟΓΗ' };
+const SECTION_GROUPS = { pantry: 'ΣΠΙΤΙ', shopping: 'ΣΠΙΤΙ', cart: 'ΣΠΙΤΙ', cook: 'ΣΠΙΤΙ', chores: 'ΣΠΙΤΙ', bills: 'ΕΞΟΔΑ', transport: 'ΕΞΟΔΑ', extras: 'ΕΞΟΔΑ', insights: 'ΕΞΟΔΑ', receipts: 'ΕΞΟΔΑ', settings: 'ΕΦΑΡΜΟΓΗ' };
 function renderCrumbs() {
   const group = SECTION_GROUPS[activeView];
   return `<nav class="eyebrow crumbs" aria-label="${escapeHtml(t('Πού βρίσκομαι'))}"><button class="crumb-home" type="button" data-view="overview">⌂ ${escapeHtml(t('Αρχική'))}</button>${group ? `<span aria-hidden="true">›</span><span>${escapeHtml(t(group))}</span>` : ''}</nav>`;
@@ -565,6 +566,7 @@ function renderApp() {
   else if (activeView === 'bills') viewRoot.innerHTML = renderBills();
   else if (activeView === 'transport') viewRoot.innerHTML = renderTransport();
   else if (activeView === 'extras') viewRoot.innerHTML = renderExtras();
+  else if (activeView === 'chores') viewRoot.innerHTML = renderChores();
   else if (activeView === 'cart') viewRoot.innerHTML = renderCart();
   else if (activeView === 'cook') { viewRoot.innerHTML = renderCook(); loadOnlineRecipes(); }
   else viewRoot.innerHTML = renderSettings();
@@ -917,6 +919,7 @@ async function writeBackgroundSnapshot() {
     const snapshot = expirySnapshot(state.items, { days: settings.days, lang: getLang(), lastNotified: settings.lastNotified,
       titleOne: t('1 προϊόν λήγει σύντομα'), titleMany: t('{count} προϊόντα λήγουν σύντομα', { count: '{count}' }), more: t(' και {count} ακόμη', { count: '{count}' }) });
     Object.assign(snapshot, { pushTitle: t('Έχεις υπενθυμίσεις στη Σπιτοθήκη'), pushBody: t('Άνοιξε για λεπτομέρειες.'), lastBillNotified: settings.lastBillNotified, billTitleOne: t('1 λογαριασμός προς πληρωμή'), billTitleMany: t('{count} λογαριασμοί προς πληρωμή', { count: '{count}' }),
+      choreTitle: t('Σήμερα: {list}', { list: '{list}' }), lastChoreNotified: settings.lastChoreNotified, chores: (state.chores || []).filter((c) => c.remind).map((c) => ({ name: c.name, next: nextDue(c) })),
       bills: (state.bills || []).filter((bill) => !bill.paid && !bill.autoPay).map((bill) => ({ name: bill.name, due: bill.due, remind: bill.remind ?? 3, amount: money(bill.amount) })) });
     await cache.put(SNAPSHOT_URL, new Response(JSON.stringify(snapshot), { headers: { 'content-type': 'application/json' } }));
   } catch {}
@@ -962,7 +965,7 @@ const pushErrorText = (error) => {
 async function refreshPush({ force = false, test = false } = {}) {
   if (!pushSupported() || !notifySettings().enabled || Notification.permission !== 'granted') { if (test) pushError = pushErrorText(null); return null; }
   try {
-    const dates = pushDates({ bills: state.bills || [], items: state.items || [] }, { days: notifySettings().days, today: localDateKey() });
+    const dates = [...new Set([...pushDates({ bills: state.bills || [], items: state.items || [] }, { days: notifySettings().days, today: localDateKey() }), ...choreDates(state.chores || [], localDateKey())])].sort().slice(0, 120);
     const sig = `${localDateKey()}|${dates.join(',')}`;
     let last = ''; try { last = localStorage.getItem(PUSH_KEY) || ''; } catch {}
     const existing = await pushSubscription(false);
@@ -1898,6 +1901,102 @@ function renderTransportReceiptOffer() {
   return `<div class="alert-banner receipt-transport" id="receipt-transport" role="status"><p>${escapeHtml(label)} ${escapeHtml(t('Θες να την καταχωρίσεις ως έξοδο μετακίνησης αντί για προϊόντα;'))}</p><div class="settings-actions"><button class="button button-primary" type="button" data-action="receipt-to-transport">🚗 ${escapeHtml(t('Καταχώριση στις Μετακινήσεις'))}</button></div></div>`;
 }
 
+// ---------- v1.6.0: «🧹 Δουλειές σπιτιού» ----------
+let choresMode = null; // null (list) | { edit: id|'' , draft } | { history: id }
+let choresLastDone = null; // chore id of the last ✓ (undo banner)
+const choreToday = () => localDateKey();
+const myName = () => String(syncStatus?.user?.name || '').split(' ')[0];
+const choreName = (c) => t(c.name);
+const STATUS_LABEL = { late: 'καθυστερεί', today: 'σήμερα', ok: 'οκ' };
+function choreDayLabel(key) {
+  const today = choreToday(); const diff = Math.round((Date.parse(`${key}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 864e5);
+  const base = new Intl.DateTimeFormat(locale(), { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(`${key}T00:00:00Z`));
+  return diff === 0 ? t('Σήμερα') : diff === -1 ? `${base} (${t('χθες')})` : diff === 1 ? `${base} (${t('αύριο')})` : base;
+}
+function renderChoreCard(c) {
+  const today = choreToday(); const st = choreStatus(c, today); const last = lastDone(c); const lastBy = c.history?.length ? c.history[c.history.length - 1].by : '';
+  return `<article class="chore-card chore-${st}" data-chore="${escapeHtml(c.id)}"><span class="chore-emoji" aria-hidden="true">${escapeHtml(c.emoji)}</span>
+    <div class="chore-main"><h3><button class="chore-title" type="button" data-action="chore-history" data-id="${escapeHtml(c.id)}">${escapeHtml(choreName(c))}</button> <span class="chore-pill">${escapeHtml(t(STATUS_LABEL[st]))}</span></h3>
+    <p class="chore-meta">${escapeHtml(t('Κάθε {n} μέρες', { n: c.every }))} · ${escapeHtml(t('Τελευταία φορά: {date}', { date: last ? choreDayLabel(last) : t('ποτέ') }))}${lastBy ? ` <span data-no-i18n>(${escapeHtml(lastBy)})</span>` : ''}<br>${escapeHtml(t('Επόμενη:'))} <strong>${escapeHtml(choreDayLabel(nextDue(c)))}</strong>${c.assignee ? ` · 👤 <span data-no-i18n>${escapeHtml(c.assignee)}</span>` : ''}${c.remind ? ' · 🔔' : ''}</p></div>
+    <button class="button button-primary chore-done" type="button" data-action="chore-done" data-id="${escapeHtml(c.id)}">✓ ${escapeHtml(t('Έγινε'))}</button></article>`;
+}
+function renderChoresList() {
+  const today = choreToday(); const list = sortChores(state.chores || [], today); const sum = choresSummary(list, today);
+  const undo = choresLastDone && (state.chores || []).find((c) => c.id === choresLastDone);
+  const summary = list.length ? `<section class="panel chores-summary" id="chores-summary"><p class="chores-sum-line">${sum.late ? `<span class="chore-badge chore-late">${escapeHtml(t('{n} καθυστερούν', { n: sum.late }))}</span>` : ''}${sum.today ? `<span class="chore-badge chore-today">${escapeHtml(t('{n} σήμερα', { n: sum.today }))}</span>` : ''}${sum.ok ? `<span class="chore-badge chore-ok">${escapeHtml(t('{n} εντάξει', { n: sum.ok }))}</span>` : ''}</p></section>` : '';
+  return `${renderHeader(t('Δουλειές σπιτιού'), t('Τι πρέπει να γίνει και πότε — χωρίς να το θυμάσαι.'))}
+    ${undo ? `<div class="alert-banner" id="chores-undo" role="status"><p>✓ ${escapeHtml(t('Έγινε: {name}', { name: choreName(undo) }))}</p><div class="settings-actions"><button class="button button-quiet" type="button" data-action="chore-undo" data-id="${escapeHtml(undo.id)}">↶ ${escapeHtml(t('Αναίρεση'))}</button></div></div>` : ''}
+    ${summary}<div class="chores-list" id="chores-list">${list.map(renderChoreCard).join('')}</div>
+    ${list.length ? '' : `<div class="empty-state"><span class="empty-art" aria-hidden="true">🧹</span><h3>${escapeHtml(t('Καμία δουλειά ακόμα'))}</h3><p>${escapeHtml(t('Πρόσθεσε τις δουλειές του σπιτιού και κάθε πόσες μέρες γίνονται.'))}</p></div>`}
+    <button class="button button-quiet chores-add" type="button" data-action="chore-new" id="chore-new">＋ ${escapeHtml(t('Νέα δουλειά'))}</button>`;
+}
+function renderChoreForm() {
+  const d = choresMode.draft || {}; const editing = Boolean(choresMode.edit);
+  const members = choreMembers(state.chores || [], [myName()]);
+  return `${renderHeader(t(editing ? 'Επεξεργασία δουλειάς' : 'Νέα δουλειά'), t('Πες τι και κάθε πόσο· τα υπόλοιπα τα θυμάται η εφαρμογή.'))}
+    <section class="panel"><form id="chore-form" novalidate><input type="hidden" name="choreId" value="${escapeHtml(choresMode.edit || '')}">
+      <label class="field-label" for="chore-name">${escapeHtml(t('Τι δουλειά;'))}</label><input class="field-input" id="chore-name" name="name" maxlength="50" autocomplete="off" value="${escapeHtml(d.name || '')}" placeholder="${escapeHtml(t('π.χ. Σκούπισμα'))}">
+      <div class="chore-chips" id="chore-suggest">${CHORE_SUGGESTIONS.map((x) => `<button class="extras-chip" type="button" data-action="chore-suggest" data-name="${escapeHtml(x.name)}" data-every="${x.every}" data-emoji="${escapeHtml(x.emoji)}"><span aria-hidden="true">${x.emoji}</span> ${escapeHtml(t(x.name))}</button>`).join('')}</div>
+      <input type="hidden" name="emoji" value="${escapeHtml(d.emoji || '')}">
+      <label class="field-label" for="chore-every">${escapeHtml(t('Κάθε πόσες μέρες;'))}</label>
+      <div class="chore-stepper"><button class="icon-button" type="button" data-action="chore-step" data-delta="-1" aria-label="${escapeHtml(t('Λιγότερες'))}">−</button><input class="field-input" id="chore-every" name="every" type="number" min="1" max="365" inputmode="numeric" value="${escapeHtml(String(d.every ?? 7))}"><button class="icon-button" type="button" data-action="chore-step" data-delta="1" aria-label="${escapeHtml(t('Περισσότερες'))}">+</button><span>${escapeHtml(t('μέρες'))}</span></div>
+      <label class="check-row chore-remind"><input type="checkbox" name="remind" id="chore-remind" ${d.remind === false ? '' : 'checked'}> <span>🔔 ${escapeHtml(t('Υπενθύμιση'))}</span></label>
+      <p class="field-hint" id="chore-remind-hint">${escapeHtml(t('Μία ειδοποίηση το πρωί (09:00) με όλες τις δουλειές της ημέρας. Ενεργοποίησε τις ειδοποιήσεις στις Ρυθμίσεις.'))}</p>
+      <label class="field-label" for="chore-assignee">${escapeHtml(t('Ποιος το κάνει; (προαιρετικό)'))}</label><input class="field-input" id="chore-assignee" name="assignee" maxlength="30" list="chore-members" value="${escapeHtml(d.assignee || '')}" placeholder="${escapeHtml(t('Όποιος προλάβει'))}"><datalist id="chore-members">${members.map((m) => `<option value="${escapeHtml(m)}"></option>`).join('')}</datalist>
+      ${members.length ? `<div class="chore-chips">${members.map((m) => `<button class="extras-chip" type="button" data-action="chore-assignee" data-name="${escapeHtml(m)}" data-no-i18n>${escapeHtml(m)}</button>`).join('')}</div>` : ''}
+      <p class="form-error" id="chore-error" role="alert" hidden></p>
+      <div class="dialog-actions">${editing ? `<button class="button button-danger" type="button" data-action="chore-delete" data-id="${escapeHtml(choresMode.edit)}">🗑 ${escapeHtml(t('Διαγραφή'))}</button>` : ''}<button class="button button-quiet" type="button" data-action="chore-back">${escapeHtml(t('Άκυρο'))}</button><button class="button button-primary" type="submit" id="chore-save">${escapeHtml(t('Αποθήκευση'))}</button></div>
+    </form></section>`;
+}
+function renderChoreHistory() {
+  const c = (state.chores || []).find((x) => x.id === choresMode.history); if (!c) { choresMode = null; return renderChoresList(); }
+  const counts = historyCounts(c, choreToday()); const rows = [...(c.history || [])].reverse();
+  return `${renderHeader(`${escapeHtml(c.emoji)} ${escapeHtml(choreName(c))}`, escapeHtml(`${t('Κάθε {n} μέρες', { n: c.every })} · ${t('Επόμενη:')} ${choreDayLabel(nextDue(c))}`))}
+    <section class="panel" id="chore-history"><h2>${escapeHtml(t('Ιστορικό'))}</h2>
+      <p class="field-hint" id="chore-counts">${escapeHtml(t('Τον τελευταίο μήνα: {n} φορές', { n: counts.total }))}${counts.by.filter((x) => x.name).map((x) => ` · <span data-no-i18n>${escapeHtml(x.name)}</span> ${x.count}`).join('')}</p>
+      ${rows.length ? `<ul class="chore-hist">${rows.map((e) => `<li><span>✓ ${escapeHtml(choreDayLabel(e.date))}</span><strong data-no-i18n>${escapeHtml(e.by || '')}</strong></li>`).join('')}</ul>` : `<p class="subtle-empty">${escapeHtml(t('Δεν έχει γίνει ακόμα.'))}</p>`}
+      <div class="dialog-actions">${rows.length ? `<button class="button button-quiet" type="button" data-action="chore-undo" data-id="${escapeHtml(c.id)}">↶ ${escapeHtml(t('Αναίρεση τελευταίου'))}</button>` : ''}<button class="button button-quiet" type="button" data-action="chore-edit" data-id="${escapeHtml(c.id)}">✎ ${escapeHtml(t('Επεξεργασία'))}</button><button class="button button-primary" type="button" data-action="chore-done" data-id="${escapeHtml(c.id)}">✓ ${escapeHtml(t('Έγινε σήμερα'))}</button></div>
+      <button class="button button-quiet chores-add" type="button" data-action="chore-back">‹ ${escapeHtml(t('Όλες οι δουλειές'))}</button></section>`;
+}
+function renderChores() {
+  if (choresMode?.history) return renderChoreHistory();
+  if (choresMode && 'edit' in choresMode) return renderChoreForm();
+  return renderChoresList();
+}
+function saveChoreForm(form) {
+  const error = form.querySelector('#chore-error'); const id = form.elements.choreId.value;
+  const existing = (state.chores || []).find((c) => c.id === id);
+  try {
+    const chore = createChore({ ...(existing || {}), id: id || undefined, name: form.elements.name.value, emoji: form.elements.emoji.value || existing?.emoji, every: form.elements.every.value, remind: form.elements.remind.checked, assignee: form.elements.assignee.value }, choreToday());
+    state.chores = existing ? state.chores.map((c) => (c.id === id ? chore : c)) : [...(state.chores || []), chore];
+  } catch (err) { error.textContent = t(err.message); error.hidden = false; return; }
+  if (!persist()) return;
+  choresMode = null; renderApp(); scheduleBackgroundSnapshot(); showToast(existing ? 'Η δουλειά ενημερώθηκε.' : 'Η δουλειά προστέθηκε.');
+}
+function choreAction(action, button) {
+  const id = button.dataset.id; const find = () => (state.chores || []).find((c) => c.id === id);
+  if (action === 'chore-new') { choresMode = { edit: '', draft: {} }; renderApp(); document.querySelector('#chore-name')?.focus(); }
+  else if (action === 'chore-edit') { const c = find(); if (c) { choresMode = { edit: c.id, draft: { ...c } }; renderApp(); } }
+  else if (action === 'chore-history') { choresMode = { history: id }; renderApp(); window.scrollTo(0, 0); }
+  else if (action === 'chore-back') { choresMode = null; renderApp(); }
+  else if (action === 'chore-done') {
+    const c = find(); if (!c) return;
+    state.chores = state.chores.map((x) => (x.id === id ? markDone(x, { date: choreToday(), by: myName() || x.assignee || '' }) : x));
+    if (!persist()) return; choresLastDone = id; renderApp(); scheduleBackgroundSnapshot();
+  } else if (action === 'chore-undo') {
+    state.chores = (state.chores || []).map((x) => (x.id === id ? undoDone(x) : x));
+    if (!persist()) return; choresLastDone = null; renderApp(); scheduleBackgroundSnapshot(); showToast('Αναιρέθηκε.');
+  } else if (action === 'chore-delete') {
+    choresMode = null;
+    undoable('Η δουλειά διαγράφηκε.', () => { state.chores = (state.chores || []).filter((c) => c.id !== id); if (persist()) { renderApp(); scheduleBackgroundSnapshot(); } });
+  } else if (action === 'chore-suggest' || action === 'chore-assignee' || action === 'chore-step') {
+    const form = document.querySelector('#chore-form'); if (!form) return;
+    if (action === 'chore-suggest') { form.elements.name.value = t(button.dataset.name); form.elements.every.value = button.dataset.every; form.elements.emoji.value = button.dataset.emoji; }
+    else if (action === 'chore-assignee') form.elements.assignee.value = button.dataset.name;
+    else form.elements.every.value = String(Math.min(365, Math.max(1, (Number(form.elements.every.value) || 7) + Number(button.dataset.delta))));
+  }
+}
+
 function renderTransportCard() {
   const month = transportMonth(state.transport || [], insightsMonth);
   return `<section class="panel settings-card" id="transport-card"><span class="stat-icon">🚗</span><h2>Μετακινήσεις</h2>
@@ -2642,6 +2741,7 @@ function handleAction(button) {
   else if (action === 'close-transport-history') closeTransportHistory();
   else if (action === 'transport-receipt') openReceiptDialog('transport');
   else if (action === 'receipt-to-transport') receiptToTransport();
+  else if (action.startsWith('chore-')) choreAction(action, button);
   else if (action === 'transport-cancel') { transportDraft = null; renderApp(); }
   else if (action === 'transport-edit') { const e = (state.transport || []).find((x) => x.id === id); if (e) { closeTransportHistory(); transportDraft = { ...e }; renderApp(); document.querySelector('#transport-add')?.scrollIntoView({ behavior: 'smooth' }); } }
   else if (action === 'transport-delete') undoable('Το έξοδο μετακίνησης διαγράφηκε.', () => { state.transport = (state.transport || []).filter((e) => e.id !== id); if (persist()) { renderApp(); if (transportHistoryDialog()?.open) renderTransportHistory(); } });
@@ -2921,6 +3021,7 @@ document.addEventListener('input', (event) => {
 document.addEventListener('submit', (event) => {
   if (event.target.id === 'receipt-edit-form') { event.preventDefault(); saveReceiptEdit(event.target); return; }
   if (event.target.id === 'bill-form') { event.preventDefault(); saveBillForm(event.target); return; }
+  if (event.target.id === 'chore-form') { event.preventDefault(); saveChoreForm(event.target); return; }
   if (event.target.id === 'transport-form') { event.preventDefault(); saveTransportForm(event.target); return; }
   if (event.target.id === 'extras-form') { event.preventDefault(); saveExtrasForm(event.target); return; }
   if (event.target.id === 'extras-new-form') { event.preventDefault(); saveExtrasNew(event.target); return; }
