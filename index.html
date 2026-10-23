@@ -9,6 +9,7 @@
   <script>try { const l = localStorage.getItem('spitothiki:lang') || ((navigator.language || '').toLowerCase().startsWith('en') ? 'en' : 'el'); document.documentElement.lang = l === 'en' ? 'en' : 'el'; } catch {}</script>
   <script>try { const z = localStorage.getItem('spitothiki:text-size'); if (z === 'large' || z === 'xlarge') document.documentElement.dataset.text = z; if (localStorage.getItem('spitothiki:contrast') === 'high') document.documentElement.dataset.contrast = 'high'; } catch {}</script>
   <script>try { const t = localStorage.getItem('spitothiki:theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch {}</script>
+  <link rel="preload" href="fonts/commissioner-greek.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="styles.css">
   <link rel="modulepreload" href="src/app.js">
   <link rel="modulepreload" href="src/domain.js">
@@ -77,7 +78,7 @@
 
       <div class="sidebar-bottom">
         <div class="privacy-card"><span class="privacy-icon" aria-hidden="true">🔒</span><div><strong>Τα δεδομένα σου είναι δικά σου</strong><p>Στη συσκευή σου και, αν συνδεθείς, ιδιωτικά μόνο με το νοικοκυριό σου.</p></div></div>
-        <span class="version-label">ΕΚΔΟΣΗ 1.6.0</span>
+        <span class="version-label">ΕΚΔΟΣΗ 1.6.1</span>
       </div>
     </aside>
 
@@ -89,7 +90,7 @@
         <button class="button button-primary button-add" type="button" data-action="add-item"><span aria-hidden="true">＋</span> Προσθήκη προϊόντος</button>
       </header>
       <div id="view-content" class="view-content" tabindex="-1"></div>
-      <footer class="app-footer"><span>Απλά, για το σπίτι. · <span id="app-version" data-no-i18n>Έκδοση 1.6.0</span></span><button type="button" class="text-button" data-view="settings">Αντίγραφο ασφαλείας & απόρρητο</button></footer>
+      <footer class="app-footer"><span>Απλά, για το σπίτι. · <span id="app-version" data-no-i18n>Έκδοση 1.6.1</span></span><button type="button" class="text-button" data-view="settings">Αντίγραφο ασφαλείας & απόρρητο</button></footer>
     </main>
   </div>
 
