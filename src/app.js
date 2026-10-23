@@ -867,12 +867,12 @@ const billPresetIds = () => { try { return JSON.parse(readKey(PRESETS_KEY) || '[
 let onboardPicks = new Set();
 function renderOnboard() {
   const lang = getLang(); const size = textSize();
-  document.querySelector('#onboard-body').innerHTML = `<div class="dialog-heading"><div><p class="eyebrow">${escapeHtml(t('ΚΑΛΩΣ ΗΡΘΕΣ'))}</p><h2 id="onboard-title">${escapeHtml(t('Τρεις γρήγορες ερωτήσεις'))}</h2></div><button class="icon-button" type="button" data-action="onboard-skip" aria-label="${escapeHtml(t('Παράλειψη'))}">×</button></div>
-    <p class="field-hint">${escapeHtml(t('Όλα αλλάζουν αργότερα από τις Ρυθμίσεις.'))}</p>
+  document.querySelector('#onboard-body').innerHTML = `<div class="dialog-heading"><div><p class="eyebrow">${escapeHtml(t('ΚΑΛΩΣ ΗΡΘΕΣ'))}</p><h2 id="onboard-title">${escapeHtml(t('Τέσσερις γρήγορες ερωτήσεις'))}</h2><p class="onboard-sub">${escapeHtml(t('Όλα αλλάζουν αργότερα από τις Ρυθμίσεις.'))}</p></div><button class="icon-button" type="button" data-action="onboard-skip" aria-label="${escapeHtml(t('Παράλειψη'))}">×</button></div>
     <h3 class="settings-sub" id="ob-lang">1. ${escapeHtml(t('Γλώσσα'))}</h3><div class="theme-options" role="group" aria-labelledby="ob-lang" data-no-i18n>${[['el', 'Ελληνικά'], ['en', 'English']].map(([v, l]) => `<button type="button" class="filter-chip ${lang === v ? 'is-active' : ''}" data-action="onboard-lang" data-lang="${v}" lang="${v}" aria-pressed="${lang === v}">${l}</button>`).join('')}</div>
     <h3 class="settings-sub" id="ob-bills">2. ${escapeHtml(t('Ποιους λογαριασμούς έχεις;'))}</h3><div class="theme-options onboard-bills" role="group" aria-labelledby="ob-bills">${BILL_PRESETS.map((p) => `<button type="button" class="filter-chip ${onboardPicks.has(p.id) ? 'is-active' : ''}" data-action="onboard-bill" data-id="${p.id}" aria-pressed="${onboardPicks.has(p.id)}">${p.icon} ${escapeHtml(t(p.name))}</button>`).join('')}</div>
     <h3 class="settings-sub" id="ob-size">3. ${escapeHtml(t('Μέγεθος γραμμάτων'))}</h3><div class="theme-options size-options" role="group" aria-labelledby="ob-size">${[['normal', 'Κανονικά'], ['large', 'Μεγάλα'], ['xlarge', 'Πολύ μεγάλα']].map(([v, l]) => `<button type="button" class="filter-chip ${size === v ? 'is-active' : ''}" data-action="onboard-size" data-size="${v}" aria-pressed="${size === v}">${escapeHtml(t(l))}</button>`).join('')}</div>
-    <div class="choice-actions"><button class="button button-primary" type="button" data-action="onboard-done" id="onboard-done">${escapeHtml(t('Ξεκίνα'))}</button><button class="button button-quiet" type="button" data-action="onboard-skip">${escapeHtml(t('Παράλειψη'))}</button></div>`;
+    <h3 class="settings-sub" id="ob-theme">4. ${escapeHtml(t('Θέμα'))}</h3><div class="theme-options" role="group" aria-labelledby="ob-theme">${[['auto', 'Αυτόματο'], ['light', 'Φωτεινό'], ['dark', 'Σκούρο']].map(([v, l]) => `<button type="button" class="filter-chip ${currentTheme() === v ? 'is-active' : ''}" data-action="onboard-theme" data-theme="${v}" aria-pressed="${currentTheme() === v}">${escapeHtml(t(l))}</button>`).join('')}</div>
+    <div class="choice-actions onboard-actions"><button class="button button-primary" type="button" data-action="onboard-done" id="onboard-done">${escapeHtml(t('Ξεκίνα'))}</button><button class="button button-quiet" type="button" data-action="onboard-skip">${escapeHtml(t('Παράλειψη'))}</button></div>`;
 }
 function openOnboard() {
   onboardPicks = new Set(billPresetIds());
@@ -2853,6 +2853,7 @@ function handleAction(button) {
   else if (action === 'onboard-lang') { changeLanguage(button.dataset.lang); renderOnboard(); document.querySelector(`[data-action="onboard-lang"][data-lang="${button.dataset.lang}"]`)?.focus(); }
   else if (action === 'onboard-bill') { const id = button.dataset.id; if (onboardPicks.has(id)) onboardPicks.delete(id); else onboardPicks.add(id); renderOnboard(); document.querySelector(`[data-action="onboard-bill"][data-id="${id}"]`)?.focus(); }
   else if (action === 'onboard-size') { setTextSize(button.dataset.size); renderOnboard(); document.querySelector(`[data-action="onboard-size"][data-size="${button.dataset.size}"]`)?.focus(); }
+  else if (action === 'onboard-theme') { setTheme(button.dataset.theme); renderOnboard(); document.querySelector(`[data-action="onboard-theme"][data-theme="${button.dataset.theme}"]`)?.focus(); }
   else if (action === 'onboard-done') finishOnboard(true);
   else if (action === 'onboard-skip') finishOnboard(false);
   else if (action === 'onboard-again') openOnboard();

@@ -26,7 +26,7 @@ export function initDietUi(context) {
   if (!document.querySelector('#diet-dialog')) {
     const el = document.createElement('dialog');
     el.id = 'diet-dialog'; el.className = 'item-dialog meal-dialog history-dialog diet-dialog'; el.setAttribute('aria-labelledby', 'diet-title');
-    el.innerHTML = '<div class="dialog-heading"><div><p class="eyebrow" id="diet-eyebrow"></p><h2 id="diet-title"></h2></div><button class="icon-button" type="button" data-diet="close" aria-label="Κλείσιμο">×</button></div><div id="diet-body"></div>';
+    el.innerHTML = '<div class="dialog-heading"><div><p class="eyebrow" id="diet-eyebrow"></p><h2 id="diet-title">Διατροφή</h2></div><button class="icon-button" type="button" data-diet="close" aria-label="Κλείσιμο">×</button></div><div id="diet-body"></div>';
     document.body.append(el);
   }
   document.addEventListener('click', onClick);

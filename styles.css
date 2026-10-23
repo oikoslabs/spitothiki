@@ -836,3 +836,24 @@ button.stat-card:hover { border-color: #bfd4c1; }
 #onboard-dialog .filter-chip[aria-pressed="true"] { border-color: var(--green); background: var(--green); color: #fff; box-shadow: 0 3px 8px rgba(45,107,76,.22); }
 #onboard-dialog .filter-chip[aria-pressed="true"]::before { content: "✓"; font-weight: 800; }
 #onboard-dialog .filter-chip:focus-visible { outline: 3px solid rgba(45,107,76,.35); outline-offset: 2px; }
+/* v1.6.4: onboarding header follows the home header; room above the buttons; clearer hover/press/focus. */
+#onboard-dialog .dialog-heading { align-items: flex-start; margin-bottom: 22px; }
+#onboard-dialog .dialog-heading .eyebrow { margin: 0; } /* home hero: eyebrow sits right on the title */
+#onboard-dialog .dialog-heading h2 { line-height: 1.1; }
+#onboard-dialog .onboard-sub { max-width: 515px; margin: 11px 0 0; color: var(--muted); font-size: calc(14px * var(--text-scale)); }
+#onboard-dialog .onboard-actions { margin-top: 28px; }
+#onboard-dialog .filter-chip, #onboard-dialog .button, #onboard-dialog .icon-button { transition: background .15s, color .15s, border-color .15s, box-shadow .15s, transform .08s; -webkit-tap-highlight-color: transparent; }
+@media (hover: hover) {
+  #onboard-dialog .filter-chip[aria-pressed="false"]:hover { border-color: var(--green); background: var(--green-soft); color: var(--green-dark); }
+  #onboard-dialog .filter-chip[aria-pressed="true"]:hover { background: var(--green-dark); border-color: var(--green-dark); }
+  #onboard-dialog .button-quiet:hover, #onboard-dialog .icon-button:hover { border-color: var(--green); color: var(--green-dark); background: var(--green-soft); }
+}
+#onboard-dialog .filter-chip:active, #onboard-dialog .button:active, #onboard-dialog .icon-button:active { transform: scale(.96); }
+#onboard-dialog .filter-chip:focus-visible, #onboard-dialog .button:focus-visible, #onboard-dialog .icon-button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
+/* a11y (WCAG AA contrast) */
+.skip-link { background: #17231d; color: #fff; }
+:root[data-dark="1"] .brand-mark { color: #0f1712; }
+:root[data-dark="1"] #onboard-dialog .filter-chip[aria-pressed="true"] { color: #0f1712; }
+:root[data-dark="1"] #onboard-dialog .filter-chip[aria-pressed="false"]:hover, :root[data-dark="1"] #onboard-dialog .button-quiet:hover, :root[data-dark="1"] #onboard-dialog .icon-button:hover { background: #22302a; color: var(--ink); }
+:root[data-dark="1"] #onboard-dialog .filter-chip[aria-pressed="true"]:hover { background: #7cc39d; border-color: #7cc39d; }
+@media (max-width: 760px) { #onboard-dialog .onboard-sub { font-size: calc(12px * var(--text-scale)); } }
