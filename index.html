@@ -58,7 +58,7 @@
         <button class="nav-item" type="button" data-view="pantry"><span class="nav-icon" aria-hidden="true">▦</span><span>Το απόθεμά μου</span><span class="nav-count" id="nav-pantry-count">0</span></button>
         <button class="nav-item" type="button" data-view="shopping"><span class="nav-icon" aria-hidden="true">✓</span><span>Λίστα αγορών</span><span class="nav-count" id="nav-shopping-count">0</span></button>
         <button class="nav-item" type="button" data-view="cart"><span class="nav-icon" aria-hidden="true">🛒</span><span>Καλάθι στο κατάστημα</span></button>
-        <button class="nav-item" type="button" data-view="cook"><span class="nav-icon" aria-hidden="true">🍳</span><span>Μαγείρεμα</span></button>
+        <button class="nav-item" type="button" data-view="cook"><span class="nav-icon" aria-hidden="true">🍳</span><span>Μαγείρεμα & γεύματα</span></button>
         <p class="nav-label">ΕΞΟΔΑ</p>
         <button class="nav-item" type="button" data-view="chores"><span class="nav-icon" aria-hidden="true">🧹</span><span>Δουλειές σπιτιού</span></button>
         <button class="nav-item" type="button" data-view="bills"><span class="nav-icon" aria-hidden="true">📄</span><span>Λογαριασμοί</span><span class="nav-count" id="nav-bills-count" hidden>0</span></button>
@@ -78,7 +78,7 @@
 
       <div class="sidebar-bottom">
         <div class="privacy-card"><span class="privacy-icon" aria-hidden="true">🔒</span><div><strong>Τα δεδομένα σου είναι δικά σου</strong><p>Στη συσκευή σου και, αν συνδεθείς, ιδιωτικά μόνο με το νοικοκυριό σου.</p></div></div>
-        <span class="version-label">ΕΚΔΟΣΗ 1.6.4</span>
+        <span class="version-label">ΕΚΔΟΣΗ 1.6.5</span>
       </div>
     </aside>
 
@@ -90,7 +90,7 @@
         <button class="button button-primary button-add" type="button" data-action="add-item"><span aria-hidden="true">＋</span> Προσθήκη προϊόντος</button>
       </header>
       <div id="view-content" class="view-content" tabindex="-1"></div>
-      <footer class="app-footer"><span>Απλά, για το σπίτι. · <span id="app-version" data-no-i18n>Έκδοση 1.6.4</span></span><button type="button" class="text-button" data-view="settings">Αντίγραφο ασφαλείας & απόρρητο</button></footer>
+      <footer class="app-footer"><span>Απλά, για το σπίτι. · <span id="app-version" data-no-i18n>Έκδοση 1.6.5</span></span><button type="button" class="text-button" data-view="settings">Αντίγραφο ασφαλείας & απόρρητο</button></footer>
     </main>
   </div>
 
@@ -102,8 +102,7 @@
       <button class="menu-item" type="button" data-view="pantry"><span class="menu-icon" aria-hidden="true">▦</span><span>Το απόθεμά μου</span></button>
       <button class="menu-item" type="button" data-view="shopping"><span class="menu-icon" aria-hidden="true">✓</span><span>Λίστα αγορών</span></button>
       <button class="menu-item" type="button" data-view="cart"><span class="menu-icon" aria-hidden="true">🛒</span><span>Καλάθι στο κατάστημα</span></button>
-      <button class="menu-item" type="button" data-view="cook"><span class="menu-icon" aria-hidden="true">🍳</span><span>Τι να μαγειρέψω;</span></button>
-      <button class="menu-item" type="button" data-action="menu-mealplan"><span class="menu-icon" aria-hidden="true">📅</span><span>Πρόγραμμα φαγητού</span></button>
+      <button class="menu-item" type="button" data-view="cook"><span class="menu-icon" aria-hidden="true">🍳</span><span>Μαγείρεμα & γεύματα</span></button>
       <p class="menu-group">ΕΞΟΔΑ</p>
       <button class="menu-item" type="button" data-action="menu-receipt"><span class="menu-icon" aria-hidden="true">🧾</span><span>Σάρωση απόδειξης</span></button>
       <button class="menu-item" type="button" data-view="receipts"><span class="menu-icon" aria-hidden="true">🧾</span><span>Αποδείξεις</span></button>
@@ -210,11 +209,13 @@
 
   <dialog id="bill-dialog" class="item-dialog" aria-labelledby="bill-title">
     <form id="bill-form" novalidate>
-      <div class="dialog-heading"><div><p class="eyebrow">ΛΟΓΑΡΙΑΣΜΟΣ</p><h2 id="bill-title">Προσθήκη λογαριασμού</h2></div><button class="icon-button" type="button" data-action="close-bill" aria-label="Κλείσιμο">×</button></div>
+      <div class="dialog-heading"><div><p class="eyebrow">ΛΟΓΑΡΙΑΣΜΟΣ</p><h2 id="bill-title">Λογαριασμός ή σταθερό έξοδο</h2></div><button class="icon-button" type="button" data-action="close-bill" aria-label="Κλείσιμο">×</button></div>
       <input type="hidden" name="billId"><input type="hidden" name="billingFrom"><input type="hidden" name="billingTo">
       <div class="barcode-row bill-scan-row"><button class="button button-quiet" type="button" data-action="bill-scan"><span aria-hidden="true">📷</span> Σάρωση κωδικού</button><p class="field-hint" id="bill-scan-status" role="status">Σκάναρε το QR ή τον barcode του λογαριασμού για να συμπληρωθεί ο κωδικός πληρωμής και, αν υπάρχει, το ποσό.</p></div>
       <label class="field-label" for="bill-name">Όνομα <span aria-hidden="true">*</span></label>
-      <input class="field-input" id="bill-name" name="name" required maxlength="60" placeholder="π.χ. ΔΕΗ, ΕΥΔΑΠ, Ενοίκιο, Netflix">
+      <input class="field-input" id="bill-name" name="name" required maxlength="60" placeholder="π.χ. ΔΕΗ, Ενοίκιο, Γυμναστήριο, Netflix">
+      <p class="field-hint" id="bill-obligation-hint">Όχι μόνο λογαριασμοί: και κάθε σταθερή υποχρέωση που πληρώνεις κάθε μήνα. Διάλεξε ή γράψε δικό σου όνομα.</p>
+      <div class="chore-chips bill-chips" id="bill-chips" role="group" aria-labelledby="bill-obligation-hint"></div>
       <div class="field-row">
         <div><label class="field-label" for="bill-type">Είδος</label><select class="field-input" id="bill-type" name="type"></select></div>
         <div><label class="field-label" for="bill-amount">Ποσό (€)</label><input class="field-input" id="bill-amount" name="amount" type="number" min="0" max="100000" step="0.01" inputmode="decimal" required></div>
