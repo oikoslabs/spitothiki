@@ -1790,7 +1790,7 @@ function renderTransport() {
   const fuelAvg = [{ id: '', name: t('Κύριο όχημα') }, ...vehicles].map((v) => ({ v, s: fuelStats(entries, v.id) })).filter((x) => x.s.average);
   const rules = state.transportRecurring || [];
   return `${renderHeader('Μετακινήσεις', 'Βενζίνη, διόδια, ΜΜΜ, ταξί και στάθμευση — πόσα ξοδεύεις κάθε μήνα.')}
-    ${renderTransportForm()}
+    ${renderMisfiledBanner()}${renderTransportForm()}
     <div class="month-switch" role="group" aria-label="Μήνας"><button class="icon-button" type="button" data-action="transport-month" data-delta="-1" aria-label="Προηγούμενος μήνας">‹</button><strong id="transport-month" data-no-i18n>${escapeHtml(monthLabel(transportMonthKey))}</strong><button class="icon-button" type="button" data-action="transport-month" data-delta="1" aria-label="Επόμενος μήνας" ${isCurrent ? 'disabled' : ''}>›</button></div>
     <section class="panel"><div class="panel-heading"><div><h2>Σύνολο μήνα</h2><p class="big-number" id="transport-total">${escapeHtml(money(month.total))}</p></div></div>
       ${month.count ? renderBars(month.byType.map((row) => ({ label: `${TRANSPORT_ICONS[row.type]} ${t(TRANSPORT_LABELS[row.type])}`, value: row.total })), money) : '<p class="subtle-empty">Κανένα έξοδο μετακίνησης αυτόν τον μήνα.</p>'}
@@ -1856,8 +1856,33 @@ function receiptToTransport() {
   navigate('transport');
 }
 
+// v1.5.5: a receipt saved by mistake as groceries → one tap moves it to Μετακινήσεις (removes the grocery expense, opens the transport form prefilled).
+const TOLLISH_RE = /ΔΙΟΔ|ΑΤΤΙΚΗ\s*ΟΔΟΣ|ΟΔΟΣ|TOLL|ODOS|ΕΓΝΑΤΙΑ|ΓΕΦΥΡΑ|ΚΑΥΣΙΜ|FUEL|BP|SHELL|AVIN|EKO|ΕΚΟ/i;
+function misfiledTransportReceipts() {
+  const linked = new Set((state.transport || []).map((e) => e.receiptId).filter(Boolean));
+  const weekAgo = new Date(Date.now() - 7 * 864e5).toISOString();
+  return (state.receipts || []).filter((r) => r.format !== 'transport' && !linked.has(r.id) && (TOLLISH_RE.test(r.store || '') || String(r.id).startsWith('toll:') || (!r.lines && String(r.importedAt || '') >= weekAgo)));
+}
+function moveReceiptToTransport(id) {
+  const r = (state.receipts || []).find((x) => x.id === id); if (!r) return;
+  Object.assign(state, deleteReceipt(state, id));
+  if (!persist()) return;
+  const fuel = /ΚΑΥΣΙΜ|FUEL|ΒΕΝΖΙΝ|BP|SHELL|AVIN|EKO|ΕΚΟ/i.test(r.store || '');
+  transportDraft = { type: fuel ? 'fuel' : 'tolls', amount: r.total || '', date: r.date || localDateKey(), note: r.store && r.store !== t('Απόδειξη') ? String(r.store).slice(0, 80) : '', receiptId: id, fromReceipt: true };
+  receiptState = { step: 'start' };
+  document.querySelector('#receipt-detail-dialog')?.close(); document.querySelector('#receipt-dialog')?.close();
+  navigate('transport');
+  requestAnimationFrame(() => document.querySelector('#transport-add')?.scrollIntoView({ block: 'center' }));
+  showToast(t('Έλεγξε κατηγορία και ποσό και πάτα Αποθήκευση.'));
+}
+function renderMisfiledBanner() {
+  const list = misfiledTransportReceipts(); if (!list.length) return '';
+  return `<section class="alert-banner" id="transport-misfiled" role="status"><p>${escapeHtml(t('Αυτές οι αποδείξεις μπήκαν στα ψώνια. Είναι διόδια ή βενζίνη; Πάτα «Μεταφορά».'))}</p><ul class="waste-top">${list.map((r) => `<li><span class="product-name" data-no-i18n>${escapeHtml(formatDate(r.date))} · ${escapeHtml(r.store || t('Απόδειξη'))}</span><strong data-no-i18n>${escapeHtml(money(r.total))}</strong><button class="button button-primary" type="button" data-action="receipt-move-transport" data-id="${escapeHtml(r.id)}">🚗 ${escapeHtml(t('Μεταφορά'))}</button></li>`).join('')}</ul></section>`;
+}
+
 function renderTransportReceiptOffer() {
   const { guess, target, duplicate } = receiptState;
+  if (duplicate && duplicate.format !== 'transport' && !(state.transport || []).some((e) => e.receiptId === duplicate.id)) return `<div class="alert-banner receipt-transport" id="receipt-move" role="status"><p>${escapeHtml(t('Αυτή η απόδειξη είχε μπει στα ψώνια. Θες να μεταφερθεί στις Μετακινήσεις;'))}</p><div class="settings-actions"><button class="button button-primary" type="button" data-action="receipt-move-transport" data-id="${escapeHtml(duplicate.id)}">🚗 ${escapeHtml(t('Μεταφορά στις Μετακινήσεις'))}</button></div></div>`;
   if (duplicate || (!guess && target !== 'transport')) return '';
   const label = guess?.type === 'tolls' ? t('Μοιάζει με απόδειξη διοδίων.') : guess?.type === 'fuel' ? t('Μοιάζει με απόδειξη καυσίμων.') : '';
   return `<div class="alert-banner receipt-transport" id="receipt-transport" role="status"><p>${escapeHtml(label)} ${escapeHtml(t('Θες να την καταχωρίσεις ως έξοδο μετακίνησης αντί για προϊόντα;'))}</p><div class="settings-actions"><button class="button button-primary" type="button" data-action="receipt-to-transport">🚗 ${escapeHtml(t('Καταχώριση στις Μετακινήσεις'))}</button></div></div>`;
@@ -2372,7 +2397,7 @@ function openReceiptDetails(id) {
   dialog.querySelector('#receipt-detail-body').innerHTML = `<p class="field-hint">${escapeHtml(formatDate(r.date))} · ${escapeHtml(t(receiptCategory(r, state.purchases)))} · <strong data-no-i18n>${escapeHtml(money(r.total))}</strong></p>
     ${items.length ? `<ul class="receipt-items" id="receipt-items">${items.map((it) => `<li><span data-no-i18n>${escapeHtml(it.name)}${it.quantity && it.quantity !== 1 ? ` ×${escapeHtml(String(it.quantity))}` : ''}</span><span data-no-i18n>${it.price ? escapeHtml(money(it.price)) : ''}</span></li>`).join('')}</ul>` : `<p class="subtle-empty">${escapeHtml(t(r.lines ? 'Τα είδη δεν κρατήθηκαν για αυτή την απόδειξη (καταγράφηκε μόνο το σύνολο).' : 'Χωρίς αναλυτικά είδη.'))}</p>`}
     ${r.url ? `<p><a class="panel-link" href="${escapeHtml(r.url)}" target="_blank" rel="noopener noreferrer" id="receipt-link">${escapeHtml(t('Άνοιγμα ηλεκτρονικής απόδειξης'))} ↗</a></p>` : ''}
-    <div class="dialog-actions"><button class="button button-danger" type="button" data-action="receipt-delete" data-id="${escapeHtml(r.id)}">🗑 ${escapeHtml(t('Διαγραφή'))}</button><button class="button button-quiet" type="button" data-action="receipt-edit" data-id="${escapeHtml(r.id)}" id="receipt-edit">✎ ${escapeHtml(t('Διόρθωση'))}</button><button class="button button-quiet" type="button" data-action="receipt-detail-close">${escapeHtml(t('Κλείσιμο'))}</button></div>`;
+    <div class="dialog-actions">${r.format !== 'transport' ? `<button class="button button-primary" type="button" data-action="receipt-move-transport" data-id="${escapeHtml(r.id)}" id="receipt-move-transport">🚗 ${escapeHtml(t('Μεταφορά στις Μετακινήσεις'))}</button>` : ''}<button class="button button-danger" type="button" data-action="receipt-delete" data-id="${escapeHtml(r.id)}">🗑 ${escapeHtml(t('Διαγραφή'))}</button><button class="button button-quiet" type="button" data-action="receipt-edit" data-id="${escapeHtml(r.id)}" id="receipt-edit">✎ ${escapeHtml(t('Διόρθωση'))}</button><button class="button button-quiet" type="button" data-action="receipt-detail-close">${escapeHtml(t('Κλείσιμο'))}</button></div>`;
   translateDom(dialog);
   dialog.showModal();
 }
@@ -2732,6 +2757,7 @@ function handleAction(button) {
   else if (action === 'receipt-queue-open') loadReceipt(button.dataset.link, { fromQueue: true });
   else if (action === 'receipt-queue-clear') { saveQueue([]); renderReceipt(); }
   else if (action === 'backup-snooze') { try { localStorage.setItem(BACKUP_SNOOZE_KEY, String(Date.now() + 7 * 86400000)); } catch {} renderApp(); }
+  else if (action === 'receipt-move-transport') moveReceiptToTransport(button.dataset.id);
   else if (action === 'receipt-delete') {
     const id = button.dataset.id; document.querySelector('#receipt-detail-dialog').close();
     undoable('Η απόδειξη διαγράφηκε μαζί με τα έξοδά της.', () => { Object.assign(state, deleteReceipt(state, id)); persist(); renderApp(); });
