@@ -1865,14 +1865,13 @@ function receiptToTransport() {
 }
 
 // v1.5.5: a receipt saved by mistake as groceries → one tap moves it to Μετακινήσεις (removes the grocery expense, opens the transport form prefilled).
-const TOLLISH_RE = /ΔΙΟΔ|DIODI|ΟΔΟΣ|ΟΔΟΥ|TOLL|ODOS|ΕΓΝΑΤΙΑ|EGNATIA|ΜΟΡΕΑ|MOREAS|ΓΕΦΥΡΑ|GEFYRA|ΡΙΟΥ|ΑΙΓΑΙΟΥ|E-?PASS|ΚΑΥΣΙΜ|FUEL|ΒΕΝΖΙΝ|\bBP\b|SHELL|AVIN|\bEKO\b|\bΕΚΟ\b|ELIN|REVOIL|AEGEAN/i;
+const TOLLISH_RE = /ΔΙΟΔ|DIODI|TOLL|ΑΤΤΙΚΗ\s*Ο[ΔΛ∆]ΟΣ|ATTIKI\s*ODOS|ΟΛΥΜΠΙΑ\s*Ο[ΔΛ∆]ΟΣ|OLYMPIA\s*ODOS|ΝΕΑ\s*Ο[ΔΛ∆]ΟΣ|NEA\s*ODOS|ΚΕΝΤΡΙΚΗ\s*Ο[ΔΛ∆]ΟΣ|KENTRIKI\s*ODOS|ΕΓΝΑΤΙΑ|EGNATIA|ΜΟΡΕΑΣ|MOREAS|ΓΕΦΥΡΑ|GEFYRA|ΑΥΤΟΚΙΝΗΤΟ[ΔΛ∆]ΡΟΜΟΣ|E-?PASS|ΚΑΥΣΙΜ|ΠΡΑΤΗΡΙ|ΒΕΝΖΙΝ|\bBP\b|SHELL|AVIN|\bEKO\b|\bΕΚΟ\b|ELINOIL|REVOIL|CORAL|AEGEAN\s*OIL|JETOIL|CYCLON/i;
 function misfiledTransportReceipts() {
   const linked = new Set((state.transport || []).map((e) => e.receiptId).filter(Boolean));
-  // v1.5.6: any receipt from the last 14 days (any shape: with or without items) or from a toll/fuel name.
+  // v1.5.7: only toll/fuel names (store) or toll ids, dated in the last 14 days — never supermarkets.
   const since = new Date(Date.now() - 14 * 864e5).toISOString().slice(0, 10);
-  const items = (r) => (r.items || []).map((i) => i.name).join(' ');
-  return (state.receipts || []).filter((r) => r.format !== 'transport' && !linked.has(r.id) && (TOLLISH_RE.test(`${r.store || ''} ${items(r)}`) || String(r.id).startsWith('toll:') || String(r.importedAt || r.date || '').slice(0, 10) >= since))
-    .sort((a, b) => String(b.importedAt || b.date).localeCompare(String(a.importedAt || a.date))).slice(0, 8);
+  return (state.receipts || []).filter((r) => r.format !== 'transport' && !linked.has(r.id) && String(r.date || '') >= since && (TOLLISH_RE.test(r.store || '') || String(r.id).startsWith('toll:')))
+    .sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 8);
 }
 function moveReceiptToTransport(id) {
   const r = (state.receipts || []).find((x) => x.id === id); if (!r) return;
@@ -1888,7 +1887,7 @@ function moveReceiptToTransport(id) {
 }
 function renderMisfiledBanner() {
   const list = misfiledTransportReceipts(); if (!list.length) return '';
-  return `<section class="alert-banner" id="transport-misfiled" role="status"><p>${escapeHtml(t('Πρόσφατες αποδείξεις που μπήκαν στα ψώνια. Αν κάποια είναι διόδια ή βενζίνη, πάτα «Μεταφορά».'))}</p><ul class="waste-top">${list.map((r) => `<li><span class="product-name" data-no-i18n>${escapeHtml(formatDate(r.date))} · ${escapeHtml(r.store || t('Απόδειξη'))}</span><strong data-no-i18n>${escapeHtml(money(r.total))}</strong><button class="button button-primary" type="button" data-action="receipt-move-transport" data-id="${escapeHtml(r.id)}">🚗 ${escapeHtml(t('Μεταφορά'))}</button></li>`).join('')}</ul></section>`;
+  return `<section class="alert-banner" id="transport-misfiled" role="status"><p>${escapeHtml(t('Αυτές οι αποδείξεις διοδίων/βενζίνης μπήκαν στα ψώνια. Πάτα «Μεταφορά».'))}</p><ul class="misfiled-list">${list.map((r) => `<li><span class="misfiled-name" data-no-i18n>${escapeHtml(formatDate(r.date))} · ${escapeHtml(r.store || t('Απόδειξη'))}</span><strong data-no-i18n>${escapeHtml(money(r.total))}</strong><button class="button button-primary" type="button" data-action="receipt-move-transport" data-id="${escapeHtml(r.id)}">🚗 ${escapeHtml(t('Μεταφορά'))}</button></li>`).join('')}</ul></section>`;
 }
 
 function renderTransportReceiptOffer() {
