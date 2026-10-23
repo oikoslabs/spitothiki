@@ -182,7 +182,7 @@ const steps = [
     const bottom = width < 700 ? await page.evaluate(() => { const vis = (sel) => [...document.querySelectorAll(sel)].filter((e) => e.offsetParent !== null).length; return vis('.quick-bar .quick-bar-item') === 5 && vis('.primary-nav .nav-item') === 0 && vis('[data-action="open-menu"]') === 1 ? 4 : -1; }) : 4;
     await page.evaluate(() => document.querySelector('#menu-sheet').open && document.querySelector('#menu-sheet').close());
     await nav('pantry');
-    const ok = open && items.length === 13 && items.includes('receipts') && items.includes('extras') && items.includes('menu-mealplan') && items.includes('menu-receipt') && view === 'transport' && closed && header === 'Μετακινήσεις' && bottom === 4;
+    const ok = open && items.length === 14 && items.includes('chores') && items.includes('receipts') && items.includes('extras') && items.includes('menu-mealplan') && items.includes('menu-receipt') && view === 'transport' && closed && header === 'Μετακινήσεις' && bottom === 4;
     if (!ok) console.log('  menu:', { open, items, view, closed, header, bottom });
     return ok;
   }],

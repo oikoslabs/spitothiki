@@ -15,7 +15,7 @@ await pg.evaluate((today, now) => { localStorage.clear(); localStorage.setItem('
   localStorage.setItem('spitothiki:v1', JSON.stringify({ items: [], shopping: [], bills: [], receipts: [{ id: 'photo-demo1', date: today, total: 2.55, store: 'ΣΤΑΘΜΟΣ ΔΙΟΔΙΩΝ', lines: 0, importedAt: now }], purchases: [{ id: 'pur-photo-demo1', rowId: '', name: 'ΣΤΑΘΜΟΣ ΔΙΟΔΙΩΝ', category: 'Άλλο', price: 2.55, date: today, receiptId: 'photo-demo1', updatedAt: now }] })); }, today, now);
 await pg.reload({ waitUntil: 'networkidle0' }); await wait(900);
 const ver = await pg.$eval('#app-version', (e) => e.textContent).catch(() => '');
-check('version visible in footer', /1\.5\.\d/.test(ver), ver);
+check('version visible in footer', /\d+\.\d+\.\d+/.test(ver), ver);
 if (shots) { await pg.evaluate(() => document.querySelector('#app-version').scrollIntoView({ block: 'center' })); await wait(200); await shot('1-version'); }
 // Path to the receipts list: Μενού → Σύνολο εξόδων → Αποδείξεις → tap the receipt
 await pg.evaluate(() => window.scrollTo(0, 0)); await pg.click('[data-action="open-menu"]'); await wait(500); await shot('2-menu');
