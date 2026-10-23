@@ -1289,7 +1289,7 @@ function renderReceiptReview() {
   const dup = duplicate ? `<p class="alert-banner" id="receipt-duplicate" role="status">${escapeHtml(t('Αυτή η απόδειξη έχει ήδη εισαχθεί ({date}).', { date: formatDate(String(duplicate.importedAt || '').slice(0, 10)) }))}</p>` : '';
   if (!receipt.lines.length) {
     return `${head}${dup}${renderTransportReceiptOffer()}${renderTripLink()}<p class="field-hint" id="receipt-aade-note">Οι αποδείξεις με QR της ΑΑΔΕ (ταμειακές) δεν περιέχουν τα είδη στο QR, μόνο το σύνολο. Για να περάσουν τα είδη, βγάλε φωτογραφία την απόδειξη — ή κατέγραψε μόνο το ποσό ως έξοδο.</p>${photoButtons()}
-      <form id="receipt-review-form" novalidate><input type="hidden" name="mode" value="total"><div class="dialog-actions"><button class="button button-quiet" type="button" data-action="receipt-reset">Πίσω</button><button class="button button-primary" type="submit" ${duplicate ? 'disabled' : ''}>Καταγραφή εξόδου</button></div></form>`;
+      <form id="receipt-review-form" novalidate><input type="hidden" name="mode" value="total"><div class="dialog-actions"><button class="button button-quiet" type="button" data-action="receipt-reset">Πίσω</button><button class="button button-primary" type="submit" ${duplicate ? 'disabled' : ''}>${receiptState.target === 'transport' || ['tolls', 'fuel'].includes(receiptState.guess?.type) ? `🚗 ${escapeHtml(t('Καταχώριση στις Μετακινήσεις'))}` : 'Καταγραφή εξόδου'}</button></div></form>`;
   }
   const rows = receipt.lines.map((line, index) => `<div class="receipt-line${line.doubtful ? ' is-doubtful' : ''}" data-line="${index}"${line.doubtful ? ` title="${escapeHtml(t('Έλεγξε αυτή τη γραμμή: ποσότητα × τιμή δεν ταιριάζει με το ποσό.'))}"` : ''}><input class="shopping-check" type="checkbox" name="use" checked aria-label="${escapeHtml(t('Εισαγωγή: {name}', { name: line.name }))}">
     <input class="field-input receipt-name" name="name" value="${escapeHtml(line.name)}" maxlength="80" aria-label="Όνομα προϊόντος">
@@ -3005,6 +3005,8 @@ document.addEventListener('submit', (event) => {
   if (event.target.id === 'receipt-review-form') {
     event.preventDefault();
     const form = event.target;
+    // v1.5.4: opened from Μετακινήσεις (or a toll/fuel receipt) with only a total → it's a transport expense, not groceries.
+    if (form.elements.mode.value === 'total' && (receiptState.target === 'transport' || ['tolls', 'fuel'].includes(receiptState.guess?.type))) { receiptToTransport(); return; }
     const button = form.querySelector('button[type="submit"]');
     if (button?.disabled) return;
     const label = button?.textContent;
