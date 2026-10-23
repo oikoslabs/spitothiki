@@ -606,6 +606,7 @@ const EN = {
   'Μετακινήσεις': 'Transport',
   'Βενζίνη / καύσιμα': 'Fuel',
   'Διόδια': 'Tolls',
+  'Αυτές οι αποδείξεις διοδίων/βενζίνης μπήκαν στα ψώνια. Πάτα «Μεταφορά».': 'These toll/fuel receipts were saved as groceries. Tap «Move».',
   'Πρόσφατες αποδείξεις που μπήκαν στα ψώνια. Αν κάποια είναι διόδια ή βενζίνη, πάτα «Μεταφορά».': 'Recent receipts saved as groceries. If one is tolls or fuel, tap «Move».',
   'Τελευταίες καταχωρίσεις': 'Latest entries',
   'Αποθήκευση ξανά': 'Save anyway',
