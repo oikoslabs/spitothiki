@@ -7,7 +7,7 @@ import { fetchReceipt, receiptId } from './receipt.js';
 import { ingredientName, pantryIngredients, recipeCat, scoreRecipe, suggestBuiltin } from './recipes.js';
 import { CATEGORIES, WASTE_REASONS, applyWaste, createStore, createWaste, groupByStore, monthKey, rowCategory, monthlySpending, moveCategory, purchaseFor, shiftMonth, storeOrder, wasteStats } from './features.js';
 import { showSigninCard } from './features.js';
-import { routeCode } from './scan-router.js';
+import { routeCode, parseStoreReceiptBarcode } from './scan-router.js';
 import { deleteReceipt, listReceipts, receiptCategory, receiptItems, receiptMonths } from './receipts.js';
 import { PROTECT_SEEN_KEY, PROTECT_SNOOZE_KEY, authKnown, showProtectCard, showProtectSheet, snoozeUntilFrom, storageMode } from './protect.js';
 import { BILL_PRESETS, ONBOARD_KEY, PRESETS_KEY, pendingPresets, shouldOnboard } from './onboarding.js';
@@ -778,6 +778,7 @@ async function fillFromBarcode(code) {
   }
 }
 
+const TILL_SKIP_HINT = 'Αυτός είναι ο barcode του ταμείου και δεν έχει τα είδη. Στόχευσε το QR της απόδειξης (συνήθως κάτω δεξιά).';
 async function openScanner({ onCode = fillFromBarcode, qr = false, confident = null } = {}) {
   const dialog = document.querySelector('#scan-dialog');
   const status = document.querySelector('#scan-status');
@@ -794,7 +795,11 @@ async function openScanner({ onCode = fillFromBarcode, qr = false, confident = n
       stopScanner = null;
       dialog.close();
       onCode(code);
-    }, { qr, confident, onIdle: () => { if (dialog.open) status.textContent = t(qr === 'all' ? 'Δεν το πιάνει; Κράτα το κινητό λίγο πιο μακριά (15–20 εκ.), με καλό φως, ή πάτα «📎 Από φωτογραφία ή PDF».' : 'Δεν το πιάνει; Κράτα το κινητό λίγο πιο μακριά (15–20 εκ.) και με καλό φως.'); } });
+    }, { qr, confident,
+      // Receipt/«all» scans: a receipt's till barcode (date + till + transaction) is skipped so the QR can be read.
+      skip: qr === true || qr === 'all' ? (v) => Boolean(parseStoreReceiptBarcode(v)) : null,
+      onSkip: () => { if (dialog.open) status.textContent = t(TILL_SKIP_HINT); },
+      onIdle: () => { if (dialog.open) status.textContent = t(qr === 'all' ? 'Δεν το πιάνει; Κράτα το κινητό λίγο πιο μακριά (15–20 εκ.), με καλό φως, ή πάτα «📎 Από φωτογραφία ή PDF».' : 'Δεν το πιάνει; Κράτα το κινητό λίγο πιο μακριά (15–20 εκ.) και με καλό φως.'); } });
     if (stopScanner?.hasTorch) torch.hidden = false;
     if (dialog.open) status.textContent = t(qr === 'all' ? 'Στόχευσε QR ή barcode: απόδειξη, λογαριασμό, διόδια ή προϊόν.' : qr === 'any' ? 'Στόχευσε το QR ή τον barcode του λογαριασμού.' : qr ? 'Στόχευσε το QR ή τον barcode της απόδειξης μέσα στο πλαίσιο.' : 'Στόχευσε τον barcode με την κάμερα.');
     else closeScanner();
@@ -836,6 +841,7 @@ function handleScanned(code) {
   const r = routeCode(code);
   if (r.route === 'receipt') { openReceiptDialog(); receiptCode(r.raw); return; }
   if (r.route === 'toll') { tollToTransport(r.toll); return; }
+  if (r.route === 'store-receipt') { openReceiptDialog(); receiptCode(r.raw); return; }
   if (r.route === 'bill') { navigate('bills'); openBillDialog(); applyBillCode(r.raw); return; }
   if (r.route === 'product') {
     showChoice({ title: 'Βρέθηκε προϊόν', message: t('Barcode {code}. Πού να το βάλω;', { code: r.barcode }), choices: [
@@ -1256,6 +1262,8 @@ function receiptCode(code) {
   if (isUrlCode(value)) { loadReceipt(value); return; }
   const toll = parseTollBarcode(value);
   if (toll) { tollToTransport(toll); return; }
+  const till = parseStoreReceiptBarcode(value);
+  if (till) { receiptState = { step: 'start', error: t('Διάβασα τον barcode του ταμείου ({date}), όχι το QR. Αυτός ο barcode δεν έχει τα είδη της απόδειξης, γι’ αυτό δεν μπορεί να ανοίξει. Σκάναρε το QR της απόδειξης (συνήθως κάτω δεξιά) ή βγάλε της φωτογραφία.', { date: formatDate(till.date) }), raw: value.slice(0, 120) }; renderReceipt(); return; }
   receiptState = { step: 'start', error: t('Ο barcode αυτής της απόδειξης δεν περιέχει τα στοιχεία της. Σκάναρε το QR code (αν υπάρχει) ή βγάλε φωτογραφία την απόδειξη για αναγνώριση κειμένου.'), raw: value.slice(0, 120) };
   renderReceipt();
 }

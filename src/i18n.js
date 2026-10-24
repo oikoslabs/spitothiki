@@ -865,6 +865,8 @@ const EN = {
   'Σκάναρε οτιδήποτε': 'Scan anything',
   'Απόδειξη, λογαριασμός, διόδια ή προϊόν': 'Receipt, bill, toll or product',
   'Στόχευσε QR ή barcode: απόδειξη, λογαριασμό, διόδια ή προϊόν.': 'Point at a QR or barcode: receipt, bill, toll or product.',
+  'Αυτός είναι ο barcode του ταμείου και δεν έχει τα είδη. Στόχευσε το QR της απόδειξης (συνήθως κάτω δεξιά).': "That's the till barcode and it has no items. Aim at the receipt's QR (usually bottom right).",
+  'Διάβασα τον barcode του ταμείου ({date}), όχι το QR. Αυτός ο barcode δεν έχει τα είδη της απόδειξης, γι’ αυτό δεν μπορεί να ανοίξει. Σκάναρε το QR της απόδειξης (συνήθως κάτω δεξιά) ή βγάλε της φωτογραφία.': "I read the till barcode ({date}), not the QR. That barcode doesn't hold the receipt's items, so it can't be opened. Scan the receipt's QR (usually bottom right) or take a photo of it.",
   'Δεν το πιάνει; Κράτα το κινητό λίγο πιο μακριά (15–20 εκ.), με καλό φως, ή πάτα «📎 Από φωτογραφία ή PDF».': 'Not reading it? Hold the phone a little further away (15–20 cm), in good light, or tap «📎 From a photo or PDF».',
   'Δεν το πιάνει; Κράτα το κινητό λίγο πιο μακριά (15–20 εκ.) και με καλό φως.': 'Not reading it? Hold the phone a little further away (15–20 cm), in good light.',
   'Από φωτογραφία ή PDF': 'From a photo or PDF',

@@ -111,7 +111,8 @@ const rememberEngine = (name) => { try { name === 'zxing' ? localStorage.setItem
 // Native BarcodeDetector where it supports the mode's formats, plus ZXing (TRY_HARDER) as a second decoder.
 // Scans ~8 times/s over SCAN_REGIONS. onIdle() fires once if nothing was read for 8 s.
 // Returns stop(); stop.torch(on) toggles the flashlight when supported (stop.hasTorch).
-export async function startScanner(video, onCode, { qr = false, confident = null, onIdle = null } = {}) {
+// skip(value) → true: a code that is read but not wanted (e.g. a receipt's till barcode); onSkip(value) is told once per value and scanning goes on.
+export async function startScanner(video, onCode, { qr = false, confident = null, onIdle = null, skip = null, onSkip = null } = {}) {
   if (!navigator.mediaDevices?.getUserMedia) throw new Error('Η κάμερα δεν είναι διαθέσιμη σε αυτόν τον browser.');
   const mode = scanMode(qr);
   const wanted = scanFormats(mode);
@@ -147,6 +148,7 @@ export async function startScanner(video, onCode, { qr = false, confident = null
   const hasTorch = track ? await tuneCamera(track) : false;
   let stopped = false, frame = 0, idleTimer = 0;
   const last = new Map(); // decoder index → previous value
+  const skipped = new Set();
   const zxingTimer = decoders.some((d) => d.name === 'zxing') ? 0 : setTimeout(() => { if (!stopped) addZxing().catch(() => {}); }, plan.zxingDelayMs);
   if (onIdle) idleTimer = setTimeout(() => { if (!stopped) onIdle(); }, 8000);
   const canvas = document.createElement('canvas');
@@ -165,9 +167,10 @@ export async function startScanner(video, onCode, { qr = false, confident = null
       canvas.width = sw; canvas.height = sh;
       ctx.drawImage(video, Math.round(w * rx), Math.round(h * ry), sw, sh, 0, 0, sw, sh);
       try {
-        const value = await decoders[slot].decode(canvas);
+        let value = await decoders[slot].decode(canvas);
         const stable = isStableRead(mode, value, last.get(slot), confident);
         last.set(slot, value);
+        if (value && skip?.(value)) { if (!skipped.has(value)) { skipped.add(value); onSkip?.(value); } value = ''; }
         if (value && accept(value) && stable && !stopped) {
           if (plan.native) rememberEngine(decoders[slot].name);
           stop(); onCode(value); return;
@@ -200,11 +203,11 @@ export async function decodeImageCodes(file, { mode = 'receipt', timeBudgetMs = 
   let ZXing;
   try { ZXing = await loadZxing(); } catch { return []; }
   const reader = new ZXing.BrowserMultiFormatReader(new Map([[2, zxingFormats(mode)], [3, true]]));
-  const t0 = Date.now();
+  let budgetEnd = Date.now() + timeBudgetMs, firstOther = '';
   // Full page, bottom/top/middle strips, then the bottom corners (A4 receipts print the QR there, small).
   const regions = [[0, 0, 1, 1], [0, 0.6, 1, 0.4], [0, 0, 1, 0.4], [0, 0.3, 1, 0.4], [0.5, 0.7, 0.5, 0.3], [0, 0.7, 0.5, 0.3]];
   for (const blur of [0, 2]) for (const angle of [0, 90, 270, 180]) for (const [rx, ry, rw, rh] of regions) {
-    if (Date.now() - t0 > timeBudgetMs) return [];
+    if (Date.now() > budgetEnd) return firstOther ? [firstOther] : [];
     const rot = angle % 180 ? [H, W] : [W, H];
     const c = document.createElement('canvas');
     const sw = Math.round(rot[0] * rw), sh = Math.round(rot[1] * rh);
@@ -214,8 +217,13 @@ export async function decodeImageCodes(file, { mode = 'receipt', timeBudgetMs = 
     const k = c.width / sw;
     ctx.setTransform(k, 0, 0, k, -rx * rot[0] * k, -ry * rot[1] * k);
     ctx.translate(rot[0] / 2, rot[1] / 2); ctx.rotate((angle * Math.PI) / 180); ctx.drawImage(base, -W / 2, -H / 2);
-    try { const text = reader.decodeFromCanvas(c).getText(); if (text) return [text]; } catch {}
+    try {
+      const text = reader.decodeFromCanvas(c).getText();
+      // A non-link (e.g. the till barcode at the top of an A4 receipt): keep looking ~2 s more for the receipt's QR link.
+      if (text && /^https?:\/\//i.test(text)) return firstOther && firstOther !== text ? [text, firstOther] : [text];
+      if (text && !firstOther) { firstOther = text; budgetEnd = Math.min(budgetEnd, Date.now() + 2000); }
+    } catch {}
     await new Promise((r) => setTimeout(r, 0));
   }
-  return [];
+  return firstOther ? [firstOther] : [];
 }
