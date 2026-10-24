@@ -2,6 +2,8 @@
 // Works for the page (every tab) and for long dialogs that scroll inside themselves.
 export const SHOW_AFTER = 300;
 export const shouldShow = (scrollTop, threshold = SHOW_AFTER) => Number(scrollTop) > threshold;
+// True within `margin` px of the bottom of a scrolling box.
+export const nearEnd = (scrollTop, scrollHeight, clientHeight, margin = 160) => Number(scrollHeight) - Number(scrollTop) - Number(clientHeight) < margin;
 export const scrollBehavior = (reduceMotion) => (reduceMotion ? 'auto' : 'smooth');
 
 const label = () => (document.documentElement.lang === 'en' ? 'Back to top' : 'Στην αρχή');
@@ -40,7 +42,8 @@ export function initBackToTop() {
       btn.addEventListener('click', () => box.scrollTo({ top: 0, behavior: scrollBehavior(reduced()) }));
       box.append(btn);
     }
-    btn.hidden = !shouldShow(box.scrollTop);
+    // Hidden near the end of the dialog, where its action buttons are, so it never covers them.
+    btn.hidden = !shouldShow(box.scrollTop) || nearEnd(box.scrollTop, box.scrollHeight, box.clientHeight);
   }, { capture: true, passive: true });
   update();
 }
