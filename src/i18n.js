@@ -865,6 +865,8 @@ const EN = {
   'Σκάναρε οτιδήποτε': 'Scan anything',
   'Απόδειξη, λογαριασμός, διόδια ή προϊόν': 'Receipt, bill, toll or product',
   'Στόχευσε QR ή barcode: απόδειξη, λογαριασμό, διόδια ή προϊόν.': 'Point at a QR or barcode: receipt, bill, toll or product.',
+  'Δεν το πιάνει; Κράτα το κινητό λίγο πιο μακριά (15–20 εκ.), με καλό φως, ή πάτα «📎 Από φωτογραφία ή PDF».': 'Not reading it? Hold the phone a little further away (15–20 cm), in good light, or tap «📎 From a photo or PDF».',
+  'Δεν το πιάνει; Κράτα το κινητό λίγο πιο μακριά (15–20 εκ.) και με καλό φως.': 'Not reading it? Hold the phone a little further away (15–20 cm), in good light.',
   'Από φωτογραφία ή PDF': 'From a photo or PDF',
   'ΣΑΡΩΣΗ': 'SCAN',
   'Τι να κάνω;': 'What should I do?',
