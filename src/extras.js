@@ -114,7 +114,7 @@ export function createExtra(input = {}, now = new Date().toISOString()) {
   if (!input.category) throw new Error('Διάλεξε κατηγορία.');
   const qty = input.qty === undefined || input.qty === '' ? 1 : Math.round(num(input.qty));
   if (!Number.isFinite(qty) || qty < 1 || qty > 99) throw new Error('Η ποσότητα πρέπει να είναι από 1 έως 99.');
-  return { id: input.id || makeId('xe'), category: String(input.category), amount: round2(amount), qty, date: input.date, note: String(input.note || '').trim().slice(0, 80), createdAt: input.createdAt || now, updatedAt: now };
+  return { id: input.id || makeId('xe'), category: String(input.category), amount: round2(amount), qty, date: input.date, note: String(input.note || '').trim().slice(0, 80), ...(input.expenseCategory ? { expenseCategory: String(input.expenseCategory) } : {}), createdAt: input.createdAt || now, updatedAt: now };
 }
 
 export const unitPrice = (entry) => round2(entry.amount / (entry.qty || 1));

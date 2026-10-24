@@ -32,6 +32,7 @@ import { DRIVE_AUTO_KEY, DRIVE_ENABLED_KEY, DRIVE_HASH_KEY, DRIVE_LAST_KEY, auto
 import { forgetToken, getDriveToken } from './gdrive-auth.js';
 import { clearDriveKey, loadDriveKey, saveDriveKey } from './drive-key.js';
 import { applyReceiptEdit } from './receipt-edit.js';
+import { EXPENSE_CAT_DEFAULT_EMOJI, NO_CATEGORY, createExpenseCategory, deleteExpenseCategory, effectiveItemCategory, expenseCategories, expenseCategoryMonth, upsertExpenseCategory } from './expense-cats.js';
 import { BACKUP_SNOOZE_KEY, LAST_BACKUP_KEY, backupReminderDue, dequeue, enqueue, hasData, loadQueue, saveQueue } from './offline.js';
 import { TRANSPORT_ICONS, TRANSPORT_TYPES, applyTransportRecurring, classifyReceipt, consumptionFor, createTransport, createTransportRecurring, fuelStats, pricePerLiter, transportMonth } from './transport.js';
 import { EXTRA_DEFAULT_EMOJI, EXTRA_SUGGESTIONS, LEGACY_EXTRA_CATEGORIES, createExtra, createExtraCategory, deleteExtraCategory, extraCategories, findExtraCategory, suggestEmoji, extrasMonth, extrasSummary, lastUnitPrice, quickExtra, setExtraQty, unitPrice } from './extras.js';
@@ -2057,7 +2058,10 @@ function monthTotals(month) {
   const extras = extrasMonth(state.extras || [], month).total;
   const split = billsMonthSplit(state.bills || [], month);
   const bills = Math.round((split.rent + split.other) * 100) / 100;
-  const rows = [{ label: `🛒 ${t('Αγορές')}`, value: shopping }, { label: `🏠 ${t('Ενοίκιο / κοινόχρηστα')}`, value: split.rent }, { label: `📄 ${t('Λογαριασμοί')}`, value: split.other }, { label: `🛣️ ${t('Διόδια')}`, value: tolls }, { label: `🚗 ${t('Μετακινήσεις')}`, value: transport }, { label: `☕ ${t('Μικροέξοδα')}`, value: extras }];
+  // v1.6.8: the user's own categories take their share out of «Αγορές» / «Μικροέξοδα» (no double counting).
+  const own = expenseCategoryMonth({ purchases: state.purchases || [], extras: state.extras || [], categories: state.expenseCategories || [] }, month);
+  const rows = [{ label: `🛒 ${t('Αγορές')}`, value: own.shopping }, { label: `🏠 ${t('Ενοίκιο / κοινόχρηστα')}`, value: split.rent }, { label: `📄 ${t('Λογαριασμοί')}`, value: split.other }, { label: `🛣️ ${t('Διόδια')}`, value: tolls }, { label: `🚗 ${t('Μετακινήσεις')}`, value: transport }, { label: `☕ ${t('Μικροέξοδα')}`, value: own.extras },
+    ...own.rows.map((c) => ({ label: `${c.emoji} ${c.name}`, value: c.total, own: true }))];
   return { rows, total: Math.round((shopping + tolls + transport + extras + bills) * 100) / 100 };
 }
 function renderMonthTotals() {
@@ -2065,7 +2069,7 @@ function renderMonthTotals() {
   const prev = monthTotals(shiftMonth(insightsMonth, -1));
   const diff = Math.round((total - prev.total) * 100) / 100;
   const trend = !prev.total ? '' : diff > 0 ? t('▲ {amount} από τον προηγούμενο μήνα', { amount: money(diff) }) : diff < 0 ? t('▼ {amount} από τον προηγούμενο μήνα', { amount: money(-diff) }) : t('Ίδιο με τον προηγούμενο μήνα');
-  const shown = rows.map((row, i) => ({ ...row, label: prev.rows[i].value ? `${row.label} · ${t('πριν: {amount}', { amount: money(prev.rows[i].value) })}` : row.label })).filter((row, i) => i !== 1 || row.value || prev.rows[i].value);
+  const shown = rows.map((row, i) => ({ ...row, label: prev.rows[i]?.value ? `${row.label} · ${t('πριν: {amount}', { amount: money(prev.rows[i].value) })}` : row.label })).filter((row, i) => (i !== 1 && !row.own) || row.value || prev.rows[i]?.value);
   return `<section class="panel settings-card" id="month-totals-card"><span class="stat-icon blue">∑</span><h2>Σύνολο εξόδων μήνα</h2><p class="big-number" id="month-grand-total">${escapeHtml(money(total))}</p>
     <p class="field-hint month-trend ${diff > 0 ? 'up' : 'down'}" id="month-trend">${escapeHtml(trend || t('Προηγούμενος μήνας: {amount}', { amount: money(prev.total) }))}</p>
     ${renderBars(shown, money)}</section>`;
@@ -2098,7 +2102,7 @@ function renderExtraEntry(entry) {
   const meta = [formatDate(entry.date)];
   if (entry.qty > 1) meta.push(`× ${entry.qty} (${money(unitPrice(entry))})`);
   return `<article class="product-card bill-row extras-row" data-extra="${escapeHtml(entry.id)}"><span class="product-emoji" aria-hidden="true">${escapeHtml(c.emoji)}</span>
-    <div class="bill-main"><h3 class="product-name">${escapeHtml(c.label)}</h3><p class="bill-meta" data-no-i18n>${escapeHtml(meta.join(' · '))}${entry.note ? ` · ${escapeHtml(entry.note)}` : ''}</p></div>
+    <div class="bill-main"><h3 class="product-name">${escapeHtml(c.label)}</h3><p class="bill-meta" data-no-i18n>${escapeHtml([...meta, ...(expCatOf(entry.expenseCategory) ? [expCatLabel(expCatOf(entry.expenseCategory))] : [])].join(' · '))}${entry.note ? ` · ${escapeHtml(entry.note)}` : ''}</p></div>
     <strong class="bill-amount">${escapeHtml(money(entry.amount))}</strong>
     <div class="bill-actions"><button class="icon-button" type="button" data-action="extras-edit" data-id="${escapeHtml(entry.id)}" aria-label="${escapeHtml(t('Επεξεργασία'))}">✎</button><button class="icon-button" type="button" data-action="extras-delete" data-id="${escapeHtml(entry.id)}" aria-label="${escapeHtml(t('Διαγραφή'))}">🗑️</button></div></article>`;
 }
@@ -2163,6 +2167,7 @@ function renderExtrasForm() {
         <div><label class="field-label" for="extras-amount">${escapeHtml(t('Ποσό (€)'))}</label><input class="field-input" id="extras-amount" name="amount" type="number" min="0" max="10000" step="0.01" inputmode="decimal" required value="${escapeHtml(d.amount ?? '')}"></div></div>
       <div class="field-row"><div><label class="field-label" for="extras-qty">${escapeHtml(t('Τεμάχια'))}</label><input class="field-input" id="extras-qty" name="qty" type="number" min="1" max="99" step="1" inputmode="numeric" value="${escapeHtml(d.qty ?? 1)}"></div>
         <div><label class="field-label" for="extras-date">${escapeHtml(t('Ημερομηνία'))}</label><input class="field-input" id="extras-date" name="date" type="date" required value="${escapeHtml(d.date || localDateKey())}"></div></div>
+      <label class="field-label" for="extras-expcat">${escapeHtml(t('Κατηγορία εξόδου'))}</label><select class="field-input expcat-select" id="extras-expcat" name="expenseCategory" data-prev="${escapeHtml(d.expenseCategory || '')}">${expCatOptions(d.expenseCategory || '', 'extra')}</select>${expCatInlineRow()}
       <label class="field-label" for="extras-note">${escapeHtml(t('Σημείωση'))}</label><input class="field-input" id="extras-note" name="note" maxlength="80" placeholder="${escapeHtml(t('π.χ. καφές με συνάδελφο'))}" value="${escapeHtml(d.note || '')}">
       <p class="field-hint">${escapeHtml(t('Το ποσό είναι το σύνολο για όλα τα τεμάχια.'))}</p>
       <p class="form-error" id="extras-error" role="alert" hidden></p>
@@ -2248,12 +2253,13 @@ function extrasQuick(id) {
   if (!entry) { extrasAsk = id; extrasLast = null; renderApp(); requestAnimationFrame(() => { const el = document.querySelector('#extras-ask-amount'); el?.focus(); el?.scrollIntoView({ block: 'center' }); }); return; }
   addExtra(entry, true);
 }
+const extraExpCat = (form, existing) => { const sel = form.elements.expenseCategory; if (!sel) return existing?.expenseCategory || ''; return sel.value === '__new' ? sel.dataset.prev || '' : sel.value; };
 function saveExtrasForm(form) {
   const error = document.querySelector('#extras-error');
   const id = form.elements.entryId.value;
   const existing = (state.extras || []).find((e) => e.id === id);
   let entry;
-  try { entry = createExtra({ ...(existing || {}), id: id || undefined, category: form.elements.category.value, amount: form.elements.amount.value, qty: form.elements.qty.value, date: form.elements.date.value, note: form.elements.note.value }); }
+  try { entry = createExtra({ ...(existing || {}), id: id || undefined, category: form.elements.category.value, amount: form.elements.amount.value, qty: form.elements.qty.value, date: form.elements.date.value, note: form.elements.note.value, expenseCategory: extraExpCat(form, existing) }); }
   catch (err) { error.textContent = t(err.message); error.hidden = false; return; }
   extrasDraft = null;
   if (!existing) { addExtra(entry, false); return; }
@@ -2552,8 +2558,10 @@ function openReceiptDetails(id) {
   const items = receiptItems(r, state.purchases);
   const dialog = document.querySelector('#receipt-detail-dialog');
   dialog.querySelector('#receipt-detail-title').textContent = r.store || t('Απόδειξη');
-  dialog.querySelector('#receipt-detail-body').innerHTML = `<p class="field-hint">${escapeHtml(formatDate(r.date))} · ${escapeHtml(t(receiptCategory(r, state.purchases)))} · <strong data-no-i18n>${escapeHtml(money(r.total))}</strong></p>
-    ${items.length ? `<ul class="receipt-items" id="receipt-items">${items.map((it) => `<li><span data-no-i18n>${escapeHtml(it.name)}${it.quantity && it.quantity !== 1 ? ` ×${escapeHtml(String(it.quantity))}` : ''}</span><span data-no-i18n>${it.price ? escapeHtml(money(it.price)) : ''}</span></li>`).join('')}</ul>` : `<p class="subtle-empty">${escapeHtml(t(r.lines ? 'Τα είδη δεν κρατήθηκαν για αυτή την απόδειξη (καταγράφηκε μόνο το σύνολο).' : 'Χωρίς αναλυτικά είδη.'))}</p>`}
+  const rc = expCatOf(r.expenseCategory);
+  const itemCat = (it) => { const c = expCatOf(effectiveItemCategory(it.expenseCategory, r.expenseCategory)); return c && c !== rc ? ` · ${expCatLabel(c)}` : ''; };
+  dialog.querySelector('#receipt-detail-body').innerHTML = `<p class="field-hint">${escapeHtml(formatDate(r.date))} · ${escapeHtml(t(receiptCategory(r, state.purchases)))} · <strong data-no-i18n>${escapeHtml(money(r.total))}</strong>${rc ? ` · <span id="receipt-expcat" data-no-i18n>${escapeHtml(expCatLabel(rc))}</span>` : ''}</p>
+    ${items.length ? `<ul class="receipt-items" id="receipt-items">${items.map((it) => `<li><span data-no-i18n>${escapeHtml(it.name)}${it.quantity && it.quantity !== 1 ? ` ×${escapeHtml(String(it.quantity))}` : ''}${escapeHtml(itemCat(it))}</span><span data-no-i18n>${it.price ? escapeHtml(money(it.price)) : ''}</span></li>`).join('')}</ul>` : `<p class="subtle-empty">${escapeHtml(t(r.lines ? 'Τα είδη δεν κρατήθηκαν για αυτή την απόδειξη (καταγράφηκε μόνο το σύνολο).' : 'Χωρίς αναλυτικά είδη.'))}</p>`}
     ${r.url ? `<p><a class="panel-link" href="${escapeHtml(r.url)}" target="_blank" rel="noopener noreferrer" id="receipt-link">${escapeHtml(t('Άνοιγμα ηλεκτρονικής απόδειξης'))} ↗</a></p>` : ''}
     <div class="dialog-actions">${r.format !== 'transport' ? `<button class="button button-primary" type="button" data-action="receipt-move-transport" data-id="${escapeHtml(r.id)}" id="receipt-move-transport">🚗 ${escapeHtml(t('Μεταφορά στις Μετακινήσεις'))}</button>` : ''}<button class="button button-danger" type="button" data-action="receipt-delete" data-id="${escapeHtml(r.id)}">🗑 ${escapeHtml(t('Διαγραφή'))}</button><button class="button button-quiet" type="button" data-action="receipt-edit" data-id="${escapeHtml(r.id)}" id="receipt-edit">✎ ${escapeHtml(t('Διόρθωση'))}</button><button class="button button-quiet" type="button" data-action="receipt-detail-close">${escapeHtml(t('Κλείσιμο'))}</button></div>`;
   translateDom(dialog);
@@ -2577,7 +2585,80 @@ function renderInsights() {
       <p class="big-number" id="waste-total">${waste.count}</p>
       <p class="field-hint">${escapeHtml(t(waste.count === 1 ? 'φορά που πετάχτηκε κάτι' : 'φορές που πετάχτηκε κάτι'))}</p>
       ${waste.count ? `${renderBars(WASTE_REASONS.filter((reason) => waste.byReason[reason]).map((reason) => ({ label: t(WASTE_LABELS[reason]), value: waste.byReason[reason] })), String)}
-      <h3 class="insights-subtitle">Πετιούνται πιο συχνά</h3><ul class="waste-top">${waste.top.map((entry) => `<li><span class="product-name">${escapeHtml(entry.name)}</span><strong>× ${entry.count}</strong></li>`).join('')}</ul>` : '<p class="subtle-empty">Τίποτα αυτόν τον μήνα. Όταν πετάς κάτι, πάτα 🗑 στο απόθεμα για να το καταγράψεις.</p>'}</section>${renderBillsCard()}${renderTransportCard()}${renderExtrasCard()}</div>`;
+      <h3 class="insights-subtitle">Πετιούνται πιο συχνά</h3><ul class="waste-top">${waste.top.map((entry) => `<li><span class="product-name">${escapeHtml(entry.name)}</span><strong>× ${entry.count}</strong></li>`).join('')}</ul>` : '<p class="subtle-empty">Τίποτα αυτόν τον μήνα. Όταν πετάς κάτι, πάτα 🗑 στο απόθεμα για να το καταγράψεις.</p>'}</section>${renderBillsCard()}${renderTransportCard()}${renderExtrasCard()}</div>${renderExpenseCats()}`;
+}
+
+// ---------- v1.6.8: the user's own expense categories («👕 Ρούχα»…) ----------
+let expCatEdit = null; // id being renamed
+let expCatTarget = null; // <select> waiting for an inline «＋ Νέα κατηγορία»
+const expCats = () => expenseCategories(state.expenseCategories || []);
+const expCatLabel = (c) => `${c.emoji || EXPENSE_CAT_DEFAULT_EMOJI} ${c.name}`;
+const expCatOf = (id) => expCats().find((c) => c.id === id) || null;
+// mode: 'receipt' (whole receipt), 'item' (one receipt line), 'extra' (a small expense)
+function expCatOptions(selected, mode) {
+  const cats = expCats();
+  const sel = selected === NO_CATEGORY && mode === 'item' ? NO_CATEGORY : cats.some((c) => c.id === selected) ? selected : '';
+  const base = mode === 'item' ? [['', t('Όπως η απόδειξη')], [NO_CATEGORY, `🛒 ${t('Αγορές')}`]]
+    : [['', mode === 'extra' ? `☕ ${t('Μικροέξοδα (προεπιλογή)')}` : `🛒 ${t('Αγορές (προεπιλογή)')}`]];
+  return [...base, ...cats.map((c) => [c.id, expCatLabel(c)]), ['__new', t('＋ Νέα κατηγορία…')]]
+    .map(([v, label]) => `<option value="${escapeHtml(v)}" data-no-i18n${v === sel ? ' selected' : ''}>${escapeHtml(label)}</option>`).join('');
+}
+function expCatInlineRow() {
+  return `<div class="expcat-new" hidden><label class="field-label" for="expcat-new-name">${escapeHtml(t('Νέα κατηγορία εξόδων'))}</label>
+    <div class="expcat-new-row"><input class="field-input extras-emoji-input" id="expcat-new-emoji" maxlength="16" placeholder="${EXPENSE_CAT_DEFAULT_EMOJI}" aria-label="${escapeHtml(t('Εικονίδιο (προαιρετικό)'))}"><input class="field-input" id="expcat-new-name" maxlength="40" placeholder="${escapeHtml(t('π.χ. Ρούχα'))}" autocomplete="off"><button class="button button-primary" type="button" data-action="expcat-inline-add">${escapeHtml(t('Προσθήκη'))}</button><button class="button button-quiet" type="button" data-action="expcat-inline-cancel">${escapeHtml(t('Άκυρο'))}</button></div>
+    <p class="form-error" id="expcat-new-error" role="alert" hidden></p></div>`;
+}
+function openExpCatInline(select) {
+  select.value = select.dataset.prev || '';
+  const row = select.form?.querySelector('.expcat-new'); if (!row) return;
+  expCatTarget = select; row.hidden = false;
+  row.querySelector('#expcat-new-name').value = ''; row.querySelector('#expcat-new-emoji').value = '';
+  row.querySelector('#expcat-new-error').hidden = true;
+  row.querySelector('#expcat-new-name').focus();
+}
+function closeExpCatInline() {
+  const row = document.querySelector('.expcat-new:not([hidden])'); if (row) row.hidden = true;
+  expCatTarget?.focus(); expCatTarget = null;
+}
+function addExpCatInline() {
+  const row = document.querySelector('.expcat-new:not([hidden])'); if (!row) return;
+  const error = row.querySelector('#expcat-new-error');
+  let rec;
+  try { rec = createExpenseCategory({ name: row.querySelector('#expcat-new-name').value, emoji: row.querySelector('#expcat-new-emoji').value }, state.expenseCategories || []); }
+  catch (err) { error.textContent = t(err.message); error.hidden = false; return; }
+  state.expenseCategories = upsertExpenseCategory(state.expenseCategories || [], rec);
+  if (!persist()) return;
+  // Add the new option to every category list of the open form (no re-render: keeps what was typed).
+  for (const sel of row.closest('form').querySelectorAll('select.expcat-select')) {
+    const opt = document.createElement('option'); opt.value = rec.id; opt.textContent = expCatLabel(rec); opt.dataset.noI18n = '';
+    sel.insertBefore(opt, sel.querySelector('option[value="__new"]'));
+    sel.hidden = false;
+  }
+  if (expCatTarget) { expCatTarget.value = rec.id; expCatTarget.dataset.prev = rec.id; }
+  row.hidden = true; expCatTarget?.focus(); expCatTarget = null;
+  showToast(t('Η κατηγορία «{name}» προστέθηκε.', { name: rec.name }));
+}
+function saveExpCatForm(form) {
+  const error = form.querySelector('.form-error');
+  let rec;
+  try { rec = createExpenseCategory({ id: form.elements.catId?.value || undefined, name: form.elements.name.value, emoji: form.elements.emoji.value }, state.expenseCategories || []); }
+  catch (err) { if (error) { error.textContent = t(err.message); error.hidden = false; } return; }
+  const isEdit = Boolean(form.elements.catId?.value);
+  state.expenseCategories = upsertExpenseCategory(state.expenseCategories || [], rec);
+  expCatEdit = null; openPanels.add('expense-cats');
+  if (persist()) { renderApp(); showToast(isEdit ? 'Η κατηγορία ενημερώθηκε.' : 'Η κατηγορία προστέθηκε.'); }
+}
+function renderExpenseCats() {
+  const cats = expCats();
+  const month = expenseCategoryMonth({ purchases: state.purchases || [], extras: state.extras || [], categories: state.expenseCategories || [] }, insightsMonth);
+  const totalOf = (id) => month.rows.find((r) => r.id === id)?.total || 0;
+  const row = (c) => (expCatEdit === c.id
+    ? `<li><form class="extras-cat-form" id="expcat-edit-form" novalidate><input type="hidden" name="catId" value="${escapeHtml(c.id)}"><input class="field-input extras-emoji-input" name="emoji" maxlength="16" value="${escapeHtml(c.emoji || '')}" aria-label="${escapeHtml(t('Εικονίδιο (προαιρετικό)'))}"><input class="field-input" name="name" maxlength="40" value="${escapeHtml(c.name)}" aria-label="${escapeHtml(t('Όνομα κατηγορίας'))}" data-no-i18n><button class="button button-primary" type="submit">${escapeHtml(t('Αποθήκευση'))}</button><button class="button button-quiet" type="button" data-action="expcat-cancel">${escapeHtml(t('Άκυρο'))}</button><p class="form-error" role="alert" hidden></p></form></li>`
+    : `<li><span class="product-name" data-no-i18n>${escapeHtml(expCatLabel(c))}</span><span class="extras-cat-actions"><strong data-no-i18n>${escapeHtml(money(totalOf(c.id)))}</strong><button class="icon-button" type="button" data-action="expcat-edit" data-id="${escapeHtml(c.id)}" aria-label="${escapeHtml(t('Μετονομασία: {name}', { name: c.name }))}">✎</button><button class="icon-button" type="button" data-action="expcat-delete" data-id="${escapeHtml(c.id)}" aria-label="${escapeHtml(t('Διαγραφή: {name}', { name: c.name }))}">🗑️</button></span></li>`);
+  return `<details class="panel collapsible extras-cats" id="expense-cats" ${expCatEdit || openPanels.has('expense-cats') ? 'open' : ''}><summary><h2>🏷️ ${escapeHtml(t('Οι κατηγορίες εξόδων μου'))}</h2><span class="field-hint">${escapeHtml(t('Φτιάξε δικές σου κατηγορίες (π.χ. Ρούχα) και μετέφερε έξοδα με «✎ Διόρθωση».'))}</span></summary>
+    ${cats.length ? `<ul class="waste-top" id="expcat-list">${cats.map(row).join('')}</ul>` : `<p class="subtle-empty">${escapeHtml(t('Δεν έχεις ακόμα δικές σου κατηγορίες.'))}</p>`}
+    <form class="extras-cat-form" id="expcat-form" novalidate><input class="field-input extras-emoji-input" name="emoji" maxlength="16" placeholder="${EXPENSE_CAT_DEFAULT_EMOJI}" aria-label="${escapeHtml(t('Εικονίδιο (προαιρετικό)'))}"><input class="field-input" name="name" id="expcat-name" maxlength="40" placeholder="${escapeHtml(t('π.χ. Ρούχα'))}" aria-label="${escapeHtml(t('Όνομα κατηγορίας'))}" autocomplete="off"><button class="button button-primary" type="submit" id="expcat-add">${escapeHtml(t('＋ Προσθήκη'))}</button><p class="form-error" role="alert" hidden></p></form>
+    <p class="field-hint">${escapeHtml(t('Μεταφορά εξόδου: άνοιξε την απόδειξη (🧾 Αποδείξεις) ή το μικροέξοδο και πάτα «✎ Διόρθωση». Αν σβήσεις μια κατηγορία, τα έξοδά της γυρίζουν στις Αγορές ή στα Μικροέξοδα.'))}</p></details>`;
 }
 
 function makeDemoItems() {
@@ -2665,14 +2746,17 @@ async function importBackupText(text) {
 function openReceiptEdit(id) {
   const r = (state.receipts || []).find((x) => x.id === id); if (!r) return;
   const items = Array.isArray(r.items) ? r.items : [];
+  const hasSpend = (state.purchases || []).some((p) => p.receiptId === r.id); // a category only matters if it was recorded as an expense
   const dialog = document.querySelector('#receipt-detail-dialog');
   dialog.querySelector('#receipt-detail-body').innerHTML = `<form id="receipt-edit-form" data-id="${escapeHtml(r.id)}" novalidate>
     <label class="field-label" for="re-store">${escapeHtml(t('Κατάστημα'))}</label><input class="field-input" id="re-store" name="store" value="${escapeHtml(r.store || '')}" maxlength="80">
     <label class="field-label" for="re-date">${escapeHtml(t('Ημερομηνία'))}</label><input class="field-input" id="re-date" name="date" type="date" value="${escapeHtml(r.date || '')}">
+    ${hasSpend ? `<label class="field-label" for="re-expcat">${escapeHtml(t('Κατηγορία εξόδου'))}</label><select class="field-input expcat-select" id="re-expcat" data-prev="${escapeHtml(r.expenseCategory || '')}">${expCatOptions(r.expenseCategory || '', 'receipt')}</select>
+    <p class="field-hint">${escapeHtml(t('Πού μετράει στο «Σύνολο εξόδων». Αν ένα είδος είναι αλλού (π.χ. ένα ρούχο), άλλαξέ το στη γραμμή του.'))}</p>${expCatInlineRow()}` : ''}
     ${items.length ? `<p class="field-hint">${escapeHtml(t('Ξετσέκαρε ό,τι θες να αφαιρεθεί. Το σύνολο υπολογίζεται από τα είδη.'))}</p><div class="receipt-lines" id="receipt-edit-lines">${items.map((it, i) => `<div class="receipt-line receipt-edit-line" data-line="${i}"><input class="shopping-check" type="checkbox" name="use" checked aria-label="${escapeHtml(t('Κράτα: {name}', { name: it.name }))}">
       <input class="field-input receipt-name" name="name" value="${escapeHtml(it.name)}" maxlength="80" aria-label="${escapeHtml(t('Όνομα προϊόντος'))}">
       <input class="field-input receipt-qty" name="quantity" type="number" min="0" step="0.001" value="${escapeHtml(String(it.quantity ?? 1))}" aria-label="${escapeHtml(t('Ποσότητα'))}">
-      <input class="field-input receipt-price" name="price" type="number" min="0" step="0.01" inputmode="decimal" value="${escapeHtml((Number(it.price) || 0).toFixed(2))}" aria-label="${escapeHtml(t('Τιμή'))}"></div>`).join('')}</div>
+      <input class="field-input receipt-price" name="price" type="number" min="0" step="0.01" inputmode="decimal" value="${escapeHtml((Number(it.price) || 0).toFixed(2))}" aria-label="${escapeHtml(t('Τιμή'))}">${hasSpend ? `<select class="field-input receipt-expcat expcat-select" name="itemCategory" data-prev="${escapeHtml(it.expenseCategory || '')}" aria-label="${escapeHtml(t('Κατηγορία εξόδου: {name}', { name: it.name }))}"${expCats().length || it.expenseCategory ? '' : ' hidden'}>${expCatOptions(it.expenseCategory || '', 'item')}</select>` : ''}</div>`).join('')}</div>
       <p class="field-hint" id="receipt-edit-sum"></p>`
       : `<label class="field-label" for="re-total">${escapeHtml(t('Σύνολο (€)'))}</label><input class="field-input" id="re-total" name="total" type="number" min="0" step="0.01" inputmode="decimal" value="${escapeHtml((Number(r.total) || 0).toFixed(2))}">`}
     <div class="dialog-actions"><button class="button button-quiet" type="button" data-action="receipt-open" data-id="${escapeHtml(r.id)}">${escapeHtml(t('Άκυρο'))}</button><button class="button button-primary" type="submit" id="receipt-edit-save">${escapeHtml(t('Αποθήκευση αλλαγών'))}</button></div></form>`;
@@ -2681,8 +2765,10 @@ function openReceiptEdit(id) {
 }
 function readReceiptEdit(form) {
   const rows = [...form.querySelectorAll('.receipt-edit-line')];
-  const items = rows.length ? rows.map((row) => { const f = (n) => row.querySelector(`[name="${n}"]`); return f('use').checked ? { name: f('name').value, quantity: f('quantity').value, price: f('price').value } : { name: '', price: 0 }; }) : undefined;
-  return { store: form.elements.store.value, date: form.elements.date.value, ...(items ? { items } : { total: form.elements.total.value }) };
+  const cat = (sel) => (sel && sel.value !== '__new' ? sel.value : sel?.dataset.prev || '');
+  const items = rows.length ? rows.map((row) => { const f = (n) => row.querySelector(`[name="${n}"]`); const c = f('itemCategory'); return f('use').checked ? { name: f('name').value, quantity: f('quantity').value, price: f('price').value, ...(c ? { expenseCategory: cat(c) } : {}) } : { name: '', price: 0 }; }) : undefined;
+  const receiptCat = form.querySelector('#re-expcat');
+  return { store: form.elements.store.value, date: form.elements.date.value, ...(receiptCat ? { expenseCategory: cat(receiptCat) } : {}), ...(items ? { items } : { total: form.elements.total.value }) };
 }
 function updateReceiptEditSum() {
   const form = document.querySelector('#receipt-edit-form'); const out = document.querySelector('#receipt-edit-sum');
@@ -2787,6 +2873,11 @@ function handleAction(button) {
   else if (action === 'extras-suggest-off') { try { localStorage.setItem(SUGGEST_OFF_KEY, '1'); } catch {} renderApp(); }
   else if (action === 'extras-qty') { const e = (state.extras || []).find((x) => x.id === extrasLast); if (e) { state.extras = state.extras.map((x) => (x.id === e.id ? setExtraQty(e, e.qty + Number(button.dataset.delta)) : x)); if (persist()) renderApp(); } }
   else if (action === 'extras-undo') { const e = (state.extras || []).find((x) => x.id === extrasLast); if (e) { state.extras = state.extras.filter((x) => x.id !== e.id); extrasLast = null; if (persist()) { renderApp(); showToast('Αναιρέθηκε.'); } } }
+  else if (action === 'expcat-inline-add') addExpCatInline();
+  else if (action === 'expcat-inline-cancel') closeExpCatInline();
+  else if (action === 'expcat-edit') { expCatEdit = id; renderApp(); requestAnimationFrame(() => document.querySelector('#expcat-edit-form [name="name"]')?.focus()); }
+  else if (action === 'expcat-cancel') { expCatEdit = null; renderApp(); }
+  else if (action === 'expcat-delete') { const c = expCatOf(id); undoable(t('Η κατηγορία «{name}» διαγράφηκε. Τα έξοδά της γύρισαν στις Αγορές / Μικροέξοδα.', { name: c?.name || '' }), () => { state.expenseCategories = deleteExpenseCategory(state.expenseCategories || [], id); if (persist()) renderApp(); }); }
   else if (action === 'extras-last-edit' || action === 'extras-edit') { const e = (state.extras || []).find((x) => x.id === (action === 'extras-edit' ? id : extrasLast)); if (e) { closeExtrasHistory(); extrasDraft = { ...e }; extrasLast = null; renderApp(); requestAnimationFrame(() => { document.querySelector('#extras-add')?.scrollIntoView({ block: 'center' }); const el = document.querySelector('#extras-amount'); el?.focus(); el?.select?.(); }); } }
   else if (action === 'extras-cancel') { extrasDraft = null; renderApp(); }
   else if (action === 'extras-delete') undoable('Το μικροέξοδο διαγράφηκε.', () => { state.extras = (state.extras || []).filter((e) => e.id !== id); if (extrasLast === id) extrasLast = null; if (persist()) { renderApp(); if (extrasHistoryDialog()?.open) renderExtrasHistory(); } });
@@ -2983,7 +3074,7 @@ function handleAction(button) {
     else loadDemo();
   } else if (action === 'clear-data') {
     showConfirm(`${t('Θα διαγραφούν όλα τα δεδομένα (απόθεμα, λίστες και έξοδα) από αυτή τη συσκευή.')}${syncStatus.user ? t(' Επειδή είσαι συνδεδεμένος, θα διαγραφούν και από τις συγχρονισμένες συσκευές.') : ''}${t(' Φρόντισε να έχεις αντίγραφο αν τα χρειάζεσαι.')}`, () => {
-      state = { items: [], shopping: [], recurring: [], stores: [], purchases: [], waste: [], receipts: [], meals: [], bills: [], trips: [], prices: [], transport: [], transportRecurring: [], vehicles: [], extras: [], extraCategories: [] }; persist(); renderApp(); showToast('Τα δεδομένα διαγράφηκαν.');
+      state = { items: [], shopping: [], recurring: [], stores: [], purchases: [], waste: [], receipts: [], meals: [], bills: [], trips: [], prices: [], transport: [], transportRecurring: [], vehicles: [], extras: [], extraCategories: [], expenseCategories: [] }; persist(); renderApp(); showToast('Τα δεδομένα διαγράφηκαν.');
     }, 'Διαγραφή όλων των δεδομένων;');
   }
 }
@@ -3003,6 +3094,11 @@ document.addEventListener('click', (event) => {
   if (button && button.type !== 'checkbox') handleAction(button);
 });
 
+document.addEventListener('keydown', (event) => {
+  // Enter in the inline «＋ Νέα κατηγορία» adds the category instead of submitting the whole form.
+  if (event.key === 'Enter' && (event.target.id === 'expcat-new-name' || event.target.id === 'expcat-new-emoji')) { event.preventDefault(); addExpCatInline(); }
+  if (event.key === 'Escape' && event.target.closest?.('.expcat-new')) { event.preventDefault(); event.stopPropagation(); closeExpCatInline(); }
+});
 document.addEventListener('input', (event) => {
   if (event.target.id === 'extras-new-name') { const e = document.querySelector('#extras-new-emoji'); if (e) e.placeholder = suggestEmoji(event.target.value) || EXTRA_DEFAULT_EMOJI; }
   if (event.target.id === 'bill-name' && !event.target.form.dataset.typeTouched) event.target.form.elements.type.value = guessBillType(event.target.value);
@@ -3018,6 +3114,7 @@ document.addEventListener('change', (event) => {
   if (event.target.id === 'transport-type') { const fuel = event.target.value === 'fuel'; document.querySelector('#transport-fuel').hidden = !fuel; document.querySelector('#transport-ppl').hidden = !fuel; }
   if (event.target.id === 'bill-type') event.target.form.dataset.typeTouched = '1';
   if (event.target.id === 'cart-item-unit') updateCartQtyLabel();
+  if (event.target.matches?.('select.expcat-select')) { if (event.target.value === '__new') openExpCatInline(event.target); else event.target.dataset.prev = event.target.value; return; }
   if (event.target.id === 'bills-history-filter') { billsHistory.filter = event.target.value; billsHistory.limit = 10; renderApp(); return; }
   if (event.target.id === 'cart-store') { const row = document.querySelector('#cart-new-store-row'); row.hidden = event.target.value !== '__new'; if (!row.hidden) document.querySelector('#cart-new-store').focus(); }
   if (event.target.classList?.contains('vm-mode')) {
@@ -3077,6 +3174,7 @@ document.addEventListener('input', (event) => {
 
 document.addEventListener('submit', (event) => {
   if (event.target.id === 'receipt-edit-form') { event.preventDefault(); saveReceiptEdit(event.target); return; }
+  if (event.target.id === 'expcat-form' || event.target.id === 'expcat-edit-form') { event.preventDefault(); saveExpCatForm(event.target); return; }
   if (event.target.id === 'bill-form') { event.preventDefault(); saveBillForm(event.target); return; }
   if (event.target.id === 'chore-form') { event.preventDefault(); saveChoreForm(event.target); return; }
   if (event.target.id === 'transport-form') { event.preventDefault(); saveTransportForm(event.target); return; }

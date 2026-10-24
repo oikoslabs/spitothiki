@@ -886,3 +886,12 @@ button.stat-card:hover { border-color: #bfd4c1; }
 .bill-chips { margin: 6px 0 10px; }
 .bill-chips [aria-pressed="true"] { border-color: var(--green); background: var(--green-soft); color: var(--green-dark); }
 :root[data-dark="1"] .bill-chips [aria-pressed="true"] { background: #22362b; color: #e4ece6; }
+/* v1.6.8: own expense categories */
+.receipt-line.receipt-edit-line .receipt-expcat{grid-column:2/-1}
+.expcat-new{margin:8px 0;padding:10px;border:1px dashed var(--line);border-radius:12px}
+.expcat-new-row{display:grid;grid-template-columns:56px minmax(0,1fr) auto auto;gap:8px}
+@media (max-width:480px){.expcat-new-row{grid-template-columns:52px minmax(0,1fr)}.expcat-new-row button{grid-column:span 1}}
+#expcat-form{grid-template-columns:64px minmax(0,1fr) auto}
+#expcat-form .form-error,#expcat-edit-form .form-error{grid-column:1/-1}
+@media (max-width:480px){#expcat-form{grid-template-columns:52px minmax(0,1fr)}#expcat-form button{grid-column:1/-1}}
+#expense-cats .extras-cat-actions{display:flex;align-items:center;gap:6px}
