@@ -9,7 +9,7 @@ export const ALLOWED_DOMAINS = [
   'epsilonnet.gr', 'epsilondigital.gr', // Epsilon Digital (e.g. epsilondigital-<chain>.epsilonnet.gr/fd/...)
   'impact.gr', 'mydataconnect.gr', // IMPACT myDATA connect / eInvoicing
   'softone.gr', 'softone.cloud', 's1cloud.net', // SoftOne e-Invoicing
-  'entersoft.gr', 'entersoft.eu', 'retail-link.gr', // Entersoft / Retail Link
+  'entersoft.gr', 'entersoft.eu', 'retail-link.gr', 'e-invoicing.gr', // Entersoft / Retail Link (e.g. Leroy Merlin: e-invoicing.gr/edocuments/ViewInvoice/...)
   'prosvasisgo.com', 'prosvasis.gr', // PROSVASISGO
   'pelatologio.gr', 'oxygen.gr', // Oxygen-Pelatologio
   'primer.gr', 'primersoftware.gr', // Primer MyData

@@ -40,3 +40,25 @@ test('scanner modes enable the right formats', () => {
   assert.deepEqual(zxingFormats('receipt'), [11, 4, 8, 2, 7, 10]);
   assert.deepEqual(zxingFormats('product').slice(0, 5), [7, 6, 14, 15, 4]);
 });
+
+import { SCAN_REGIONS, isStableRead, scanEnginePlan } from '../src/barcode.js';
+test('scanner engine plan: ZXing always joins native (some Android detectors never find anything)', () => {
+  assert.deepEqual(scanEnginePlan([], false), { native: false, zxingDelayMs: 0 });
+  assert.deepEqual(scanEnginePlan(['qr_code'], false), { native: true, zxingDelayMs: 1500 });
+  assert.deepEqual(scanEnginePlan(['qr_code'], true), { native: true, zxingDelayMs: 0 });
+});
+test('scan regions include a tight centre crop for small QRs on A4 receipts, all inside the frame', () => {
+  assert.ok(SCAN_REGIONS.some(([, , w, h]) => w === 1 && h === 1));
+  assert.ok(SCAN_REGIONS.some(([, , w, h]) => w <= 0.5 && h <= 0.4));
+  for (const [x, y, w, h] of SCAN_REGIONS) { assert.ok(x >= 0 && y >= 0 && x + w <= 1.0001 && y + h <= 1.0001); }
+});
+test('stable reads: links at once in receipt mode, other codes twice; «all» trusts routable values', () => {
+  const link = 'https://e-invoicing.gr/edocuments/ViewInvoice/-1/demo/EN16931';
+  assert.equal(isStableRead('receipt', link, ''), true);
+  assert.equal(isStableRead('receipt', '0042', ''), false);
+  assert.equal(isStableRead('receipt', '0042', '0042'), true);
+  assert.equal(isStableRead('all', '5201234567890', '', () => true), true);
+  assert.equal(isStableRead('all', '1234', '', () => false), false);
+  assert.equal(isStableRead('product', '5201234567890', ''), true);
+  assert.equal(isStableRead('product', '', ''), false);
+});

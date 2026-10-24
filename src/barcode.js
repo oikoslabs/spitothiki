@@ -82,11 +82,36 @@ async function tuneCamera(track) {
   return Boolean(caps.torch);
 }
 
+// Which decoders a scan session runs, given the native formats and whether ZXing worked better last time.
+// Native BarcodeDetector is fast but on some Android phones it reports formats and then never finds anything
+// (missing/broken Play Services module), so ZXing always joins in after a short delay. Pure, unit-tested.
+export function scanEnginePlan(nativeFormats = [], preferZxing = false) {
+  if (!nativeFormats.length) return { native: false, zxingDelayMs: 0 };
+  return { native: true, zxingDelayMs: preferZxing ? 0 : 1500 };
+}
+
+// Frame regions (fractions of the video frame) the scanner cycles through: the on-screen box, the full frame,
+// and a tight centre crop that acts as a 2x digital zoom for a small QR (e.g. the corner of an A4 receipt).
+export const SCAN_REGIONS = [[0.1, 0.25, 0.8, 0.5], [0, 0, 1, 1], [0.275, 0.325, 0.45, 0.35]];
+
+// Accept rule for a read: links (and, in «all» mode, anything that routes somewhere) at once;
+// otherwise the same value must come twice in a row from the same decoder (avoids partial 1D reads).
+export function isStableRead(mode, value, previous, confident = null) {
+  if (!value) return false;
+  if (mode === 'all') return Boolean(confident?.(value)) || value === previous;
+  if (mode === 'receipt') return /^https?:\/\//i.test(value) || value === previous;
+  return true;
+}
+
+const ENGINE_KEY = 'spitothiki:scan-engine';
+const prefersZxing = () => { try { return localStorage.getItem(ENGINE_KEY) === 'zxing'; } catch { return false; } };
+const rememberEngine = (name) => { try { name === 'zxing' ? localStorage.setItem(ENGINE_KEY, 'zxing') : localStorage.removeItem(ENGINE_KEY); } catch {} };
+
 // Starts the camera in <video> and calls onCode once with the first accepted code.
-// Native BarcodeDetector where it supports the mode's formats, otherwise ZXing (TRY_HARDER).
-// Scans ~8 times/s, alternating a central crop (the on-screen scan box) and the full frame.
+// Native BarcodeDetector where it supports the mode's formats, plus ZXing (TRY_HARDER) as a second decoder.
+// Scans ~8 times/s over SCAN_REGIONS. onIdle() fires once if nothing was read for 8 s.
 // Returns stop(); stop.torch(on) toggles the flashlight when supported (stop.hasTorch).
-export async function startScanner(video, onCode, { qr = false, confident = null } = {}) {
+export async function startScanner(video, onCode, { qr = false, confident = null, onIdle = null } = {}) {
   if (!navigator.mediaDevices?.getUserMedia) throw new Error('Η κάμερα δεν είναι διαθέσιμη σε αυτόν τον browser.');
   const mode = scanMode(qr);
   const wanted = scanFormats(mode);
@@ -95,49 +120,58 @@ export async function startScanner(video, onCode, { qr = false, confident = null
   const nativeFormats = wanted.filter((f) => native.includes(f));
   // Product mode accepts retail barcodes and GS1 DataMatrix / GS1 QR / Digital Link; other QR codes are ignored.
   const accept = (value) => mode !== 'product' || interpretCode(value).barcode;
-  let decode;
-  if (nativeFormats.length) {
+  const plan = scanEnginePlan(nativeFormats, prefersZxing());
+  const decoders = []; // { name, decode(canvas) → string }
+  if (plan.native) {
     // «Σκάναρε οτιδήποτε»: one detector with every format is much slower per frame on phones (ML Kit),
     // so alternate a 2D detector (QR/DataMatrix/PDF417) and a 1D detector, each as light as the inner scanners.
     const TWO_D = ['qr_code', 'data_matrix', 'pdf417'];
     const groups = mode === 'all' ? [nativeFormats.filter((f) => TWO_D.includes(f)), nativeFormats.filter((f) => !TWO_D.includes(f))].filter((g) => g.length) : [nativeFormats];
-    const detectors = groups.map((formats) => new globalThis.BarcodeDetector({ formats }));
-    let turn = 0;
-    decode = async (canvas) => (await detectors[turn++ % detectors.length].detect(canvas))[0]?.rawValue || '';
-  } else {
-    const ZXing = await loadZxing();
-    const hints = new Map([[2, zxingFormats(mode)], [3, true]]); // POSSIBLE_FORMATS, TRY_HARDER
-    const reader = new ZXing.BrowserMultiFormatReader(hints);
-    decode = async (canvas) => { try { return reader.decodeFromCanvas(canvas).getText(); } catch { return ''; } };
+    for (const formats of groups) {
+      try { const d = new globalThis.BarcodeDetector({ formats }); decoders.push({ name: 'native', decode: async (c) => (await d.detect(c))[0]?.rawValue || '' }); } catch {}
+    }
   }
+  let zxingReady = null;
+  const addZxing = () => {
+    zxingReady ||= loadZxing().then((ZXing) => {
+      const reader = new ZXing.BrowserMultiFormatReader(new Map([[2, zxingFormats(mode)], [3, true]])); // POSSIBLE_FORMATS, TRY_HARDER
+      decoders.push({ name: 'zxing', decode: async (c) => { try { return reader.decodeFromCanvas(c).getText(); } catch { return ''; } } });
+    });
+    return zxingReady;
+  };
+  if (!decoders.length) await addZxing(); // no usable native detector: ZXing is the only decoder (throws if it can't load)
   const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false });
   const track = stream.getVideoTracks()[0];
   video.srcObject = stream;
   await video.play();
   const hasTorch = track ? await tuneCamera(track) : false;
-  let stopped = false, frame = 0, last = '';
+  let stopped = false, frame = 0, idleTimer = 0;
+  const last = new Map(); // decoder index → previous value
+  const zxingTimer = decoders.some((d) => d.name === 'zxing') ? 0 : setTimeout(() => { if (!stopped) addZxing().catch(() => {}); }, plan.zxingDelayMs);
+  if (onIdle) idleTimer = setTimeout(() => { if (!stopped) onIdle(); }, 8000);
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
-  const stop = () => { stopped = true; stream.getTracks().forEach((t) => t.stop()); video.srcObject = null; };
+  const stop = () => { stopped = true; clearTimeout(zxingTimer); clearTimeout(idleTimer); stream.getTracks().forEach((t) => t.stop()); video.srcObject = null; };
   stop.hasTorch = hasTorch;
   stop.torch = async (on) => { try { await track.applyConstraints({ advanced: [{ torch: Boolean(on) }] }); return true; } catch { return false; } };
   const tick = async () => {
     if (stopped) return;
     const w = video.videoWidth, h = video.videoHeight;
-    if (w && h) {
-      const crop = frame++ % 2 === 0; // central box: 80% width, 50% height
-      const sw = crop ? Math.round(w * 0.8) : w, sh = crop ? Math.round(h * 0.5) : h;
+    if (w && h && decoders.length) {
+      const n = frame++;
+      const slot = n % decoders.length;
+      const [rx, ry, rw, rh] = SCAN_REGIONS[Math.floor(n / decoders.length) % SCAN_REGIONS.length];
+      const sw = Math.round(w * rw), sh = Math.round(h * rh);
       canvas.width = sw; canvas.height = sh;
-      ctx.drawImage(video, (w - sw) / 2, (h - sh) / 2, sw, sh, 0, 0, sw, sh);
+      ctx.drawImage(video, Math.round(w * rx), Math.round(h * ry), sw, sh, 0, 0, sw, sh);
       try {
-        const value = await decode(canvas);
-        // Receipt mode: a non-link code must be read the same way twice in a row (avoids partial 1D reads).
-        // «All» mode: accept at once only a value that routes somewhere (link, toll, RF/EPC, valid product code);
-        // anything else must also be read twice in a row, so a partial 1D read can't hijack the scan.
-        const stable = mode === 'all' ? Boolean(confident?.(value)) || value === last
-          : mode !== 'receipt' || /^https?:\/\//i.test(value) || value === last;
-        last = value;
-        if (value && accept(value) && stable && !stopped) { stop(); onCode(value); return; }
+        const value = await decoders[slot].decode(canvas);
+        const stable = isStableRead(mode, value, last.get(slot), confident);
+        last.set(slot, value);
+        if (value && accept(value) && stable && !stopped) {
+          if (plan.native) rememberEngine(decoders[slot].name);
+          stop(); onCode(value); return;
+        }
       } catch {}
     }
     setTimeout(tick, 125);
@@ -167,7 +201,8 @@ export async function decodeImageCodes(file, { mode = 'receipt', timeBudgetMs = 
   try { ZXing = await loadZxing(); } catch { return []; }
   const reader = new ZXing.BrowserMultiFormatReader(new Map([[2, zxingFormats(mode)], [3, true]]));
   const t0 = Date.now();
-  const regions = [[0, 0, 1, 1], [0, 0.6, 1, 0.4], [0, 0, 1, 0.4], [0, 0.3, 1, 0.4]];
+  // Full page, bottom/top/middle strips, then the bottom corners (A4 receipts print the QR there, small).
+  const regions = [[0, 0, 1, 1], [0, 0.6, 1, 0.4], [0, 0, 1, 0.4], [0, 0.3, 1, 0.4], [0.5, 0.7, 0.5, 0.3], [0, 0.7, 0.5, 0.3]];
   for (const blur of [0, 2]) for (const angle of [0, 90, 270, 180]) for (const [rx, ry, rw, rh] of regions) {
     if (Date.now() - t0 > timeBudgetMs) return [];
     const rot = angle % 180 ? [H, W] : [W, H];

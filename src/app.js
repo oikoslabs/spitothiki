@@ -794,7 +794,7 @@ async function openScanner({ onCode = fillFromBarcode, qr = false, confident = n
       stopScanner = null;
       dialog.close();
       onCode(code);
-    }, { qr, confident });
+    }, { qr, confident, onIdle: () => { if (dialog.open) status.textContent = t(qr === 'all' ? 'Δεν το πιάνει; Κράτα το κινητό λίγο πιο μακριά (15–20 εκ.), με καλό φως, ή πάτα «📎 Από φωτογραφία ή PDF».' : 'Δεν το πιάνει; Κράτα το κινητό λίγο πιο μακριά (15–20 εκ.) και με καλό φως.'); } });
     if (stopScanner?.hasTorch) torch.hidden = false;
     if (dialog.open) status.textContent = t(qr === 'all' ? 'Στόχευσε QR ή barcode: απόδειξη, λογαριασμό, διόδια ή προϊόν.' : qr === 'any' ? 'Στόχευσε το QR ή τον barcode του λογαριασμού.' : qr ? 'Στόχευσε το QR ή τον barcode της απόδειξης μέσα στο πλαίσιο.' : 'Στόχευσε τον barcode με την κάμερα.');
     else closeScanner();
