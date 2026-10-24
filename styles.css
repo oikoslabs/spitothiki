@@ -895,3 +895,14 @@ button.stat-card:hover { border-color: #bfd4c1; }
 #expcat-form .form-error,#expcat-edit-form .form-error{grid-column:1/-1}
 @media (max-width:480px){#expcat-form{grid-template-columns:52px minmax(0,1fr)}#expcat-form button{grid-column:1/-1}}
 #expense-cats .extras-cat-actions{display:flex;align-items:center;gap:6px}
+/* v1.6.9: dialog buttons never stick out sideways. They wrap; on phones they form a 2-column grid
+   (an odd last button takes the full row). The round ⬆ stays out of the way (see back-to-top.js). */
+.dialog-actions { flex-wrap: wrap; }
+.dialog-actions > .button { min-width: 0; white-space: normal; text-align: center; line-height: 1.2; }
+@media (max-width: 560px) {
+  .dialog-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .dialog-actions > .button { width: 100%; padding-inline: 8px; }
+  .dialog-actions > :only-child, .dialog-actions > :last-child:nth-child(odd) { grid-column: 1 / -1; }
+}
+.item-dialog, .confirm-dialog { overflow-x: hidden; }
+body:has(dialog[open]) .back-to-top-page { display: none; }

@@ -11,3 +11,10 @@ test('back-to-top respects reduced motion', () => {
   assert.equal(scrollBehavior(true), 'auto');
   assert.equal(scrollBehavior(false), 'smooth');
 });
+
+import { nearEnd } from '../src/back-to-top.js';
+test('dialog ⬆ hides near the end of a dialog, where its buttons are', () => {
+  assert.equal(nearEnd(900, 1500, 600), true);
+  assert.equal(nearEnd(400, 1500, 600), false);
+  assert.equal(nearEnd(800, 1500, 600, 50), false);
+});
