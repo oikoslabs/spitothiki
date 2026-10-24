@@ -16,3 +16,17 @@ test('scan anything: routes receipts, bills, products and unknown values', () =>
   assert.deepEqual(routeCode('hello world 42'), { route: 'unknown', raw: 'hello world 42' });
   assert.equal(routeCode('').route, 'unknown');
 });
+
+import { parseStoreReceiptBarcode } from '../src/scan-router.js';
+test('till barcode on a retail receipt (date + till + transaction) is recognised, never as a product or bill', () => {
+  // Demo value in the Leroy Merlin / Entersoft layout: 20250315 | 000007 | 123456
+  const r = routeCode('20250315000007123456');
+  assert.equal(r.route, 'store-receipt');
+  assert.equal(r.till.date, '2025-03-15');
+  assert.equal(parseStoreReceiptBarcode('20251332000007123456'), null); // no month 13
+  assert.equal(parseStoreReceiptBarcode('19990315000007123456'), null); // year out of range
+  assert.equal(parseStoreReceiptBarcode('2025031500000'), null); // too short
+  assert.equal(routeCode('5201234567890').route, 'product'); // EAN-13 still a product
+  assert.equal(routeCode('20251231').route === 'store-receipt', false);
+  assert.equal(routeCode('https://e-invoicing.gr/edocuments/ViewInvoice/-1/demo/EN16931').route, 'receipt');
+});
