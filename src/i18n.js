@@ -475,6 +475,8 @@ const EN = {
   "Χωρίς πληρωτή": "No payer",
   "Πλήρωσε": "Paid by",
   "Ποιος πλήρωσε τι": "Who paid what",
+  "Μέλη σε αυτό το σπίτι: {n}": "Members in this home: {n}",
+  "Για «Ποιος πλήρωσε τι» χρειάζονται 2 μέλη: Ρυθμίσεις → Κοινό σπίτι → ＋ Πρόσκληση μέλους.": "«Who paid what» needs 2 members: Settings → Shared home → ＋ Invite member.",
   "{month} · μετράνε {amount}": "{month} · counted {amount}",
   "Κοινό ταμείο (δεν μετράει): {amount}": "Shared fund (not counted): {amount}",
   "Χωρίς πληρωτή: {amount} · διάλεξε παρακάτω ποιος πλήρωσε": "No payer: {amount} · choose who paid below",

@@ -38,7 +38,7 @@ export async function createFirebaseSync({ config, getState, setState, onStatus 
           first = false;
           onDocs(changes.map((d) => d.data()));
           report({ state: 'synced', user, householdId: hid, members, offline: snapshot.metadata.fromCache });
-        }, (error) => report({ state: 'error', user, householdId: hid, message: error.code || error.message }));
+        }, (error) => report({ state: 'error', user, householdId: hid, members, message: error.code || error.message }));
       },
       async write(docs) {
         for (let i = 0; i < docs.length; i += 400) {
@@ -47,7 +47,7 @@ export async function createFirebaseSync({ config, getState, setState, onStatus 
             batch.set(fs.doc(records, `${doc.kind}_${doc.id}`), { kind: doc.kind, id: String(doc.id), data: doc.deleted ? null : doc.data, deleted: Boolean(doc.deleted), ts: doc.ts, by: user?.uid || '' });
           }
           // Offline: Firestore queues the batch and sends it when back online.
-          batch.commit().catch((error) => report({ state: 'error', user, householdId: hid, message: error.code || error.message }));
+          batch.commit().catch((error) => report({ state: 'error', user, householdId: hid, members, message: error.code || error.message }));
         }
       }
     };

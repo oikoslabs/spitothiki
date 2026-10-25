@@ -72,7 +72,10 @@ await addData(phone, (s, day) => {
   s.transport = [...(s.transport || []), { id: 'tr-demo', type: 'tolls', amount: 50, date: day, createdAt: day, updatedAt: day }];
 }, d);
 let totalBefore = '';
-await check('single-member household: card hidden, totals unchanged', async () => { await insights(phone); totalBefore = await total(phone); return (await card(phone)) === null && /50/.test(totalBefore); });
+await check('single-member household: card hidden (one-line hint only), «Μέλη: 1» in Ρυθμίσεις, totals unchanged', async () => { await insights(phone); totalBefore = await total(phone); const hint = await phone.$eval('#whopaid-hint', (el) => el.textContent).catch(() => '');
+  await phone.evaluate(() => { location.hash = '#settings'; }); await wait(500);
+  const count = await phone.$eval('#sync-members', (el) => el.textContent).catch(() => '');
+  return (await card(phone)) === null && /50/.test(totalBefore) && /2 μέλη/.test(hint) && /: 1$/.test(count.trim()); });
 let invite = '';
 await phone.evaluate(() => { location.hash = '#settings'; }); await wait();
 await phone.click('[data-action="sync-invite"]'); await wait(600);

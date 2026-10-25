@@ -725,6 +725,7 @@ function renderSyncCard() {
   return `${head}<p>Συνδεδεμένος ως <strong>${escapeHtml(who)}</strong>${shared ? ` · ${escapeHtml(t('μέλος κοινού σπιτιού'))}` : ''}.</p>${line}
     <h3 class="settings-sub">Κοινό σπίτι</h3>
     <p>Όσοι είναι στο ίδιο σπίτι βλέπουν και αλλάζουν τα ίδια: απόθεμα, λίστα αγορών, λογαριασμούς και έξοδα. Ό,τι αλλάζει ο ένας, το βλέπει ο άλλος σε λίγα δευτερόλεπτα.</p>
+    ${Array.isArray(status.members) && status.members.length ? `<p class="field-hint" id="sync-members">${escapeHtml(t('Μέλη σε αυτό το σπίτι: {n}', { n: status.members.length }))}</p>` : ''}
     <div class="settings-actions"><button class="button button-quiet" type="button" data-action="sync-invite">＋ Πρόσκληση μέλους</button>${shared ? '<button class="button button-quiet" type="button" data-action="sync-leave">Αποχώρηση από το κοινό σπίτι</button>' : ''}<button class="button button-quiet" type="button" data-action="sync-signout">Αποσύνδεση</button></div>
     <form id="sync-join-form" class="sync-join-form" novalidate><label class="field-label" for="sync-invite-code">Σου έδωσαν κωδικό πρόσκλησης; Γράψ' τον εδώ για να μπεις στο σπίτι τους.</label><input class="field-input" id="sync-invite-code" name="invite" placeholder="Κωδικός πρόσκλησης" autocomplete="off"><button class="button button-quiet" type="submit">Μπες στο σπίτι</button></form>
     <p class="field-hint">Όταν μπαίνεις σε άλλο σπίτι, τα προϊόντα αυτής της συσκευής προστίθενται στο κοινό απόθεμα.</p>
@@ -2137,6 +2138,8 @@ function whoPaidLabel(e) {
   return `${cat?.emoji || '☕'} ${cat ? extraCatLabel(cat) : t('Μικροέξοδα')}${e.label ? ` · ${e.label}` : ''}`;
 }
 function renderWhoPaid() {
+  // One member (signed in, members known): just a one-line hint, only here in Σύνολο εξόδων.
+  if (syncStatus?.user && householdMembers().length === 1) return `<p class="field-hint" id="whopaid-hint">🤝 ${escapeHtml(t('Για «Ποιος πλήρωσε τι» χρειάζονται 2 μέλη: Ρυθμίσεις → Κοινό σπίτι → ＋ Πρόσκληση μέλους.'))}</p>`;
   if (!whoPaidOn()) return '';
   const { members, names, expenses, balance } = whoPaidData();
   const me = syncStatus.user.uid;
