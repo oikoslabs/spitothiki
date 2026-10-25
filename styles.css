@@ -926,3 +926,10 @@ body:has(dialog[open]) .back-to-top-page { display: none; }
 /* v1.6.15: the desktop sidebar has the same sections as the phone menu; on short screens it scrolls. */
 @media (min-width: 761px) { .sidebar { overflow-y: auto; overscroll-behavior: contain; } }
 @media (min-width: 761px) and (max-height: 900px) { .sidebar { padding-top: 20px; } .sidebar > .brand { margin-bottom: 20px; } .primary-nav { gap: 2px; } .nav-item { min-height: 38px; } .primary-nav .nav-label { margin-top: 10px; } }
+/* v1.6.16: number / price fields in dark theme: dark background, light digits, also while typing, on Android autofill
+   and when the browser applies its own colours (text-fill, caret). Light theme unchanged. */
+:root[data-dark="1"] :is(.field-input, .search-input, .price-input, input[type="number"], input[inputmode="decimal"], input[inputmode="numeric"], select, textarea),
+:root[data-dark="1"] :is(.field-input, .search-input, .price-input, input[type="number"], input[inputmode="decimal"]):focus {
+  background-color: var(--surface); color: var(--ink); -webkit-text-fill-color: var(--ink); caret-color: var(--ink); color-scheme: dark; }
+:root[data-dark="1"] :is(.field-input, input):-webkit-autofill { -webkit-box-shadow: 0 0 0 40px var(--surface) inset; -webkit-text-fill-color: var(--ink); }
+:root[data-dark="1"] .cart-price-display { background-color: var(--surface-soft); }

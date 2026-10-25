@@ -1,4 +1,4 @@
-// v1.6.16: the cart's price keypad (and every number field / dialog) is readable in light AND dark theme on a phone:
+// v1.6.16: the cart's price keypad and price field (and every number field / dialog) is readable in light AND dark theme on a phone:
 // text vs background contrast ≥ 4.5:1 for keypad keys and inputs. Screenshots of the cart price dialog. Demo data only.
 // Usage: node tests/smoke/v1616-smoke.mjs <url> [shots-dir]
 import puppeteer from 'puppeteer-core';
@@ -23,7 +23,7 @@ const audit = (pg, root, sel = 'input:not([type=hidden]):not([type=checkbox]):no
   return out;
 }, root, sel);
 const seed = { items: [], shopping: [{ id: 's1', name: 'Γάλα demo', quantity: 1, checked: true, updatedAt: 'x' }] };
-for (const mode of ['light', 'dark', 'auto-dark']) {
+for (const mode of ['light', 'dark', 'auto-dark', 'dark-high-contrast']) {
   const ctx = await browser.createBrowserContext(); const pg = await ctx.newPage(); await pg.setBypassServiceWorker(true);
   pg.on('pageerror', (e) => errors.push(`${mode}: ${e.message}`));
   await pg.setViewport({ width: 412, height: 860, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
@@ -31,7 +31,7 @@ for (const mode of ['light', 'dark', 'auto-dark']) {
   await pg.evaluateOnNewDocument(() => { window.__spitoProtect = true; });
   await pg.goto(url, { waitUntil: 'networkidle0' });
   await pg.evaluate((s, m) => { localStorage.clear(); localStorage.setItem('spitothiki:onboarded', '1'); localStorage.setItem('spitothiki:protect-sheet-seen', '1'); localStorage.setItem('spitothiki:lang', 'el');
-    if (m !== 'auto-dark') localStorage.setItem('spitothiki:theme', m); localStorage.setItem('spitothiki:v1', JSON.stringify(s)); }, seed, mode);
+    if (m !== 'auto-dark') localStorage.setItem('spitothiki:theme', m.startsWith('dark') ? 'dark' : m); if (m === 'dark-high-contrast') localStorage.setItem('spitothiki:contrast', 'high'); localStorage.setItem('spitothiki:v1', JSON.stringify(s)); }, seed, mode);
   await pg.reload({ waitUntil: 'networkidle0' }); await wait(600);
   // Cart: manual product → price dialog with the keypad; type 2,49 with the keypad.
   await pg.evaluate(() => { location.hash = '#cart'; }); await wait(500);
@@ -46,6 +46,9 @@ for (const mode of ['light', 'dark', 'auto-dark']) {
   const low = keys.filter((x) => x.ratio < 4.5);
   check(`${mode}: cart price dialog open with keypad`, open.length && (await pg.$$('.keypad-key')).length >= 12, open);
   check(`${mode}: keypad keys + price field readable (contrast ≥ 4.5)`, keys.some((x) => /keypad/.test(x.el)) && !low.filter((x) => /keypad|price|field-input/.test(x.el)).length, low);
+  await pg.focus('#cart-item-price');
+  const pf = await pg.$eval('#cart-item-price', (e) => { const cs = getComputedStyle(e); const n = (c) => (c.match(/[\d.]+/g) || []).slice(0, 3).map(Number); const bg = n(cs.backgroundColor); return { bg: cs.backgroundColor, fill: cs.webkitTextFillColor, dark: bg.reduce((a, b) => a + b, 0) < 200, focused: document.activeElement === e }; });
+  check(`${mode}: price field background follows the theme while typing (${pf.bg})`, pf.focused && (mode === 'light' ? !pf.dark : pf.dark), pf);
   check(`${mode}: price shows 2,49`, (await pg.$eval('#cart-item-price', (e) => e.value)) === '2,49');
   if (shots) await pg.screenshot({ path: `${shots}/cart-price-${mode}.png` });
   await pg.evaluate(() => document.querySelectorAll('dialog[open]').forEach((d) => d.close()));
