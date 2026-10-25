@@ -468,6 +468,8 @@ const EN = {
   "λήξη {date}": "due {date}",
   "πάγια {date}": "direct debit {date}",
   "πληρώθηκε {date}": "paid {date}",
+  "Κανένα έξοδο αυτόν τον μήνα ακόμη.": "No spending this month yet.",
+  "+{count} ακόμα →": "+{count} more →",
   "μετράει στη λήξη (παλιός)": "counted at due date (old bill)",
   "μετράει στην πληρωμή": "counted at payment",
   "Λάθος μήνας; Λογαριασμοί → ✎ → «Πληρώθηκε στις» ή «Παλιός λογαριασμός».": "Wrong month? Bills → ✎ → «Paid on» or «Old bill».",

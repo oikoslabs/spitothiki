@@ -113,3 +113,16 @@ test('migration: old saves/backups without categories load unchanged; categories
   saveState({ ...old, expenseCategories: [clothes] }, storage);
   assert.deepEqual(loadState(storage).expenseCategories, [clothes]);
 });
+
+test('v1.6.14: month rows show only categories with spending, biggest first; top 5 + «+N»; totals untouched', async () => {
+  const { visibleSpendRows } = await import('../src/expense-cats.js');
+  const rows = [{ label: '🛒 Αγορές', value: 320.5 }, { label: '🏠 Ενοίκιο / κοινόχρηστα', value: 0 }, { label: '📄 Λογαριασμοί', value: 254.41 }, { label: '🛣️ Διόδια', value: 0 },
+    { label: '🚗 Μετακινήσεις', value: 60 }, { label: '☕ Μικροέξοδα', value: 0.004 }, { label: '👕 Ρούχα', value: 89.9, own: true }];
+  const all = visibleSpendRows(rows);
+  assert.deepEqual(all.rows.map((r) => r.label), ['🛒 Αγορές', '📄 Λογαριασμοί', '👕 Ρούχα', '🚗 Μετακινήσεις']);
+  assert.equal(all.more, 0); assert.equal(all.rows[2].own, true);
+  const many = visibleSpendRows([...rows, { label: '☕ Μικροέξοδα', value: 12 }, { label: '🎁 Δώρα', value: 40 }, { label: '🛣️ Διόδια', value: 7.5 }], 5);
+  assert.deepEqual(many.rows.map((r) => r.value), [320.5, 254.41, 89.9, 60, 40]); assert.equal(many.more, 2);
+  assert.deepEqual(visibleSpendRows([{ label: 'x', value: 0 }]), { rows: [], more: 0 });
+  assert.equal(rows[1].value, 0); // input not changed
+});

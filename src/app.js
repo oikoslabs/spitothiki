@@ -32,7 +32,7 @@ import { DRIVE_AUTO_KEY, DRIVE_ENABLED_KEY, DRIVE_HASH_KEY, DRIVE_LAST_KEY, auto
 import { forgetToken, getDriveToken } from './gdrive-auth.js';
 import { clearDriveKey, loadDriveKey, saveDriveKey } from './drive-key.js';
 import { applyReceiptEdit } from './receipt-edit.js';
-import { EXPENSE_CAT_DEFAULT_EMOJI, NO_CATEGORY, createExpenseCategory, deleteExpenseCategory, effectiveItemCategory, expenseCategories, expenseCategoryMonth, upsertExpenseCategory } from './expense-cats.js';
+import { EXPENSE_CAT_DEFAULT_EMOJI, NO_CATEGORY, createExpenseCategory, deleteExpenseCategory, effectiveItemCategory, expenseCategories, expenseCategoryMonth, upsertExpenseCategory, visibleSpendRows } from './expense-cats.js';
 import { BACKUP_SNOOZE_KEY, LAST_BACKUP_KEY, backupReminderDue, dequeue, enqueue, hasData, loadQueue, saveQueue } from './offline.js';
 import { TRANSPORT_ICONS, TRANSPORT_TYPES, applyTransportRecurring, classifyReceipt, consumptionFor, createTransport, createTransportRecurring, fuelStats, pricePerLiter, transportMonth } from './transport.js';
 import { EXTRA_DEFAULT_EMOJI, EXTRA_SUGGESTIONS, LEGACY_EXTRA_CATEGORIES, createExtra, createExtraCategory, deleteExtraCategory, extraCategories, findExtraCategory, suggestEmoji, extrasMonth, extrasSummary, lastUnitPrice, quickExtra, setExtraQty, unitPrice } from './extras.js';
@@ -449,6 +449,13 @@ function goToSignin() {
   });
 }
 
+// v1.6.14: only what was actually spent this month, biggest first, at most 5 rows (+N → «Σύνολο εξόδων»).
+function renderHomeMonthRows(rows) {
+  const { rows: shown, more } = visibleSpendRows(rows, 5);
+  if (!shown.length) return `<p class="subtle-empty" id="home-month-empty">${escapeHtml(t('Κανένα έξοδο αυτόν τον μήνα ακόμη.'))}</p>`;
+  return `${renderBars(shown, money)}${more ? `<button class="text-button home-month-more" type="button" data-view="insights" id="home-month-more">${escapeHtml(t('+{count} ακόμα →', { count: more }))}</button>` : ''}`;
+}
+
 function renderOverview() {
   const today = localDateKey();
   const summary = pantrySummary(state.items, today);
@@ -468,7 +475,7 @@ function renderOverview() {
     </section>
     <div class="dashboard-grid">
       <section class="panel" id="home-month"><div class="panel-heading"><div><h2>${escapeHtml(t('Τα έξοδα του μήνα'))}</h2><p data-no-i18n>${escapeHtml(monthLabel(month))}</p></div><button class="panel-link" type="button" data-view="insights">${escapeHtml(t('Αναλυτικά →'))}</button></div>
-        <p class="big-number" id="home-month-total">${escapeHtml(money(totals.total))}</p>${renderBars(totals.rows, money)}
+        <p class="big-number" id="home-month-total">${escapeHtml(money(totals.total))}</p>${renderHomeMonthRows(totals.rows)}
         ${due.length ? `<button class="alert-banner home-bills-due" type="button" data-view="bills">📄 ${escapeHtml((due.length === 1 ? t('1 λογαριασμός λήγει σύντομα ή έχει λήξει') : t('{count} λογαριασμοί λήγουν σύντομα ή έχουν λήξει', { count: due.length })))} ›</button>` : ''}</section>
       <section class="panel quick-panel" id="home-quick"><div class="panel-heading"><div><h2>Γρήγορες κινήσεις</h2><p>Τα βασικά, χωρίς ψάξιμο</p></div></div><div class="quick-actions quick-grid">${renderQuickActions(['scan', 'list', 'extra', 'transport', 'bill', 'product'])}</div></section>
       <section class="panel" id="home-expiry"><div class="panel-heading"><div><h2>Έλεγξε τις ημερομηνίες</h2><p>Ό,τι λήγει μέσα στις επόμενες 7 ημέρες</p></div><button class="panel-link" type="button" data-action="home-card" data-card="expiring">${escapeHtml(t('Όλα όσα λήγουν →'))}</button></div><div class="product-list">${upcoming.length ? upcoming.map(renderMiniProduct).join('') : renderEmpty('Όλα καλά εδώ', 'Δεν έχεις προϊόντα που λήγουν σύντομα.', 'add-item', 'Πρόσθεσε προϊόν', '🌿')}</div></section>
@@ -2082,10 +2089,11 @@ function renderMonthTotals() {
   const prev = monthTotals(shiftMonth(insightsMonth, -1));
   const diff = Math.round((total - prev.total) * 100) / 100;
   const trend = !prev.total ? '' : diff > 0 ? t('▲ {amount} από τον προηγούμενο μήνα', { amount: money(diff) }) : diff < 0 ? t('▼ {amount} από τον προηγούμενο μήνα', { amount: money(-diff) }) : t('Ίδιο με τον προηγούμενο μήνα');
-  const shown = rows.map((row, i) => ({ ...row, label: prev.rows[i]?.value ? `${row.label} · ${t('πριν: {amount}', { amount: money(prev.rows[i].value) })}` : row.label })).filter((row, i) => (i !== 1 && !row.own) || row.value || prev.rows[i]?.value);
+  // v1.6.14: only categories with spending this month, biggest first (zero rows such as an unused «Ενοίκιο» hidden).
+  const shown = visibleSpendRows(rows.map((row, i) => ({ ...row, label: prev.rows[i]?.value ? `${row.label} · ${t('πριν: {amount}', { amount: money(prev.rows[i].value) })}` : row.label }))).rows;
   return `<section class="panel settings-card" id="month-totals-card"><span class="stat-icon blue">∑</span><h2>Σύνολο εξόδων μήνα</h2><p class="big-number" id="month-grand-total">${escapeHtml(money(total))}</p>
     <p class="field-hint month-trend ${diff > 0 ? 'up' : 'down'}" id="month-trend">${escapeHtml(trend || t('Προηγούμενος μήνας: {amount}', { amount: money(prev.total) }))}</p>
-    ${renderBars(shown, money)}${renderPendingBills(pending, 'month-pending-bills')}</section>`;
+    ${shown.length ? renderBars(shown, money) : `<p class="subtle-empty">${escapeHtml(t('Κανένα έξοδο αυτόν τον μήνα ακόμη.'))}</p>`}${renderPendingBills(pending, 'month-pending-bills')}</section>`;
 }
 // v1.6.12: «Ποιοι λογαριασμοί μετράνε» for the chosen month: closed by default, one line per bill.
 function renderBillsMonthList() {

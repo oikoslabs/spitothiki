@@ -101,3 +101,12 @@ export function totalPurchaseCategory(items, receiptCategory) {
   if (keys.length === 1 && priced.every((it) => effectiveItemCategory(it.expenseCategory, receiptCategory) === keys[0])) return { expenseCategory: keys[0] };
   return keys.length ? { expenseSplit: split } : {};
 }
+
+// v1.6.14: month rows to show: only categories with spending (> 0,00 €), biggest first; `limit` keeps the main
+// screen short (the rest is counted in `more`). Never changes the totals: it only picks rows to display.
+export function visibleSpendRows(rows = [], limit = Infinity) {
+  const spent = rows.map((row, i) => ({ ...row, i })).filter((row) => Math.round(Number(row.value) * 100) > 0)
+    .sort((a, b) => b.value - a.value || a.i - b.i).map(({ i, ...row }) => row);
+  const shown = spent.slice(0, limit);
+  return { rows: shown, more: spent.length - shown.length };
+}
