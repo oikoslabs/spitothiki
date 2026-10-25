@@ -14,3 +14,11 @@ test('desktop sidebar has every view and action of the phone menu, same order', 
   const app = readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');
   assert.match(app, /action === 'menu-receipt'\) \{ const sheet = document\.querySelector\('#menu-sheet'\); if \(sheet\?\.open\) sheet\.close\(\)/);
 });
+
+// v1.6.16: the cart price keypad follows the theme (was a fixed light background → white on white in dark mode).
+test('cart keypad uses theme colours, not a fixed light background', () => {
+  const css = readFileSync(new URL('../styles.css', import.meta.url), 'utf8');
+  const rule = css.match(/\.keypad-key \{[^}]*\}/)[0];
+  assert.match(rule, /background: var\(--surface-soft\)/); assert.match(rule, /color: var\(--ink\)/);
+  assert.doesNotMatch(rule, /#f6f8f4|color: inherit/);
+});

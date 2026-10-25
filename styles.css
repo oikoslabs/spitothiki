@@ -503,8 +503,9 @@ body[data-screen="pantry"] .topbar .button-add { display: none; }
 .cart-finish { justify-content: space-between; margin: 6px 0 18px; }
 .cart-price-display { font-size: calc(28px * var(--text-scale)); font-weight: 800; text-align: right; }
 .keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 8px 0; }
-.keypad-key { min-height: 52px; font-size: calc(22px * var(--text-scale)); font-weight: 700; border: 1px solid #e3e9df; border-radius: 12px; background: #f6f8f4; color: inherit; cursor: pointer; }
-.keypad-key:active { background: var(--green-soft, #e3f0e8); }
+/* v1.6.16: theme colours (was a fixed light background with inherited text → white on white in dark mode). */
+.keypad-key { min-height: 52px; font-size: calc(22px * var(--text-scale)); font-weight: 700; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-soft); color: var(--ink); -webkit-text-fill-color: var(--ink); cursor: pointer; }
+.keypad-key:active { background: var(--green-soft); }
 .trip-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
 .trip-list li { display: flex; flex-wrap: wrap; gap: 4px 10px; justify-content: space-between; }
 .trip-list small { width: 100%; color: var(--muted); }
