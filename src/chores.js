@@ -74,9 +74,23 @@ export function choreMembers(chores = [], extra = []) {
 // Chores with reminder on that are due or late today (for the one daily reminder).
 export const choresDueToday = (chores = [], today) => sortChores(chores.filter((c) => c.remind && nextDue(c) <= today), today);
 
-// Push wake-up dates (today … +90): one date per due day; late ones → today. A Set, so never more than one per day.
+// Push wake-up dates (today … +90). v1.6.11: a chore keeps reminding EVERY morning from its due day until it is
+// marked done (before, a late chore got only the day of the last app open, so the phone went quiet after day one).
+// A Set, so never more than one wake-up per day; the service worker then shows one combined chores notification.
 export function choreDates(chores = [], today) {
   const end = addDays(today, 90); const out = new Set();
-  for (const c of chores) { if (!c.remind) continue; const n = nextDue(c); const d = n < today ? today : n; if (d <= end) out.add(d); }
+  for (const c of chores) {
+    if (!c.remind) continue;
+    const n = nextDue(c);
+    for (let d = n < today ? today : n; d <= end && out.size < 91; d = addDays(d, 1)) out.add(d);
+  }
   return [...out].sort();
+}
+
+// The one daily chores notification (app open or service worker): title with up to 4 names, or null if nothing is
+// due / it was already shown today (`last` = the day it was last shown).
+export function choreNotice(chores = [], today, last = '') {
+  const due = choresDueToday(chores, today);
+  if (!due.length || last === today) return null;
+  return { names: due.slice(0, 4).map((c) => c.name), more: due.length > 4, count: due.length };
 }

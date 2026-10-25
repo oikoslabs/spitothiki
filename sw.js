@@ -2,7 +2,7 @@
 // Strategy: network-first for everything from this site (HTML, JS, CSS, manifest), so a new
 // deploy shows up on the next load; the cache is only used when the network is unavailable.
 // Bump CACHE_VERSION when the list of shell files changes; old caches are deleted on activate.
-const CACHE_VERSION = 'v74';
+const CACHE_VERSION = 'v75';
 const CACHE = `spitothiki-${CACHE_VERSION}`;
 const OCR_CACHE = 'spitothiki-ocr';
 const SHARE_CACHE = 'spitothiki-share'; // a file shared to the app (Web Share Target), picked up by the page // Tesseract.js script/worker/core/language files, kept across versions
@@ -110,6 +110,11 @@ async function backgroundExpiryCheck({ force = false } = {}) {
     shown += 1;
     await self.registration.showNotification(String(snap.choreTitle || 'Σήμερα: {list}').replace('{list}', choresDue.slice(0, 4).map((c) => c.name).join(', ') + (choresDue.length > 4 ? '…' : '')), { body: '', tag: 'spitothiki-chores', icon: 'icons/icon-192.png', badge: 'icons/icon-192.png', lang: snap.lang || 'el' });
     await cache.put('./__chores-notified', new Response(today));
+  } else if (choresDue.length && force) {
+    // v1.6.11: the 9:00 push came but the app already showed today's chores: refresh the same notification quietly
+    // (same tag, no sound) instead of a vague «Έχεις υπενθυμίσεις».
+    shown += 1;
+    await self.registration.showNotification(String(snap.choreTitle || 'Σήμερα: {list}').replace('{list}', choresDue.slice(0, 4).map((c) => c.name).join(', ') + (choresDue.length > 4 ? '…' : '')), { body: '', tag: 'spitothiki-chores', silent: true, icon: 'icons/icon-192.png', badge: 'icons/icon-192.png', lang: snap.lang || 'el' });
   }
   if (snap.lastNotified === today && !force) return shown;
   const limit = addDaysKey(today, Number(snap.days ?? 3));

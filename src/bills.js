@@ -82,19 +82,25 @@ export function billsDue(bills = [], today) {
     .sort((a, b) => a.due.localeCompare(b.due));
 }
 
-// Monthly totals for a year (by due month) and totals per type; paid vs. still to pay.
+// v1.6.11: a bill counts as money spent only once it is paid, on the day it was paid (paidAt; old data without it:
+// its due date). Unpaid bills (also not-yet-run direct debits) are never in the totals; they are shown apart as
+// «απλήρωτοι». Before, every bill counted by due month even if unpaid.
+export const billSpentDate = (b) => (b?.paid ? String(DATE.test(String(b.paidAt || '')) ? b.paidAt : b.due || '') : '');
+
+// Monthly totals for a year (paid bills, by payment month) and totals per type; unpaid ones of the year apart.
 export function billStats(bills = [], year) {
   const months = Array.from({ length: 12 }, (_, i) => ({ month: `${year}-${String(i + 1).padStart(2, '0')}`, total: 0, paid: 0 }));
-  const byType = {};
+  const byType = {}; const pending = { count: 0, total: 0 };
   for (const b of bills) {
-    if (!String(b.due).startsWith(`${year}-`)) continue;
-    const row = months[Number(b.due.slice(5, 7)) - 1];
-    row.total = round2(row.total + b.amount);
-    if (b.paid) row.paid = round2(row.paid + b.amount);
+    if (!b.paid) { if (String(b.due).startsWith(`${year}-`)) { pending.count += 1; pending.total = round2(pending.total + b.amount); } continue; }
+    const when = billSpentDate(b);
+    if (!when.startsWith(`${year}-`)) continue;
+    const row = months[Number(when.slice(5, 7)) - 1];
+    row.total = round2(row.total + b.amount); row.paid = row.total;
     byType[b.type] = round2((byType[b.type] || 0) + b.amount);
   }
   const total = round2(months.reduce((s, m) => s + m.total, 0));
-  return { months, total, byType: Object.entries(byType).map(([type, value]) => ({ type, total: value })).sort((a, b) => b.total - a.total) };
+  return { months, total, pending, byType: Object.entries(byType).map(([type, value]) => ({ type, total: value })).sort((a, b) => b.total - a.total) };
 }
 
 // ---------- Scanning codes on bills ----------
@@ -179,10 +185,11 @@ export function autoPayFor(bills = [], name) {
 
 // Bills due in a month, with rent/common charges split out so they show as their own expense row.
 export function billsMonthSplit(bills = [], month) {
-  let rent = 0; let other = 0;
+  let rent = 0; let other = 0; let pending = 0; let pendingCount = 0;
   for (const b of bills) {
-    if (!String(b.due).startsWith(`${month}-`)) continue;
+    if (!b.paid) { if (String(b.due).startsWith(`${month}-`)) { pending += b.amount; pendingCount += 1; } continue; }
+    if (!billSpentDate(b).startsWith(`${month}-`)) continue;
     if (b.type === 'rent') rent += b.amount; else other += b.amount;
   }
-  return { rent: round2(rent), other: round2(other) };
+  return { rent: round2(rent), other: round2(other), pending: round2(pending), pendingCount };
 }
