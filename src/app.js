@@ -2904,7 +2904,7 @@ function handleAction(button) {
   else if (action === 'quick' && button.dataset.quick === 'scan') { pressFeedback(button); runQuickAction('scan'); }
   else if (action === 'quick') { const id = button.dataset.quick; if (button.closest('#quick-sheet')) document.querySelector('#quick-sheet')?.close(); pressFeedback(button); afterPaint(() => runQuickAction(id)); }
   else if (action === 'close-quick') document.querySelector('#quick-sheet').close();
-  else if (action === 'menu-receipt') { document.querySelector('#menu-sheet').close(); openReceiptDialog(); }
+  else if (action === 'menu-receipt') { const sheet = document.querySelector('#menu-sheet'); if (sheet?.open) sheet.close(); openReceiptDialog(); } // phone menu, desktop sidebar or Αποδείξεις
   else if (action === 'menu-mealplan') { document.querySelector('#menu-sheet').close(); afterPaint(() => { cookTab = 'plan'; navigate('cook'); setTimeout(() => (document.querySelector('#plan-classic:not([open])') ? document.querySelector('#diet-section') : document.querySelector('#plan-grid'))?.scrollIntoView({ block: 'start' }), 50); }); }
   else if (action === 'transport-month') { transportMonthKey = shiftMonth(transportMonthKey, Number(button.dataset.delta)); renderApp(); if (transportHistoryDialog()?.open) renderTransportHistory(); }
   else if (action === 'transport-history') openTransportHistory();
