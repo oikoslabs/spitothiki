@@ -78,7 +78,7 @@
 
       <div class="sidebar-bottom">
         <div class="privacy-card"><span class="privacy-icon" aria-hidden="true">🔒</span><div><strong>Τα δεδομένα σου είναι δικά σου</strong><p>Στη συσκευή σου και, αν συνδεθείς, ιδιωτικά μόνο με το νοικοκυριό σου.</p></div></div>
-        <span class="version-label">ΕΚΔΟΣΗ 1.6.12</span>
+        <span class="version-label">ΕΚΔΟΣΗ 1.6.13</span>
       </div>
     </aside>
 
@@ -90,7 +90,7 @@
         <button class="button button-primary button-add" type="button" data-action="add-item"><span aria-hidden="true">＋</span> Προσθήκη προϊόντος</button>
       </header>
       <div id="view-content" class="view-content" tabindex="-1"></div>
-      <footer class="app-footer"><span>Απλά, για το σπίτι. · <span id="app-version" data-no-i18n>Έκδοση 1.6.12</span></span><button type="button" class="text-button" data-view="settings">Αντίγραφο ασφαλείας & απόρρητο</button></footer>
+      <footer class="app-footer"><span>Απλά, για το σπίτι. · <span id="app-version" data-no-i18n>Έκδοση 1.6.13</span></span><button type="button" class="text-button" data-view="settings">Αντίγραφο ασφαλείας & απόρρητο</button></footer>
     </main>
   </div>
 
@@ -226,6 +226,10 @@
         <div><label class="field-label" for="bill-remind">Υπενθύμιση (ημέρες πριν)</label><input class="field-input" id="bill-remind" name="remind" type="number" min="0" max="30" step="1" value="3" inputmode="numeric"></div>
       </div>
       <label class="check-row" for="bill-autopay"><input type="checkbox" id="bill-autopay" name="autoPay"> <span>Πληρώνεται με πάγια εντολή <small class="field-hint">— χρεώνεται αυτόματα από την τράπεζα· δεν θα σου ζητάει πληρωμή</small></span></label>
+      <div class="bill-paid-fields" id="bill-paid-fields" hidden>
+        <label class="field-label" for="bill-paid-at">Πληρώθηκε στις</label><input class="field-input" id="bill-paid-at" name="paidAt" type="date">
+        <label class="check-row" for="bill-count-due"><input type="checkbox" id="bill-count-due" name="countDue"> <span>Παλιός λογαριασμός — μέτρα στον μήνα λήξης <small class="field-hint">— αλλιώς μετράει στον μήνα που πληρώθηκε</small></span></label>
+      </div>
       <label class="field-label" for="bill-reference">Κωδικός πληρωμής</label>
       <input class="field-input" id="bill-reference" name="reference" maxlength="40" autocomplete="off" placeholder="RF00 0000…" data-no-i18n>
       <p class="alert-banner" id="bill-duplicate" role="status" hidden></p>
