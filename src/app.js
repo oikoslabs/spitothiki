@@ -15,7 +15,7 @@ import { applyDisplayPrefs, highContrast, setHighContrast, setTextSize, textSize
 import { RECURRING_INTERVALS, applyRecurring, createRecurring, dueFromSnapshot, expirySnapshot, parseVoiceItems } from './features.js';
 import { MEAL_SLOTS, copyPreviousWeek, createMeal, recipeFromMealDb, shiftDays, weekDays, weekShoppingNeeds, weekStart } from './mealplan.js';
 import { BUILTIN_RECIPES, RECIPE_CATS } from './recipes.js';
-import { BILL_ICONS, BILL_PERIODS, BILL_TYPES, applyAutoPay, autoPayFor, billsMonthList, billsMonthSplit, scheduledDebits, billStats, billsDue, createBill, guessBillType, paidHistory, parseBillCode, unpaidBills, payBill, unpayBill } from './bills.js';
+import { BILL_ICONS, BILL_PERIODS, BILL_TYPES, applyAutoPay, autoPayFor, billCountInfo, billsMonthList, billsMonthSplit, scheduledDebits, billStats, billsDue, createBill, guessBillType, paidHistory, parseBillCode, unpaidBills, payBill, unpayBill } from './bills.js';
 import { findDuplicateBill, readBillFile } from './bill-pdf.js';
 import { initDietUi, renderDietSection } from './diet-ui.js';
 import { pushDates, pushSupported, pushSubscription, syncPush, stopPush } from './push.js';
@@ -2091,7 +2091,7 @@ function renderMonthTotals() {
 function renderBillsMonthList() {
   const list = billsMonthList(state.bills || [], insightsMonth);
   if (!list.length) return '';
-  return `<details class="bills-month-list" id="bills-month-list"><summary>${escapeHtml(t('Ποιοι μετράνε τον {month} ({count})', { month: monthLabel(insightsMonth), count: list.length }))}</summary><ul>${list.map((b) => `<li><span><span data-no-i18n>${escapeHtml(b.name)}</span> <small>${escapeHtml(t('λήξη {date}', { date: formatDate(b.due) }))}${b.paidAt ? ` · ${escapeHtml(t(b.autoPay ? 'πάγια {date}' : 'πληρώθηκε {date}', { date: formatDate(b.paidAt) }))}` : ''}</small></span><strong data-no-i18n>${escapeHtml(money(b.amount))}</strong></li>`).join('')}</ul></details>`;
+  return `<details class="bills-month-list" id="bills-month-list"><summary>${escapeHtml(t('Ποιοι μετράνε τον {month} ({count})', { month: monthLabel(insightsMonth), count: list.length }))}</summary><ul>${list.map((b) => `<li><span><span data-no-i18n>${escapeHtml(b.name)}</span> <small>${escapeHtml(t('λήξη {date}', { date: formatDate(b.due) }))}${b.paidAt ? ` · ${escapeHtml(t(b.autoPay ? 'πάγια {date}' : 'πληρώθηκε {date}', { date: formatDate(b.paidAt) }))}` : ''} · ${escapeHtml(t(b.by === 'due' ? 'μετράει στη λήξη (παλιός)' : 'μετράει στην πληρωμή'))}</small></span><strong data-no-i18n>${escapeHtml(money(b.amount))}</strong></li>`).join('')}</ul><p class="field-hint">${escapeHtml(t('Λάθος μήνας; Λογαριασμοί → ✎ → «Πληρώθηκε στις» ή «Παλιός λογαριασμός».'))}</p></details>`;
 }
 // v1.6.11: unpaid bills are not spent money yet: shown apart, never in the totals; they count on the day they are paid.
 function renderPendingBills(pending, id) {
@@ -2396,6 +2396,10 @@ function openBillDialog(id = '') {
   form.elements.billingTo.value = bill?.billingTo || '';
   form.elements.autoPay.checked = Boolean(bill?.autoPay);
   form.dataset.autoPayTouched = bill ? '1' : '';
+  // v1.6.13: a paid bill: its payment date and «Παλιός λογαριασμός — μέτρα στον μήνα λήξης» can be corrected.
+  form.querySelector('#bill-paid-fields').hidden = !bill?.paid;
+  form.elements.paidAt.value = bill?.paid ? bill.paidAt || '' : '';
+  form.elements.countDue.checked = Boolean(bill?.paid && billCountInfo(state.bills || []).get(bill)?.by === 'due');
   form.dataset.preset = bill?.presetId || '';
   setBillDuplicate(null);
   document.querySelector('#bill-error').hidden = true;
@@ -2513,7 +2517,8 @@ function saveBillForm(form) {
   const id = form.elements.billId.value;
   const existing = (state.bills || []).find((bill) => bill.id === id);
   try {
-    const bill = createBill({ ...(existing || {}), id: id || undefined, name: form.elements.name.value, type: form.elements.type.value, amount: form.elements.amount.value === '' ? NaN : form.elements.amount.value, due: form.elements.due.value, period: form.elements.period.value, remind: form.elements.remind.value, reference: form.elements.reference.value, billingFrom: form.elements.billingFrom.value, billingTo: form.elements.billingTo.value, autoPay: form.elements.autoPay.checked, presetId: form.dataset.preset || '' });
+    const bill = createBill({ ...(existing || {}), id: id || undefined, name: form.elements.name.value, type: form.elements.type.value, amount: form.elements.amount.value === '' ? NaN : form.elements.amount.value, due: form.elements.due.value, period: form.elements.period.value, remind: form.elements.remind.value, reference: form.elements.reference.value, billingFrom: form.elements.billingFrom.value, billingTo: form.elements.billingTo.value, autoPay: form.elements.autoPay.checked, presetId: form.dataset.preset || '',
+      ...(existing?.paid ? { paidAt: /^\d{4}-\d{2}-\d{2}$/.test(form.elements.paidAt.value) ? form.elements.paidAt.value : existing.paidAt, countBy: form.elements.countDue.checked ? 'due' : 'paid' } : {}) });
     state.bills = existing ? state.bills.map((entry) => (entry.id === id ? bill : entry)) : [...(state.bills || []), bill];
   } catch (err) { error.textContent = t(err.message); error.hidden = false; return; }
   if (!persist()) return;

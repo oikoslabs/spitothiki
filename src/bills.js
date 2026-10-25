@@ -50,11 +50,13 @@ export function createBill(input = {}, now = new Date().toISOString()) {
     paid: Boolean(input.paid), paidAt: input.paid ? String(input.paidAt || '') : '',
     billingFrom: DATE.test(String(input.billingFrom || '')) ? input.billingFrom : '', billingTo: DATE.test(String(input.billingTo || '')) ? input.billingTo : '',
     autoPay: Boolean(input.autoPay),
+    ...(input.paid && (input.countBy === 'due' || input.countBy === 'paid') ? { countBy: input.countBy } : {}),
     ...(input.presetId ? { presetId: String(input.presetId).slice(0, 20) } : {}),
     seriesId: input.seriesId || input.id || '', updatedAt: now
   };
 }
 
+const withoutCountBy = ({ countBy, ...rest }) => rest; // eslint-disable-line no-unused-vars
 // Marks a bill paid; a recurring one gets its next instance (once), with the same amount as a starting guess.
 export function payBill(bills = [], id, today, now = new Date().toISOString()) {
   const bill = bills.find((b) => b.id === id);
@@ -65,14 +67,14 @@ export function payBill(bills = [], id, today, now = new Date().toISOString()) {
   if (bill.period) {
     const due = addMonths(bill.due, bill.period);
     if (!bills.some((b) => (b.seriesId || b.id) === series && b.due === due)) {
-      next = { ...bill, id: `${series}-${due}`, due, paid: false, paidAt: '', billingFrom: '', billingTo: '', seriesId: series, updatedAt: now };
+      next = { ...withoutCountBy(bill), id: `${series}-${due}`, due, paid: false, paidAt: '', billingFrom: '', billingTo: '', seriesId: series, updatedAt: now };
     }
   }
   return { bills: [...bills.map((b) => (b.id === id ? paid : b)), ...(next ? [next] : [])], next };
 }
 
 export function unpayBill(bills = [], id, now = new Date().toISOString()) {
-  return bills.map((b) => (b.id === id ? { ...b, paid: false, paidAt: '', updatedAt: now } : b));
+  return bills.map((b) => (b.id === id ? { ...withoutCountBy(b), paid: false, paidAt: '', updatedAt: now } : b));
 }
 
 // Unpaid bills to remind about: overdue, or within each bill's own reminder window.
@@ -82,24 +84,47 @@ export function billsDue(bills = [], today) {
     .sort((a, b) => a.due.localeCompare(b.due));
 }
 
-// A bill counts only once it is paid (v1.6.11), and it counts in the month it BELONGS to: its due date (v1.6.12).
-// v1.6.11 used the day «Πληρώθηκε» was pressed, so past months' bills entered and ticked in October all piled up in
-// October. Unpaid bills (also not-yet-run direct debits) are never in the totals; they are shown apart.
-// The bill's own dates win: due date, else the end of its billing period; the payment day only as a last resort.
-// Never the day it was scanned or ticked when the bill has a date of its own.
-export const billSpentDate = (b) => {
-  if (!b?.paid) return '';
-  for (const d of [b.due, b.billingTo, b.billingFrom, b.paidAt]) if (DATE.test(String(d || ''))) return d;
-  return '';
-};
+// Which month a PAID bill counts in (v1.6.13, the user's rule): the month it was paid, except old bills entered
+// late, which count in their due month. Unpaid bills (also not-yet-run direct debits) never count; shown apart.
+//  - countBy 'paid' / 'due': set by the user in ✎ («Παλιός λογαριασμός — μέτρα στον μήνα λήξης»); always wins.
+//  - auto: bills of the same provider ticked paid on the SAME day are a bulk entry of old bills (e.g. a whole year of
+//    ΔΕΗ scanned on 18/10): only the newest of them (latest due date) counts on the payment day, the older ones in
+//    their due month. A bill paid on its own counts on its payment day.
+//  - no valid payment date (old data): its due date, else its billing period.
+const providerKey = (b) => String(b.name || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleUpperCase('el-GR').replace(/[^A-ZΑ-Ω0-9]/g, '') || String(b.type || '');
+const ownDate = (b) => [b.due, b.billingTo, b.billingFrom].find((d) => DATE.test(String(d || ''))) || '';
+export function billCountInfo(bills = []) {
+  const out = new Map(); const groups = new Map();
+  for (const b of bills) {
+    if (!b?.paid || b.countBy || !DATE.test(String(b.paidAt || ''))) continue;
+    const k = `${providerKey(b)}|${b.paidAt}`;
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(b);
+  }
+  const newest = new Set();
+  for (const g of groups.values()) newest.add(g.reduce((x, y) => (String(y.due) > String(x.due) ? y : x)));
+  for (const b of bills) {
+    if (!b?.paid) continue;
+    const paidAt = DATE.test(String(b.paidAt || '')) ? b.paidAt : '';
+    const own = ownDate(b);
+    let by;
+    if (!paidAt) by = 'due';
+    else if (b.countBy === 'due' || b.countBy === 'paid') by = b.countBy;
+    else by = newest.has(b) ? 'paid' : 'due';
+    const date = by === 'due' ? own || paidAt : paidAt;
+    if (date) out.set(b, { date, by: by === 'due' && !own ? 'paid' : by, old: by === 'due' && Boolean(paidAt) && !b.countBy });
+  }
+  return out;
+}
+export const billSpentDate = (b, bills = [b]) => (b?.paid ? billCountInfo(bills.includes(b) ? bills : [...bills, b]).get(b)?.date || '' : '');
 
-// Monthly totals for a year (paid bills, by due month) and totals per type; unpaid ones of the year apart.
+// Monthly totals for a year (paid bills, by their count month, see billCountInfo); unpaid ones of the year apart.
 export function billStats(bills = [], year) {
   const months = Array.from({ length: 12 }, (_, i) => ({ month: `${year}-${String(i + 1).padStart(2, '0')}`, total: 0, paid: 0 }));
-  const byType = {}; const pending = { count: 0, total: 0 };
+  const byType = {}; const pending = { count: 0, total: 0 }; const info = billCountInfo(bills);
   for (const b of bills) {
     if (!b.paid) { if (String(b.due).startsWith(`${year}-`)) { pending.count += 1; pending.total = round2(pending.total + b.amount); } continue; }
-    const when = billSpentDate(b);
+    const when = info.get(b)?.date || '';
     if (!when.startsWith(`${year}-`)) continue;
     const row = months[Number(when.slice(5, 7)) - 1];
     row.total = round2(row.total + b.amount); row.paid = row.total;
@@ -151,8 +176,9 @@ export function paidHistory(bills = [], { filter = '', limit = 10 } = {}) {
   const [field, ...rest] = String(filter).split(':');
   const value = rest.join(':');
   const matches = (b) => !filter || (field === 'type' ? b.type === value : field === 'name' ? String(b.name).trim().toLocaleLowerCase('el-GR') === value.toLocaleLowerCase('el-GR') : true);
-  // v1.6.12: grouped by the month the bill belongs to (due date), same as the totals; newest payment first inside.
-  const when = (b) => String(b.due || '');
+  // Grouped by the month the bill counts in (same rule as the totals); newest first inside.
+  const info = billCountInfo(bills);
+  const when = (b) => String(info.get(b)?.date || b.due || '');
   const list = all.filter(matches).sort((a, b) => when(b).localeCompare(when(a)) || String(b.paidAt || '').localeCompare(String(a.paidAt || '')));
   const shown = list.slice(0, Math.max(1, limit));
   const groups = [];
@@ -193,15 +219,16 @@ export function autoPayFor(bills = [], name) {
 // Bills due in a month, with rent/common charges split out so they show as their own expense row.
 // v1.6.12: what makes up a month's bills figure (paid, by due month), biggest first, so anyone can check the number.
 export function billsMonthList(bills = [], month) {
-  return bills.filter((b) => billSpentDate(b).startsWith(`${month}-`))
-    .map((b) => ({ id: b.id, name: b.name, type: b.type, amount: round2(b.amount), due: b.due, paidAt: DATE.test(String(b.paidAt || '')) ? b.paidAt : '', autoPay: Boolean(b.autoPay) }))
+  const info = billCountInfo(bills);
+  return bills.filter((b) => (info.get(b)?.date || '').startsWith(`${month}-`))
+    .map((b) => ({ id: b.id, name: b.name, type: b.type, amount: round2(b.amount), due: b.due, paidAt: DATE.test(String(b.paidAt || '')) ? b.paidAt : '', autoPay: Boolean(b.autoPay), by: info.get(b).by, old: info.get(b).old, countDate: info.get(b).date }))
     .sort((a, b) => b.amount - a.amount || a.due.localeCompare(b.due));
 }
 export function billsMonthSplit(bills = [], month) {
-  let rent = 0; let other = 0; let pending = 0; let pendingCount = 0;
+  let rent = 0; let other = 0; let pending = 0; let pendingCount = 0; const info = billCountInfo(bills);
   for (const b of bills) {
     if (!b.paid) { if (String(b.due).startsWith(`${month}-`)) { pending += b.amount; pendingCount += 1; } continue; }
-    if (!billSpentDate(b).startsWith(`${month}-`)) continue;
+    if (!(info.get(b)?.date || '').startsWith(`${month}-`)) continue;
     if (b.type === 'rent') rent += b.amount; else other += b.amount;
   }
   return { rent: round2(rent), other: round2(other), pending: round2(pending), pendingCount };

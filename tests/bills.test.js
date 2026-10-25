@@ -119,84 +119,79 @@ test('bills: direct debit — not "to pay", no warnings, auto-paid on the due da
   assert.equal(autoPayFor(after, 'Cosmote'), false);
 });
 
-test('v1.6.11/12: unpaid bills never count; paid ones count once, in their due month', async () => {
+test('v1.6.13: unpaid never count; a bill paid on its own counts in the month it was paid; undo takes it out', async () => {
   const { billsMonthSplit, billSpentDate } = await import('../src/bills.js');
   const deh = createBill({ id: 'd1', name: 'ΔΕΗ', amount: 60, due: '2026-11-05', period: 1 }, now);
   const water = createBill({ id: 'w1', name: 'ΕΥΔΑΠ', amount: 25, due: '2026-10-30' }, now);
   let bills = [deh, water];
-  // Not due yet / not paid: nothing in the October or November totals, both listed as pending in their due month.
   assert.deepEqual(billsMonthSplit(bills, '2026-10'), { rent: 0, other: 0, pending: 25, pendingCount: 1 });
   assert.deepEqual(billsMonthSplit(bills, '2026-11'), { rent: 0, other: 0, pending: 60, pendingCount: 1 });
   assert.equal(billStats(bills, 2026).total, 0);
-  // Paid early, on 25/10: still counts in November (its due month), not October; the new December one is pending.
+  // Paid early, on 25/10: counts in October (paid then); the new December one is pending.
   bills = payBill(bills, 'd1', '2026-10-25', now).bills;
-  assert.equal(billSpentDate(bills.find((b) => b.id === 'd1')), '2026-11-05');
-  assert.deepEqual(billsMonthSplit(bills, '2026-10'), { rent: 0, other: 0, pending: 25, pendingCount: 1 });
-  assert.deepEqual(billsMonthSplit(bills, '2026-11'), { rent: 0, other: 60, pending: 0, pendingCount: 0 });
+  assert.equal(billSpentDate(bills.find((b) => b.id === 'd1'), bills), '2026-10-25');
+  assert.deepEqual(billsMonthSplit(bills, '2026-10'), { rent: 0, other: 60, pending: 25, pendingCount: 1 });
+  assert.deepEqual(billsMonthSplit(bills, '2026-11'), { rent: 0, other: 0, pending: 0, pendingCount: 0 });
   assert.deepEqual(billsMonthSplit(bills, '2026-12'), { rent: 0, other: 0, pending: 60, pendingCount: 1 });
-  const s = billStats(bills, 2026); assert.equal(s.total, 60); assert.equal(s.months[10].total, 60); assert.equal(s.months[9].total, 0); assert.deepEqual(s.pending, { count: 2, total: 85 });
-  // Undo the payment: back out of the totals. No double counting across months.
+  const s = billStats(bills, 2026); assert.equal(s.total, 60); assert.equal(s.months[9].total, 60); assert.deepEqual(s.pending, { count: 2, total: 85 });
   bills = unpayBill(bills, 'd1', now);
   assert.equal(billStats(bills, 2026).total, 0);
+  // Old data without a payment date: its due date, else its billing period.
   assert.equal(billSpentDate({ paid: true, due: '2026-09-01' }), '2026-09-01');
+  assert.equal(billSpentDate({ paid: true, due: '', billingTo: '2026-03-31' }), '2026-03-31');
   assert.equal(billSpentDate({ paid: false, due: '2026-09-01' }), '');
 });
 
-test('v1.6.12: new user enters and ticks past months\' bills in October → each counts in its own month', async () => {
-  const { billsMonthSplit, paidHistory } = await import('../src/bills.js');
-  const now2 = '2026-10-20T10:00:00.000Z';
-  // Like a real household that started on 17–23/10: bills from July–October, all ticked «Πληρώθηκε» in October.
-  let bills = [
-    createBill({ id: 'r7', name: 'Ενοίκιο', type: 'rent', amount: 450, due: '2026-07-01' }, now2), createBill({ id: 'r8', name: 'Ενοίκιο', type: 'rent', amount: 450, due: '2026-08-01' }, now2),
-    createBill({ id: 'r9', name: 'Ενοίκιο', type: 'rent', amount: 450, due: '2026-09-01' }, now2), createBill({ id: 'r10', name: 'Ενοίκιο', type: 'rent', amount: 450, due: '2026-10-01', period: 1 }, now2),
-    createBill({ id: 'e8', name: 'ΔΕΗ', amount: 98.4, due: '2026-08-20' }, now2), createBill({ id: 'e10', name: 'ΔΕΗ', amount: 87.15, due: '2026-10-20', period: 2 }, now2),
-    createBill({ id: 'w9', name: 'ΕΥΔΑΠ', amount: 31.2, due: '2026-09-15' }, now2), createBill({ id: 'c10', name: 'Cosmote', amount: 45.9, due: '2026-10-10', period: 1, autoPay: true }, now2),
-    createBill({ id: 'n10', name: 'Netflix', amount: 62.93, due: '2026-10-28' }, now2)
-  ];
-  for (const id of ['r7', 'r8', 'r9', 'r10', 'e8', 'e10', 'w9']) bills = payBill(bills, id, id === 'r7' ? '2026-10-17' : '2026-10-21', now2).bills;
-  bills = applyAutoPay(bills, '2026-10-25', now2).bills;
-  const oct = billsMonthSplit(bills, '2026-10');
-  assert.deepEqual(oct, { rent: 450, other: 133.05, pending: 62.93, pendingCount: 1 }); // rent + ΔΕΗ + Cosmote; Netflix apart
-  assert.deepEqual(billsMonthSplit(bills, '2026-09'), { rent: 450, other: 31.2, pending: 0, pendingCount: 0 });
-  assert.deepEqual(billsMonthSplit(bills, '2026-08'), { rent: 450, other: 98.4, pending: 0, pendingCount: 0 });
-  assert.deepEqual(billsMonthSplit(bills, '2026-07'), { rent: 450, other: 0, pending: 0, pendingCount: 0 });
-  // Auto-created next bills (rent 1/11, ΔΕΗ 20/12, Cosmote 10/11) are unpaid: not in November's total, only pending.
-  assert.deepEqual(billsMonthSplit(bills, '2026-11'), { rent: 0, other: 0, pending: 495.9, pendingCount: 2 });
+test('v1.6.13: HIS case — whole year of ΔΕΗ scanned + ticked 18/10, ΕΥΔΑΠ (due Sept) paid in October', async () => {
+  const { billsMonthSplit, billsMonthList, paidHistory } = await import('../src/bills.js');
+  const at = '2026-10-18T09:00:00.000Z';
+  const dei = [181.2, 165.4, 120.3, 98.7, 88.1, 102.5, 140.8, 189.0, 156, 149];
+  let bills = dei.map((amount, i) => createBill({ id: `dei${i + 1}`, name: 'ΔΕΗ', amount, due: `2026-${String(i + 1).padStart(2, '0')}-22`, period: 0 }, at));
+  bills.push(createBill({ id: 'water', name: 'ΕΥΔΑΠ', amount: 105.41, due: '2026-09-28', period: 0 }, at));
+  bills.push(createBill({ id: 'net', name: 'Internet', amount: 62.93, due: '2026-10-30', period: 0 }, at));
+  for (let i = 1; i <= 10; i++) bills = payBill(bills, `dei${i}`, '2026-10-18').bills;
+  bills = payBill(bills, 'water', '2026-10-05').bills;
+  // October = ΔΕΗ Oct 149 (newest of the bulk, paid 18/10) + ΕΥΔΑΠ 105,41 (paid 5/10) = 254,41; Internet apart.
+  assert.deepEqual(billsMonthSplit(bills, '2026-10'), { rent: 0, other: 254.41, pending: 62.93, pendingCount: 1 });
+  assert.deepEqual(billsMonthSplit(bills, '2026-09'), { rent: 0, other: 156, pending: 0, pendingCount: 0 });
+  assert.equal(billsMonthSplit(bills, '2026-01').other, 181.2);
   const s = billStats(bills, 2026);
-  assert.deepEqual(s.months.slice(6, 10).map((m) => m.total), [450, 548.4, 481.2, 583.05]);
-  assert.equal(s.total, 2062.65); // = sum of the months, nothing counted twice
-  // The paid history groups the same way (October header = October total).
-  const h = paidHistory(bills, { limit: 50 });
-  assert.equal(h.groups.find((g) => g.month === '2026-10').total, 583.05);
-  assert.equal(h.groups.find((g) => g.month === '2026-08').total, 548.4);
+  assert.deepEqual(s.months.map((m) => m.total), [...dei.slice(0, 9), 254.41, 0, 0]);
+  assert.equal(s.total, Math.round((dei.reduce((a, b) => a + b, 0) + 105.41) * 100) / 100);
+  const oct = billsMonthList(bills, '2026-10');
+  assert.deepEqual(oct.map((b) => [b.id, b.by]), [['dei10', 'paid'], ['water', 'paid']]);
+  assert.deepEqual(billsMonthList(bills, '2026-03').map((b) => [b.id, b.by, b.old]), [['dei3', 'due', true]]);
+  assert.equal(paidHistory(bills, { limit: 50 }).groups.find((g) => g.month === '2026-10').total, 254.41);
+  // Same day, ΕΥΔΑΠ scanned with the ΔΕΗ ones: still only one ΕΥΔΑΠ (its own group) → payment day.
+  let same = payBill(unpayBill(bills, 'water'), 'water', '2026-10-18').bills;
+  assert.equal(billsMonthSplit(same, '2026-10').other, 254.41);
 });
 
-test('v1.6.12: the month breakdown lists exactly the bills that make up the figure', async () => {
-  const { billsMonthList, billsMonthSplit } = await import('../src/bills.js');
-  const bills = [
-    { id: 'a', name: 'ΔΕΗ', type: 'electricity', amount: 149, due: '2026-10-20', paid: true, paidAt: '2026-10-21' },
-    { id: 'b', name: 'ΕΥΔΑΠ', type: 'water', amount: 105.41, due: '2026-10-15', paid: true, paidAt: '2026-10-21' },
-    { id: 'c', name: 'ΔΕΗ', type: 'electricity', amount: 640, due: '2026-08-20', paid: true, paidAt: '2026-10-22' }, // past bill ticked in October
-    { id: 'd', name: 'Internet', type: 'phone', amount: 62.93, due: '2026-10-28', paid: false, paidAt: '' }
-  ];
-  const list = billsMonthList(bills, '2026-10');
-  assert.deepEqual(list.map((b) => b.id), ['a', 'b']);
-  const split = billsMonthSplit(bills, '2026-10');
-  assert.equal(Math.round(list.reduce((s, b) => s + b.amount, 0) * 100) / 100, split.rent + split.other);
-  assert.equal(split.other, 254.41);
-  assert.deepEqual(billsMonthList(bills, '2026-08').map((b) => b.id), ['c']);
+test('v1.6.13: «Παλιός λογαριασμός» / payment date set by hand always win; next instance starts clean', async () => {
+  const { billsMonthSplit } = await import('../src/bills.js');
+  let bills = [createBill({ id: 'a', name: 'ΕΥΔΑΠ', amount: 105.41, due: '2026-09-28', period: 4 }, now)];
+  bills = payBill(bills, 'a', '2026-10-05').bills;
+  assert.equal(billsMonthSplit(bills, '2026-10').other, 105.41);
+  // ✎: mark it as an old bill → September.
+  bills = bills.map((b) => (b.id === 'a' ? createBill({ ...b, countBy: 'due' }, now) : b));
+  assert.equal(billsMonthSplit(bills, '2026-09').other, 105.41); assert.equal(billsMonthSplit(bills, '2026-10').other, 0);
+  // ✎: back to payment month, with a corrected payment date in November.
+  bills = bills.map((b) => (b.id === 'a' ? createBill({ ...b, countBy: 'paid', paidAt: '2026-11-02' }, now) : b));
+  assert.equal(billsMonthSplit(bills, '2026-11').other, 105.41);
+  // The auto-created next bill doesn't inherit the choice; unpaying clears it.
+  const next = bills.find((b) => b.id !== 'a'); assert.equal('countBy' in next, false);
+  assert.equal('countBy' in unpayBill(bills, 'a').find((b) => b.id === 'a'), false);
+  // A bill paid twice in a bulk with an explicit choice is left out of the auto grouping.
+  const two = [createBill({ id: 'x', name: 'ΔΕΗ', amount: 10, due: '2026-08-01', paid: true, paidAt: '2026-10-18', countBy: 'paid' }, now), createBill({ id: 'y', name: 'ΔΕΗ', amount: 20, due: '2026-09-01', paid: true, paidAt: '2026-10-18' }, now)];
+  assert.equal(billsMonthSplit(two, '2026-10').other, 30);
 });
 
-test('v1.6.12: all 2026 ΔΕΗ bills scanned and ticked on 18/10 → each in its own month, not October', async () => {
-  const { billsMonthSplit, billSpentDate } = await import('../src/bills.js');
-  const amounts = [181.2, 165.4, 120.3, 98.7, 88.1, 102.5, 140.8, 160.2, 136.8, 149];
-  let bills = amounts.map((amount, i) => createBill({ id: `dei${i + 1}`, name: 'ΔΕΗ', amount, due: `2026-${String(i + 1).padStart(2, '0')}-22`, billingFrom: `2026-${String(i + 1).padStart(2, '0')}-01`, billingTo: `2026-${String(i + 1).padStart(2, '0')}-28`, period: 0 }, '2026-10-18T09:00:00.000Z'));
-  bills.push(createBill({ id: 'water', name: 'ΕΥΔΑΠ', amount: 105.41, due: '2026-10-12', period: 0 }, '2026-10-18T09:00:00.000Z'));
-  for (const b of [...bills]) bills = payBill(bills, b.id, '2026-10-18').bills;
-  assert.deepEqual(billsMonthSplit(bills, '2026-10'), { rent: 0, other: 254.41, pending: 0, pendingCount: 0 });
-  assert.equal(billStats(bills, 2026).months[0].total, 181.2);
-  assert.equal(billStats(bills, 2026).total, Math.round((amounts.reduce((a, b) => a + b, 0) + 105.41) * 100) / 100);
-  // Fallbacks: billing period end, then the payment day, only when the bill has no date of its own.
-  assert.equal(billSpentDate({ paid: true, due: '', billingTo: '2026-03-31', paidAt: '2026-10-18' }), '2026-03-31');
-  assert.equal(billSpentDate({ paid: true, due: '', paidAt: '2026-10-18' }), '2026-10-18');
+test('v1.6.13: catching up two months of the same bill on one day → older one in its due month (documented)', async () => {
+  const { billsMonthSplit } = await import('../src/bills.js');
+  const two = [createBill({ id: 'x', name: 'Cosmote', amount: 40, due: '2026-09-10', paid: true, paidAt: '2026-10-05' }, now), createBill({ id: 'y', name: 'cosmote', amount: 40, due: '2026-10-10', paid: true, paidAt: '2026-10-05' }, now)];
+  assert.equal(billsMonthSplit(two, '2026-10').other, 40); assert.equal(billsMonthSplit(two, '2026-09').other, 40);
+  // Direct debit: paid on its due date, so both rules agree.
+  let dd = [createBill({ id: 'd', name: 'Vodafone', amount: 30, due: '2026-10-10', period: 1, autoPay: true }, now)];
+  dd = applyAutoPay(dd, '2026-10-25', now).bills;
+  assert.equal(billsMonthSplit(dd, '2026-10').other, 30); assert.equal(billsMonthSplit(dd, '2026-11').other, 0);
 });
