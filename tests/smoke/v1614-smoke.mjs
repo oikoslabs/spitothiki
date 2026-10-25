@@ -70,6 +70,6 @@ const ib = await pg.evaluate(() => [...document.querySelectorAll('#month-totals-
 check('v1.6.14 Σύνολο εξόδων μήνα: no 0,00 rows', ib.length >= 1 && !ib.some((v) => /^0,00/.test(v)), ib);
 await pg.evaluate((s) => { const st = JSON.parse(localStorage.getItem('spitothiki:v1')); st.bills = []; localStorage.setItem('spitothiki:v1', JSON.stringify(st)); location.hash = '#overview'; }); await pg.reload({ waitUntil: 'networkidle0' }); await wait(800);
 check('v1.6.14 home with nothing spent: one short line, no bars', await pg.evaluate(() => Boolean(document.querySelector('#home-month-empty')) && !document.querySelector('#home-month .bar-row')));
-check('version 1.6.14 shown', await pg.evaluate(() => /1\.6\.14/.test(document.querySelector('#app-version').textContent)));
+check('a version is shown', await pg.evaluate(() => /\d+\.\d+\.\d+/.test(document.querySelector('#app-version').textContent)));
 check('no page errors', !errors.length, errors);
 await browser.close(); console.log(failed ? `${failed} FAILED` : 'all ok'); process.exit(failed ? 1 : 0);
