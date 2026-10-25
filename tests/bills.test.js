@@ -186,3 +186,17 @@ test('v1.6.12: the month breakdown lists exactly the bills that make up the figu
   assert.equal(split.other, 254.41);
   assert.deepEqual(billsMonthList(bills, '2026-08').map((b) => b.id), ['c']);
 });
+
+test('v1.6.12: all 2026 ΔΕΗ bills scanned and ticked on 18/10 → each in its own month, not October', async () => {
+  const { billsMonthSplit, billSpentDate } = await import('../src/bills.js');
+  const amounts = [181.2, 165.4, 120.3, 98.7, 88.1, 102.5, 140.8, 160.2, 136.8, 149];
+  let bills = amounts.map((amount, i) => createBill({ id: `dei${i + 1}`, name: 'ΔΕΗ', amount, due: `2026-${String(i + 1).padStart(2, '0')}-22`, billingFrom: `2026-${String(i + 1).padStart(2, '0')}-01`, billingTo: `2026-${String(i + 1).padStart(2, '0')}-28`, period: 0 }, '2026-10-18T09:00:00.000Z'));
+  bills.push(createBill({ id: 'water', name: 'ΕΥΔΑΠ', amount: 105.41, due: '2026-10-12', period: 0 }, '2026-10-18T09:00:00.000Z'));
+  for (const b of [...bills]) bills = payBill(bills, b.id, '2026-10-18').bills;
+  assert.deepEqual(billsMonthSplit(bills, '2026-10'), { rent: 0, other: 254.41, pending: 0, pendingCount: 0 });
+  assert.equal(billStats(bills, 2026).months[0].total, 181.2);
+  assert.equal(billStats(bills, 2026).total, Math.round((amounts.reduce((a, b) => a + b, 0) + 105.41) * 100) / 100);
+  // Fallbacks: billing period end, then the payment day, only when the bill has no date of its own.
+  assert.equal(billSpentDate({ paid: true, due: '', billingTo: '2026-03-31', paidAt: '2026-10-18' }), '2026-03-31');
+  assert.equal(billSpentDate({ paid: true, due: '', paidAt: '2026-10-18' }), '2026-10-18');
+});

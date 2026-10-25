@@ -85,7 +85,13 @@ export function billsDue(bills = [], today) {
 // A bill counts only once it is paid (v1.6.11), and it counts in the month it BELONGS to: its due date (v1.6.12).
 // v1.6.11 used the day «Πληρώθηκε» was pressed, so past months' bills entered and ticked in October all piled up in
 // October. Unpaid bills (also not-yet-run direct debits) are never in the totals; they are shown apart.
-export const billSpentDate = (b) => (b?.paid && DATE.test(String(b.due || '')) ? b.due : '');
+// The bill's own dates win: due date, else the end of its billing period; the payment day only as a last resort.
+// Never the day it was scanned or ticked when the bill has a date of its own.
+export const billSpentDate = (b) => {
+  if (!b?.paid) return '';
+  for (const d of [b.due, b.billingTo, b.billingFrom, b.paidAt]) if (DATE.test(String(d || ''))) return d;
+  return '';
+};
 
 // Monthly totals for a year (paid bills, by due month) and totals per type; unpaid ones of the year apart.
 export function billStats(bills = [], year) {
