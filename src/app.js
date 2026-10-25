@@ -18,6 +18,7 @@ import { BUILTIN_RECIPES, RECIPE_CATS } from './recipes.js';
 import { BILL_ICONS, BILL_PERIODS, BILL_TYPES, applyAutoPay, autoPayFor, billCountInfo, billsMonthList, billsMonthSplit, scheduledDebits, billStats, billsDue, createBill, guessBillType, paidHistory, parseBillCode, unpaidBills, payBill, unpayBill } from './bills.js';
 import { findDuplicateBill, readBillFile } from './bill-pdf.js';
 import { initDietUi, renderDietSection } from './diet-ui.js';
+import { SHARED, cleanName, memberNames, monthBalance, monthExpenses, payerOf, setPayer, settlementsFor } from './whopaid.js';
 import { pushDates, pushSupported, pushSubscription, syncPush, stopPush } from './push.js';
 import { autoListAdds } from './auto-list.js';
 import { comparePrices, listComparison } from './price-compare.js';
@@ -695,7 +696,7 @@ async function startSync() {
       config: firebaseConfig,
       getState: () => state,
       setState: (next) => { state = next; try { saveState(state); } catch {} renderApp(); },
-      onStatus: (status) => { syncStatus = status; if (status.user) requestPersistentStorage(); if (activeView === 'settings' || activeView === 'overview') renderApp(); maybeProtectSheet(); }
+      onStatus: (status) => { syncStatus = status; if (status.user) requestPersistentStorage(); ensureMyName(); if (activeView === 'settings' || activeView === 'overview' || activeView === 'insights') renderApp(); maybeProtectSheet(); }
     });
   } catch {
     syncStatus = { state: 'error', message: navigator.onLine === false ? 'Χωρίς σύνδεση: ο συγχρονισμός θα ξεκινήσει όταν επιστρέψει το internet.' : 'Δεν φόρτωσε το Firebase.' };
@@ -724,6 +725,7 @@ function renderSyncCard() {
   return `${head}<p>Συνδεδεμένος ως <strong>${escapeHtml(who)}</strong>${shared ? ` · ${escapeHtml(t('μέλος κοινού σπιτιού'))}` : ''}.</p>${line}
     <h3 class="settings-sub">Κοινό σπίτι</h3>
     <p>Όσοι είναι στο ίδιο σπίτι βλέπουν και αλλάζουν τα ίδια: απόθεμα, λίστα αγορών, λογαριασμούς και έξοδα. Ό,τι αλλάζει ο ένας, το βλέπει ο άλλος σε λίγα δευτερόλεπτα.</p>
+    ${Array.isArray(status.members) && status.members.length ? `<p class="field-hint" id="sync-members">${escapeHtml(t('Μέλη σε αυτό το σπίτι: {n}', { n: status.members.length }))}</p>` : ''}
     <div class="settings-actions"><button class="button button-quiet" type="button" data-action="sync-invite">＋ Πρόσκληση μέλους</button>${shared ? '<button class="button button-quiet" type="button" data-action="sync-leave">Αποχώρηση από το κοινό σπίτι</button>' : ''}<button class="button button-quiet" type="button" data-action="sync-signout">Αποσύνδεση</button></div>
     <form id="sync-join-form" class="sync-join-form" novalidate><label class="field-label" for="sync-invite-code">Σου έδωσαν κωδικό πρόσκλησης; Γράψ' τον εδώ για να μπεις στο σπίτι τους.</label><input class="field-input" id="sync-invite-code" name="invite" placeholder="Κωδικός πρόσκλησης" autocomplete="off"><button class="button button-quiet" type="submit">Μπες στο σπίτι</button></form>
     <p class="field-hint">Όταν μπαίνεις σε άλλο σπίτι, τα προϊόντα αυτής της συσκευής προστίθενται στο κοινό απόθεμα.</p>
@@ -2107,6 +2109,78 @@ function renderPendingBills(pending, id) {
   return `<button class="field-hint pending-bills text-button" type="button" data-view="bills" id="${id}">⏳ ${escapeHtml(pending.count === 1 ? t('1 απλήρωτος λογαριασμός · {amount} · δεν μετράει ακόμη', { amount: money(pending.total) }) : t('{count} απλήρωτοι λογαριασμοί · {amount} · δεν μετράνε ακόμη', { count: pending.count, amount: money(pending.total) }))}</button>`;
 }
 
+// ---------- v1.7.0: «Ποιος πλήρωσε τι» (shared households only) ----------
+// Shown only when signed in to a household with 2+ members. Reads the same expenses as «Σύνολο εξόδων μήνα»
+// (never changes them); who paid = the member's choice, else whoever entered it. Settlements are not expenses.
+const householdMembers = () => (syncStatus?.user && Array.isArray(syncStatus.members) ? syncStatus.members : []);
+const whoPaidOn = () => householdMembers().length >= 2 && householdMembers().includes(syncStatus.user.uid);
+function ensureMyName() {
+  if (!whoPaidOn() || syncStatus.state !== 'synced') return;
+  const uid = syncStatus.user.uid;
+  if ((state.people || []).some((p) => p.id === uid)) return;
+  state.people = [...(state.people || []), { id: uid, name: cleanName(String(syncStatus.user.name || '').split(' ')[0]), updatedAt: new Date().toISOString() }];
+  persist();
+}
+function whoPaidData(month = insightsMonth) {
+  const members = householdMembers();
+  const names = memberNames(members, state.people || [], (n) => t('Μέλος {n}', { n }));
+  const expenses = monthExpenses(state, month, sync?.writers?.() || {});
+  const balance = monthBalance({ expenses, payers: state.payers || [], members, split: (state.paySplit || []).find((x) => x.id === 'split'), settlements: state.settlements || [], month });
+  return { members, names, expenses, balance };
+}
+function whoPaidLabel(e) {
+  if (e.kind === 'receipt') return `🧾 ${e.label || t('Απόδειξη')}`;
+  if (e.kind === 'trip') return `🛒 ${e.label || t('Καλάθι')}`;
+  if (e.kind === 'purchase') return `🛒 ${e.label || t('Αγορά')}`;
+  if (e.kind === 'bill') return `📄 ${e.label}`;
+  if (e.kind === 'transport') return `${TRANSPORT_ICONS[e.type] || '🚗'} ${t(TRANSPORT_LABELS[e.type] || 'Μετακινήσεις')}${e.label ? ` · ${e.label}` : ''}`;
+  const cat = extraCats().find((c) => c.id === e.category);
+  return `${cat?.emoji || '☕'} ${cat ? extraCatLabel(cat) : t('Μικροέξοδα')}${e.label ? ` · ${e.label}` : ''}`;
+}
+function renderWhoPaid() {
+  // One member (signed in, members known): just a one-line hint, only here in Σύνολο εξόδων.
+  if (syncStatus?.user && householdMembers().length === 1) return `<p class="field-hint" id="whopaid-hint">🤝 ${escapeHtml(t('Για «Ποιος πλήρωσε τι» χρειάζονται 2 μέλη: Ρυθμίσεις → Κοινό σπίτι → ＋ Πρόσκληση μέλους.'))}</p>`;
+  if (!whoPaidOn()) return '';
+  const { members, names, expenses, balance } = whoPaidData();
+  const me = syncStatus.user.uid;
+  const pct = (m) => `${Math.round(balance.shares[m] * 10) / 10}%`;
+  const rows = members.map((m) => ({ label: `${names[m]} · ${t('μερίδιο {pct}', { pct: pct(m) })}`, value: balance.paid[m] }));
+  const lines = balance.transfers.length
+    ? balance.transfers.map((x) => `<p class="whopaid-owe" data-no-i18n>${escapeHtml(t('{from} χρωστάει σε {to}: {amount}', { from: names[x.from], to: names[x.to], amount: money(x.amount) }))}</p>`).join('')
+    : `<p class="whopaid-owe is-even">${escapeHtml(balance.counted ? t('Είστε πάτσι αυτόν τον μήνα ✓') : t('Κανένα έξοδο αυτόν τον μήνα ακόμη.'))}</p>`;
+  const done = balance.settlements.map((x) => `<li><span data-no-i18n>${escapeHtml(t('Εξοφλήθηκε {date}: {from} → {to} {amount}', { date: formatDate(x.date), from: names[x.from], to: names[x.to], amount: money(x.amount) }))}</span><button class="icon-button" type="button" data-action="whopaid-unsettle" data-id="${escapeHtml(x.id)}" aria-label="${escapeHtml(t('Αναίρεση εξόφλησης'))}">×</button></li>`).join('');
+  const options = (cur) => [...members.map((m) => `<option value="${escapeHtml(m)}" data-no-i18n ${cur === m ? 'selected' : ''}>${escapeHtml(names[m])}</option>`), `<option value="${SHARED}" ${cur === SHARED ? 'selected' : ''}>${escapeHtml(t('Κοινό ταμείο / δεν μετράει'))}</option>`, cur ? '' : `<option value="" selected>${escapeHtml(t('Χωρίς πληρωτή'))}</option>`].join('');
+  const list = expenses.map((e) => { const cur = payerOf(e, state.payers || [], members); return `<li><span><span data-no-i18n>${escapeHtml(whoPaidLabel(e))}</span> <small>${escapeHtml(formatDate(e.date))} · <strong data-no-i18n>${escapeHtml(money(e.amount))}</strong></small></span><label class="whopaid-select"><span class="visually-hidden">${escapeHtml(t('Πλήρωσε'))}</span><select class="field-input" data-whopaid-key="${escapeHtml(e.key)}">${options(cur)}</select></label></li>`; }).join('');
+  const split = (state.paySplit || []).find((x) => x.id === 'split');
+  return `<section class="panel settings-card" id="whopaid-card"><span class="stat-icon">🤝</span><h2>${escapeHtml(t('Ποιος πλήρωσε τι'))}</h2>
+    <p class="field-hint">${escapeHtml(t('{month} · μετράνε {amount}', { month: monthLabel(insightsMonth), amount: money(balance.counted) }))}</p>
+    ${renderBars(rows, money)}
+    ${balance.shared ? `<p class="field-hint" id="whopaid-shared">${escapeHtml(t('Κοινό ταμείο (δεν μετράει): {amount}', { amount: money(balance.shared) }))}</p>` : ''}
+    ${balance.unknown ? `<p class="field-hint" id="whopaid-unknown">${escapeHtml(t('Χωρίς πληρωτή: {amount} · διάλεξε παρακάτω ποιος πλήρωσε', { amount: money(balance.unknown) }))}</p>` : ''}
+    <div id="whopaid-balance">${lines}</div>
+    ${balance.transfers.length ? `<div class="settings-actions"><button class="button button-primary" type="button" data-action="whopaid-settle" id="whopaid-settle">✓ ${escapeHtml(t('Εξοφλήθηκε'))}</button></div>` : ''}
+    ${done ? `<ul class="whopaid-done" id="whopaid-done">${done}</ul>` : ''}
+    ${expenses.length ? `<details class="collapsible whopaid-list" id="whopaid-list" ${openAttr('whopaid-list')}><summary>${escapeHtml(t('Ποιος πλήρωσε κάθε έξοδο ({count})', { count: expenses.length }))}</summary><ul>${list}</ul></details>` : ''}
+    <details class="collapsible whopaid-list" id="whopaid-settings" ${openAttr('whopaid-settings')}><summary>${escapeHtml(t('Όνομα και μοίρασμα'))}</summary>
+      <form id="whopaid-form" novalidate>
+        <label class="field-label" for="whopaid-name">${escapeHtml(t('Το όνομά μου'))}</label><input class="field-input" id="whopaid-name" name="name" maxlength="30" value="${escapeHtml((state.people || []).find((p) => p.id === me)?.name || '')}" placeholder="${escapeHtml(names[me])}" autocomplete="off">
+        <p class="field-label">${escapeHtml(t('Ποσοστό του καθενός (%)'))}</p>
+        ${members.map((m) => `<div class="whopaid-share"><label for="whopaid-share-${escapeHtml(m)}" data-no-i18n>${escapeHtml(names[m])}</label><input class="field-input" id="whopaid-share-${escapeHtml(m)}" name="share" data-member="${escapeHtml(m)}" type="number" min="0" max="100" step="1" inputmode="numeric" value="${escapeHtml(String(Math.round((split ? balance.shares[m] : 100 / members.length) * 10) / 10))}"></div>`).join('')}
+        <p class="field-hint">${escapeHtml(t('Αρχικά μισά-μισά (ίσα). Τα ποσοστά ισχύουν για όλους τους μήνες.'))}</p>
+        <div class="settings-actions"><button class="button button-quiet" type="button" data-action="whopaid-equal">${escapeHtml(t('Ίσα'))}</button><button class="button button-primary" type="submit">${escapeHtml(t('Αποθήκευση'))}</button></div>
+      </form></details></section>`;
+}
+function saveWhoPaidForm(form) {
+  const me = syncStatus.user?.uid; if (!me) return;
+  const now = new Date().toISOString();
+  const name = cleanName(form.elements.name.value);
+  state.people = [...(state.people || []).filter((p) => p.id !== me), { id: me, name, updatedAt: now }];
+  const shares = {}; for (const input of form.querySelectorAll('[name="share"]')) shares[input.dataset.member] = Math.max(0, Math.min(100, Number(String(input.value).replace(',', '.')) || 0));
+  if (Object.values(shares).some((v) => v > 0)) state.paySplit = [...(state.paySplit || []).filter((x) => x.id !== 'split'), { id: 'split', shares, updatedAt: now }];
+  if (!persist()) return;
+  renderApp(); showToast('Αποθηκεύτηκε.');
+}
+
 // ---------- Small daily expenses (coffee, snacks, tobacco…) ----------
 let extrasMonthKey = monthKey(localDateKey());
 let extrasDraft = null; // manual form prefill / edit
@@ -2620,7 +2694,7 @@ function renderInsights() {
   return `${renderHeader('Σύνολο εξόδων', 'Πόσα ξοδεύεις και τι πετιέται, ανά μήνα.')}
     <div class="settings-actions"><button class="button button-quiet" type="button" data-view="receipts" id="insights-receipts">🧾 ${escapeHtml(t('Αποδείξεις'))} (${(state.receipts || []).length})</button></div>
     <div class="month-switch" role="group" aria-label="Μήνας"><button class="icon-button" type="button" data-action="insights-month" data-delta="-1" aria-label="Προηγούμενος μήνας">‹</button><strong id="insights-month" data-no-i18n>${escapeHtml(monthLabel(insightsMonth))}</strong><button class="icon-button" type="button" data-action="insights-month" data-delta="1" aria-label="Επόμενος μήνας" ${isCurrent ? 'disabled' : ''}>›</button></div>
-    <div class="settings-grid insights-grid">${renderMonthTotals(spending)}
+    <div class="settings-grid insights-grid">${renderMonthTotals(spending)}${renderWhoPaid()}
     <section class="panel settings-card" id="spending-card"><span class="stat-icon blue">€</span><h2>Έξοδα</h2>
       <p class="big-number" id="spending-total">${escapeHtml(money(spending.total))}</p>
       <p class="field-hint">${escapeHtml(t('{count} αγορές με τιμή · προηγούμενος μήνας: {prev}', { count: spending.count, prev: money(previous.total) }))}</p>
@@ -2887,6 +2961,15 @@ function handleAction(button) {
   else if (action === 'cart-remove') { const trip = activeTrip(); if (trip && saveTrip(removeCartItem(trip, button.dataset.key))) renderApp(); }
   else if (action === 'cart-line-step') { const trip = activeTrip(); const item = trip?.items.find((entry) => entry.key === button.dataset.key); if (item && saveTrip(updateCartItem(trip, item.key, { qty: item.qty + Number(button.dataset.delta) }))) renderApp(); }
   else if (action === 'cart-qty-step') { const input = document.querySelector('#cart-item-qty'); const kg = document.querySelector('#cart-item-unit').value === 'κιλά'; input.value = String(Math.max(0, Math.round(((Number(input.value) || 0) + Number(button.dataset.delta) * (kg ? 0.1 : 1)) * 1000) / 1000)); }
+  else if (action === 'whopaid-settle') {
+    const { names, balance } = whoPaidData();
+    if (!balance.transfers.length) return;
+    showConfirm(balance.transfers.map((x) => t('{from} έδωσε σε {to} {amount}', { from: names[x.from], to: names[x.to], amount: money(x.amount) })).join(' · ') + t('. Το υπόλοιπο του μήνα μηδενίζεται· τα έξοδα δεν αλλάζουν.'), () => {
+      state.settlements = [...(state.settlements || []), ...settlementsFor(balance, localDateKey())];
+      if (persist()) { renderApp(); showToast('Καταγράφηκε η εξόφληση.'); }
+    }, 'Εξοφλήθηκε;');
+  } else if (action === 'whopaid-unsettle') { state.settlements = (state.settlements || []).filter((x) => x.id !== button.dataset.id); if (persist()) renderApp(); }
+  else if (action === 'whopaid-equal') { const form = document.querySelector('#whopaid-form'); const n = form.querySelectorAll('[name="share"]').length; form.querySelectorAll('[name="share"]').forEach((i) => { i.value = String(Math.round((100 / n) * 10) / 10); }); }
   else if (action === 'keypad') {
     const input = document.querySelector('#cart-item-price');
     const key = button.dataset.key;
@@ -3152,6 +3235,7 @@ document.addEventListener('input', (event) => {
 
 document.addEventListener('change', (event) => {
   if (event.target.id === 'drive-auto') { try { localStorage.setItem(DRIVE_AUTO_KEY, event.target.checked ? '1' : '0'); } catch {} showToast(event.target.checked ? 'Το αυτόματο αντίγραφο ενεργοποιήθηκε.' : 'Το αυτόματο αντίγραφο σταμάτησε.'); return; }
+  if (event.target.dataset?.whopaidKey !== undefined) { state.payers = setPayer(state.payers || [], event.target.dataset.whopaidKey, event.target.value); if (persist()) { openPanels.add('whopaid-list'); renderApp(); } return; }
   if (event.target.id === 'bill-autopay') event.target.form.dataset.autoPayTouched = '1';
   if (event.target.id === 'scan-file') { const file = event.target.files?.[0]; event.target.value = ''; handleScanFile(file); return; }
   if (event.target.id === 'high-contrast') { setHighContrast(event.target.checked); renderApp(); document.querySelector('#high-contrast')?.focus(); return; }
@@ -3219,6 +3303,7 @@ document.addEventListener('input', (event) => {
 document.addEventListener('submit', (event) => {
   if (event.target.id === 'receipt-edit-form') { event.preventDefault(); saveReceiptEdit(event.target); return; }
   if (event.target.id === 'expcat-form' || event.target.id === 'expcat-edit-form') { event.preventDefault(); saveExpCatForm(event.target); return; }
+  if (event.target.id === 'whopaid-form') { event.preventDefault(); openPanels.add('whopaid-settings'); saveWhoPaidForm(event.target); return; }
   if (event.target.id === 'bill-form') { event.preventDefault(); saveBillForm(event.target); return; }
   if (event.target.id === 'chore-form') { event.preventDefault(); saveChoreForm(event.target); return; }
   if (event.target.id === 'transport-form') { event.preventDefault(); saveTransportForm(event.target); return; }

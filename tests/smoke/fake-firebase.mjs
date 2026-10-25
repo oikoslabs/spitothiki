@@ -63,6 +63,13 @@ export function writeBatch() {
   return { set: (ref, data) => ops.push([key(ref), data]), commit: async () => { for (const [k, d] of ops) await window.__fb('set', k, d); } };
 }
 export function onSnapshot(ref, options, next, error) {
+  if (typeof options === 'function') { error = next; next = options; }
+  if (ref.path.length % 2 === 0) { // a single document (e.g. the household, for its members)
+    let last, stopped = false;
+    const pollDoc = async () => { if (stopped) return; try { const d = await window.__fb('get', key(ref)); const s = JSON.stringify(d); if (s !== last) { last = s; next({ ...snap(ref, d), metadata: { fromCache: false } }); } } catch (e) { error?.(e); } setTimeout(pollDoc, 200); };
+    pollDoc();
+    return () => { stopped = true; };
+  }
   const prefix = key(ref) + '/';
   let seen = new Map(), stopped = false;
   const poll = async () => {

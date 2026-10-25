@@ -950,3 +950,15 @@ body:has(dialog[open]) .back-to-top-page { display: none; }
 :root[data-dark="1"] .alert-banner.is-danger { background: #3d2422; color: #ffb4ad; }
 :root[data-dark="1"] .budget-track { background: #2c3a33; }
 :root[data-dark="1"] .chore-card { background: var(--surface); }
+/* v1.7.0: «Ποιος πλήρωσε τι» (only for households with 2+ members). */
+.whopaid-owe { margin: 10px 0 4px; font-weight: 800; font-size: calc(16px * var(--text-scale)); }
+.whopaid-owe.is-even { color: var(--green); }
+.whopaid-done { list-style: none; margin: 8px 0 0; padding: 0; font-size: .9rem; color: var(--muted); }
+.whopaid-done li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 0; }
+.whopaid-list { margin-top: 12px; font-size: .92rem; }
+.whopaid-list summary { cursor: pointer; color: var(--muted); }
+.whopaid-list ul { list-style: none; margin: 8px 0 0; padding: 0; }
+.whopaid-list li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 0; border-top: 1px solid var(--line); }
+.whopaid-list small { display: block; color: var(--muted); }
+.whopaid-select select { min-width: 130px; max-width: 46vw; }
+.whopaid-share { display: grid; grid-template-columns: 1fr 90px; align-items: center; gap: 8px; margin-bottom: 6px; }

@@ -66,10 +66,12 @@ export function applyRemote(state, times, docs) {
 // backend: { subscribe(onDocs) -> unsubscribe, write(docs) -> Promise }
 // store: { load() -> { snapshot, times } | null, save({ snapshot, times }) }
 export class SyncEngine {
-  constructor({ backend, getState, setState, store, now = () => Date.now() }) {
-    Object.assign(this, { backend, getState, setState, store, now });
+  constructor({ backend, getState, setState, store, now = () => Date.now(), uid = () => '' }) {
+    Object.assign(this, { backend, getState, setState, store, now, uid });
     const saved = store.load() || {};
     this.times = saved.times || {};
+    // v1.7.0: who last saved each record ('kind:id' → uid), from the sync rows' `by`; local meta only, never sent.
+    this.writers = saved.writers && typeof saved.writers === 'object' ? saved.writers : {};
     this.snapshot = saved.snapshot || null;
     this.ready = false;
     this.unsubscribe = null;
@@ -87,6 +89,11 @@ export class SyncEngine {
 
   receive(docs) {
     const firstSync = !this.ready;
+    for (const doc of docs) {
+      if (!doc?.kind || !doc.id) continue;
+      const key = recordKey(doc.kind, doc.id);
+      if (doc.deleted) delete this.writers[key]; else if (doc.by && (Number(doc.ts) >= Number(this.times[key] || 0))) this.writers[key] = String(doc.by);
+    }
     const result = applyRemote(this.getState(), this.times, docs);
     this.times = result.times;
     if (firstSync) {
@@ -125,13 +132,14 @@ export class SyncEngine {
     if (!changes.length) return Promise.resolve();
     const ts = this.now();
     const docs = changes.map((change) => ({ ...change, ts }));
-    for (const doc of docs) this.times[recordKey(doc.kind, doc.id)] = ts;
+    const me = this.uid() || '';
+    for (const doc of docs) { const key = recordKey(doc.kind, doc.id); this.times[key] = ts; if (doc.deleted) delete this.writers[key]; else if (me) this.writers[key] = me; }
     this.snapshot = JSON.parse(JSON.stringify(lists(current)));
     this.persistMeta();
     return this.backend.write(docs);
   }
 
   persistMeta() {
-    this.store.save({ snapshot: this.snapshot, times: this.times });
+    this.store.save({ snapshot: this.snapshot, times: this.times, writers: this.writers });
   }
 }
