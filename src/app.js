@@ -26,7 +26,7 @@ import { addCartItem, budgetState, createTrip, finishTrip, lastPrice, lineTotal,
 import { VM_MODES, interpretCode } from './gs1.js';
 import { initBackToTop } from './back-to-top.js';
 import { BAR_KEY, BAR_MAX, BAR_OPTIONS, DEFAULT_BAR, barOption, moveBar, parseBar, toggleBar } from './bar.js';
-import { CHORE_SUGGESTIONS, choreDates, choreMembers, choreStatus, choresDueToday, choresSummary, createChore, historyCounts, lastDone, markDone, nextDue, sortChores, undoDone } from './chores.js';
+import { CHORE_SUGGESTIONS, choreDates, choreMembers, choreStatus, choreNotice, choresDueToday, choresSummary, createChore, historyCounts, lastDone, markDone, nextDue, sortChores, undoDone } from './chores.js';
 import { decryptBackup, decryptWithKey, deriveDeviceKey, encryptBackup, encryptWithKey, readBackup } from './backup-crypto.js';
 import { DRIVE_AUTO_KEY, DRIVE_ENABLED_KEY, DRIVE_HASH_KEY, DRIVE_LAST_KEY, autoBackupDue, createDriveClient, stateHash } from './gdrive.js';
 import { forgetToken, getDriveToken } from './gdrive-auth.js';
@@ -1066,6 +1066,16 @@ async function checkExpiryNotifications() {
       saveNotifySettings({ lastBillNotified: today });
     } catch {}
   }
+  // v1.6.11: chores due or late also notify when the app opens (once a day, shared with the service worker's mark).
+  try {
+    const cache = await caches.open(DATA_CACHE);
+    const last = await (await cache.match('./__chores-notified'))?.text() || '';
+    const notice = choreNotice(state.chores || [], today, last);
+    if (notice) {
+      await showNotification(t('Σήμερα: {list}', { list: notice.names.join(', ') + (notice.more ? '…' : '') }), '', 'spitothiki-chores');
+      await cache.put('./__chores-notified', new Response(today));
+    }
+  } catch {}
   if (settings.lastNotified === today) return;
   if (swSnapshot?.lastNotified === today) { saveNotifySettings({ lastNotified: today }); return; }
   const due = expiringWithin(state.items, today, settings.days);
@@ -2065,17 +2075,22 @@ function monthTotals(month) {
   const own = expenseCategoryMonth({ purchases: state.purchases || [], extras: state.extras || [], categories: state.expenseCategories || [] }, month);
   const rows = [{ label: `🛒 ${t('Αγορές')}`, value: own.shopping }, { label: `🏠 ${t('Ενοίκιο / κοινόχρηστα')}`, value: split.rent }, { label: `📄 ${t('Λογαριασμοί')}`, value: split.other }, { label: `🛣️ ${t('Διόδια')}`, value: tolls }, { label: `🚗 ${t('Μετακινήσεις')}`, value: transport }, { label: `☕ ${t('Μικροέξοδα')}`, value: own.extras },
     ...own.rows.map((c) => ({ label: `${c.emoji} ${c.name}`, value: c.total, own: true }))];
-  return { rows, total: Math.round((shopping + tolls + transport + extras + bills) * 100) / 100 };
+  return { rows, pending: { count: split.pendingCount, total: split.pending }, total: Math.round((shopping + tolls + transport + extras + bills) * 100) / 100 };
 }
 function renderMonthTotals() {
-  const { rows, total } = monthTotals(insightsMonth);
+  const { rows, total, pending } = monthTotals(insightsMonth);
   const prev = monthTotals(shiftMonth(insightsMonth, -1));
   const diff = Math.round((total - prev.total) * 100) / 100;
   const trend = !prev.total ? '' : diff > 0 ? t('▲ {amount} από τον προηγούμενο μήνα', { amount: money(diff) }) : diff < 0 ? t('▼ {amount} από τον προηγούμενο μήνα', { amount: money(-diff) }) : t('Ίδιο με τον προηγούμενο μήνα');
   const shown = rows.map((row, i) => ({ ...row, label: prev.rows[i]?.value ? `${row.label} · ${t('πριν: {amount}', { amount: money(prev.rows[i].value) })}` : row.label })).filter((row, i) => (i !== 1 && !row.own) || row.value || prev.rows[i]?.value);
   return `<section class="panel settings-card" id="month-totals-card"><span class="stat-icon blue">∑</span><h2>Σύνολο εξόδων μήνα</h2><p class="big-number" id="month-grand-total">${escapeHtml(money(total))}</p>
     <p class="field-hint month-trend ${diff > 0 ? 'up' : 'down'}" id="month-trend">${escapeHtml(trend || t('Προηγούμενος μήνας: {amount}', { amount: money(prev.total) }))}</p>
-    ${renderBars(shown, money)}</section>`;
+    ${renderBars(shown, money)}${renderPendingBills(pending, 'month-pending-bills')}</section>`;
+}
+// v1.6.11: unpaid bills are not spent money yet: shown apart, never in the totals; they count on the day they are paid.
+function renderPendingBills(pending, id) {
+  if (!pending?.count) return '';
+  return `<button class="field-hint pending-bills text-button" type="button" data-view="bills" id="${id}">⏳ ${escapeHtml(pending.count === 1 ? t('1 απλήρωτος λογαριασμός · {amount} · δεν μετράει ακόμη', { amount: money(pending.total) }) : t('{count} απλήρωτοι λογαριασμοί · {amount} · δεν μετράνε ακόμη', { count: pending.count, amount: money(pending.total) }))}</button>`;
 }
 
 // ---------- Small daily expenses (coffee, snacks, tobacco…) ----------
@@ -2507,8 +2522,8 @@ function renderBillsCard() {
   const current = Number(localDateKey().slice(0, 4));
   return `<section class="panel settings-card" id="bills-card"><span class="stat-icon">📄</span><h2>Λογαριασμοί</h2>
     <div class="month-switch" role="group" aria-label="Έτος"><button class="icon-button" type="button" data-action="bills-year" data-delta="-1" aria-label="Προηγούμενο έτος">‹</button><strong id="bills-year" data-no-i18n>${billsYear}</strong><button class="icon-button" type="button" data-action="bills-year" data-delta="1" aria-label="Επόμενο έτος" ${billsYear > current ? 'disabled' : ''}>›</button></div>
-    <p class="big-number" id="bills-year-total">${escapeHtml(money(stats.total))}</p>
-    <p class="field-hint">${escapeHtml(t('Σύνολο έτους · {month}: {sum}', { month: monthLabel(insightsMonth), sum: money(insightsMonth.startsWith(`${billsYear}-`) ? stats.months[Number(insightsMonth.slice(5, 7)) - 1].total : 0) }))}</p>
+    <p class="big-number" id="bills-year-total">${escapeHtml(money(stats.total))}</p>${renderPendingBills(stats.pending, 'bills-year-pending')}
+    <p class="field-hint">${escapeHtml(t('Πληρωμένοι έτους · {month}: {sum}', { month: monthLabel(insightsMonth), sum: money(insightsMonth.startsWith(`${billsYear}-`) ? stats.months[Number(insightsMonth.slice(5, 7)) - 1].total : 0) }))}</p>
     ${stats.total ? `<div id="bills-months">${renderBars(stats.months.map((row) => ({ label: short(row.month), value: row.total })), money)}</div><h3 class="insights-subtitle">Ανά είδος</h3>${renderBars(stats.byType.map((row) => ({ label: `${BILL_ICONS[row.type]} ${t(BILL_TYPE_LABELS[row.type])}`, value: row.total })), money)}` : '<p class="subtle-empty">Δεν υπάρχουν λογαριασμοί για αυτό το έτος.</p>'}</section>`;
 }
 

@@ -54,10 +54,12 @@ test('bills: yearly stats by month and type', () => {
     createBill({ name: 'ΔΕΗ', amount: 99, due: '2025-12-20' }, now)
   ];
   const s = billStats(bills, 2026);
-  assert.equal(s.total, 132.99);
+  // v1.6.11: only the paid one counts; the two unpaid March bills are shown apart.
+  assert.equal(s.total, 50);
   assert.equal(s.months[0].paid, 50);
-  assert.equal(s.months[2].total, 82.99);
-  assert.deepEqual(s.byType.map((r) => r.type), ['electricity', 'subscription']);
+  assert.equal(s.months[2].total, 0);
+  assert.deepEqual(s.pending, { count: 2, total: 82.99 });
+  assert.deepEqual(s.byType.map((r) => r.type), ['electricity']);
 });
 
 test('bills: RF references, EPC QR and barcodes', () => {
@@ -111,8 +113,32 @@ test('bills: direct debit — not "to pay", no warnings, auto-paid on the due da
   assert.deepEqual(caught.paid.length, 4);
   assert.equal(caught.bills.filter((b) => b.name === 'ΔΕΗ' && !b.paid).length, 1);
   // counted once in the yearly stats
-  assert.equal(billStats(caught.bills, 2026).months[9].total, 80);
+  assert.equal(billStats(caught.bills, 2026).months[9].total, 50); // v1.6.11: the unpaid ΕΥΔΑΠ (30) is not counted
   assert.equal(autoPayFor(after, 'δεη'), true);
   assert.equal(autoPayFor(after, 'ΕΥΔΑΠ'), false);
   assert.equal(autoPayFor(after, 'Cosmote'), false);
+});
+
+test('v1.6.11: unpaid bills never count; paid ones count once, on the payment day', async () => {
+  const { billsMonthSplit, billSpentDate } = await import('../src/bills.js');
+  const deh = createBill({ id: 'd1', name: 'ΔΕΗ', amount: 60, due: '2026-11-05', period: 1 }, now);
+  const water = createBill({ id: 'w1', name: 'ΕΥΔΑΠ', amount: 25, due: '2026-10-30' }, now);
+  let bills = [deh, water];
+  // Not due yet / not paid: nothing in the October or November totals, both listed as pending in their due month.
+  assert.deepEqual(billsMonthSplit(bills, '2026-10'), { rent: 0, other: 0, pending: 25, pendingCount: 1 });
+  assert.deepEqual(billsMonthSplit(bills, '2026-11'), { rent: 0, other: 0, pending: 60, pendingCount: 1 });
+  assert.equal(billStats(bills, 2026).total, 0);
+  // Paid early, on 25/10: counts in October (payment day), not in November; the new December instance is pending.
+  bills = payBill(bills, 'd1', '2026-10-25', now).bills;
+  assert.equal(billSpentDate(bills.find((b) => b.id === 'd1')), '2026-10-25');
+  assert.deepEqual(billsMonthSplit(bills, '2026-10'), { rent: 0, other: 60, pending: 25, pendingCount: 1 });
+  assert.deepEqual(billsMonthSplit(bills, '2026-11'), { rent: 0, other: 0, pending: 0, pendingCount: 0 });
+  assert.deepEqual(billsMonthSplit(bills, '2026-12'), { rent: 0, other: 0, pending: 60, pendingCount: 1 });
+  const s = billStats(bills, 2026); assert.equal(s.total, 60); assert.equal(s.months[9].total, 60); assert.deepEqual(s.pending, { count: 2, total: 85 });
+  // Undo the payment: back out of the totals. No double counting across months.
+  bills = unpayBill(bills, 'd1', now);
+  assert.equal(billStats(bills, 2026).total, 0);
+  // Old data paid without a payment date: counts on its due date.
+  assert.equal(billSpentDate({ paid: true, due: '2026-09-01' }), '2026-09-01');
+  assert.equal(billSpentDate({ paid: false, due: '2026-09-01' }), '');
 });

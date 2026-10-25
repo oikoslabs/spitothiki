@@ -912,3 +912,5 @@ button.stat-card:hover { border-color: #bfd4c1; }
 }
 .item-dialog, .confirm-dialog { overflow-x: hidden; }
 body:has(dialog[open]) .back-to-top-page { display: none; }
+/* v1.6.11: unpaid bills shown apart from the totals («δεν μετράνε ακόμη»). */
+.pending-bills { display: block; margin-top: 10px; text-align: left; color: var(--muted, #6b6b6b); font-size: .9rem; }
