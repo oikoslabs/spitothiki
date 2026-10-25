@@ -933,3 +933,15 @@ body:has(dialog[open]) .back-to-top-page { display: none; }
   background-color: var(--surface); color: var(--ink); -webkit-text-fill-color: var(--ink); caret-color: var(--ink); color-scheme: dark; }
 :root[data-dark="1"] :is(.field-input, input):-webkit-autofill { -webkit-box-shadow: 0 0 0 40px var(--surface) inset; -webkit-text-fill-color: var(--ink); }
 :root[data-dark="1"] .cart-price-display { background-color: var(--surface-soft); }
+/* v1.7.0: «Ποιος πλήρωσε τι» (only for households with 2+ members). */
+.whopaid-owe { margin: 10px 0 4px; font-weight: 800; font-size: calc(16px * var(--text-scale)); }
+.whopaid-owe.is-even { color: var(--green); }
+.whopaid-done { list-style: none; margin: 8px 0 0; padding: 0; font-size: .9rem; color: var(--muted); }
+.whopaid-done li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 0; }
+.whopaid-list { margin-top: 12px; font-size: .92rem; }
+.whopaid-list summary { cursor: pointer; color: var(--muted); }
+.whopaid-list ul { list-style: none; margin: 8px 0 0; padding: 0; }
+.whopaid-list li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 0; border-top: 1px solid var(--line); }
+.whopaid-list small { display: block; color: var(--muted); }
+.whopaid-select select { min-width: 130px; max-width: 46vw; }
+.whopaid-share { display: grid; grid-template-columns: 1fr 90px; align-items: center; gap: 8px; margin-bottom: 6px; }

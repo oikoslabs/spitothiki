@@ -18,6 +18,10 @@ export async function createFirebaseSync({ config, getState, setState, onStatus 
   let engine = null;
   let householdId = '';
   let user = null;
+  let members = []; // v1.7.0: uids of the household (read-only, for «Ποιος πλήρωσε τι»)
+  let stopMembers = null;
+  let lastStatus = {};
+  const report = (status) => { lastStatus = status; onStatus(status); };
 
   const metaStore = (hid) => ({
     load: () => { try { const saved = JSON.parse(localStorage.getItem(META_KEY) || 'null'); return saved?.householdId === hid ? saved : null; } catch { return null; } },
@@ -33,8 +37,8 @@ export async function createFirebaseSync({ config, getState, setState, onStatus 
           const changes = first ? snapshot.docs : snapshot.docChanges().filter((c) => c.type !== 'removed').map((c) => c.doc);
           first = false;
           onDocs(changes.map((d) => d.data()));
-          onStatus({ state: 'synced', user, householdId: hid, offline: snapshot.metadata.fromCache });
-        }, (error) => onStatus({ state: 'error', user, householdId: hid, message: error.code || error.message }));
+          report({ state: 'synced', user, householdId: hid, members, offline: snapshot.metadata.fromCache });
+        }, (error) => report({ state: 'error', user, householdId: hid, message: error.code || error.message }));
       },
       async write(docs) {
         for (let i = 0; i < docs.length; i += 400) {
@@ -43,7 +47,7 @@ export async function createFirebaseSync({ config, getState, setState, onStatus 
             batch.set(fs.doc(records, `${doc.kind}_${doc.id}`), { kind: doc.kind, id: String(doc.id), data: doc.deleted ? null : doc.data, deleted: Boolean(doc.deleted), ts: doc.ts, by: user?.uid || '' });
           }
           // Offline: Firestore queues the batch and sends it when back online.
-          batch.commit().catch((error) => onStatus({ state: 'error', user, householdId: hid, message: error.code || error.message }));
+          batch.commit().catch((error) => report({ state: 'error', user, householdId: hid, message: error.code || error.message }));
         }
       }
     };
@@ -64,20 +68,31 @@ export async function createFirebaseSync({ config, getState, setState, onStatus 
   function connect(hid) {
     engine?.stop();
     householdId = hid;
-    engine = new SyncEngine({ backend: backendFor(hid), getState, setState, store: metaStore(hid) });
+    engine = new SyncEngine({ backend: backendFor(hid), getState, setState, store: metaStore(hid), uid: () => user?.uid || '' });
     engine.start();
+    // v1.7.0: household members (read only; a failure just hides «Ποιος πλήρωσε τι»).
+    stopMembers?.(); members = [];
+    try {
+      stopMembers = fs.onSnapshot(fs.doc(db, 'households', hid), (doc) => {
+        const list = Array.isArray(doc.data()?.members) ? doc.data().members.filter((m) => typeof m === 'string') : [];
+        if (list.join() === members.join()) return;
+        members = list;
+        if (lastStatus.householdId === hid) report({ ...lastStatus, members });
+      }, () => {});
+    } catch { stopMembers = null; }
   }
 
   auth.onAuthStateChanged(authApi, async (current) => {
     user = current ? { uid: current.uid, email: current.email, name: current.displayName } : null;
-    if (!current) { engine?.stop(); engine = null; householdId = ''; onStatus({ state: 'signed-out' }); return; }
-    onStatus({ state: 'connecting', user });
+    if (!current) { engine?.stop(); engine = null; householdId = ''; stopMembers?.(); stopMembers = null; members = []; report({ state: 'signed-out' }); return; }
+    report({ state: 'connecting', user });
     try { connect(await ensureHousehold(current.uid)); }
-    catch (error) { onStatus({ state: 'error', user, message: error.code || error.message }); }
+    catch (error) { report({ state: 'error', user, message: error.code || error.message }); }
   });
 
   return {
     push: () => engine?.push(),
+    writers: () => engine?.writers || {},
     async signInWithGoogle() {
       const provider = new auth.GoogleAuthProvider();
       try { await auth.signInWithPopup(authApi, provider); }
