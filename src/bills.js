@@ -82,12 +82,12 @@ export function billsDue(bills = [], today) {
     .sort((a, b) => a.due.localeCompare(b.due));
 }
 
-// v1.6.11: a bill counts as money spent only once it is paid, on the day it was paid (paidAt; old data without it:
-// its due date). Unpaid bills (also not-yet-run direct debits) are never in the totals; they are shown apart as
-// «απλήρωτοι». Before, every bill counted by due month even if unpaid.
-export const billSpentDate = (b) => (b?.paid ? String(DATE.test(String(b.paidAt || '')) ? b.paidAt : b.due || '') : '');
+// A bill counts only once it is paid (v1.6.11), and it counts in the month it BELONGS to: its due date (v1.6.12).
+// v1.6.11 used the day «Πληρώθηκε» was pressed, so past months' bills entered and ticked in October all piled up in
+// October. Unpaid bills (also not-yet-run direct debits) are never in the totals; they are shown apart.
+export const billSpentDate = (b) => (b?.paid && DATE.test(String(b.due || '')) ? b.due : '');
 
-// Monthly totals for a year (paid bills, by payment month) and totals per type; unpaid ones of the year apart.
+// Monthly totals for a year (paid bills, by due month) and totals per type; unpaid ones of the year apart.
 export function billStats(bills = [], year) {
   const months = Array.from({ length: 12 }, (_, i) => ({ month: `${year}-${String(i + 1).padStart(2, '0')}`, total: 0, paid: 0 }));
   const byType = {}; const pending = { count: 0, total: 0 };
@@ -145,8 +145,9 @@ export function paidHistory(bills = [], { filter = '', limit = 10 } = {}) {
   const [field, ...rest] = String(filter).split(':');
   const value = rest.join(':');
   const matches = (b) => !filter || (field === 'type' ? b.type === value : field === 'name' ? String(b.name).trim().toLocaleLowerCase('el-GR') === value.toLocaleLowerCase('el-GR') : true);
-  const when = (b) => String(b.paidAt || b.due || '');
-  const list = all.filter(matches).sort((a, b) => when(b).localeCompare(when(a)) || String(b.due).localeCompare(String(a.due)));
+  // v1.6.12: grouped by the month the bill belongs to (due date), same as the totals; newest payment first inside.
+  const when = (b) => String(b.due || '');
+  const list = all.filter(matches).sort((a, b) => when(b).localeCompare(when(a)) || String(b.paidAt || '').localeCompare(String(a.paidAt || '')));
   const shown = list.slice(0, Math.max(1, limit));
   const groups = [];
   for (const bill of shown) {
@@ -184,6 +185,12 @@ export function autoPayFor(bills = [], name) {
 }
 
 // Bills due in a month, with rent/common charges split out so they show as their own expense row.
+// v1.6.12: what makes up a month's bills figure (paid, by due month), biggest first, so anyone can check the number.
+export function billsMonthList(bills = [], month) {
+  return bills.filter((b) => billSpentDate(b).startsWith(`${month}-`))
+    .map((b) => ({ id: b.id, name: b.name, type: b.type, amount: round2(b.amount), due: b.due, paidAt: DATE.test(String(b.paidAt || '')) ? b.paidAt : '', autoPay: Boolean(b.autoPay) }))
+    .sort((a, b) => b.amount - a.amount || a.due.localeCompare(b.due));
+}
 export function billsMonthSplit(bills = [], month) {
   let rent = 0; let other = 0; let pending = 0; let pendingCount = 0;
   for (const b of bills) {

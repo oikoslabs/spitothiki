@@ -15,7 +15,7 @@ import { applyDisplayPrefs, highContrast, setHighContrast, setTextSize, textSize
 import { RECURRING_INTERVALS, applyRecurring, createRecurring, dueFromSnapshot, expirySnapshot, parseVoiceItems } from './features.js';
 import { MEAL_SLOTS, copyPreviousWeek, createMeal, recipeFromMealDb, shiftDays, weekDays, weekShoppingNeeds, weekStart } from './mealplan.js';
 import { BUILTIN_RECIPES, RECIPE_CATS } from './recipes.js';
-import { BILL_ICONS, BILL_PERIODS, BILL_TYPES, applyAutoPay, autoPayFor, billsMonthSplit, scheduledDebits, billStats, billsDue, createBill, guessBillType, paidHistory, parseBillCode, unpaidBills, payBill, unpayBill } from './bills.js';
+import { BILL_ICONS, BILL_PERIODS, BILL_TYPES, applyAutoPay, autoPayFor, billsMonthList, billsMonthSplit, scheduledDebits, billStats, billsDue, createBill, guessBillType, paidHistory, parseBillCode, unpaidBills, payBill, unpayBill } from './bills.js';
 import { findDuplicateBill, readBillFile } from './bill-pdf.js';
 import { initDietUi, renderDietSection } from './diet-ui.js';
 import { pushDates, pushSupported, pushSubscription, syncPush, stopPush } from './push.js';
@@ -2087,6 +2087,12 @@ function renderMonthTotals() {
     <p class="field-hint month-trend ${diff > 0 ? 'up' : 'down'}" id="month-trend">${escapeHtml(trend || t('Προηγούμενος μήνας: {amount}', { amount: money(prev.total) }))}</p>
     ${renderBars(shown, money)}${renderPendingBills(pending, 'month-pending-bills')}</section>`;
 }
+// v1.6.12: «Ποιοι λογαριασμοί μετράνε» for the chosen month: closed by default, one line per bill.
+function renderBillsMonthList() {
+  const list = billsMonthList(state.bills || [], insightsMonth);
+  if (!list.length) return '';
+  return `<details class="bills-month-list" id="bills-month-list"><summary>${escapeHtml(t('Ποιοι μετράνε τον {month} ({count})', { month: monthLabel(insightsMonth), count: list.length }))}</summary><ul>${list.map((b) => `<li><span><span data-no-i18n>${escapeHtml(b.name)}</span> <small>${escapeHtml(t('λήξη {date}', { date: formatDate(b.due) }))}${b.paidAt ? ` · ${escapeHtml(t(b.autoPay ? 'πάγια {date}' : 'πληρώθηκε {date}', { date: formatDate(b.paidAt) }))}` : ''}</small></span><strong data-no-i18n>${escapeHtml(money(b.amount))}</strong></li>`).join('')}</ul></details>`;
+}
 // v1.6.11: unpaid bills are not spent money yet: shown apart, never in the totals; they count on the day they are paid.
 function renderPendingBills(pending, id) {
   if (!pending?.count) return '';
@@ -2522,7 +2528,7 @@ function renderBillsCard() {
   const current = Number(localDateKey().slice(0, 4));
   return `<section class="panel settings-card" id="bills-card"><span class="stat-icon">📄</span><h2>Λογαριασμοί</h2>
     <div class="month-switch" role="group" aria-label="Έτος"><button class="icon-button" type="button" data-action="bills-year" data-delta="-1" aria-label="Προηγούμενο έτος">‹</button><strong id="bills-year" data-no-i18n>${billsYear}</strong><button class="icon-button" type="button" data-action="bills-year" data-delta="1" aria-label="Επόμενο έτος" ${billsYear > current ? 'disabled' : ''}>›</button></div>
-    <p class="big-number" id="bills-year-total">${escapeHtml(money(stats.total))}</p>${renderPendingBills(stats.pending, 'bills-year-pending')}
+    <p class="big-number" id="bills-year-total">${escapeHtml(money(stats.total))}</p>${renderPendingBills(stats.pending, 'bills-year-pending')}${renderBillsMonthList()}
     <p class="field-hint">${escapeHtml(t('Πληρωμένοι έτους · {month}: {sum}', { month: monthLabel(insightsMonth), sum: money(insightsMonth.startsWith(`${billsYear}-`) ? stats.months[Number(insightsMonth.slice(5, 7)) - 1].total : 0) }))}</p>
     ${stats.total ? `<div id="bills-months">${renderBars(stats.months.map((row) => ({ label: short(row.month), value: row.total })), money)}</div><h3 class="insights-subtitle">Ανά είδος</h3>${renderBars(stats.byType.map((row) => ({ label: `${BILL_ICONS[row.type]} ${t(BILL_TYPE_LABELS[row.type])}`, value: row.total })), money)}` : '<p class="subtle-empty">Δεν υπάρχουν λογαριασμοί για αυτό το έτος.</p>'}</section>`;
 }

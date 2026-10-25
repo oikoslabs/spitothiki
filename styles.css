@@ -914,3 +914,9 @@ button.stat-card:hover { border-color: #bfd4c1; }
 body:has(dialog[open]) .back-to-top-page { display: none; }
 /* v1.6.11: unpaid bills shown apart from the totals («δεν μετράνε ακόμη»). */
 .pending-bills { display: block; margin-top: 10px; text-align: left; color: var(--muted, #6b6b6b); font-size: .9rem; }
+/* v1.6.12: which bills make up the month's figure (closed by default). */
+.bills-month-list { margin-top: 10px; font-size: .92rem; }
+.bills-month-list summary { cursor: pointer; color: var(--muted); }
+.bills-month-list ul { list-style: none; margin: 8px 0 0; padding: 0; }
+.bills-month-list li { display: flex; justify-content: space-between; gap: 10px; padding: 6px 0; border-top: 1px solid rgba(0,0,0,.06); }
+.bills-month-list small { display: block; color: var(--muted); }
