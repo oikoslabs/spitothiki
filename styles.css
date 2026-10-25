@@ -427,7 +427,9 @@ body[data-screen="pantry"] .topbar .button-add { display: none; }
 
 /* Scan receipt */
 .receipt-dialog { width: min(820px, calc(100vw - 24px)); }
-#receipt-body { min-height: min(420px, 60vh); }
+/* v1.6.10: pinned to the top, so the heading doesn't jump when the receipt arrives and the dialog grows (CLS). */
+.receipt-dialog[open] { margin-top: max(12px, 5vh); margin-bottom: auto; height: fit-content; }
+/* (no reserved height needed any more: the dialog is pinned to the top) */
 .receipt-summary { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 6px 0 10px; }
 .receipt-summary > div { display: grid; gap: 2px; }
 .receipt-lines { display: grid; gap: 6px; max-height: 50vh; overflow: auto; padding-right: 4px; }
@@ -681,6 +683,10 @@ button.stat-card:hover { border-color: #bfd4c1; }
 .onboard-bills { flex-wrap: wrap; }
 .bill-presets .theme-options { flex-wrap: wrap; }
 #onboard-dialog, #choice-dialog, #scan-dialog { padding: 22px 20px 20px; }
+/* v1.6.10: the receipt dialogs get the same inner space as the others (heading no longer cut off, content off the left edge). */
+#receipt-dialog { padding: 22px 20px 20px; }
+#receipt-dialog form { padding: 0; } /* the dialog itself has the padding now (no double indent) */
+#receipt-detail-dialog > .dialog-heading { padding: 22px 22px 0; }
 .toast-undo { margin-left: 10px; min-height: 36px; padding: 6px 14px; border: 0; border-radius: 10px; background: #fff; color: #17301f; font-weight: 800; cursor: pointer; }
 .relative-help { margin-top: 14px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-soft); }
 .relative-help summary { cursor: pointer; font-weight: 700; min-height: 44px; display: flex; align-items: center; }

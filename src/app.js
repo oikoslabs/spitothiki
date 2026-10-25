@@ -897,9 +897,12 @@ function finishOnboard(save) {
   if (save) writeKey(PRESETS_KEY, JSON.stringify([...onboardPicks]));
   writeKey(ONBOARD_KEY, '1');
   document.querySelector('#onboard-dialog').close();
-  renderApp();
-  setTimeout(maybeProtectSheet, 300);
-  if (save) showToast(onboardPicks.size ? t('Έτοιμο! Οι λογαριασμοί σου είναι στους Λογαριασμούς, για να τους προσθέσεις με ένα πάτημα.') : t('Έτοιμο!'));
+  // Close first and let the phone paint, then do the heavy re-render (v1.6.10: the tap used to wait for renderApp).
+  afterPaint(() => {
+    renderApp();
+    if (save) showToast(onboardPicks.size ? t('Έτοιμο! Οι λογαριασμοί σου είναι στους Λογαριασμούς, για να τους προσθέσεις με ένα πάτημα.') : t('Έτοιμο!'));
+    setTimeout(maybeProtectSheet, 300);
+  });
 }
 function maybeOnboard() {
   if (navigator.webdriver && !window.__spitoOnboarding) return; // automated tests opt in explicitly
@@ -1751,7 +1754,7 @@ function saveCartItem(form) {
     : addCartItem(trip, { barcode: form.elements.barcode.value, shoppingId: form.elements.shoppingId.value, category: form.elements.category.value, name: form.elements.name.value, unit, qty, price, noMerge: Boolean(form.elements.fixed.value) });
   if (!saveTrip(next)) return;
   document.querySelector('#cart-item-dialog').close();
-  renderApp();
+  afterPaint(renderApp); // close first, re-render after the paint (INP)
   if (cartScanning && !key && form.elements.barcode.value) setTimeout(() => startCartScan(), 400);
 }
 
@@ -2553,6 +2556,13 @@ function renderReceipts() {
     <section class="panel" id="receipts-panel">${filter}${rows.length ? `<p class="field-hint" id="receipts-summary">${escapeHtml(t('{count} αποδείξεις · σύνολο {total}', { count: rows.length, total: money(total) }))}</p>` : ''}${list}</section>`;
 }
 
+// v1.6.10: «Μεταφορά στις Μετακινήσεις» only for a saved receipt that looks like fuel or tolls (same detection as the scan).
+function looksLikeTransport(r) {
+  if (String(r.id || '').startsWith('toll:')) return true;
+  const items = r.items || [];
+  const lines = items.length ? items : Array.from({ length: Number(r.lines) || 0 }, () => ({ name: '' }));
+  return Boolean(classifyReceipt({ issuerName: r.store || '', total: r.total, lines }));
+}
 function openReceiptDetails(id) {
   const r = (state.receipts || []).find((x) => x.id === id); if (!r) return;
   const items = receiptItems(r, state.purchases);
@@ -2563,7 +2573,7 @@ function openReceiptDetails(id) {
   dialog.querySelector('#receipt-detail-body').innerHTML = `<p class="field-hint">${escapeHtml(formatDate(r.date))} · ${escapeHtml(t(receiptCategory(r, state.purchases)))} · <strong data-no-i18n>${escapeHtml(money(r.total))}</strong>${rc ? ` · <span id="receipt-expcat" data-no-i18n>${escapeHtml(expCatLabel(rc))}</span>` : ''}</p>
     ${items.length ? `<ul class="receipt-items" id="receipt-items">${items.map((it) => `<li><span data-no-i18n>${escapeHtml(it.name)}${it.quantity && it.quantity !== 1 ? ` ×${escapeHtml(String(it.quantity))}` : ''}${escapeHtml(itemCat(it))}</span><span data-no-i18n>${it.price ? escapeHtml(money(it.price)) : ''}</span></li>`).join('')}</ul>` : `<p class="subtle-empty">${escapeHtml(t(r.lines ? 'Τα είδη δεν κρατήθηκαν για αυτή την απόδειξη (καταγράφηκε μόνο το σύνολο).' : 'Χωρίς αναλυτικά είδη.'))}</p>`}
     ${r.url ? `<p><a class="panel-link" href="${escapeHtml(r.url)}" target="_blank" rel="noopener noreferrer" id="receipt-link">${escapeHtml(t('Άνοιγμα ηλεκτρονικής απόδειξης'))} ↗</a></p>` : ''}
-    <div class="dialog-actions">${r.format !== 'transport' ? `<button class="button button-primary" type="button" data-action="receipt-move-transport" data-id="${escapeHtml(r.id)}" id="receipt-move-transport">🚗 ${escapeHtml(t('Μεταφορά στις Μετακινήσεις'))}</button>` : ''}<button class="button button-danger" type="button" data-action="receipt-delete" data-id="${escapeHtml(r.id)}">🗑 ${escapeHtml(t('Διαγραφή'))}</button><button class="button button-quiet" type="button" data-action="receipt-edit" data-id="${escapeHtml(r.id)}" id="receipt-edit">✎ ${escapeHtml(t('Διόρθωση'))}</button><button class="button button-quiet" type="button" data-action="receipt-detail-close">${escapeHtml(t('Κλείσιμο'))}</button></div>`;
+    <div class="dialog-actions">${r.format !== 'transport' && looksLikeTransport(r) ? `<button class="button button-primary" type="button" data-action="receipt-move-transport" data-id="${escapeHtml(r.id)}" id="receipt-move-transport">🚗 ${escapeHtml(t('Μεταφορά στις Μετακινήσεις'))}</button>` : ''}<button class="button button-danger" type="button" data-action="receipt-delete" data-id="${escapeHtml(r.id)}">🗑 ${escapeHtml(t('Διαγραφή'))}</button><button class="button button-quiet" type="button" data-action="receipt-edit" data-id="${escapeHtml(r.id)}" id="receipt-edit">✎ ${escapeHtml(t('Διόρθωση'))}</button><button class="button button-quiet" type="button" data-action="receipt-detail-close">${escapeHtml(t('Κλείσιμο'))}</button></div>`;
   translateDom(dialog);
   dialog.showModal();
 }

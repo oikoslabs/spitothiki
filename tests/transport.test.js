@@ -77,3 +77,22 @@ test('v1.5.6: impossible dates are refused with a message (no entry hidden in a 
   assert.throws(() => createTransport({ type: 'tolls', amount: '2,55', date: '2026-14-10' }), /ημερομηνία/);
   assert.equal(createTransport({ type: 'tolls', amount: '2,55', date: '2026-10-22' }).amount, 2.55);
 });
+
+test('v1.6.10: a supermarket receipt with milk / olive oil in litres is not fuel', () => {
+  const lines = [makeLine({ name: 'ΓΑΛΑ ΦΡΕΣΚΟ 1LT', quantity: 2, unit: 'λίτρα', price: 3.2 }), makeLine({ name: 'ΕΛΑΙΟΛΑΔΟ ΕΞΤΡΑ ΠΑΡΘΕΝΟ 1 ΛΙΤΡΟ', quantity: 1, unit: 'λίτρα', price: 9.9 }),
+    makeLine({ name: 'ΨΩΜΙ ΤΟΣΤ', quantity: 1, unit: 'τεμ.', price: 1.8 }), makeLine({ name: 'ΝΤΟΜΑΤΕΣ', quantity: 1.2, unit: 'κιλά', price: 2.4 }), makeLine({ name: 'ΑΠΟΡΡΥΠΑΝΤΙΚΟ 3LT', quantity: 1, unit: 'λίτρα', price: 7.5 })];
+  assert.equal(classifyReceipt({ issuerName: 'DEMO ΣΟΥΠΕΡ ΜΑΡΚΕΤ ΑΕ', date: '2026-10-20', total: 24.8, lines }), null);
+  // Even a short one: 2 litres of milk is not a fill-up.
+  assert.equal(classifyReceipt({ issuerName: 'DEMO ΜΙΝΙ ΜΑΡΚΕΤ', total: 4.1, lines: [makeLine({ name: 'ΓΑΛΑ 1LT', quantity: 2, unit: 'λίτρα', price: 3.2 }), makeLine({ name: 'ΑΥΓΑ', quantity: 1, unit: 'τεμ.', price: 0.9 })] }), null);
+});
+
+test('v1.6.10: fuel is still detected: fuel name, station, or a single big litre line', () => {
+  assert.equal(classifyReceipt({ issuerName: 'DEMO ΑΕ', total: 50, lines: [makeLine({ name: 'DIESEL', quantity: 30, unit: 'λίτρα', price: 50 })] }).type, 'fuel');
+  assert.equal(classifyReceipt({ issuerName: 'DEMO OIL ΠΡΑΤΗΡΙΟ', total: 30, lines: [makeLine({ name: 'ΕΙΔΟΣ 1', quantity: 18, unit: 'λίτρα', price: 30 })] }).liters, 18);
+  assert.equal(classifyReceipt({ issuerName: 'DEMO ΑΕ', total: 35, lines: [makeLine({ name: 'ΕΙΔΟΣ', quantity: 20, unit: 'λίτρα', price: 35 })] }).type, 'fuel');
+  // Fuel plus a coffee and a water at the station shop: fuel (fuel is most of the money).
+  const shop = [makeLine({ name: 'ΑΜΟΛΥΒΔΗ 95', quantity: 25, unit: 'λίτρα', price: 45 }), makeLine({ name: 'ΚΑΦΕΣ', quantity: 1, unit: 'τεμ.', price: 2 }), makeLine({ name: 'ΝΕΡΟ 1,5LT', quantity: 1, unit: 'λίτρα', price: 0.5 }), makeLine({ name: 'ΚΡΟΥΑΣΑΝ', quantity: 1, unit: 'τεμ.', price: 1.5 })];
+  const f = classifyReceipt({ issuerName: 'DEMO ΑΕ', total: 49, lines: shop });
+  assert.deepEqual([f.type, f.liters], ['fuel', 25]);
+  assert.equal(classifyReceipt({ issuerName: 'DEMO ΣΟΥΠΕΡ ΜΑΡΚΕΤ', total: 2, lines: [makeLine({ name: 'ΓΑΛΑ 1LT', quantity: 1, unit: 'λίτρα', price: 1.2 })] }), null);
+});

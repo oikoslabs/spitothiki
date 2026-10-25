@@ -91,18 +91,28 @@ export function applyTransportRecurring(rules = [], entries = [], today, now = n
 
 // ---------- Receipts: detect fuel / toll receipts ----------
 const plain = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleUpperCase('el-GR');
-const FUEL_RE = /ΑΜΟΛΥΒΔ|UNLEADED|DIESEL|ΝΤΙΖΕΛ|ΠΕΤΡΕΛΑΙΟ ΚΙΝΗΣ|ΒΕΝΖΙΝ|BENZIN|ΚΑΥΣΙΜ|\bLPG\b|AUTOGAS|ΥΓΡΑΕΡΙΟ|ΛΙΤΡ|LITR|\bLT\b|SUPER ?95|\b95 ?OCT|\b100 ?OCT|ΑΝΤΛΙΑ|PUMP|ΠΡΑΤΗΡΙΟ|SHELL|\bBP\b|\bEKO\b|\bΕΚΟ\b|AVIN|AEGEAN OIL|ELIN|ΕΛΙΝ|REVOIL|CYCLON|JETOIL|KAOIL/;
+// v1.6.10: split in three, so a supermarket receipt with milk or olive oil in litres is no longer «fuel».
+const FUEL_PRODUCT_RE = /ΑΜΟΛΥΒΔ|UNLEADED|DIESEL|ΝΤΙΖΕΛ|ΠΕΤΡΕΛΑΙΟ ΚΙΝΗΣ|ΒΕΝΖΙΝ|BENZIN|ΚΑΥΣΙΜ|\bLPG\b|AUTOGAS|ΥΓΡΑΕΡΙΟ|SUPER ?95|\b95 ?OCT|\b100 ?OCT/;
+const FUEL_STATION_RE = /ΚΑΥΣΙΜ|ΠΡΑΤΗΡΙΟ|ΑΝΤΛΙΑ|PUMP|SHELL|\bBP\b|\bEKO\b|\bΕΚΟ\b|AVIN|AEGEAN OIL|ELIN|ΕΛΙΝ|REVOIL|CYCLON|JETOIL|KAOIL/;
+const LITRE_RE = /ΛΙΤΡ|LITR|\bLT\b/;
 const TOLL_RE = /ΔΙΟΔΙ|TOLL|ΑΤΤΙΚΗ ΟΔΟΣ|ATTIKI ODOS|ΑΤΤΙΚΗΣ ΟΔΟΥ|ΕΓΝΑΤΙΑ|EGNATIA|ΟΛΥΜΠΙΑ ΟΔΟΣ|OLYMPIA ODOS|ΝΕΑ ΟΔΟΣ|NEA ODOS|ΚΕΝΤΡΙΚΗ ΟΔΟΣ|ΜΟΡΕΑΣ|MOREAS|ΑΥΤΟΚΙΝΗΤΟΔΡΟΜΟΣ ΑΙΓΑΙΟΥ|ΓΕΦΥΡΑ.*ΡΙΟΥ|GEFYRA|ΣΤΑΘΜΟΣ ΔΙΟΔΙΩΝ|E-?PASS/;
 const n = (s) => Number(String(s).replace(',', '.'));
 
 export function classifyReceipt(receipt = {}, rawText = '') {
   const text = plain([receipt.issuerName, ...(receipt.lines || []).map((l) => l.rawName || l.name), rawText].join('\n'));
   const toll = TOLL_RE.test(text);
-  const fuelLines = (receipt.lines || []).filter((l) => FUEL_RE.test(plain(l.rawName || l.name)) || l.unit === 'λίτρα');
-  const fuel = fuelLines.length > 0 || FUEL_RE.test(text);
+  const lines = receipt.lines || [];
+  const many = lines.length > 3; // a basket of groceries, not a fill-up
+  const productLines = lines.filter((l) => FUEL_PRODUCT_RE.test(plain(l.rawName || l.name)));
+  const station = FUEL_STATION_RE.test(plain(receipt.issuerName)) || (!lines.length && FUEL_STATION_RE.test(text));
+  const sum = (ls) => ls.reduce((s, l) => s + (Number(l.price) || 0), 0);
+  const share = productLines.length ? sum(productLines) / (Number(receipt.total) || sum(lines) || 1) : 0;
+  const bigLitre = lines.length <= 2 && lines.some((l) => l.unit === 'λίτρα' && Number(l.quantity) >= 5);
+  const fuel = productLines.length ? (!many || station || share >= 0.5) : (!many && (station || bigLitre || FUEL_PRODUCT_RE.test(text)));
   if (!fuel && !toll) return null;
   // Tolls win only when there is no sign of litres (a toll name can appear on a fuel station receipt on the motorway).
-  const type = fuel && !(toll && !fuelLines.length && !/ΛΙΤΡ|LITR|\bLT\b/.test(text)) ? 'fuel' : 'tolls';
+  const type = fuel && !(toll && !productLines.length && !LITRE_RE.test(text)) ? 'fuel' : 'tolls';
+  const fuelLines = productLines.length ? productLines : lines.filter((l) => l.unit === 'λίτρα');
   const out = { type, amount: receipt.total || 0, date: receipt.date || '', note: receipt.issuerName || '' };
   if (type === 'fuel') {
     let liters = fuelLines.reduce((s, l) => s + (l.unit === 'λίτρα' || l.quantity > 1.5 ? l.quantity : 0), 0);
