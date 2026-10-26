@@ -15,7 +15,7 @@ import { applyDisplayPrefs, highContrast, setHighContrast, setTextSize, textSize
 import { RECURRING_INTERVALS, applyRecurring, createRecurring, dueFromSnapshot, expirySnapshot, parseVoiceItems } from './features.js';
 import { MEAL_SLOTS, copyPreviousWeek, createMeal, recipeFromMealDb, shiftDays, weekDays, weekShoppingNeeds, weekStart } from './mealplan.js';
 import { BUILTIN_RECIPES, RECIPE_CATS } from './recipes.js';
-import { BILL_ICONS, BILL_PERIODS, BILL_TYPES, applyAutoPay, autoPayFor, billCountInfo, billsMonthList, billsMonthSplit, scheduledDebits, billStats, billsDue, createBill, guessBillType, paidHistory, parseBillCode, unpaidBills, payBill, unpayBill } from './bills.js';
+import { BILL_ICONS, BILL_PERIODS, BILL_TYPES, applyAutoPay, autoPayFor, incomeTaxPlan, billCountInfo, billsMonthList, billsMonthSplit, scheduledDebits, billStats, billsDue, createBill, guessBillType, paidHistory, parseBillCode, unpaidBills, payBill, unpayBill } from './bills.js';
 import { findDuplicateBill, readBillFile } from './bill-pdf.js';
 import { initDietUi, renderDietSection } from './diet-ui.js';
 import { SHARED, cleanName, memberNames, monthBalance, monthExpenses, payerOf, setPayer, settlementsFor } from './whopaid.js';
@@ -932,8 +932,20 @@ function openBillPreset(id) {
   form.elements.name.value = t(preset.name); form.elements.type.value = preset.type; form.dataset.typeTouched = '1';
   form.elements.period.value = String(preset.period);
   form.dataset.preset = preset.id;
+  if (preset.plan === 'incometax') applyIncomeTaxPlan(form);
   rememberAutoPay(form);
   form.elements.amount.focus();
+}
+
+// v1.7.1: income tax in 8 instalments (end of July → end of February). Prefills the next due date and which
+// instalment it is; the user can change amount, date and numbers before saving.
+function applyIncomeTaxPlan(form) {
+  const plan = incomeTaxPlan(localDateKey());
+  form.elements.period.value = '1';
+  form.elements.due.value = plan.due;
+  form.elements.installment.value = String(plan.installment);
+  form.elements.installments.value = String(plan.installments);
+  document.querySelector('#bill-installments').open = true;
 }
 
 function closeScanner() {
@@ -2393,7 +2405,7 @@ function renderExtrasCard() {
 
 // ---------- Household bills ----------
 // v1.6.5: «Λογαριασμοί» are fixed monthly obligations, not only utilities.
-const OBLIGATION_CHIPS = [{ name: 'Γυμναστήριο', type: 'gym' }, { name: 'Φροντιστήριο', type: 'education' }, { name: 'Ξένες γλώσσες', type: 'education' }, { name: 'Παιδικός σταθμός', type: 'childcare' }, { name: 'Συνδρομή (Netflix, Spotify…)', type: 'subscription' }, { name: 'Δόση δανείου', type: 'loan' }, { name: 'Πάρκινγκ', type: 'parking' }];
+const OBLIGATION_CHIPS = [{ name: 'Γυμναστήριο', type: 'gym' }, { name: 'Φροντιστήριο', type: 'education' }, { name: 'Ξένες γλώσσες', type: 'education' }, { name: 'Παιδικός σταθμός', type: 'childcare' }, { name: 'Συνδρομή (Netflix, Spotify…)', type: 'subscription' }, { name: 'Δόση δανείου', type: 'loan' }, { name: 'Φόρος εισοδήματος (8 δόσεις)', type: 'tax', plan: 'incometax' }, { name: 'Πάρκινγκ', type: 'parking' }];
 const BILL_TYPE_LABELS = { gym: 'Γυμναστήριο / αθλητισμός', education: 'Φροντιστήριο / μαθήματα', childcare: 'Παιδικός σταθμός / νταντά', loan: 'Δόση δανείου', parking: 'Πάρκινγκ', electricity: 'Ρεύμα', water: 'Νερό', gas: 'Φυσικό αέριο / θέρμανση', rent: 'Ενοίκιο / κοινόχρηστα', phone: 'Τηλέφωνο', internet: 'Internet', subscription: 'Συνδρομή', insurance: 'Ασφάλεια', tax: 'Φόροι / τέλη', other: 'Άλλο' };
 const BILL_PERIOD_LABELS = { 0: 'Μία φορά', 1: 'Κάθε μήνα', 2: 'Κάθε 2 μήνες', 3: 'Κάθε 3 μήνες', 4: 'Κάθε 4 μήνες', 6: 'Κάθε 6 μήνες', 12: 'Κάθε χρόνο' };
 let billsYear = Number(localDateKey().slice(0, 4));
@@ -2412,7 +2424,7 @@ function renderBillRow(bill) {
   const today = localDateKey();
   const state_ = bill.paid ? 'paid' : bill.autoPay ? 'debit' : bill.due < today ? 'overdue' : billsDue([bill], today).length ? 'soon' : 'later';
   return `<article class="product-card bill-row is-${state_}" data-bill="${escapeHtml(bill.id)}"><span class="product-emoji" aria-hidden="true">${BILL_ICONS[bill.type] || '📄'}</span>
-    <div class="bill-main"><h3 class="product-name"><span data-no-i18n>${escapeHtml(bill.name)}</span>${bill.autoPay ? ` <span class="bill-badge">${escapeHtml(t('🏦 Πάγια εντολή'))}</span>` : ''}</h3><p class="bill-meta"><span class="bill-due">${escapeHtml(billDueLabel(bill))}</span>${bill.period ? ` · <span>${escapeHtml(t(BILL_PERIOD_LABELS[bill.period]))}</span>` : ''}${bill.billingFrom && bill.billingTo ? ` · <span class="bill-billing">${escapeHtml(t('περίοδος {from} – {to}', { from: formatDate(bill.billingFrom), to: formatDate(bill.billingTo) }))}</span>` : ''}${bill.reference ? ` · <code class="bill-ref" data-no-i18n>${escapeHtml(bill.reference)}</code>` : ''}</p></div>
+    <div class="bill-main"><h3 class="product-name"><span data-no-i18n>${escapeHtml(bill.name)}</span>${bill.autoPay ? ` <span class="bill-badge">${escapeHtml(t('🏦 Πάγια εντολή'))}</span>` : ''}</h3><p class="bill-meta"><span class="bill-due">${escapeHtml(billDueLabel(bill))}</span>${bill.period ? ` · <span>${escapeHtml(t(BILL_PERIOD_LABELS[bill.period]))}</span>` : ''}${bill.installments ? ` · <span class="bill-installment">${escapeHtml(t('δόση {n} από {total}', { n: bill.installment || 1, total: bill.installments }))}</span>` : ''}${bill.billingFrom && bill.billingTo ? ` · <span class="bill-billing">${escapeHtml(t('περίοδος {from} – {to}', { from: formatDate(bill.billingFrom), to: formatDate(bill.billingTo) }))}</span>` : ''}${bill.reference ? ` · <code class="bill-ref" data-no-i18n>${escapeHtml(bill.reference)}</code>` : ''}</p></div>
     <strong class="bill-amount">${escapeHtml(money(bill.amount))}</strong>
     <div class="bill-actions">${bill.autoPay && !bill.paid ? '' : bill.paid ? `<button class="button button-quiet" type="button" data-action="bill-unpay" data-id="${escapeHtml(bill.id)}">Αναίρεση</button>` : `<button class="button button-primary" type="button" data-action="bill-pay" data-id="${escapeHtml(bill.id)}">✓ Πληρώθηκε</button>`}
     ${bill.reference ? `<button class="icon-button" type="button" data-action="bill-copy" data-id="${escapeHtml(bill.id)}" aria-label="${escapeHtml(t('Αντιγραφή κωδικού {name}', { name: bill.name }))}">📋</button>` : ''}
@@ -2483,12 +2495,15 @@ function openBillDialog(id = '') {
   form.elements.paidAt.value = bill?.paid ? bill.paidAt || '' : '';
   form.elements.countDue.checked = Boolean(bill?.paid && billCountInfo(state.bills || []).get(bill)?.by === 'due');
   form.dataset.preset = bill?.presetId || '';
+  form.elements.installment.value = bill?.installments ? String(bill.installment || 1) : '';
+  form.elements.installments.value = bill?.installments ? String(bill.installments) : '';
+  document.querySelector('#bill-installments').open = Boolean(bill?.installments);
   setBillDuplicate(null);
   document.querySelector('#bill-error').hidden = true;
   document.querySelector('#bill-scan-status').textContent = t('Σκάναρε το QR ή τον barcode του λογαριασμού για να συμπληρωθεί ο κωδικός πληρωμής και, αν υπάρχει, το ποσό.');
   document.querySelector('#bill-title').textContent = t(bill ? 'Επεξεργασία λογαριασμού' : 'Νέος λογαριασμός ή σταθερό έξοδο');
   const chips = document.querySelector('#bill-chips');
-  if (chips) { chips.hidden = Boolean(bill); chips.innerHTML = OBLIGATION_CHIPS.map((c) => `<button class="extras-chip" type="button" data-action="bill-chip" data-name="${escapeHtml(c.name)}" data-type="${c.type}"><span aria-hidden="true">${BILL_ICONS[c.type]}</span> ${escapeHtml(t(c.name))}</button>`).join(''); }
+  if (chips) { chips.hidden = Boolean(bill); chips.innerHTML = OBLIGATION_CHIPS.map((c) => `<button class="extras-chip" type="button" data-action="bill-chip" data-name="${escapeHtml(c.name)}" data-type="${c.type}"${c.plan ? ` data-plan="${c.plan}"` : ''}><span aria-hidden="true">${BILL_ICONS[c.type]}</span> ${escapeHtml(t(c.name))}</button>`).join(''); }
   document.querySelector('#bill-obligation-hint')?.toggleAttribute('hidden', Boolean(bill));
   document.querySelector('#bill-dialog').showModal();
 }
@@ -2600,6 +2615,7 @@ function saveBillForm(form) {
   const existing = (state.bills || []).find((bill) => bill.id === id);
   try {
     const bill = createBill({ ...(existing || {}), id: id || undefined, name: form.elements.name.value, type: form.elements.type.value, amount: form.elements.amount.value === '' ? NaN : form.elements.amount.value, due: form.elements.due.value, period: form.elements.period.value, remind: form.elements.remind.value, reference: form.elements.reference.value, billingFrom: form.elements.billingFrom.value, billingTo: form.elements.billingTo.value, autoPay: form.elements.autoPay.checked, presetId: form.dataset.preset || '',
+      installments: form.elements.installments.value, installment: form.elements.installment.value,
       ...(existing?.paid ? { paidAt: /^\d{4}-\d{2}-\d{2}$/.test(form.elements.paidAt.value) ? form.elements.paidAt.value : existing.paidAt, countBy: form.elements.countDue.checked ? 'due' : 'paid' } : {}) });
     state.bills = existing ? state.bills.map((entry) => (entry.id === id ? bill : entry)) : [...(state.bills || []), bill];
   } catch (err) { error.textContent = t(err.message); error.hidden = false; return; }
@@ -3019,7 +3035,7 @@ function handleAction(button) {
   else if (action === 'transport-edit') { const e = (state.transport || []).find((x) => x.id === id); if (e) { closeTransportHistory(); transportDraft = { ...e }; renderApp(); document.querySelector('#transport-add')?.scrollIntoView({ behavior: 'smooth' }); } }
   else if (action === 'transport-delete') undoable('Το έξοδο μετακίνησης διαγράφηκε.', () => { state.transport = (state.transport || []).filter((e) => e.id !== id); if (persist()) { renderApp(); if (transportHistoryDialog()?.open) renderTransportHistory(); } });
   else if (action === 'transport-rule-delete') { state.transportRecurring = (state.transportRecurring || []).filter((r) => r.id !== id); if (persist()) renderApp(); }
-  else if (action === 'bill-chip') { const f = document.querySelector('#bill-form'); f.elements.name.value = t(button.dataset.name).replace(/ \(.*\)$/, ''); f.elements.type.value = button.dataset.type; f.elements.period.value = '1'; document.querySelectorAll('#bill-chips [data-action="bill-chip"]').forEach((b) => b.setAttribute('aria-pressed', String(b === button))); f.elements.amount.focus(); }
+  else if (action === 'bill-chip') { const f = document.querySelector('#bill-form'); f.elements.name.value = t(button.dataset.name).replace(/ \(.*\)$/, ''); f.elements.type.value = button.dataset.type; f.elements.period.value = '1'; if (button.dataset.plan === 'incometax') applyIncomeTaxPlan(f); else if (!f.elements.billId.value) { f.elements.installment.value = ''; f.elements.installments.value = ''; document.querySelector('#bill-installments').open = false; } document.querySelectorAll('#bill-chips [data-action="bill-chip"]').forEach((b) => b.setAttribute('aria-pressed', String(b === button))); f.elements.amount.focus(); }
   else if (action === 'vehicle-delete') { state.vehicles = (state.vehicles || []).filter((v) => v.id !== id); if (persist()) renderApp(); }
   else if (action === 'add-bill') openBillDialog();
   else if (action === 'close-bill') document.querySelector('#bill-dialog').close();

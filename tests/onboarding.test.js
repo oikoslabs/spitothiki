@@ -14,6 +14,6 @@ test('first run: only for new users without data and without the done flag', () 
 test('first run: chosen bills become shortcuts until a bill of that provider exists', () => {
   assert.deepEqual(presetsFrom(['dei', 'water', 'nope']).map((p) => p.name), ['ΔΕΗ', 'ΕΥΔΑΠ']);
   assert.deepEqual(pendingPresets(['dei', 'water', 'road'], [{ name: 'δεη' }, { name: 'Road tax', presetId: 'road' }]).map((p) => p.id), ['water']);
-  assert.equal(BILL_PRESETS.length, 9);
+  assert.equal(BILL_PRESETS.length, 10);
   assert.ok(BILL_PRESETS.every((p) => p.name && p.type && Number.isInteger(p.period)));
 });

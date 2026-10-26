@@ -1000,6 +1000,13 @@ const EN = {
   'Σταθερό / internet': 'Landline / internet',
   'Ενοίκιο': 'Rent',
   'ΕΝΦΙΑ': 'Property tax (ENFIA)',
+  'Φόρος εισοδήματος': 'Income tax',
+  'Φόρος εισοδήματος (8 δόσεις)': 'Income tax (8 instalments)',
+  'δόση {n} από {total}': 'instalment {n} of {total}',
+  'Πληρώνεται σε δόσεις;': 'Paid in instalments?',
+  'Π.χ. φόρος εισοδήματος σε 8 δόσεις. Μετά την τελευταία δόση δεν βγαίνει άλλη. Άφησέ τα κενά αν δεν έχει τέλος.': 'E.g. income tax in 8 instalments. After the last one no new one is added. Leave empty if it never ends.',
+  'Αυτή είναι η δόση': 'This is instalment',
+  'από (σύνολο δόσεων)': 'of (total instalments)',
   'Τέλη κυκλοφορίας': 'Road tax',
   'Ασφάλιση': 'Insurance',
   // Undo
