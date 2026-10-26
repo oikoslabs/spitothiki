@@ -50,3 +50,34 @@ test('a supported receipt still opens (direct, or via the proxy after a CORS blo
   const p = await fetchReceipt('https://b.epsilonnet.gr/fd/ok', opts(corsBlocked((u) => res(200, u.includes('myDATA') ? myData : '<html>'))));
   assert.equal(p.total, 19.87);
 });
+
+// v1.8.0 (preview fix): classification must not depend on whether the proxy answers this origin.
+test('unknown provider is «not supported» even when every lookup fails at network level — never «offline», never the proxy', async () => {
+  const seen = [];
+  const dead = async (u) => { seen.push(u); throw new TypeError('Failed to fetch'); };
+  await assert.rejects(fetchReceipt('https://receipts.demo-shop.example/v/1', opts(dead)), (e) => {
+    assert.equal(e.kind, 'unsupported'); assert.equal(e.message, RECEIPT_MESSAGES.unsupported); assert.ok(!e.cors); return true;
+  });
+  assert.deepEqual(seen, ['https://receipts.demo-shop.example/v/1/myDATA']); // one quiet direct try, no proxy
+  // …and if such a provider does allow a direct read, the receipt still opens
+  const r = await fetchReceipt('https://receipts.demo-shop.example/v/2', { fetchImpl: async (u) => res(200, u.endsWith('/myDATA') ? myData : '') });
+  assert.equal(r.lines.length, 8);
+});
+
+test('known provider: proxy unreachable / timing out → «network» (offline box allowed); proxy refusing → «unsupported»', async () => {
+  const allDead = async () => { throw new TypeError('Failed to fetch'); };
+  await assert.rejects(fetchReceipt('https://epsilondigital-demo.epsilonnet.gr/fd/x', opts(allDead)), (e) => e.kind === 'network' && e.cors === true && !e.status);
+  await assert.rejects(fetchReceipt('https://e-invoicing.gr/edocuments/ViewInvoice/-1/demo', opts(corsBlocked(() => res(403, 'Origin not allowed')))), (e) => e.kind === 'unsupported');
+  await assert.rejects(fetchReceipt('https://epsilondigital-nohost.epsilonnet.gr/fd/x', opts(corsBlocked(() => res(530)))), (e) => e.kind === 'temporary');
+  await assert.rejects(fetchReceipt('https://epsilondigital-nohost.epsilonnet.gr/fd/x', opts(corsBlocked(() => res(502, 'Upstream error')))), (e) => e.kind === 'temporary' && !/internet/.test(e.message));
+});
+
+test('phone offline (navigator.onLine === false) → «network» before any lookup', async () => {
+  const had = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+  Object.defineProperty(globalThis, 'navigator', { value: { onLine: false }, configurable: true });
+  try {
+    let called = false;
+    await assert.rejects(fetchReceipt('https://receipts.demo-shop.example/v/1', opts(async () => { called = true; throw new TypeError('x'); })), (e) => e.kind === 'network' && e.cors === true);
+    assert.equal(called, false);
+  } finally { if (had) Object.defineProperty(globalThis, 'navigator', had); else delete globalThis.navigator; }
+});
