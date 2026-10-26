@@ -41,6 +41,7 @@ import { EXTRA_DEFAULT_EMOJI, EXTRA_SUGGESTIONS, LEGACY_EXTRA_CATEGORIES, create
 import { getLang, locale, setLang, t, translateDom, untranslatedGreek } from './i18n.js';
 import { daysUntil, escapeHtml, expiryLabel, formatDate, localDateKey, readKey, writeKey } from './format.js';
 import { THEME_KEY, applyTheme, currentTheme } from './theme.js';
+import { initSource, sourceSignup } from './source.js';
 
 const viewRoot = document.querySelector('#view-content');
 const itemDialog = document.querySelector('#item-dialog');
@@ -49,6 +50,9 @@ const itemForm = document.querySelector('#item-form');
 const backupFile = document.querySelector('#backup-file');
 const toast = document.querySelector('#toast');
 
+// v1.8.2: anonymous source count (first open only; devices used before are 'existing'). Never blocks the app.
+const sourceHasData = (() => { try { return Boolean(localStorage.getItem('spitothiki:v1') || localStorage.getItem(ONBOARD_KEY)); } catch { return false; } })();
+initSource({ hasData: sourceHasData });
 let state = loadState();
 const VIEWS = ['overview', 'pantry', 'shopping', 'cart', 'cook', 'bills', 'transport', 'extras', 'chores', 'insights', 'receipts', 'settings'];
 let activeView = VIEWS.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'overview';
@@ -570,7 +574,7 @@ function renderShopping() {
 
 function renderSettings() {
   return `${renderHeader('Ρυθμίσεις', 'Διαχείριση και αντίγραφο ασφαλείας των δεδομένων σου.')}${storageBadge()}
-    <div class="settings-grid"><section class="panel settings-card" id="privacy"><span class="stat-icon">🔒</span><h2>Απόρρητο πρώτα</h2><p>Τα δεδομένα σου μένουν στη συσκευή σου και η εφαρμογή δουλεύει και χωρίς internet. Δεν υπάρχουν διαφημίσεις.</p><details class="privacy-details" id="privacy-details"><summary>Τι ακριβώς αποθηκεύεται και πού</summary><ul class="privacy-list"><li>Στη συσκευή σου: απόθεμα, λίστες, έξοδα, λογαριασμοί, μετακινήσεις, πρόγραμμα διατροφής και ρυθμίσεις. Δεν φεύγουν από εκεί αν δεν συνδεθείς.</li><li>Αν συνδεθείς: τα ίδια δεδομένα συγχρονίζονται στο Firebase (Google) και τα βλέπουν μόνο τα μέλη του νοικοκυριού σου. Μπορείς να αποσυνδεθείς ή να τα διαγράψεις όποτε θες.</li><li>Αποδείξεις με QR: ο σύνδεσμος της απόδειξης περνά από έναν μικρό διακομιστή μας (Cloudflare) μόνο για να διαβαστεί. Δεν κρατάμε τα είδη, τα ποσά ή τη διεύθυνση IP σου, μόνο ανώνυμη μέτρηση (π.χ. «σούπερ μάρκετ, επιτυχία»).</li><li>Φωτογραφίες και PDF (αποδείξεις, λογαριασμοί, πρόγραμμα διατροφής) διαβάζονται μέσα στο κινητό σου και δεν ανεβαίνουν πουθενά.</li><li>Barcode: στέλνεται μόνο ο αριθμός στο Open Food Facts. Οι συνταγές είναι μέσα στην εφαρμογή και δουλεύουν χωρίς internet. Ειδοποιήσεις με κλειστή εφαρμογή: ο διακομιστής μας (Cloudflare) κρατά μόνο τις ημερομηνίες υπενθύμισης, όχι ονόματα, ποσά ή προϊόντα.</li><li>Δεν υπάρχουν διαφημίσεις ούτε cookies παρακολούθησης. Χρησιμοποιούμε μόνο το ανώνυμο Cloudflare Web Analytics (χωρίς cookies) για να ξέρουμε πόσοι μπαίνουν και αν η εφαρμογή είναι γρήγορη.</li></ul></details><div class="privacy-note">Αν δεν έχεις συνδεθεί και καθαρίσεις τα δεδομένα του browser ή αλλάξεις συσκευή, χρησιμοποίησε αντίγραφο ασφαλείας.</div></section>
+    <div class="settings-grid"><section class="panel settings-card" id="privacy"><span class="stat-icon">🔒</span><h2>Απόρρητο πρώτα</h2><p>Τα δεδομένα σου μένουν στη συσκευή σου και η εφαρμογή δουλεύει και χωρίς internet. Δεν υπάρχουν διαφημίσεις.</p><details class="privacy-details" id="privacy-details"><summary>Τι ακριβώς αποθηκεύεται και πού</summary><ul class="privacy-list"><li>Στη συσκευή σου: απόθεμα, λίστες, έξοδα, λογαριασμοί, μετακινήσεις, πρόγραμμα διατροφής και ρυθμίσεις. Δεν φεύγουν από εκεί αν δεν συνδεθείς.</li><li>Αν συνδεθείς: τα ίδια δεδομένα συγχρονίζονται στο Firebase (Google) και τα βλέπουν μόνο τα μέλη του νοικοκυριού σου. Μπορείς να αποσυνδεθείς ή να τα διαγράψεις όποτε θες.</li><li>Αποδείξεις με QR: ο σύνδεσμος της απόδειξης περνά από έναν μικρό διακομιστή μας (Cloudflare) μόνο για να διαβαστεί. Δεν κρατάμε τα είδη, τα ποσά ή τη διεύθυνση IP σου, μόνο ανώνυμη μέτρηση (π.χ. «σούπερ μάρκετ, επιτυχία»).</li><li>Φωτογραφίες και PDF (αποδείξεις, λογαριασμοί, πρόγραμμα διατροφής) διαβάζονται μέσα στο κινητό σου και δεν ανεβαίνουν πουθενά.</li><li>Barcode: στέλνεται μόνο ο αριθμός στο Open Food Facts. Οι συνταγές είναι μέσα στην εφαρμογή και δουλεύουν χωρίς internet. Ειδοποιήσεις με κλειστή εφαρμογή: ο διακομιστής μας (Cloudflare) κρατά μόνο τις ημερομηνίες υπενθύμισης, όχι ονόματα, ποσά ή προϊόντα.</li><li>Δεν υπάρχουν διαφημίσεις ούτε cookies παρακολούθησης. Χρησιμοποιούμε μόνο το ανώνυμο Cloudflare Web Analytics (χωρίς cookies) για να ξέρουμε πόσοι μπαίνουν και αν η εφαρμογή είναι γρήγορη.</li><li>Μετράμε ανώνυμα από ποια σελίδα ήρθες (π.χ. TikTok, Facebook), μόνο ως συνολικό αριθμό. Χωρίς προσωπικά στοιχεία και χωρίς να δίνουμε τίποτα σε τρίτους.</li></ul></details><div class="privacy-note">Αν δεν έχεις συνδεθεί και καθαρίσεις τα δεδομένα του browser ή αλλάξεις συσκευή, χρησιμοποίησε αντίγραφο ασφαλείας.</div></section>
     <section class="panel settings-card"><span class="stat-icon">◐</span><h2>Εμφάνιση</h2><p>Θέμα, μέγεθος γραμμάτων και αντίθεση. Ισχύουν σε όλη την εφαρμογή, σε αυτή τη συσκευή.</p><div class="theme-options" role="group" aria-label="Θέμα">${[['auto', 'Αυτόματο'], ['light', 'Φωτεινό'], ['dark', 'Σκούρο']].map(([value, label]) => `<button type="button" class="filter-chip ${currentTheme() === value ? 'is-active' : ''}" data-action="set-theme" data-theme="${value}" aria-pressed="${currentTheme() === value}">${label}</button>`).join('')}</div>
       <h3 class="settings-sub" id="text-size-label">Μέγεθος γραμμάτων</h3><div class="theme-options size-options" role="group" aria-labelledby="text-size-label">${[['normal', 'Κανονικά'], ['large', 'Μεγάλα'], ['xlarge', 'Πολύ μεγάλα']].map(([value, label]) => `<button type="button" class="filter-chip ${textSize() === value ? 'is-active' : ''}" data-action="set-text-size" data-size="${value}" aria-pressed="${textSize() === value}">${label}</button>`).join('')}</div>
       <label class="check-row"><input type="checkbox" id="high-contrast" ${highContrast() ? 'checked' : ''}> <span>Υψηλή αντίθεση (πιο έντονα γράμματα και περιγράμματα)</span></label></section>
@@ -699,6 +703,7 @@ async function startSync() {
       config: firebaseConfig,
       getState: () => state,
       setState: (next) => { state = next; try { saveState(state); } catch {} renderApp(); },
+      onNewHousehold: () => { sourceSignup(); },
       onStatus: (status) => { syncStatus = status; if (status.user) requestPersistentStorage(); ensureMyName(); if (activeView === 'settings' || activeView === 'overview' || activeView === 'insights') renderApp(); maybeProtectSheet(); }
     });
   } catch {

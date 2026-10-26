@@ -1059,7 +1059,9 @@ const EN = {
   "Δεν ήταν δυνατή η σύνδεση για να ανοίξει η απόδειξη (δεν υπάρχει internet ή η σύνδεση είναι πολύ αργή). Δοκίμασε ξανά σε λίγο.": "Couldn’t connect to open the receipt (no internet or a very slow connection). Try again in a moment.",
   "Η υπηρεσία αποδείξεων δεν απαντά αυτή τη στιγμή. Δοκίμασε ξανά σε λίγα λεπτά.": "The receipt service is not responding right now. Try again in a few minutes.",
   // v1.8.1
-  "Νέα & tips στο Telegram": "News & tips on Telegram"
+  "Νέα & tips στο Telegram": "News & tips on Telegram",
+  // v1.8.2
+  "Μετράμε ανώνυμα από ποια σελίδα ήρθες (π.χ. TikTok, Facebook), μόνο ως συνολικό αριθμό. Χωρίς προσωπικά στοιχεία και χωρίς να δίνουμε τίποτα σε τρίτους.": "We anonymously count which page you came from (e.g. TikTok, Facebook), only as a total number. No personal data, and nothing is shared with third parties."
 };
 
 export const dictionaries = { el: Object.fromEntries(Object.keys(EN).map((key) => [key, key])), en: EN };

@@ -1,0 +1,14 @@
+name = "spitothiki-stats"
+account_id = "509f96807f1c43e201c2a56cc6d65683"
+main = "worker.js"
+compatibility_date = "2026-10-01"
+workers_dev = true
+
+# Anonymous source counter: blob1 = type ('visit' | 'signup'), blob2 = source word. Nothing else.
+[[analytics_engine_datasets]]
+binding = "SOURCES"
+dataset = "spitothiki_sources"
+
+# Privacy: no request logs for this worker (no IP, headers or user agent kept anywhere).
+[observability]
+enabled = false
