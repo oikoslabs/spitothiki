@@ -971,3 +971,7 @@ body:has(dialog[open]) .back-to-top-page { display: none; }
 #scan-torch[aria-pressed="true"] { border-color: var(--green); background: var(--green-soft); color: var(--green-dark); }
 :root[data-dark="1"] #scan-torch[aria-pressed="true"] { background: #22362b; color: #e4ece6; }
 #receipt-manual-form .dialog-actions { flex-wrap: wrap; }
+
+/* v1.8.1: «📢 Νέα & tips στο Telegram» link in the sidebar and the phone menu (looks like the other items) */
+a.nav-item, a.menu-item { text-decoration: none; box-sizing: border-box; }
+a.menu-item { color: inherit; }

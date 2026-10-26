@@ -22,3 +22,20 @@ test('cart keypad uses theme colours, not a fixed light background', () => {
   assert.match(rule, /background: var\(--surface-soft\)/); assert.match(rule, /color: var\(--ink\)/);
   assert.doesNotMatch(rule, /#f6f8f4|color: inherit/);
 });
+
+// v1.8.1: «📢 Νέα & tips στο Telegram» — same link at the end of the phone menu and of the PC sidebar, opens in a new tab.
+test('Telegram link: last item in both menus, same target, new tab, translated, not on the home screen', async () => {
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const block = (start, end) => html.slice(html.indexOf(start), html.indexOf(end, html.indexOf(start)));
+  for (const nav of [block('<nav class="primary-nav"', '</nav>'), block('<nav class="menu-list" id="menu-list"', '</nav>')]) {
+    const links = [...nav.matchAll(/<a [^>]*data-link="telegram"[^>]*>[\s\S]*?<\/a>/g)].map((m) => m[0]);
+    assert.equal(links.length, 1);
+    assert.match(links[0], /href="https:\/\/t\.me\/spitothiki"/); assert.match(links[0], /target="_blank"/); assert.match(links[0], /rel="noopener"/);
+    assert.match(links[0], /Νέα &amp; tips στο Telegram/);
+    assert.ok(nav.trim().endsWith('</a>'), 'Telegram link is the last item');
+  }
+  const app = readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(app, /t\.me\/spitothiki/); // nothing on the home screen or in rendered views
+  const { dictionaries } = await import('../src/i18n.js');
+  assert.equal(dictionaries.en['Νέα & tips στο Telegram'], 'News & tips on Telegram');
+});
