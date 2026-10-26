@@ -10,6 +10,7 @@ export const BILL_PRESETS = [
   { id: 'internet', name: 'Σταθερό / internet', type: 'internet', period: 1, icon: '🌐' },
   { id: 'rent', name: 'Ενοίκιο', type: 'rent', period: 1, icon: '🏠' },
   { id: 'enfia', name: 'ΕΝΦΙΑ', type: 'tax', period: 1, icon: '🏛️' },
+  { id: 'incometax', name: 'Φόρος εισοδήματος', type: 'tax', period: 1, icon: '🧾', plan: 'incometax' },
   { id: 'road', name: 'Τέλη κυκλοφορίας', type: 'tax', period: 12, icon: '🚗' },
   { id: 'insurance', name: 'Ασφάλιση', type: 'insurance', period: 12, icon: '🛡️' }
 ];

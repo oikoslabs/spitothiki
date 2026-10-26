@@ -52,8 +52,33 @@ export function createBill(input = {}, now = new Date().toISOString()) {
     autoPay: Boolean(input.autoPay),
     ...(input.paid && (input.countBy === 'due' || input.countBy === 'paid') ? { countBy: input.countBy } : {}),
     ...(input.presetId ? { presetId: String(input.presetId).slice(0, 20) } : {}),
+    ...installmentsOf(input, period),
     seriesId: input.seriesId || input.id || '', updatedAt: now
   };
+}
+
+// v1.7.1: optional fixed number of instalments (e.g. income tax: 8). Only kept on recurring bills; bills without it
+// repeat forever as before. The last instalment, once paid, gets no next one.
+function installmentsOf(input, period) {
+  const total = Math.round(Number(input.installments)); const n = Math.round(Number(input.installment));
+  if (!period || !Number.isFinite(total) || total < 2 || total > 120) return {};
+  return { installments: total, installment: Number.isFinite(n) && n >= 1 ? Math.min(n, total) : 1 };
+}
+const lastDay = (key) => { const [y, m] = key.split('-').map(Number); return new Date(Date.UTC(y, m, 0)).getUTCDate(); };
+// Next due date of an instalment bill: an end-of-month due stays end-of-month (31/8 → 30/9 → 31/10).
+function nextInstallmentDue(due, period) {
+  const next = addMonths(due, period);
+  return Number(due.slice(8, 10)) === lastDay(due) ? `${next.slice(0, 8)}${String(lastDay(next)).padStart(2, '0')}` : next;
+}
+// Greek income tax: 8 instalments, due the last day of each month from July to February.
+// Suggests the next one from today: Jul–Dec and Jan–Feb → this month's (instalment 1–8); Mar–Jun → 31 July.
+export const INCOME_TAX_INSTALLMENTS = 8;
+export function incomeTaxPlan(today) {
+  const [y, m] = today.split('-').map(Number);
+  const pick = (year, month, installment) => { const key = `${year}-${String(month).padStart(2, '0')}-01`; return { due: `${key.slice(0, 8)}${String(lastDay(key)).padStart(2, '0')}`, installment, installments: INCOME_TAX_INSTALLMENTS }; };
+  if (m >= 7) return pick(y, m, m - 6);
+  if (m <= 2) return pick(y, m, m + 6);
+  return pick(y, 7, 1);
 }
 
 const withoutCountBy = ({ countBy, ...rest }) => rest; // eslint-disable-line no-unused-vars
@@ -64,10 +89,12 @@ export function payBill(bills = [], id, today, now = new Date().toISOString()) {
   const series = bill.seriesId || bill.id;
   const paid = { ...bill, paid: true, paidAt: today, seriesId: series, updatedAt: now };
   let next = null;
-  if (bill.period) {
-    const due = addMonths(bill.due, bill.period);
+  const lastOne = bill.installments && (bill.installment || 1) >= bill.installments;
+  if (bill.period && !lastOne) {
+    const due = bill.installments ? nextInstallmentDue(bill.due, bill.period) : addMonths(bill.due, bill.period);
     if (!bills.some((b) => (b.seriesId || b.id) === series && b.due === due)) {
-      next = { ...withoutCountBy(bill), id: `${series}-${due}`, due, paid: false, paidAt: '', billingFrom: '', billingTo: '', seriesId: series, updatedAt: now };
+      next = { ...withoutCountBy(bill), id: `${series}-${due}`, due, paid: false, paidAt: '', billingFrom: '', billingTo: '', seriesId: series, updatedAt: now,
+        ...(bill.installments ? { installment: (bill.installment || 1) + 1 } : {}) };
     }
   }
   return { bills: [...bills.map((b) => (b.id === id ? paid : b)), ...(next ? [next] : [])], next };
