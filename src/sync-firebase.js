@@ -4,7 +4,7 @@ import { SyncEngine } from './sync-core.js';
 const SDK = 'https://www.gstatic.com/firebasejs/13.0.0';
 const META_KEY = 'spitothiki:sync';
 
-export async function createFirebaseSync({ config, getState, setState, onStatus }) {
+export async function createFirebaseSync({ config, getState, setState, onStatus, onNewHousehold }) {
   const [{ initializeApp }, auth, fs] = await Promise.all([
     import(`${SDK}/firebase-app.js`), import(`${SDK}/firebase-auth.js`), import(`${SDK}/firebase-firestore.js`)
   ]);
@@ -60,7 +60,10 @@ export async function createFirebaseSync({ config, getState, setState, onStatus 
     if (saved) return saved;
     const own = fs.doc(db, 'households', uid);
     const ownDoc = await fs.getDoc(own).catch(() => null);
-    if (!ownDoc?.exists()) await fs.setDoc(own, { ownerUid: uid, members: [uid], createdAt: fs.serverTimestamp() });
+    if (!ownDoc?.exists()) {
+      await fs.setDoc(own, { ownerUid: uid, members: [uid], createdAt: fs.serverTimestamp() });
+      try { onNewHousehold?.(); } catch {} // v1.8.2: anonymous «new account» count (source word only)
+    }
     await fs.setDoc(userRef, { householdId: uid }, { merge: true });
     return uid;
   }
