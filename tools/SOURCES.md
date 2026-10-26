@@ -18,3 +18,6 @@ dataset `spitothiki_sources` (blob1 = type, blob2 = source). Χωρίς IP, συ
 Χωρίς παράμετρο = `direct`. Άγνωστη λέξη = `other`. Συσκευές που χρησιμοποιούσαν την εφαρμογή πριν το v1.8.2 = `existing` (δεν στέλνουν visit, μόνο signup αν φτιάξουν λογαριασμό).
 
 Νούμερα: `tools/sources-report.sh [days]` ή τα SQL στο `tools/sources.sql`. Η Analytics Engine κρατά ~90 μέρες.
+
+## Δοκιμαστικά events (αφαίρεσέ τα)
+- 26/10/2026 19:41 ώρα Αθήνας: **1 visit, tiktok** (έλεγχος του v1.8.2 στο live). Signup δοκιμή δεν έγινε.
