@@ -161,9 +161,33 @@ export async function receiptId(receipt, sourceUrl = '') {
 }
 
 // ---------- Fetching ----------
+// v1.8.0: why a lookup failed decides what the user is told.
+//   network     – no internet, timeout or the request never reached the provider → «δοκίμασε ξανά» (can be kept for later)
+//   temporary   – the provider/proxy is overloaded or briefly down (429, 502/503/504, Cloudflare timeouts) → «δοκίμασε ξανά»
+//   unsupported – refused domain (proxy 403), unknown page layout (HTML instead of receipt data, 404/500…) → «δεν υποστηρίζεται ακόμα»
+export const RECEIPT_MESSAGES = {
+  unsupported: 'Οι αποδείξεις αυτού του καταστήματος δεν υποστηρίζονται ακόμα από τη Σπιτοθήκη. Γράψε το ποσό με το «＋ Έξοδο με το χέρι» ή βγάλε φωτογραφία την απόδειξη.',
+  network: 'Δεν ήταν δυνατή η σύνδεση για να ανοίξει η απόδειξη (δεν υπάρχει internet ή η σύνδεση είναι πολύ αργή). Δοκίμασε ξανά σε λίγο.',
+  temporary: 'Η υπηρεσία αποδείξεων δεν απαντά αυτή τη στιγμή. Δοκίμασε ξανά σε λίγα λεπτά.',
+  busy: 'Πολλές αναζητήσεις αυτή τη στιγμή. Δοκίμασε ξανά σε λίγα λεπτά ή σκάναρε τη φωτογραφία της απόδειξης.'
+};
+const TEMPORARY_STATUSES = new Set([408, 502, 503, 504, 520, 521, 522, 523, 524]);
+const FETCH_TIMEOUT_MS = 15000;
+
+export function receiptFailure(error) {
+  if (!error) return 'unsupported';
+  if (error.status === 429) return 'busy';
+  if (error.status && TEMPORARY_STATUSES.has(error.status)) return 'temporary';
+  if (!error.status && (error.network || error.name === 'TypeError' || error.name === 'TimeoutError' || error.name === 'AbortError')) return 'network';
+  return 'unsupported';
+}
+
 async function getText(url, { fetchImpl, proxy }) {
   const attempt = async (target) => {
-    const res = await fetchImpl(target, { headers: { accept: 'application/xml, text/xml, */*' } });
+    let res;
+    const signal = typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(FETCH_TIMEOUT_MS) : undefined;
+    try { res = await fetchImpl(target, { headers: { accept: 'application/xml, text/xml, */*' }, ...(signal ? { signal } : {}) }); }
+    catch (error) { throw Object.assign(error instanceof Error ? error : new Error(String(error)), { network: true }); }
     if (!res.ok) { const error = new Error(`HTTP ${res.status}`); error.status = res.status; throw error; }
     return res.text();
   };
@@ -189,11 +213,10 @@ export async function fetchReceipt(input, { fetchImpl = fetch, proxy = '' } = {}
   }
   if (!receipt?.lines.length && ubl?.lines.length) receipt = ubl;
   else if (receipt && ubl?.issuerName) receipt.issuerName = ubl.issuerName;
-  if (!receipt) {
-    if (lastError?.status === 429) throw Object.assign(new Error('Πολλές αναζητήσεις αυτή τη στιγμή. Δοκίμασε ξανά σε λίγα λεπτά ή σκάναρε τη φωτογραφία της απόδειξης.'), { cors: true });
-    if (lastError?.status >= 500) throw Object.assign(new Error('Η υπηρεσία αποδείξεων δεν απαντά αυτή τη στιγμή. Δοκίμασε ξανά αργότερα ή σκάναρε τη φωτογραφία της απόδειξης.'), { cors: true });
-    if (lastError && !lastError.status) throw Object.assign(new Error('Δεν ήταν δυνατή η λήψη της απόδειξης (ο πάροχος δεν επιτρέπει πρόσβαση από την εφαρμογή ή δεν υπάρχει σύνδεση).'), { cors: true });
-    throw new Error('Δεν βρέθηκαν είδη σε αυτή την απόδειξη.');
+  if (!receipt || (!receipt.lines.length && !(receipt.total > 0))) {
+    // Body arrived but isn't receipt data (e.g. an HTML page) → unsupported layout; otherwise judge by the error.
+    const kind = receipt ? 'unsupported' : receiptFailure(lastError);
+    throw Object.assign(new Error(RECEIPT_MESSAGES[kind]), { kind, unsupported: kind === 'unsupported', cors: kind !== 'unsupported', ...(kind === 'network' ? {} : { status: lastError?.status || 0 }) });
   }
   return { ...receipt, sourceUrl: target.url };
 }

@@ -155,6 +155,7 @@ export async function startScanner(video, onCode, { qr = false, confident = null
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
   const stop = () => { stopped = true; clearTimeout(zxingTimer); clearTimeout(idleTimer); stream.getTracks().forEach((t) => t.stop()); video.srcObject = null; };
   stop.hasTorch = hasTorch;
+  stop.checkTorch = () => { try { stop.hasTorch = Boolean(track?.getCapabilities?.().torch); } catch {} return stop.hasTorch; };
   stop.torch = async (on) => { try { await track.applyConstraints({ advanced: [{ torch: Boolean(on) }] }); return true; } catch { return false; } };
   const tick = async () => {
     if (stopped) return;

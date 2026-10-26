@@ -962,3 +962,12 @@ body:has(dialog[open]) .back-to-top-page { display: none; }
 .whopaid-list small { display: block; color: var(--muted); }
 .whopaid-select select { min-width: 130px; max-width: 46vw; }
 .whopaid-share { display: grid; grid-template-columns: 1fr 90px; align-items: center; gap: 8px; margin-bottom: 6px; }
+
+/* v1.8.0: scan failure → «＋ Έξοδο με το χέρι»; receipt QR hint; torch on */
+.receipt-fail { margin: 10px 0; padding: 12px 14px; border-radius: 14px; background: var(--amber-soft, #fff6e5); }
+:root[data-dark="1"] .receipt-fail { background: #3a3020; }
+.receipt-fail .form-error { margin: 0 0 6px; }
+.receipt-qr-hint { font-weight: 600; }
+#scan-torch[aria-pressed="true"] { border-color: var(--green); background: var(--green-soft); color: var(--green-dark); }
+:root[data-dark="1"] #scan-torch[aria-pressed="true"] { background: #22362b; color: #e4ece6; }
+#receipt-manual-form .dialog-actions { flex-wrap: wrap; }
