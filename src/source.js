@@ -8,15 +8,19 @@ export const SOURCE_WORDS = [...SOURCES, 'other', 'direct', 'existing'];
 export const EVENT_TYPES = ['visit', 'signup'];
 export const SOURCE_KEY = 'spitothiki:src';
 const TRACK_PARAMS = /^(src|utm_[a-z_]+|fbclid|ttclid|gclid)$/i;
+// v1.8.3: short links people can type (TikTok bio is not clickable): /tiktok, /TikTok/, … = ?src=tiktok.
+// Firebase Hosting redirects them (302) to /?src=<word>; the service worker does the same offline; this is the fallback.
+export const SHORT_PATH = new RegExp(`^/(${SOURCES.join('|')})/?$`, 'i');
 const LIVE_ORIGIN = /^https:\/\/spitothiki(--[a-z0-9-]{1,60})?\.web\.app$/;
 
 export const isStatsOrigin = (origin) => LIVE_ORIGIN.test(String(origin || ''));
 export const validEvent = (type, src) => EVENT_TYPES.includes(type) && SOURCE_WORDS.includes(src);
 
 // '?src=TikTok' -> 'tiktok'; '?utm_source=sofisstore' -> 'sofisstore'; unknown -> 'other'; nothing -> 'direct'.
-export function parseSource(search = '') {
+export function parseSource(search = '', pathname = '/') {
   const params = new URLSearchParams(String(search || ''));
-  const raw = (params.get('src') || params.get('utm_source') || '').trim().toLowerCase();
+  const short = String(pathname || '').match(SHORT_PATH)?.[1] || '';
+  const raw = (params.get('src') || params.get('utm_source') || short).trim().toLowerCase();
   if (!raw) return 'direct';
   return SOURCES.includes(raw) ? raw : 'other';
 }
@@ -25,7 +29,9 @@ export function parseSource(search = '') {
 export function cleanUrl(href) {
   const url = new URL(href);
   const keys = [...url.searchParams.keys()].filter((key) => TRACK_PARAMS.test(key));
-  if (!keys.length) return null;
+  const short = SHORT_PATH.test(url.pathname);
+  if (!keys.length && !short) return null;
+  if (short) url.pathname = '/';
   for (const key of keys) url.searchParams.delete(key);
   return `${url.pathname}${url.search}${url.hash}`;
 }
@@ -49,7 +55,7 @@ export async function initSource({ storage = globalThis.localStorage, loc = glob
     const clean = loc && cleanUrl(loc.href);
     let saved = read(storage);
     if (!saved) {
-      saved = hasData ? { src: 'existing', visit: true } : { src: parseSource(loc?.search), visit: false };
+      saved = hasData ? { src: 'existing', visit: true } : { src: parseSource(loc?.search, loc?.pathname), visit: false };
       write(storage, saved);
     }
     if (clean && hist?.replaceState) { try { hist.replaceState(hist.state ?? null, '', clean); } catch {} }

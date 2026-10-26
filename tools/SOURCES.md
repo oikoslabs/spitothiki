@@ -15,6 +15,13 @@ dataset `spitothiki_sources` (blob1 = type, blob2 = source). Χωρίς IP, συ
 | Pinterest | https://spitothiki.web.app/?src=pinterest |
 | SofisStore | https://spitothiki.web.app/?src=sofisstore (και το παλιό `?utm_source=sofisstore`) |
 
+## Σύντομα links (v1.8.3) — για όπου το link δεν πατιέται (π.χ. TikTok bio)
+
+`spitothiki.web.app/tiktok`, `/facebook`, `/instagram`, `/telegram`, `/viber`, `/reddit`, `/pinterest`, `/sofisstore`.
+Κεφαλαία/μικρά δεν πειράζουν (`/TikTok`, `/TIKTOK`), ούτε η κάθετος στο τέλος. Το Firebase Hosting κάνει 302 → `/?src=<λέξη>`
+(firebase.json `redirects`), offline το ίδιο κάνει ο service worker, και η εφαρμογή διαβάζει και το path ως εφεδρεία.
+Μετράνε ακριβώς σαν το `?src=` (μία φορά ανά συσκευή, η διεύθυνση γίνεται `/`).
+
 Χωρίς παράμετρο = `direct`. Άγνωστη λέξη = `other`. Συσκευές που χρησιμοποιούσαν την εφαρμογή πριν το v1.8.2 = `existing` (δεν στέλνουν visit, μόνο signup αν φτιάξουν λογαριασμό).
 
 Νούμερα: `tools/sources-report.sh [days]` ή τα SQL στο `tools/sources.sql`. Η Analytics Engine κρατά ~90 μέρες.
