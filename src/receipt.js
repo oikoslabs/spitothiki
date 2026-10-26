@@ -2,6 +2,7 @@
 // Appending /myDATA gives the AADE InvoicesDoc XML with the item lines; /EN16931 gives a UBL invoice.
 import { normalizeSearch } from './domain.js';
 import { matchIngredient } from './recipes.js';
+import { allowedHost } from './receipt-domains.js';
 
 // ---------- Minimal namespace-agnostic XML tree ----------
 // Node: { name (local name), children: Node[], text }. Uses DOMParser in the browser, a tiny parser elsewhere (tests).
@@ -161,16 +162,42 @@ export async function receiptId(receipt, sourceUrl = '') {
 }
 
 // ---------- Fetching ----------
-async function getText(url, { fetchImpl, proxy }) {
+// v1.8.0: why a lookup failed decides what the user is told.
+//   network     – the phone is offline, or our receipt proxy itself can't be reached / times out → «δοκίμασε ξανά» (can be kept for later)
+//   temporary   – the provider/proxy is overloaded or briefly down (429, 502/503/504, Cloudflare timeouts) → «δοκίμασε ξανά»
+//   unsupported – a shop whose provider isn't in receipt-domains.js (decided before any lookup), refused by the proxy (403),
+//                 or an unknown page layout (HTML instead of receipt data, 404/500…) → «δεν υποστηρίζεται ακόμα»
+export const RECEIPT_MESSAGES = {
+  unsupported: 'Οι αποδείξεις αυτού του καταστήματος δεν υποστηρίζονται ακόμα από τη Σπιτοθήκη. Γράψε το ποσό με το «＋ Έξοδο με το χέρι» ή βγάλε φωτογραφία την απόδειξη.',
+  network: 'Δεν ήταν δυνατή η σύνδεση για να ανοίξει η απόδειξη (δεν υπάρχει internet ή η σύνδεση είναι πολύ αργή). Δοκίμασε ξανά σε λίγο.',
+  temporary: 'Η υπηρεσία αποδείξεων δεν απαντά αυτή τη στιγμή. Δοκίμασε ξανά σε λίγα λεπτά.',
+  busy: 'Πολλές αναζητήσεις αυτή τη στιγμή. Δοκίμασε ξανά σε λίγα λεπτά ή σκάναρε τη φωτογραφία της απόδειξης.'
+};
+const TEMPORARY_STATUSES = new Set([408, 502, 503, 504, 520, 521, 522, 523, 524, 530]);
+const FETCH_TIMEOUT_MS = 15000;
+
+export function receiptFailure(error) {
+  if (!error) return 'unsupported';
+  if (error.status === 429) return 'busy';
+  if (error.status && TEMPORARY_STATUSES.has(error.status)) return 'temporary';
+  if (!error.status && (error.network || error.name === 'TypeError' || error.name === 'TimeoutError' || error.name === 'AbortError')) return 'network';
+  return 'unsupported';
+}
+
+async function getText(url, { fetchImpl, proxy, known = true }) {
   const attempt = async (target) => {
-    const res = await fetchImpl(target, { headers: { accept: 'application/xml, text/xml, */*' } });
+    let res;
+    const signal = typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(FETCH_TIMEOUT_MS) : undefined;
+    try { res = await fetchImpl(target, { headers: { accept: 'application/xml, text/xml, */*' }, ...(signal ? { signal } : {}) }); }
+    catch (error) { throw Object.assign(error instanceof Error ? error : new Error(String(error)), { network: true }); }
     if (!res.ok) { const error = new Error(`HTTP ${res.status}`); error.status = res.status; throw error; }
     return res.text();
   };
   try { return await attempt(url); }
   catch (error) {
     // A CORS block or network error surfaces as TypeError; retry through the proxy if one is configured.
-    if (!proxy || error.status) throw error;
+    // Only for known providers: the proxy refuses every other domain anyway.
+    if (!proxy || error.status || !known) throw error;
     return attempt(`${proxy.replace(/\/+$/, '')}/?url=${encodeURIComponent(url)}`);
   }
 }
@@ -180,20 +207,23 @@ export async function fetchReceipt(input, { fetchImpl = fetch, proxy = '' } = {}
   if (target.kind === 'invalid') throw new Error('Ο σύνδεσμος δεν είναι έγκυρος.');
   if (target.kind === 'insecure') throw new Error('Ο σύνδεσμος πρέπει να ξεκινά με https://');
   if (target.kind === 'aade') return { ...parseAadeSummary(target.url), sourceUrl: target.url };
+  if (globalThis.navigator?.onLine === false) throw Object.assign(new Error(RECEIPT_MESSAGES.network), { kind: 'network', cors: true });
+  // v1.8.0: a provider that isn't in our list is «not supported yet» whatever happens next (never «no internet»).
+  // One quiet direct read is still tried, in case such a provider happens to allow it; no proxy, no retry.
+  const known = allowedHost(target.host);
   let receipt = null;
   let lastError = null;
-  try { receipt = parseMyData(await getText(`${target.url}/myDATA`, { fetchImpl, proxy })); } catch (error) { lastError = error; }
+  try { receipt = parseMyData(await getText(`${target.url}/myDATA`, { fetchImpl, proxy, known })); } catch (error) { lastError = error; }
   let ubl = null;
-  if (!receipt?.lines.length || !receipt.issuerName) {
-    try { ubl = parseUbl(await getText(`${target.url}/EN16931`, { fetchImpl, proxy })); } catch (error) { lastError = lastError || error; }
+  if (known && (!receipt?.lines.length || !receipt.issuerName)) {
+    try { ubl = parseUbl(await getText(`${target.url}/EN16931`, { fetchImpl, proxy, known })); } catch (error) { lastError = lastError || error; }
   }
   if (!receipt?.lines.length && ubl?.lines.length) receipt = ubl;
   else if (receipt && ubl?.issuerName) receipt.issuerName = ubl.issuerName;
-  if (!receipt) {
-    if (lastError?.status === 429) throw Object.assign(new Error('Πολλές αναζητήσεις αυτή τη στιγμή. Δοκίμασε ξανά σε λίγα λεπτά ή σκάναρε τη φωτογραφία της απόδειξης.'), { cors: true });
-    if (lastError?.status >= 500) throw Object.assign(new Error('Η υπηρεσία αποδείξεων δεν απαντά αυτή τη στιγμή. Δοκίμασε ξανά αργότερα ή σκάναρε τη φωτογραφία της απόδειξης.'), { cors: true });
-    if (lastError && !lastError.status) throw Object.assign(new Error('Δεν ήταν δυνατή η λήψη της απόδειξης (ο πάροχος δεν επιτρέπει πρόσβαση από την εφαρμογή ή δεν υπάρχει σύνδεση).'), { cors: true });
-    throw new Error('Δεν βρέθηκαν είδη σε αυτή την απόδειξη.');
+  if (!receipt || (!receipt.lines.length && !(receipt.total > 0))) {
+    // Body arrived but isn't receipt data (e.g. an HTML page) → unsupported layout; otherwise judge by the error.
+    const kind = receipt || !known ? 'unsupported' : receiptFailure(lastError);
+    throw Object.assign(new Error(RECEIPT_MESSAGES[kind]), { kind, unsupported: kind === 'unsupported', cors: kind !== 'unsupported', ...(kind === 'network' ? {} : { status: lastError?.status || 0 }) });
   }
   return { ...receipt, sourceUrl: target.url };
 }

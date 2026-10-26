@@ -1036,6 +1036,28 @@ const EN = {
   'Συνδέσου για να έχεις τα ίδια δεδομένα σε όλες τις συσκευές σου και για να τα μοιράζεσαι με τα μέλη του σπιτιού σου. Τα δεδομένα αυτής της συσκευής θα ενωθούν με όσα έχεις ήδη.': 'Sign in to have the same data on all your devices and to share it with the people in your home. The data on this device will be merged with what you already have.',
   "Ο κωδικός αντιγράφηκε. Δώσ’ τον στον άλλον άνθρωπο: θα τον γράψει στο «Μπες στο σπίτι» στο δικό του κινητό. Κωδικός: {code}": 'The code was copied. Give it to the other person: they type it in “Join the home” on their phone. Code: {code}',
   'Άλλα γεύματα: πρωινό, μεσημεριανό, βραδινό': 'Other meals: breakfast, lunch, dinner',
+  // v1.8.0: expense by hand, clearer receipt failures
+  "Έξοδο με το χέρι": "Expense by hand",
+  "Σούπερ μάρκετ, κρεοπωλείο, λαϊκή — χωρίς απόδειξη": "Supermarket, butcher, street market — no receipt",
+  "Σκάναρε το QR της απόδειξης, όχι την κάρτα πόντων ή το barcode του ταμείου.": "Scan the receipt’s QR, not the loyalty card or the till barcode.",
+  "Στόχευσε το QR της απόδειξης μέσα στο πλαίσιο, όχι την κάρτα πόντων ή το barcode του ταμείου.": "Point at the receipt’s QR inside the frame, not the loyalty card or the till barcode.",
+  "Αυτός ο κωδικός δεν είναι το QR της απόδειξης (μπορεί να είναι κάρτα πόντων ή ο barcode του ταμείου). Σκάναρε το QR της απόδειξης ή βγάλε φωτογραφία την απόδειξη.": "This code is not the receipt’s QR (it may be a loyalty card or the till barcode). Scan the receipt’s QR or take a photo of the receipt.",
+  "Χωρίς απόδειξη ή δεν διαβάζεται; Γράψε απλώς το ποσό:": "No receipt, or it can’t be read? Just type the amount:",
+  "Αυτό το QR (ταμειακή μηχανή, ΑΑΔΕ) δεν έχει μέσα το ποσό ούτε τα είδη. Γράψε το σύνολο της απόδειξης.": "This QR (cash register, tax authority) holds neither the amount nor the items. Type the receipt total.",
+  "Για ψώνια χωρίς απόδειξη: σούπερ μάρκετ, κρεοπωλείο, λαϊκή… Μετράει στα έξοδα του μήνα.": "For shopping without a receipt: supermarket, butcher, street market… It counts in the month’s expenses.",
+  "Είναι καύσιμα / διόδια": "It’s fuel / tolls",
+  "Κατάστημα (προαιρετικό)": "Shop (optional)",
+  "π.χ. Κρεοπωλείο, λαϊκή": "e.g. Butcher, street market",
+  "Θες και τα είδη; Βγάλε φωτογραφία την απόδειξη:": "Want the items too? Take a photo of the receipt:",
+  "Καταχωρήθηκε έξοδο {amount}": "Expense saved: {amount}",
+  "Γράψε ποσό μεγαλύτερο από 0.": "Enter an amount greater than 0.",
+  "Το ποσό είναι πολύ μεγάλο.": "The amount is too large.",
+  "Διάλεξε ημερομηνία.": "Pick a date.",
+  "Αυτή η απόδειξη έχει ήδη καταχωρηθεί.": "This receipt has already been recorded.",
+  "🔦 Φακός: ανοιχτός": "🔦 Torch: on",
+  "Οι αποδείξεις αυτού του καταστήματος δεν υποστηρίζονται ακόμα από τη Σπιτοθήκη. Γράψε το ποσό με το «＋ Έξοδο με το χέρι» ή βγάλε φωτογραφία την απόδειξη.": "Receipts from this shop are not supported by Spitothiki yet. Type the amount with «＋ Expense by hand» or take a photo of the receipt.",
+  "Δεν ήταν δυνατή η σύνδεση για να ανοίξει η απόδειξη (δεν υπάρχει internet ή η σύνδεση είναι πολύ αργή). Δοκίμασε ξανά σε λίγο.": "Couldn’t connect to open the receipt (no internet or a very slow connection). Try again in a moment.",
+  "Η υπηρεσία αποδείξεων δεν απαντά αυτή τη στιγμή. Δοκίμασε ξανά σε λίγα λεπτά.": "The receipt service is not responding right now. Try again in a few minutes."
 };
 
 export const dictionaries = { el: Object.fromEntries(Object.keys(EN).map((key) => [key, key])), en: EN };

@@ -33,6 +33,7 @@ import { DRIVE_AUTO_KEY, DRIVE_ENABLED_KEY, DRIVE_HASH_KEY, DRIVE_LAST_KEY, auto
 import { forgetToken, getDriveToken } from './gdrive-auth.js';
 import { clearDriveKey, loadDriveKey, saveDriveKey } from './drive-key.js';
 import { applyReceiptEdit } from './receipt-edit.js';
+import { addManualExpense, createManualExpense, needsAmount } from './manual-expense.js';
 import { EXPENSE_CAT_DEFAULT_EMOJI, NO_CATEGORY, createExpenseCategory, deleteExpenseCategory, effectiveItemCategory, expenseCategories, expenseCategoryMonth, upsertExpenseCategory, visibleSpendRows } from './expense-cats.js';
 import { BACKUP_SNOOZE_KEY, LAST_BACKUP_KEY, backupReminderDue, dequeue, enqueue, hasData, loadQueue, saveQueue } from './offline.js';
 import { TRANSPORT_ICONS, TRANSPORT_TYPES, applyTransportRecurring, classifyReceipt, consumptionFor, createTransport, createTransportRecurring, fuelStats, pricePerLiter, transportMonth } from './transport.js';
@@ -187,6 +188,7 @@ const QUICK_ACTIONS = [
   { id: 'bill', icon: '📄', label: 'Νέος λογαριασμός', hint: 'ΔΕΗ, νερό, ενοίκιο, συνδρομές' },
   { id: 'rent', icon: '🏠', label: 'Ενοίκιο / κοινόχρηστα', hint: 'Μπαίνει μόνο του κάθε μήνα' },
   { id: 'receipt', icon: '🧾', label: 'Σάρωση απόδειξης', hint: 'Ψώνια, καύσιμα ή διόδια με ένα QR/barcode' },
+  { id: 'manual', icon: '✍️', label: 'Έξοδο με το χέρι', hint: 'Σούπερ μάρκετ, κρεοπωλείο, λαϊκή — χωρίς απόδειξη' },
   { id: 'product', icon: '＋', label: 'Πρόσθεσε προϊόν', hint: 'Κάτι που έφερες σπίτι' },
   { id: 'cart', icon: '🛒', label: 'Καλάθι στο κατάστημα', hint: 'Σκάναρε ό,τι βάζεις στο καρότσι' },
   { id: 'cook', icon: '🍳', label: 'Τι να μαγειρέψω;', hint: 'Ιδέες με ό,τι λήγει πρώτο' }
@@ -223,6 +225,7 @@ function runQuickAction(id) {
   if (id === 'all') { document.querySelector('#quick-sheet-list').innerHTML = renderQuickActions(); translateDom(sheet); sheet.showModal(); }
   else if (id === 'scan') openUniversalScan();
   else if (id === 'receipt') openReceiptDialog();
+  else if (id === 'manual') openManualExpense();
   else if (id === 'product') openItemDialog();
   else if (id === 'list') { navigate('shopping'); focus('#shopping-form input[name="name"]'); }
   else if (id === 'extra') { navigate('extras'); focus('#extras-quick-panel', 'start'); }
@@ -796,7 +799,7 @@ async function openScanner({ onCode = fillFromBarcode, qr = false, confident = n
   document.querySelector('#scan-file-row').hidden = qr !== 'all';
   document.querySelector('#scan-title').textContent = t(qr === 'all' ? 'Σκάναρε οτιδήποτε' : qr === 'any' ? 'Σάρωση κωδικού λογαριασμού' : qr ? 'Σάρωση QR απόδειξης' : 'Σάρωση προϊόντος');
   const torch = document.querySelector('#scan-torch');
-  torch.hidden = true; torch.setAttribute('aria-pressed', 'false');
+  torch.hidden = true; torch.setAttribute('aria-pressed', 'false'); torch.textContent = t('🔦 Φακός');
   dialog.showModal();
   await afterPaint(); // let the dialog paint before the heavy camera/detector setup (INP)
   if (!dialog.open) return;
@@ -811,7 +814,9 @@ async function openScanner({ onCode = fillFromBarcode, qr = false, confident = n
       onSkip: () => { if (dialog.open) status.textContent = t(TILL_SKIP_HINT); },
       onIdle: () => { if (dialog.open) status.textContent = t(qr === 'all' ? 'Δεν το πιάνει; Κράτα το κινητό λίγο πιο μακριά (15–20 εκ.), με καλό φως, ή πάτα «📎 Από φωτογραφία ή PDF».' : 'Δεν το πιάνει; Κράτα το κινητό λίγο πιο μακριά (15–20 εκ.) και με καλό φως.'); } });
     if (stopScanner?.hasTorch) torch.hidden = false;
-    if (dialog.open) status.textContent = t(qr === 'all' ? 'Στόχευσε QR ή barcode: απόδειξη, λογαριασμό, διόδια ή προϊόν.' : qr === 'any' ? 'Στόχευσε το QR ή τον barcode του λογαριασμού.' : qr ? 'Στόχευσε το QR ή τον barcode της απόδειξης μέσα στο πλαίσιο.' : 'Στόχευσε τον barcode με την κάμερα.');
+    // Some phones report the flashlight only a moment after the camera starts.
+    else setTimeout(() => { if (dialog.open && stopScanner?.checkTorch?.()) torch.hidden = false; }, 800);
+    if (dialog.open) status.textContent = t(qr === 'all' ? 'Στόχευσε QR ή barcode: απόδειξη, λογαριασμό, διόδια ή προϊόν.' : qr === 'any' ? 'Στόχευσε το QR ή τον barcode του λογαριασμού.' : qr ? 'Στόχευσε το QR της απόδειξης μέσα στο πλαίσιο, όχι την κάρτα πόντων ή το barcode του ταμείου.' : 'Στόχευσε τον barcode με την κάμερα.');
     else closeScanner();
   } catch (error) {
     status.textContent = t(error?.name === 'NotAllowedError' ? 'Δεν δόθηκε άδεια για την κάμερα. Μπορείς να γράψεις τον barcode με το χέρι.'
@@ -1299,7 +1304,7 @@ function receiptCode(code) {
   if (toll) { tollToTransport(toll); return; }
   const till = parseStoreReceiptBarcode(value);
   if (till) { receiptState = { step: 'start', error: t('Διάβασα τον barcode του ταμείου ({date}), όχι το QR. Αυτός ο barcode δεν έχει τα είδη της απόδειξης, γι’ αυτό δεν μπορεί να ανοίξει. Σκάναρε το QR της απόδειξης (συνήθως κάτω δεξιά) ή βγάλε της φωτογραφία.', { date: formatDate(till.date) }), raw: value.slice(0, 120) }; renderReceipt(); return; }
-  receiptState = { step: 'start', error: t('Ο barcode αυτής της απόδειξης δεν περιέχει τα στοιχεία της. Σκάναρε το QR code (αν υπάρχει) ή βγάλε φωτογραφία την απόδειξη για αναγνώριση κειμένου.'), raw: value.slice(0, 120) };
+  receiptState = { step: 'start', error: t('Αυτός ο κωδικός δεν είναι το QR της απόδειξης (μπορεί να είναι κάρτα πόντων ή ο barcode του ταμείου). Σκάναρε το QR της απόδειξης ή βγάλε φωτογραφία την απόδειξη.'), raw: value.slice(0, 120) };
   renderReceipt();
 }
 
@@ -1333,20 +1338,25 @@ async function loadReceipt(link, { fromQueue = false } = {}) {
     if (fromQueue || loadQueue().some((e) => e.link === receiptState.link)) saveQueue(dequeue(loadQueue(), receiptState.link));
     const id = await receiptId(receipt, receipt.sourceUrl);
     const duplicate = (state.receipts || []).find((entry) => entry.id === id);
-    receiptState = { step: 'review', receipt, id, duplicate, trip: tripForReceipt(state.trips || [], receipt), target: receiptTarget, guess: classifyReceipt(receipt) };
+    // v1.8.0: a scan with neither items nor an amount (ΑΑΔΕ cash-register QR) asks for the amount — never a 0 € expense.
+    if (needsAmount(receipt) && receiptTarget !== 'transport' && !duplicate) {
+      receiptState = { step: 'manual', receipt, id, guess: classifyReceipt(receipt), target: receiptTarget, manual: { id, url: receipt.sourceUrl, format: receipt.format, date: receipt.date, store: receipt.issuerName, reason: 'aade' } };
+    } else receiptState = { step: 'review', receipt, id, duplicate, trip: tripForReceipt(state.trips || [], receipt), target: receiptTarget, guess: classifyReceipt(receipt) };
   } catch (error) {
-    receiptState = { step: 'start', link: receiptState.link, error: t(error.message || 'Η αναζήτηση απέτυχε.'), cors: Boolean(error.cors), canQueue: Boolean(error.cors) && !error.status && !/πολλές αναζητήσεις/i.test(error.message || '') };
+    receiptState = { step: 'start', link: receiptState.link, error: t(error.message || 'Η αναζήτηση απέτυχε.'), unsupported: Boolean(error.unsupported), cors: Boolean(error.cors), canQueue: Boolean(error.cors) && !error.status && !/πολλές αναζητήσεις/i.test(error.message || '') };
   }
   renderReceipt();
 }
 
 function renderReceiptStart() {
   const { link = '', error = '', cors = false, canQueue = false } = receiptState;
+  const manualButton = (primary) => `<button class="button ${primary ? 'button-primary' : 'button-quiet'}" type="button" data-action="receipt-manual" id="${primary ? 'receipt-manual-error' : 'receipt-manual'}">＋ ${escapeHtml(t('Έξοδο με το χέρι'))}</button>`;
   return `${renderQueueNote()}<p class="field-hint">Σκάναρε το QR code της ηλεκτρονικής απόδειξης ή επικόλλησε τον σύνδεσμό του. Θα δεις τα είδη πριν μπουν οπουδήποτε.</p>
-    <div class="settings-actions"><button class="button button-primary" type="button" data-action="receipt-scan">📷 Σάρωση QR</button></div>
+    <p class="field-hint receipt-qr-hint" id="receipt-qr-hint">💡 ${escapeHtml(t('Σκάναρε το QR της απόδειξης, όχι την κάρτα πόντων ή το barcode του ταμείου.'))}</p>
+    <div class="settings-actions"><button class="button button-primary" type="button" data-action="receipt-scan">📷 Σάρωση QR</button>${error ? '' : manualButton(false)}</div>
     <p class="field-hint">Χωρίς QR παρόχου (π.χ. ταμειακή με QR της ΑΑΔΕ); Βγάλε φωτογραφία την απόδειξη και θα διαβαστούν τα είδη στη συσκευή σου.</p>${photoButtons()}
     <form id="receipt-link-form" class="store-form" novalidate><input class="field-input" name="link" type="url" inputmode="url" value="${escapeHtml(link)}" placeholder="https://… (σύνδεσμος απόδειξης)" aria-label="Σύνδεσμος απόδειξης" autocomplete="off"><button class="button button-quiet" type="submit">Άνοιγμα</button></form>
-    ${error ? `<p class="form-error" id="receipt-error" role="alert">${escapeHtml(error)}</p>` : ''}${receiptState.raw ? `<p class="field-hint" id="receipt-raw-code"><small>${escapeHtml(t('Διαβάστηκε:'))} <code data-no-i18n>${escapeHtml(receiptState.raw)}</code> (${receiptState.raw.length})</small></p>` : ''}
+    ${error ? `<div class="receipt-fail" id="receipt-fail"><p class="form-error" id="receipt-error" role="alert">${escapeHtml(error)}</p><p class="field-hint">${escapeHtml(t('Χωρίς απόδειξη ή δεν διαβάζεται; Γράψε απλώς το ποσό:'))}</p><div class="settings-actions">${manualButton(true)}</div></div>` : ''}${receiptState.raw ? `<p class="field-hint" id="receipt-raw-code"><small>${escapeHtml(t('Διαβάστηκε:'))} <code data-no-i18n>${escapeHtml(receiptState.raw)}</code> (${receiptState.raw.length})</small></p>` : ''}
     ${error && canQueue && link ? `<div class="alert-banner" id="receipt-save-later-box"><p>${escapeHtml(t('Χωρίς σύνδεση; Κράτα την απόδειξη και θα ανοίξει μόνη της μόλις επιστρέψει το internet.'))}</p><div class="settings-actions"><button class="button button-primary" type="button" data-action="receipt-save-later" id="receipt-save-later">💾 ${escapeHtml(t('Αποθήκευση για αργότερα'))}</button></div></div>` : ''}
     ${cors && !receiptProxy() ? '<p class="field-hint">Αν δεν ανοίγει, δοκίμασε τη φωτογραφία της απόδειξης.</p>' : ''}`;
 }
@@ -1382,10 +1392,53 @@ function renderReceiptReview() {
     <div class="dialog-actions"><button class="button button-quiet" type="button" data-action="receipt-reset">Πίσω</button><button class="button button-primary" type="submit" ${duplicate ? 'disabled' : ''}>Εισαγωγή</button></div></form>`;
 }
 
+// v1.8.0: «＋ Έξοδο με το χέρι»: amount, optional shop, date, expense category → saved like a receipt with only a total.
+function renderReceiptManual() {
+  const m = receiptState.manual || {};
+  const stores = [...new Set((state.stores || []).map((s) => s.name).filter(Boolean))].slice(0, 50);
+  const note = m.reason === 'aade'
+    ? `<p class="alert-banner" id="manual-aade-note" role="status">${escapeHtml(t('Αυτό το QR (ταμειακή μηχανή, ΑΑΔΕ) δεν έχει μέσα το ποσό ούτε τα είδη. Γράψε το σύνολο της απόδειξης.'))}</p>`
+    : `<p class="field-hint" id="manual-note">${escapeHtml(t('Για ψώνια χωρίς απόδειξη: σούπερ μάρκετ, κρεοπωλείο, λαϊκή… Μετράει στα έξοδα του μήνα.'))}</p>`;
+  const transport = m.reason === 'aade' && receiptState.receipt ? `<button class="button button-quiet" type="button" data-action="receipt-to-transport" id="manual-to-transport">🚗 ${escapeHtml(t('Είναι καύσιμα / διόδια'))}</button>` : '';
+  return `${note}<form id="receipt-manual-form" novalidate>
+    <label class="field-label" for="manual-amount">${escapeHtml(t('Ποσό (€)'))}</label><input class="field-input" id="manual-amount" name="amount" type="number" min="0.01" max="100000" step="0.01" inputmode="decimal" required placeholder="€" value="${escapeHtml(m.amount ?? '')}">
+    <label class="field-label" for="manual-store">${escapeHtml(t('Κατάστημα (προαιρετικό)'))}</label><input class="field-input" id="manual-store" name="store" maxlength="80" autocomplete="off" list="manual-stores" placeholder="${escapeHtml(t('π.χ. Κρεοπωλείο, λαϊκή'))}" value="${escapeHtml(m.store || '')}"><datalist id="manual-stores">${stores.map((n) => `<option value="${escapeHtml(n)}"></option>`).join('')}</datalist>
+    <label class="field-label" for="manual-date">${escapeHtml(t('Ημερομηνία'))}</label><input class="field-input" id="manual-date" name="date" type="date" required value="${escapeHtml(m.date || localDateKey())}" max="${escapeHtml(localDateKey())}">
+    <label class="field-label" for="manual-expcat">${escapeHtml(t('Κατηγορία εξόδου'))}</label><select class="field-input expcat-select" id="manual-expcat" name="expenseCategory" data-prev="">${expCatOptions('', 'receipt')}</select>${expCatInlineRow()}
+    <p class="form-error" id="manual-error" role="alert" hidden></p>
+    <div class="dialog-actions">${transport}<button class="button button-quiet" type="button" data-action="receipt-reset">${escapeHtml(t('Πίσω'))}</button><button class="button button-primary" type="submit" id="manual-save">${escapeHtml(t('Αποθήκευση'))}</button></div></form>
+    ${m.reason === 'aade' ? `<p class="field-hint">${escapeHtml(t('Θες και τα είδη; Βγάλε φωτογραφία την απόδειξη:'))}</p>${photoButtons()}` : ''}`;
+}
+function openManualExpense(prefill = {}) {
+  const dialog = document.querySelector('#receipt-dialog');
+  if (!dialog.open) openReceiptDialog();
+  receiptState = { step: 'manual', manual: { ...prefill } };
+  renderReceipt();
+  requestAnimationFrame(() => document.querySelector('#manual-amount')?.focus());
+}
+function saveManualExpense(form) {
+  const m = receiptState.manual || {};
+  const error = document.querySelector('#manual-error');
+  const sel = form.elements.expenseCategory;
+  const expenseCategory = sel ? (sel.value === '__new' ? sel.dataset.prev || '' : sel.value) : '';
+  let entry;
+  try {
+    if (m.id && (state.receipts || []).some((r) => r.id === m.id)) throw new Error('Αυτή η απόδειξη έχει ήδη καταχωρηθεί.');
+    entry = createManualExpense({ amount: form.elements.amount.value, store: form.elements.store.value, date: form.elements.date.value, expenseCategory, id: m.id, url: m.url, format: m.format === 'AADE' ? 'AADE' : 'manual' }, localDateKey());
+  } catch (err) { error.textContent = t(err.message); error.hidden = false; form.elements.amount.focus(); return; }
+  const next = addManualExpense(state, entry);
+  state.receipts = next.receipts; state.purchases = next.purchases;
+  if (!persist()) return;
+  receiptState = { step: 'start' };
+  document.querySelector('#receipt-dialog').close();
+  renderApp();
+  showToast(t('Καταχωρήθηκε έξοδο {amount}', { amount: `${money(entry.receipt.total)}${entry.receipt.store ? ` · ${entry.receipt.store}` : ''}` }));
+}
+
 function renderReceipt() {
   const body = document.querySelector('#receipt-body');
   if (!body) return;
-  body.innerHTML = receiptState.step === 'loading' ? `<p class="field-hint" id="receipt-loading" role="status">${escapeHtml(t(receiptState.photo ? 'Φόρτωση αναγνώρισης κειμένου (μόνο την πρώτη φορά)…' : 'Φόρτωση απόδειξης…'))}</p>`
+  body.innerHTML = receiptState.step === 'manual' ? renderReceiptManual() : receiptState.step === 'loading' ? `<p class="field-hint" id="receipt-loading" role="status">${escapeHtml(t(receiptState.photo ? 'Φόρτωση αναγνώρισης κειμένου (μόνο την πρώτη φορά)…' : 'Φόρτωση απόδειξης…'))}</p>`
     : receiptState.step === 'review' ? renderReceiptReview() : renderReceiptStart();
   translateDom(body);
 }
@@ -1403,6 +1456,7 @@ function importReceipt(form) {
   let merged = 0;
   let spent = 0;
   if (form.elements.mode.value === 'total') {
+    if (!(receipt.total > 0)) { receiptState = { ...receiptState, step: 'manual', manual: { id, url: receipt.sourceUrl, format: receipt.format, date: receipt.date, store: storeName, reason: 'aade' } }; renderReceipt(); return; }
     state.purchases.push({ id: `pur-${id}`, rowId: '', name: storeName || t('Απόδειξη'), category: 'Άλλο', price: receipt.total, date, ...extra, updatedAt: now });
     spent = receipt.total;
   } else {
@@ -2676,7 +2730,7 @@ function renderReceipts() {
   const list = rows.length ? `<ul class="receipts-list" id="receipts-list">${rows.map((r) => `<li><button type="button" class="receipt-row" data-action="receipt-open" data-id="${escapeHtml(r.id)}"><span class="receipt-main"><strong data-no-i18n>${escapeHtml(r.store || t('Απόδειξη'))}</strong><small>${escapeHtml(formatDate(r.date))} · ${escapeHtml(t(receiptCategory(r, state.purchases)))}</small></span><span class="receipt-total" data-no-i18n>${escapeHtml(money(r.total))}</span><span class="arrow" aria-hidden="true">›</span></button></li>`).join('')}</ul>`
     : `<p class="subtle-empty">${escapeHtml(t(all.length ? 'Καμία απόδειξη αυτόν τον μήνα.' : 'Δεν έχεις σκανάρει αποδείξεις ακόμα. Πάτα «📷 Σάρωση» και στόχευσε το QR της απόδειξης.'))}</p>`;
   return `${renderHeader('Αποδείξεις', 'Όσες αποδείξεις έχεις σκανάρει, οι πιο πρόσφατες πρώτα.')}
-    <div class="settings-actions"><button class="button button-primary" type="button" data-action="menu-receipt">📷 ${escapeHtml(t('Σάρωση απόδειξης'))}</button></div>
+    <div class="settings-actions"><button class="button button-primary" type="button" data-action="menu-receipt">📷 ${escapeHtml(t('Σάρωση απόδειξης'))}</button><button class="button button-quiet" type="button" data-action="receipt-manual" id="receipts-manual">＋ ${escapeHtml(t('Έξοδο με το χέρι'))}</button></div>
     <section class="panel" id="receipts-panel">${filter}${rows.length ? `<p class="field-hint" id="receipts-summary">${escapeHtml(t('{count} αποδείξεις · σύνολο {total}', { count: rows.length, total: money(total) }))}</p>` : ''}${list}</section>`;
 }
 
@@ -3075,6 +3129,7 @@ function handleAction(button) {
   else if (action === 'close-receipt') document.querySelector('#receipt-dialog').close();
   else if (action === 'receipt-scan') openScanner({ qr: true, onCode: receiptCode });
   else if (action === 'receipt-reset') { receiptState = { step: 'start' }; renderReceipt(); }
+  else if (action === 'receipt-manual') { const sheet = document.querySelector('#menu-sheet'); if (sheet?.open) sheet.close(); openManualExpense(); }
   else if (action === 'delete-item') {
     const item = state.items.find((entry) => entry.id === id);
     if (!item) return;
@@ -3106,7 +3161,7 @@ function handleAction(button) {
   });
   else if (action === 'sync-leave') showConfirm('Θα επιστρέψεις στο δικό σου νοικοκυριό. Τα κοινά προϊόντα θα μείνουν στο κοινό νοικοκυριό.', () => syncAction(() => sync.leaveHousehold(), 'Αποχώρησες από το νοικοκυριό.'), 'Αποχώρηση;');
   else if (action === 'scan-barcode') openScanner();
-  else if (action === 'scan-torch') { const on = button.getAttribute('aria-pressed') !== 'true'; stopScanner?.torch?.(on).then((ok) => { if (ok) button.setAttribute('aria-pressed', String(on)); }); }
+  else if (action === 'scan-torch') { const on = button.getAttribute('aria-pressed') !== 'true'; stopScanner?.torch?.(on).then((ok) => { if (ok) { button.setAttribute('aria-pressed', String(on)); button.textContent = t(on ? '🔦 Φακός: ανοιχτός' : '🔦 Φακός'); } else { button.hidden = true; } }); }
   else if (action === 'close-scan') { cartScanning = false; closeScanner(); }
   else if (action === 'lookup-barcode') fillFromBarcode(itemForm.elements.barcode.value);
   else if (action === 'enable-notifications') enableNotifications();
@@ -3440,6 +3495,7 @@ document.addEventListener('submit', (event) => {
     loadReceipt(event.target.elements.link.value);
     return;
   }
+  if (event.target.id === 'receipt-manual-form') { event.preventDefault(); saveManualExpense(event.target); return; }
   if (event.target.id === 'receipt-review-form') {
     event.preventDefault();
     const form = event.target;

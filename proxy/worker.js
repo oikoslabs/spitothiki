@@ -1,42 +1,14 @@
 // Spitothiki receipt proxy (Cloudflare Worker).
 // Forwards GET requests only to known Greek e-invoicing provider domains and adds CORS for the app,
 // for providers whose receipt pages don't allow direct browser access. Usage: GET /?url=<https receipt url>
-const ALLOWED_ORIGINS = ['https://spitothiki.web.app', 'https://spitothiki.firebaseapp.com', 'http://localhost:8080', 'http://127.0.0.1:8080'];
-
-// Registered domains of AADE-licensed e-invoicing providers (subdomains allowed).
-// Keep this list short and explicit: the proxy must never become an open relay.
-export const ALLOWED_DOMAINS = [
-  'epsilonnet.gr', 'epsilondigital.gr', // Epsilon Digital (e.g. epsilondigital-<chain>.epsilonnet.gr/fd/...)
-  'impact.gr', 'mydataconnect.gr', // IMPACT myDATA connect / eInvoicing
-  'softone.gr', 'softone.cloud', 's1cloud.net', // SoftOne e-Invoicing
-  'entersoft.gr', 'entersoft.eu', 'retail-link.gr', 'e-invoicing.gr', // Entersoft / Retail Link (e.g. Leroy Merlin: e-invoicing.gr/edocuments/ViewInvoice/...)
-  'prosvasisgo.com', 'prosvasis.gr', // PROSVASISGO
-  'pelatologio.gr', 'oxygen.gr', // Oxygen-Pelatologio
-  'primer.gr', 'primersoftware.gr', // Primer MyData
-  'ilyda.com', 'megmydata.gr', // Meg myData (ΙΛΥΔΑ)
-  'mat.gr', 'matrapidsign.gr', // MAT RapidSign
-  'simplyinvoice.gr', 'simply.gr', // SIMPLY
-  'tesae.gr', // Pegasus e-invoicing
-  'orian.gr', // Orian MyInvoices
-  'parochos.gr', 'parochos-online.gr', // Parochos Online
-  'vivawallet.com', 'viva.com', // Viva Fiscal
-  'wrapp.ai', // WRAPP
-  'edicomgroup.com', // EDIWIN
-  'invoicelink.gr', 'megasoft.gr', // InvoiceLink
-  'onesys.gr', // ONESIGN
-  'elorus.com', // Elorus Fuse
-  'timologisi.online' // timologisi.online
-];
+import { ALLOWED_DOMAINS, ALLOWED_ORIGINS, allowedHost, isAllowedOrigin } from '../src/receipt-domains.js';
+export { ALLOWED_DOMAINS, ALLOWED_ORIGINS };
 
 const MAX_BYTES = 2 * 1024 * 1024;
 
-function allowedHost(host) {
-  const h = host.toLowerCase();
-  return ALLOWED_DOMAINS.some((d) => h === d || h.endsWith(`.${d}`));
-}
 
 function cors(origin) {
-  const allow = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  const allow = isAllowedOrigin(origin) ? origin : ALLOWED_ORIGINS[0];
   return { 'access-control-allow-origin': allow, 'access-control-allow-methods': 'GET, OPTIONS', 'access-control-allow-headers': 'accept', vary: 'Origin' };
 }
 
@@ -86,7 +58,7 @@ async function handle(request, info, env) {
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers });
     if (request.method !== 'GET') return new Response('Method not allowed', { status: 405, headers });
     // Browsers always send Origin on the app's cross-origin fetch; requests without one are scripts, not the app.
-    if (!ALLOWED_ORIGINS.includes(origin)) return new Response('Origin not allowed', { status: 403, headers });
+    if (!isAllowedOrigin(origin)) return new Response('Origin not allowed', { status: 403, headers });
     // Per-IP rate limit (Workers Rate Limiting binding): stops one client from burning the free daily quota.
     if (!isolateAllow(request.headers.get('cf-connecting-ip') || 'unknown')) { info.host = 'rate-limited'; return new Response('Too many requests', { status: 429, headers: { ...headers, 'retry-after': '60' } }); }
     if (env?.LIMITER) {
