@@ -1057,7 +1057,9 @@ const EN = {
   "🔦 Φακός: ανοιχτός": "🔦 Torch: on",
   "Οι αποδείξεις αυτού του καταστήματος δεν υποστηρίζονται ακόμα από τη Σπιτοθήκη. Γράψε το ποσό με το «＋ Έξοδο με το χέρι» ή βγάλε φωτογραφία την απόδειξη.": "Receipts from this shop are not supported by Spitothiki yet. Type the amount with «＋ Expense by hand» or take a photo of the receipt.",
   "Δεν ήταν δυνατή η σύνδεση για να ανοίξει η απόδειξη (δεν υπάρχει internet ή η σύνδεση είναι πολύ αργή). Δοκίμασε ξανά σε λίγο.": "Couldn’t connect to open the receipt (no internet or a very slow connection). Try again in a moment.",
-  "Η υπηρεσία αποδείξεων δεν απαντά αυτή τη στιγμή. Δοκίμασε ξανά σε λίγα λεπτά.": "The receipt service is not responding right now. Try again in a few minutes."
+  "Η υπηρεσία αποδείξεων δεν απαντά αυτή τη στιγμή. Δοκίμασε ξανά σε λίγα λεπτά.": "The receipt service is not responding right now. Try again in a few minutes.",
+  // v1.8.1
+  "Νέα & tips στο Telegram": "News & tips on Telegram"
 };
 
 export const dictionaries = { el: Object.fromEntries(Object.keys(EN).map((key) => [key, key])), en: EN };
