@@ -3,6 +3,9 @@
     "public": ".",
     "ignore": ["firebase.json", ".firebaserc", "**/.*", "**/node_modules/**", "tests/**", "package.json", "package-lock.json", "*.md", "firestore.rules", "docs/**", "push/**", "stats/**", "tools/**"],
     "cleanUrls": false,
+    "redirects": [
+      { "regex": "^/(?i)(?P<src>tiktok|facebook|instagram|telegram|viber|reddit|pinterest|sofisstore)/?$", "destination": "/?src=:src", "type": 302 }
+    ],
     "headers": [
       { "source": "**", "headers": [
         { "key": "X-Content-Type-Options", "value": "nosniff" },

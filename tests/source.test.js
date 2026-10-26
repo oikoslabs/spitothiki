@@ -86,3 +86,31 @@ test('stats worker: writes only [type, src]; refuses other origins and words', a
   assert.equal((await worker.fetch(req('https://spitothiki.web.app', '{}', 'POST', '/other'), env)).status, 404);
   assert.equal(points.length, 1);
 });
+
+test('v1.8.3 short links: /tiktok, /TikTok/, /TIKTOK count like ?src and the address becomes /', async () => {
+  const { SHORT_PATH } = await import('../src/source.js');
+  assert.equal(parseSource('', '/tiktok'), 'tiktok');
+  assert.equal(parseSource('', '/TikTok/'), 'tiktok');
+  assert.equal(parseSource('', '/SOFISSTORE'), 'sofisstore');
+  assert.equal(parseSource('', '/'), 'direct');
+  assert.equal(parseSource('', '/tiktokx'), 'direct');
+  assert.equal(parseSource('', '/src/app.js'), 'direct');
+  assert.equal(parseSource('?src=facebook', '/tiktok'), 'facebook');
+  assert.equal(cleanUrl('https://spitothiki.web.app/TikTok/'), '/');
+  assert.equal(cleanUrl('https://spitothiki.web.app/viber#bills'), '/#bills');
+  assert.ok(!SHORT_PATH.test('/tiktok/x') && !SHORT_PATH.test('/index.html'));
+  const storage = memory(); const sent = []; const replaced = [];
+  await initSource({ storage, loc: { href: 'https://spitothiki.web.app/TIKTOK', search: '', pathname: '/TIKTOK' }, hist: { replaceState: (_s, _t, u) => replaced.push(u) }, send: async (...a) => { sent.push(a); return true; } });
+  assert.deepEqual(sent, [['visit', 'tiktok']]); assert.deepEqual(replaced, ['/']);
+});
+
+test('v1.8.3 short links: hosting redirect (302) and service worker use the same list', async () => {
+  const { readFileSync } = await import('node:fs');
+  const fb = JSON.parse(readFileSync(new URL('../firebase.json', import.meta.url)));
+  const rule = fb.hosting.redirects.find((r) => r.destination === '/?src=:src');
+  assert.equal(rule.type, 302);
+  assert.ok(rule.regex.includes(`(?P<src>${SOURCES.join('|')})`) && rule.regex.includes('(?i)'));
+  const sw = readFileSync(new URL('../sw.js', import.meta.url), 'utf8');
+  assert.ok(sw.includes(`/^\\/(${SOURCES.join('|')})\\/?$/i`));
+  for (const f of SOURCES) assert.throws(() => readFileSync(new URL(`../${f}`, import.meta.url)), 'no file or folder clashes with a short link');
+});
