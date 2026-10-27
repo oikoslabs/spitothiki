@@ -5,7 +5,27 @@
 //   state.purchases += { id: `pur-${id}`, rowId: '', name, category: 'Άλλο', price, date, receiptId: id, storeName?, expenseCategory?, updatedAt }
 // so it counts in «Τα έξοδα του μήνα» / «Σύνολο εξόδων» (under «Αγορές» or the chosen category), shows in «🧾 Αποδείξεις»,
 // can be edited (✎) and deleted there, and older app versions in the same household read, edit and delete it the same way.
+// v1.8.4: the product group of a hand-typed expense («Τι αγόρασες;»), same groups as a scanned receipt's items,
+// so butcher / λαϊκή / cheese show in the right bar of «Έξοδα». Old entries without it stay 'Άλλο'.
+import { CATEGORIES } from './features.js';
+import { normalizeSearch } from './domain.js';
 const r2 = (n) => Math.round(n * 100) / 100;
+
+export const manualCategory = (value) => (CATEGORIES.includes(value) ? value : 'Άλλο');
+
+// Light guess from the shop text (accent- and case-insensitive). '' when nothing matches.
+const GUESS = [
+  [/κρεοπωλ|κρεατ|χασαπ|ιχθυοπωλ|ψαρ/, 'Κρέας & ψάρι'],
+  [/λαικ|μαναβ|οπωροπωλ/, 'Φρούτα & λαχανικά'],
+  [/τυρ|γαλακτοκομ/, 'Γαλακτοκομικά'],
+  [/φουρν|αρτοποι/, 'Ξηρά τρόφιμα']
+];
+export function guessManualCategory(store) {
+  const s = normalizeSearch(store);
+  if (!s.trim()) return '';
+  const hit = GUESS.find(([re]) => re.test(s));
+  return hit ? hit[1] : '';
+}
 export const MANUAL_MAX = 100000;
 const isDate = (d) => /^\d{4}-\d{2}-\d{2}$/.test(String(d || '')) && !Number.isNaN(Date.parse(`${d}T00:00:00Z`));
 
@@ -23,7 +43,7 @@ function makeId() {
   return `manual-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-// input: { amount, store?, date?, expenseCategory?, id?, url?, format? } → { receipt, purchase }. Throws a Greek message.
+// input: { amount, store?, date?, category?, expenseCategory?, id?, url?, format? } → { receipt, purchase }. Throws a Greek message.
 export function createManualExpense(input = {}, today, now = new Date().toISOString()) {
   const amount = parseAmount(input.amount);
   if (!(amount > 0)) throw new Error('Γράψε ποσό μεγαλύτερο από 0.');
@@ -35,7 +55,7 @@ export function createManualExpense(input = {}, today, now = new Date().toISOStr
   const id = input.id || makeId();
   const cat = String(input.expenseCategory || '');
   const receipt = { id, date, total, store, issuerVat: '', format: input.format || 'manual', lines: 0, items: [], ...(cat ? { expenseCategory: cat } : {}), ...(input.url ? { url: input.url } : {}), importedAt: now };
-  const purchase = { id: `pur-${id}`, rowId: '', name: store || 'Έξοδο', category: 'Άλλο', price: total, date, receiptId: id, ...(store ? { storeName: store } : {}), ...(cat ? { expenseCategory: cat } : {}), updatedAt: now };
+  const purchase = { id: `pur-${id}`, rowId: '', name: store || 'Έξοδο', category: manualCategory(input.category), price: total, date, receiptId: id, ...(store ? { storeName: store } : {}), ...(cat ? { expenseCategory: cat } : {}), updatedAt: now };
   return { receipt, purchase };
 }
 

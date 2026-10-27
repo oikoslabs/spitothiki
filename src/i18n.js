@@ -1047,6 +1047,7 @@ const EN = {
   "Για ψώνια χωρίς απόδειξη: σούπερ μάρκετ, κρεοπωλείο, λαϊκή… Μετράει στα έξοδα του μήνα.": "For shopping without a receipt: supermarket, butcher, street market… It counts in the month’s expenses.",
   "Είναι καύσιμα / διόδια": "It’s fuel / tolls",
   "Κατάστημα (προαιρετικό)": "Shop (optional)",
+  'Τι αγόρασες;': 'What did you buy?',
   "π.χ. Κρεοπωλείο, λαϊκή": "e.g. Butcher, street market",
   "Θες και τα είδη; Βγάλε φωτογραφία την απόδειξη:": "Want the items too? Take a photo of the receipt:",
   "Καταχωρήθηκε έξοδο {amount}": "Expense saved: {amount}",
