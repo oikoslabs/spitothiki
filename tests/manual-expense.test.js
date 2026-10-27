@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { addManualExpense, createManualExpense, needsAmount, parseAmount } from '../src/manual-expense.js';
+import { addManualExpense, createManualExpense, guessManualCategory, needsAmount, parseAmount } from '../src/manual-expense.js';
+import { monthlySpending } from '../src/features.js';
 import { expenseCategoryMonth } from '../src/expense-cats.js';
 import { applyReceiptEdit } from '../src/receipt-edit.js';
 import { deleteReceipt, listReceipts, receiptCategory } from '../src/receipts.js';
@@ -86,4 +87,47 @@ test('ΑΑΔΕ cash-register QR has no amount → needs the amount (never a 0 �
   assert.equal(e.receipt.format, 'AADE');
   assert.equal(e.receipt.url, 'https://www1.aade.gr/tameiakes/myweb/q1.php?SIG=DEMO123');
   assert.equal(e.purchase.id, 'pur-rcpt-demo');
+});
+
+test('v1.8.4 manual expense: «Τι αγόρασες;» product group, validated, default Άλλο', () => {
+  assert.equal(createManualExpense({ amount: '12', store: 'Χασάπης' }, '2026-10-27', NOW).purchase.category, 'Άλλο');
+  assert.equal(createManualExpense({ amount: '12', category: 'Κρέας & ψάρι' }, '2026-10-27', NOW).purchase.category, 'Κρέας & ψάρι');
+  assert.equal(createManualExpense({ amount: '12', category: 'Γαλακτοκομικά' }, '2026-10-27', NOW).purchase.category, 'Γαλακτοκομικά');
+  assert.equal(createManualExpense({ amount: '12', category: 'Ρούχα' }, '2026-10-27', NOW).purchase.category, 'Άλλο');
+  assert.equal(createManualExpense({ amount: '12', category: '' }, '2026-10-27', NOW).purchase.category, 'Άλλο');
+  const e = createManualExpense({ amount: '12', category: 'Κρέας & ψάρι', expenseCategory: 'ec-1' }, '2026-10-27', NOW);
+  assert.equal(e.purchase.expenseCategory, 'ec-1'); // the separate expense category is untouched
+  assert.equal(e.receipt.category, undefined);
+});
+
+test('v1.8.4 guessManualCategory: from the shop text, accent- and case-insensitive', () => {
+  const cases = [
+    ['Κρεοπωλείο Παπαδόπουλος', 'Κρέας & ψάρι'], ['ΚΡΕΑΤΑΓΟΡΑ', 'Κρέας & ψάρι'], ['χασάπης', 'Κρέας & ψάρι'], ['Χασαπικο', 'Κρέας & ψάρι'],
+    ['Ιχθυοπωλείο', 'Κρέας & ψάρι'], ['ψαράς', 'Κρέας & ψάρι'], ['ΨΑΡΑΔΙΚΟ', 'Κρέας & ψάρι'],
+    ['Λαϊκή', 'Φρούτα & λαχανικά'], ['ΛΑΪΚΗ Τρίτης', 'Φρούτα & λαχανικά'], ['λαικη', 'Φρούτα & λαχανικά'], ['Μανάβης', 'Φρούτα & λαχανικά'], ['ΟΠΩΡΟΠΩΛΕΙΟ', 'Φρούτα & λαχανικά'],
+    ['Τυριά Κρήτης', 'Γαλακτοκομικά'], ['ΤΥΡΟΚΟΜΕΙΟ', 'Γαλακτοκομικά'], ['Γαλακτοκομικά Νίκος', 'Γαλακτοκομικά'],
+    ['Φούρνος', 'Ξηρά τρόφιμα'], ['ΦΟΥΡΝΟΣ', 'Ξηρά τρόφιμα'], ['Αρτοποιείο', 'Ξηρά τρόφιμα'],
+    ['Σκλαβενίτης', ''], ['', ''], [null, ''], ['   ', '']
+  ];
+  for (const [store, want] of cases) assert.equal(guessManualCategory(store), want, String(store));
+});
+
+test('v1.8.4 manual expense group shows in the spending bars and survives an edit', () => {
+  const e = createManualExpense({ amount: '18,40', store: 'Κρεοπωλείο', category: 'Κρέας & ψάρι' }, '2026-10-27', NOW);
+  let state = { ...addManualExpense({ receipts: [], purchases: [] }, e) };
+  const bar = (s) => monthlySpending(s.purchases, '2026-10').byCategory;
+  assert.deepEqual(bar(state).map((r) => [r.category, r.total]), [['Κρέας & ψάρι', 18.4]]);
+  // edit without touching the group keeps it
+  state = applyReceiptEdit(state, e.receipt.id, { store: 'Κρεοπωλείο Γ.', date: '2026-10-27', total: '20' }, NOW);
+  assert.equal(state.purchases[0].category, 'Κρέας & ψάρι');
+  assert.equal(state.purchases[0].price, 20);
+  // edit that changes the group
+  state = applyReceiptEdit(state, e.receipt.id, { store: 'Λαϊκή', date: '2026-10-27', total: '20', category: 'Φρούτα & λαχανικά' }, NOW);
+  assert.equal(state.purchases[0].category, 'Φρούτα & λαχανικά');
+  state = applyReceiptEdit(state, e.receipt.id, { store: 'Λαϊκή', date: '2026-10-27', total: '20', category: 'bogus' }, NOW);
+  assert.equal(state.purchases[0].category, 'Άλλο');
+  // an old manual entry (no group chosen) stays 'Άλλο' after an edit
+  const old = createManualExpense({ amount: '5', store: 'Φούρνος' }, '2026-10-27', NOW);
+  const s2 = applyReceiptEdit(addManualExpense({ receipts: [], purchases: [] }, old), old.receipt.id, { store: 'Φούρνος', date: '2026-10-27', total: '6' }, NOW);
+  assert.equal(s2.purchases[0].category, 'Άλλο');
 });

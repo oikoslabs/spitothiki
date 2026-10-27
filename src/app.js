@@ -33,7 +33,7 @@ import { DRIVE_AUTO_KEY, DRIVE_ENABLED_KEY, DRIVE_HASH_KEY, DRIVE_LAST_KEY, auto
 import { forgetToken, getDriveToken } from './gdrive-auth.js';
 import { clearDriveKey, loadDriveKey, saveDriveKey } from './drive-key.js';
 import { applyReceiptEdit } from './receipt-edit.js';
-import { addManualExpense, createManualExpense, needsAmount } from './manual-expense.js';
+import { addManualExpense, createManualExpense, guessManualCategory, manualCategory, needsAmount } from './manual-expense.js';
 import { EXPENSE_CAT_DEFAULT_EMOJI, NO_CATEGORY, createExpenseCategory, deleteExpenseCategory, effectiveItemCategory, expenseCategories, expenseCategoryMonth, upsertExpenseCategory, visibleSpendRows } from './expense-cats.js';
 import { BACKUP_SNOOZE_KEY, LAST_BACKUP_KEY, backupReminderDue, dequeue, enqueue, hasData, loadQueue, saveQueue } from './offline.js';
 import { TRANSPORT_ICONS, TRANSPORT_TYPES, applyTransportRecurring, classifyReceipt, consumptionFor, createTransport, createTransportRecurring, fuelStats, pricePerLiter, transportMonth } from './transport.js';
@@ -1409,11 +1409,14 @@ function renderReceiptManual() {
     <label class="field-label" for="manual-amount">${escapeHtml(t('Ποσό (€)'))}</label><input class="field-input" id="manual-amount" name="amount" type="number" min="0.01" max="100000" step="0.01" inputmode="decimal" required placeholder="€" value="${escapeHtml(m.amount ?? '')}">
     <label class="field-label" for="manual-store">${escapeHtml(t('Κατάστημα (προαιρετικό)'))}</label><input class="field-input" id="manual-store" name="store" maxlength="80" autocomplete="off" list="manual-stores" placeholder="${escapeHtml(t('π.χ. Κρεοπωλείο, λαϊκή'))}" value="${escapeHtml(m.store || '')}"><datalist id="manual-stores">${stores.map((n) => `<option value="${escapeHtml(n)}"></option>`).join('')}</datalist>
     <label class="field-label" for="manual-date">${escapeHtml(t('Ημερομηνία'))}</label><input class="field-input" id="manual-date" name="date" type="date" required value="${escapeHtml(m.date || localDateKey())}" max="${escapeHtml(localDateKey())}">
+    <label class="field-label" for="manual-group">${escapeHtml(t('Τι αγόρασες;'))}</label><select class="field-input" id="manual-group" name="category">${groupOptions(m.category || guessManualCategory(m.store) || 'Άλλο')}</select>
     <label class="field-label" for="manual-expcat">${escapeHtml(t('Κατηγορία εξόδου'))}</label><select class="field-input expcat-select" id="manual-expcat" name="expenseCategory" data-prev="">${expCatOptions('', 'receipt')}</select>${expCatInlineRow()}
     <p class="form-error" id="manual-error" role="alert" hidden></p>
     <div class="dialog-actions">${transport}<button class="button button-quiet" type="button" data-action="receipt-reset">${escapeHtml(t('Πίσω'))}</button><button class="button button-primary" type="submit" id="manual-save">${escapeHtml(t('Αποθήκευση'))}</button></div></form>
     ${m.reason === 'aade' ? `<p class="field-hint">${escapeHtml(t('Θες και τα είδη; Βγάλε φωτογραφία την απόδειξη:'))}</p>${photoButtons()}` : ''}`;
 }
+// v1.8.4: product group («Τι αγόρασες;»), same groups/emoji as the items of a scanned receipt.
+const groupOptions = (selected) => CATEGORIES.map((c) => `<option value="${escapeHtml(c)}"${c === manualCategory(selected) ? ' selected' : ''}>${escapeHtml(categoryLabel(c))}</option>`).join('');
 function openManualExpense(prefill = {}) {
   const dialog = document.querySelector('#receipt-dialog');
   if (!dialog.open) openReceiptDialog();
@@ -1429,7 +1432,7 @@ function saveManualExpense(form) {
   let entry;
   try {
     if (m.id && (state.receipts || []).some((r) => r.id === m.id)) throw new Error('Αυτή η απόδειξη έχει ήδη καταχωρηθεί.');
-    entry = createManualExpense({ amount: form.elements.amount.value, store: form.elements.store.value, date: form.elements.date.value, expenseCategory, id: m.id, url: m.url, format: m.format === 'AADE' ? 'AADE' : 'manual' }, localDateKey());
+    entry = createManualExpense({ amount: form.elements.amount.value, store: form.elements.store.value, date: form.elements.date.value, category: form.elements.category?.value, expenseCategory, id: m.id, url: m.url, format: m.format === 'AADE' ? 'AADE' : 'manual' }, localDateKey());
   } catch (err) { error.textContent = t(err.message); error.hidden = false; form.elements.amount.focus(); return; }
   const next = addManualExpense(state, entry);
   state.receipts = next.receipts; state.purchases = next.purchases;
@@ -2940,6 +2943,7 @@ function openReceiptEdit(id) {
   const r = (state.receipts || []).find((x) => x.id === id); if (!r) return;
   const items = Array.isArray(r.items) ? r.items : [];
   const hasSpend = (state.purchases || []).some((p) => p.receiptId === r.id); // a category only matters if it was recorded as an expense
+  const whole = !items.length && (state.purchases || []).find((p) => p.id === `pur-${r.id}`); // v1.8.4: only a total → its product group
   const dialog = document.querySelector('#receipt-detail-dialog');
   dialog.querySelector('#receipt-detail-body').innerHTML = `<form id="receipt-edit-form" data-id="${escapeHtml(r.id)}" novalidate>
     <label class="field-label" for="re-store">${escapeHtml(t('Κατάστημα'))}</label><input class="field-input" id="re-store" name="store" value="${escapeHtml(r.store || '')}" maxlength="80">
@@ -2951,7 +2955,7 @@ function openReceiptEdit(id) {
       <input class="field-input receipt-qty" name="quantity" type="number" min="0" step="0.001" value="${escapeHtml(String(it.quantity ?? 1))}" aria-label="${escapeHtml(t('Ποσότητα'))}">
       <input class="field-input receipt-price" name="price" type="number" min="0" step="0.01" inputmode="decimal" value="${escapeHtml((Number(it.price) || 0).toFixed(2))}" aria-label="${escapeHtml(t('Τιμή'))}">${hasSpend ? `<select class="field-input receipt-expcat expcat-select" name="itemCategory" data-prev="${escapeHtml(it.expenseCategory || '')}" aria-label="${escapeHtml(t('Κατηγορία εξόδου: {name}', { name: it.name }))}"${expCats().length || it.expenseCategory ? '' : ' hidden'}>${expCatOptions(it.expenseCategory || '', 'item')}</select>` : ''}</div>`).join('')}</div>
       <p class="field-hint" id="receipt-edit-sum"></p>`
-      : `<label class="field-label" for="re-total">${escapeHtml(t('Σύνολο (€)'))}</label><input class="field-input" id="re-total" name="total" type="number" min="0" step="0.01" inputmode="decimal" value="${escapeHtml((Number(r.total) || 0).toFixed(2))}">`}
+      : `<label class="field-label" for="re-total">${escapeHtml(t('Σύνολο (€)'))}</label><input class="field-input" id="re-total" name="total" type="number" min="0" step="0.01" inputmode="decimal" value="${escapeHtml((Number(r.total) || 0).toFixed(2))}">${whole ? `<label class="field-label" for="re-group">${escapeHtml(t('Τι αγόρασες;'))}</label><select class="field-input" id="re-group" name="category">${groupOptions(whole.category)}</select>` : ''}`}
     <div class="dialog-actions"><button class="button button-quiet" type="button" data-action="receipt-open" data-id="${escapeHtml(r.id)}">${escapeHtml(t('Άκυρο'))}</button><button class="button button-primary" type="submit" id="receipt-edit-save">${escapeHtml(t('Αποθήκευση αλλαγών'))}</button></div></form>`;
   updateReceiptEditSum();
   dialog.querySelector('#re-store')?.focus();
@@ -2961,7 +2965,8 @@ function readReceiptEdit(form) {
   const cat = (sel) => (sel && sel.value !== '__new' ? sel.value : sel?.dataset.prev || '');
   const items = rows.length ? rows.map((row) => { const f = (n) => row.querySelector(`[name="${n}"]`); const c = f('itemCategory'); return f('use').checked ? { name: f('name').value, quantity: f('quantity').value, price: f('price').value, ...(c ? { expenseCategory: cat(c) } : {}) } : { name: '', price: 0 }; }) : undefined;
   const receiptCat = form.querySelector('#re-expcat');
-  return { store: form.elements.store.value, date: form.elements.date.value, ...(receiptCat ? { expenseCategory: cat(receiptCat) } : {}), ...(items ? { items } : { total: form.elements.total.value }) };
+  const group = form.querySelector('#re-group');
+  return { store: form.elements.store.value, date: form.elements.date.value, ...(group ? { category: group.value } : {}), ...(receiptCat ? { expenseCategory: cat(receiptCat) } : {}), ...(items ? { items } : { total: form.elements.total.value }) };
 }
 function updateReceiptEditSum() {
   const form = document.querySelector('#receipt-edit-form'); const out = document.querySelector('#receipt-edit-sum');
@@ -3305,6 +3310,7 @@ document.addEventListener('keydown', (event) => {
 document.addEventListener('input', (event) => {
   if (event.target.id === 'extras-new-name') { const e = document.querySelector('#extras-new-emoji'); if (e) e.placeholder = suggestEmoji(event.target.value) || EXTRA_DEFAULT_EMOJI; }
   if (event.target.id === 'bill-name' && !event.target.form.dataset.typeTouched) event.target.form.elements.type.value = guessBillType(event.target.value);
+  if (event.target.id === 'manual-store' && !event.target.form.dataset.groupTouched) event.target.form.elements.category.value = guessManualCategory(event.target.value) || 'Άλλο';
   if ((event.target.id === 'bill-name' || event.target.name === 'type') && event.target.form?.id === 'bill-form' && !event.target.form.elements.billId.value && event.target.form.elements.type.value === 'rent') event.target.form.elements.period.value = '1';
   if (event.target.id === 'bill-name') rememberAutoPay(event.target.form);
 });
@@ -3317,6 +3323,7 @@ document.addEventListener('change', (event) => {
   if (event.target.id === 'high-contrast') { setHighContrast(event.target.checked); renderApp(); document.querySelector('#high-contrast')?.focus(); return; }
   if (event.target.id === 'transport-type') { const fuel = event.target.value === 'fuel'; document.querySelector('#transport-fuel').hidden = !fuel; document.querySelector('#transport-ppl').hidden = !fuel; }
   if (event.target.id === 'bill-type') event.target.form.dataset.typeTouched = '1';
+  if (event.target.id === 'manual-group') event.target.form.dataset.groupTouched = '1';
   if (event.target.id === 'cart-item-unit') updateCartQtyLabel();
   if (event.target.matches?.('select.expcat-select')) { if (event.target.value === '__new') openExpCatInline(event.target); else event.target.dataset.prev = event.target.value; return; }
   if (event.target.id === 'bills-history-filter') { billsHistory.filter = event.target.value; billsHistory.limit = 10; renderApp(); return; }

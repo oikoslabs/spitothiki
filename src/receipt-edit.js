@@ -1,7 +1,9 @@
 // v1.4: edit a saved receipt; keeps the receipt record and its linked purchases consistent. Unit-tested.
 // v1.6.8: optional expense category for the whole receipt (edits.expenseCategory) and per item (items[i].expenseCategory:
 // '' = same as the receipt, '-' = none). Omitted fields keep what the receipt already had.
+// v1.8.4: edits.category = product group («Τι αγόρασες;») of a receipt with only a total (e.g. «＋ Έξοδο με το χέρι»).
 import { effectiveItemCategory, totalPurchaseCategory } from './expense-cats.js';
+import { CATEGORIES } from './features.js';
 const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 
 // edits: { store, date, total?, expenseCategory?, items: [{ name, quantity, price, expenseCategory? }] } (items index = original line index)
@@ -27,6 +29,7 @@ export function applyReceiptEdit(state, id, edits, now = new Date().toISOString(
     if (p.receiptId !== id) { purchases.push(p); continue; }
     const base = { ...p, date, storeName: store || p.storeName, updatedAt: now };
     if (!store) delete base.storeName;
+    if (p.id === `pur-${id}` && !items && edits.category !== undefined) base.category = CATEGORIES.includes(edits.category) ? edits.category : 'Άλλο';
     if (p.id === `pur-${id}`) { purchases.push(withCat({ ...base, price: total, ...(p.name === receipt.store || !p.name ? { name: store || p.name } : {}) }, totalPurchaseCategory(catItems, receiptCat))); continue; }
     const index = Number(p.id.slice(`pur-${id}-`.length));
     const it = items && Number.isInteger(index) ? items[index] : null;
