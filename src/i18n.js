@@ -1062,7 +1062,10 @@ const EN = {
   // v1.8.1
   "Νέα & tips στο Telegram": "News & tips on Telegram",
   // v1.8.2
-  "Μετράμε ανώνυμα από ποια σελίδα ήρθες (π.χ. TikTok, Facebook), μόνο ως συνολικό αριθμό. Χωρίς προσωπικά στοιχεία και χωρίς να δίνουμε τίποτα σε τρίτους.": "We anonymously count which page you came from (e.g. TikTok, Facebook), only as a total number. No personal data, and nothing is shared with third parties."
+  "Μετράμε ανώνυμα από ποια σελίδα ήρθες (π.χ. TikTok, Facebook), μόνο ως συνολικό αριθμό. Χωρίς προσωπικά στοιχεία και χωρίς να δίνουμε τίποτα σε τρίτους.": "We anonymously count which page you came from (e.g. TikTok, Facebook), only as a total number. No personal data, and nothing is shared with third parties.",
+  // v1.8.5
+  "Αναζήτηση στοιχείων…": "Looking up details…",
+  "Δεν βρέθηκαν στοιχεία για αυτό το προϊόν. Μπορείς να γράψεις εσύ το όνομα.": "No details found for this product. You can type the name yourself."
 };
 
 export const dictionaries = { el: Object.fromEntries(Object.keys(EN).map((key) => [key, key])), en: EN };

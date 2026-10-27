@@ -857,19 +857,37 @@ async function addBarcodeToList(code) {
   showToast(t('Προστέθηκε στη λίστα: {name}', { name }));
 }
 
+// v1.8.5: «Σκάναρε οτιδήποτε» → product: say what the product is (saved item or Open Food Facts)
+// before asking where it goes; if nothing is found, say so clearly (the name is typed in the next step).
+let productChoiceSeq = 0;
+async function showProductChoice(r) {
+  const seq = ++productChoiceSeq;
+  const where = t('Barcode {code}. Πού να το βάλω;', { code: r.barcode });
+  const known = state.items.find((item) => item.barcode === r.barcode);
+  const weighed = codeInfo(r.raw).kind === 'vm';
+  const lookup = !known && !weighed;
+  showChoice({ title: 'Βρέθηκε προϊόν', message: known ? `${known.name} · ${where}` : lookup ? `${t('Αναζήτηση στοιχείων…')} ${where}` : where, choices: [
+    { label: 'Στο απόθεμα του σπιτιού', primary: true, run: () => { navigate('pantry'); openItemDialog(); fillFromBarcode(r.raw); } },
+    { label: 'Στη λίστα αγορών', run: () => addBarcodeToList(r.raw) }
+  ] });
+  if (!lookup) return;
+  let text;
+  if (navigator.onLine === false) text = t('Χωρίς σύνδεση: η αναζήτηση δεν είναι διαθέσιμη.');
+  else {
+    try { text = (await lookupBarcode(r.barcode))?.name || t('Δεν βρέθηκαν στοιχεία για αυτό το προϊόν. Μπορείς να γράψεις εσύ το όνομα.'); }
+    catch { text = t('Δεν βρέθηκαν στοιχεία για αυτό το προϊόν. Μπορείς να γράψεις εσύ το όνομα.'); }
+  }
+  if (seq !== productChoiceSeq || !document.querySelector('#choice-dialog').open) return;
+  document.querySelector('#choice-message').textContent = `${text} · ${where}`;
+}
+
 function handleScanned(code) {
   const r = routeCode(code);
   if (r.route === 'receipt') { openReceiptDialog(); receiptCode(r.raw); return; }
   if (r.route === 'toll') { tollToTransport(r.toll); return; }
   if (r.route === 'store-receipt') { openReceiptDialog(); receiptCode(r.raw); return; }
   if (r.route === 'bill') { navigate('bills'); openBillDialog(); applyBillCode(r.raw); return; }
-  if (r.route === 'product') {
-    showChoice({ title: 'Βρέθηκε προϊόν', message: t('Barcode {code}. Πού να το βάλω;', { code: r.barcode }), choices: [
-      { label: 'Στο απόθεμα του σπιτιού', primary: true, run: () => { navigate('pantry'); openItemDialog(); fillFromBarcode(r.raw); } },
-      { label: 'Στη λίστα αγορών', run: () => addBarcodeToList(r.raw) }
-    ] });
-    return;
-  }
+  if (r.route === 'product') { showProductChoice(r); return; }
   showChoice({ title: 'Άγνωστος κωδικός', message: t('Δεν αναγνώρισα τι είναι. Αυτό διάβασα:'), raw: r.raw.slice(0, 300), choices: [
     { label: 'Αντιγραφή', primary: true, run: async () => { try { await navigator.clipboard.writeText(r.raw); showToast('Αντιγράφηκε.'); } catch { showToast('Η αντιγραφή δεν ήταν δυνατή.'); } } },
     { label: 'Ως κωδικός πληρωμής σε νέο λογαριασμό', run: () => { navigate('bills'); openBillDialog(); document.querySelector('#bill-reference').value = r.raw.replace(/\s+/g, '').slice(0, 40); } },
