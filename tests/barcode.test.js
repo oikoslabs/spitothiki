@@ -62,3 +62,16 @@ test('stable reads: links at once in receipt mode, other codes twice; «all» tr
   assert.equal(isStableRead('product', '5201234567890', ''), true);
   assert.equal(isStableRead('product', '', ''), false);
 });
+
+test('v1.8.5 «Σκάναρε οτιδήποτε» → product: the choice shows the product name or a clear «not found» before «where should it go?»', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { dictionaries } = await import('../src/i18n.js');
+  const app = readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');
+  assert.match(app, /if \(r\.route === 'product'\) \{ showProductChoice\(r\); return; \}/);
+  const fn = app.slice(app.indexOf('async function showProductChoice'), app.indexOf('function handleScanned'));
+  assert.match(fn, /state\.items\.find\(\(item\) => item\.barcode === r\.barcode\)/); // a saved item is named without the internet
+  assert.match(fn, /await lookupBarcode\(r\.barcode\)/);
+  assert.match(fn, /Δεν βρέθηκαν στοιχεία για αυτό το προϊόν\. Μπορείς να γράψεις εσύ το όνομα\./);
+  assert.match(fn, /seq !== productChoiceSeq/); // a slow answer never overwrites a newer scan
+  for (const key of ['Αναζήτηση στοιχείων…', 'Δεν βρέθηκαν στοιχεία για αυτό το προϊόν. Μπορείς να γράψεις εσύ το όνομα.']) assert.ok(dictionaries.en[key], key);
+});
