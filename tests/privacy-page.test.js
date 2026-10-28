@@ -21,7 +21,17 @@ test('v1.8.7 privacy.html: deployed (not in firebase.json ignore), cached by the
   for (const pattern of hosting.ignore) assert.ok(!['*.html', '**/*.html', 'privacy.html'].includes(pattern), pattern);
   const sw = read('sw.js');
   assert.match(sw, /'\.\/privacy\.html'/);
-  assert.match(sw, /CACHE_VERSION = 'v94'/);
+  assert.match(sw, /CACHE_VERSION = 'v95'/);
   assert.match(read('src/app.js'), /href="\.\/privacy\.html"/);
   assert.equal(dictionaries.en['Πλήρης πολιτική απορρήτου'], 'Full privacy policy');
+});
+
+test('v1.8.8 contact email: mailto on privacy.html (Greek + English, incl. deletion) and in Settings', () => {
+  const html = read('privacy.html');
+  const mail = 'mailto:oikoslabs.apps@gmail.com';
+  const el = html.slice(html.indexOf('id="el"'), html.indexOf('id="en"'));
+  const en = html.slice(html.indexOf('id="en"'));
+  assert.ok(el.includes(mail) && /αίτημα διαγραφής/.test(el), 'Greek contact + deletion');
+  assert.ok(en.includes(mail) && /account-deletion/.test(en), 'English contact + deletion');
+  assert.ok(read('src/app.js').includes(mail));
 });
