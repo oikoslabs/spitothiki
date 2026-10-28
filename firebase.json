@@ -1,10 +1,10 @@
 {
   "hosting": {
     "public": ".",
-    "ignore": ["firebase.json", ".firebaserc", "**/.*", "**/node_modules/**", "tests/**", "package.json", "package-lock.json", "*.md", "firestore.rules", "docs/**", "push/**", "stats/**", "tools/**"],
+    "ignore": ["firebase.json", ".firebaserc", "**/.!(well-known)", "**/.!(well-known)/**", "**/node_modules/**", "tests/**", "package.json", "package-lock.json", "*.md", "firestore.rules", "docs/**", "push/**", "stats/**", "tools/**"],
     "cleanUrls": false,
     "redirects": [
-      { "regex": "^/(?i)(?P<src>tiktok|facebook|instagram|telegram|viber|reddit|pinterest|sofisstore)/?$", "destination": "/?src=:src", "type": 302 }
+      { "regex": "^/(?i)(?P<src>tiktok|facebook|instagram|telegram|viber|reddit|pinterest|sofisstore|play)/?$", "destination": "/?src=:src", "type": 302 }
     ],
     "headers": [
       { "source": "**", "headers": [
@@ -14,6 +14,7 @@
       { "source": "**/*.@(html|js|css|webmanifest)", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] },
       { "source": "/", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] },
       { "source": "/sw.js", "headers": [{ "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }, { "key": "Service-Worker-Allowed", "value": "/" }] },
+      { "source": "/.well-known/assetlinks.json", "headers": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Cache-Control", "value": "public, max-age=3600" }] },
       { "source": "/icons/**", "headers": [{ "key": "Cache-Control", "value": "public, max-age=604800" }] }
     ]
   },

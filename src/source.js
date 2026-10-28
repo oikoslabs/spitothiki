@@ -3,9 +3,10 @@
 // 'signup'). No user id, email, device info or time is sent; no third-party pixel/SDK; nothing goes to Firestore.
 // Fire-and-forget: never blocks the app, never shows an error; offline = try again on a later open.
 export const STATS_URL = 'https://spitothiki-stats.cornerstore553.workers.dev/e';
-export const SOURCES = ['tiktok', 'facebook', 'instagram', 'telegram', 'viber', 'reddit', 'pinterest', 'sofisstore'];
+export const SOURCES = ['tiktok', 'facebook', 'instagram', 'telegram', 'viber', 'reddit', 'pinterest', 'sofisstore', 'play'];
 export const SOURCE_WORDS = [...SOURCES, 'other', 'direct', 'existing'];
 export const EVENT_TYPES = ['visit', 'signup'];
+// v1.8.9: 'play' = opened from the Google Play app (Android, start address /?src=play).
 export const SOURCE_KEY = 'spitothiki:src';
 const TRACK_PARAMS = /^(src|utm_[a-z_]+|fbclid|ttclid|gclid)$/i;
 // v1.8.3: short links people can type (TikTok bio is not clickable): /tiktok, /TikTok/, … = ?src=tiktok.

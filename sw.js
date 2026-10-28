@@ -2,18 +2,19 @@
 // Strategy: network-first for everything from this site (HTML, JS, CSS, manifest), so a new
 // deploy shows up on the next load; the cache is only used when the network is unavailable.
 // Bump CACHE_VERSION when the list of shell files changes; old caches are deleted on activate.
-const CACHE_VERSION = 'v95';
+const CACHE_VERSION = 'v96';
 const CACHE = `spitothiki-${CACHE_VERSION}`;
 const OCR_CACHE = 'spitothiki-ocr';
 const SHARE_CACHE = 'spitothiki-share'; // a file shared to the app (Web Share Target), picked up by the page // Tesseract.js script/worker/core/language files, kept across versions
 const DATA_CACHE = 'spitothiki-data'; // written by the app: expiry snapshot for background checks
+// v1.8.9: Google Play app (TWA): /.well-known/assetlinks.json, source word 'play' (cache bumped).
 // v1.8.8: contact email on the privacy page and in Settings (cache bumped).
 // v1.8.7: standalone /privacy.html (own page, also cached for offline) (cache bumped).
 // v1.8.6: clearer names: «Είδος προϊόντος» (Γαλακτοκομικά…) vs «Κατηγορία εξόδου» (Αγορές, Ρούχα…) (cache bumped).
 // v1.8.5: a scanned product shows its name (or «no details found») before «where should it go?» (cache bumped).
 // v1.8.4: «Τι αγόρασες;» on a hand-typed expense (no new shell files; cache bumped so phones get the new code).
 // v1.8.3: short links (/tiktok, /TikTok/ …). Online, Firebase Hosting redirects them; offline we do the same.
-const SHORT_PATH = /^\/(tiktok|facebook|instagram|telegram|viber|reddit|pinterest|sofisstore)\/?$/i;
+const SHORT_PATH = /^\/(tiktok|facebook|instagram|telegram|viber|reddit|pinterest|sofisstore|play)\/?$/i;
 const SHELL = [
   './', './index.html', './privacy.html', './styles.css', './manifest.webmanifest',
   './src/app.js', './src/format.js', './src/theme.js', './src/i18n.js', './src/features.js', './src/recipes.js', './src/receipt.js', './src/receipt-photo.js', './src/mealplan.js', './src/diet-plan.js', './src/receipts.js', './src/diet-ui.js', './src/diet-i18n.js', './src/bills.js', './src/transport.js', './src/extras.js', './src/chores.js', './src/bar.js', './src/bill-pdf.js', './src/prefs.js', './src/scan-router.js', './src/onboarding.js', './src/cart.js', './src/shelf-price.js', './src/push.js', './src/auto-list.js', './src/price-compare.js', './src/recipe-data.js', './src/gs1.js', './src/back-to-top.js', './src/backup-crypto.js', './src/gdrive.js', './src/gdrive-auth.js', './src/drive-key.js', './src/receipt-edit.js', './src/manual-expense.js', './src/receipt-domains.js', './src/expense-cats.js', './src/whopaid.js', './src/offline.js', './src/protect.js', './src/domain.js', './src/storage.js', './src/barcode.js', './src/toll-barcode.js', './src/firebase-config.js', './src/sync-core.js', './src/sync-firebase.js', './src/source.js',
