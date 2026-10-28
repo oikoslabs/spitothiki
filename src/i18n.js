@@ -89,6 +89,7 @@ const EN = {
   "Δεν υπάρχουν διαφημίσεις ούτε cookies παρακολούθησης. Χρησιμοποιούμε μόνο το ανώνυμο Cloudflare Web Analytics (χωρίς cookies) για να ξέρουμε πόσοι μπαίνουν και αν η εφαρμογή είναι γρήγορη.": "There are no ads and no tracking cookies. We only use anonymous Cloudflare Web Analytics (no cookies) to know how many people visit and whether the app is fast.",
   "Τα δεδομένα σου μένουν στη συσκευή σου και η εφαρμογή δουλεύει και χωρίς internet. Δεν υπάρχουν διαφημίσεις.": "Your data stays on your device and the app works offline. There are no ads.",
   "Τι ακριβώς αποθηκεύεται και πού": "What exactly is stored, and where",
+  "Πλήρης πολιτική απορρήτου": "Full privacy policy",
   "Αν δεν έχεις συνδεθεί και καθαρίσεις τα δεδομένα του browser ή αλλάξεις συσκευή, χρησιμοποίησε αντίγραφο ασφαλείας.": "If you are not signed in and you clear browser data or change device, use a backup.",
   "Πολλές αναζητήσεις αυτή τη στιγμή. Δοκίμασε ξανά σε λίγα λεπτά ή σκάναρε τη φωτογραφία της απόδειξης.": "Too many lookups right now. Try again in a few minutes or scan a photo of the receipt.",
   "Η υπηρεσία αποδείξεων δεν απαντά αυτή τη στιγμή. Δοκίμασε ξανά αργότερα ή σκάναρε τη φωτογραφία της απόδειξης.": "The receipt service is not responding right now. Try again later or scan a photo of the receipt.",

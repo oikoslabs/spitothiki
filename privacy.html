@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="el">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Πολιτική απορρήτου · Σπιτοθήκη</title>
+<meta name="description" content="Τι δεδομένα χρησιμοποιεί η Σπιτοθήκη, πού αποθηκεύονται και πώς τα διαγράφεις.">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<style>
+  :root { color-scheme: light dark; --ink: #1e3329; --muted: #5d6c64; --paper: #f5f6f0; --surface: #fff; --line: #e7ebe3; --green: #2d6b4c; }
+  @media (prefers-color-scheme: dark) { :root { --ink: #e6efe9; --muted: #a9b8b0; --paper: #121a16; --surface: #1a241f; --line: #2a3832; --green: #7cc29b; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font: 17px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 24px 18px 48px; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 20px 22px; margin: 16px 0; }
+  h1 { font-size: 1.7rem; margin: 8px 0 4px; } h2 { font-size: 1.2rem; margin: 22px 0 6px; color: var(--green); }
+  .muted { color: var(--muted); font-size: .95rem; } a { color: var(--green); } li { margin: 6px 0; }
+  .back { display: inline-block; margin-top: 8px; font-weight: 600; }
+</style>
+</head>
+<body>
+<main>
+<a class="back" href="./">← Σπιτοθήκη</a>
+<article class="card" lang="el" id="el">
+<h1>Πολιτική απορρήτου</h1>
+<p class="muted">Σπιτοθήκη · https://spitothiki.web.app · Τελευταία ενημέρωση: 28 Οκτωβρίου 2026</p>
+<p>Η Σπιτοθήκη είναι μια δωρεάν εφαρμογή για το απόθεμα, τις αγορές και τα έξοδα του σπιτιού. Δεν έχει διαφημίσεις, δεν πουλάμε δεδομένα και δεν χρησιμοποιούμε cookies παρακολούθησης. Παρακάτω περιγράφουμε απλά τι γίνεται με τα δεδομένα σου.</p>
+
+<h2>Στη συσκευή σου</h2>
+<p>Απόθεμα, λίστες, έξοδα, αποδείξεις, λογαριασμοί, μετακινήσεις, πρόγραμμα διατροφής και ρυθμίσεις αποθηκεύονται στη συσκευή σου. Αν δεν συνδεθείς, δεν φεύγουν από εκεί. Φωτογραφίες και PDF (αποδείξεις, λογαριασμοί, πρόγραμμα διατροφής) διαβάζονται μέσα στη συσκευή σου και δεν ανεβαίνουν πουθενά.</p>
+
+<h2>Αν συνδεθείς (Google ή email)</h2>
+<p>Η σύνδεση γίνεται μέσω Firebase Authentication (Google), που κρατά το email σου και, αν συνδεθείς με Google, το όνομά σου. Τα δεδομένα της εφαρμογής συγχρονίζονται στο Firebase Firestore (Google) και έχουν πρόσβαση σε αυτά μόνο τα μέλη του νοικοκυριού σου, δηλαδή όσοι μπήκαν με κωδικό πρόσκλησης που έδωσες.</p>
+
+<h2>Αποδείξεις με QR</h2>
+<p>Ο σύνδεσμος της απόδειξης περνά από έναν μικρό διακομιστή μας (Cloudflare Worker) μόνο για να διαβαστεί η απόδειξη. Δεν κρατάμε τα είδη, τα ποσά ή τη διεύθυνση IP σου. Κρατάμε μόνο ανώνυμη μέτρηση, π.χ. «σούπερ μάρκετ, επιτυχία», για να ξέρουμε ποια καταστήματα διαβάζονται σωστά.</p>
+
+<h2>Barcode</h2>
+<p>Όταν σκανάρεις barcode, στέλνεται μόνο ο αριθμός του barcode στο <a href="https://world.openfoodfacts.org/" rel="noopener">Open Food Facts</a> για να βρεθεί το όνομα του προϊόντος.</p>
+
+<h2>Ειδοποιήσεις</h2>
+<p>Αν ενεργοποιήσεις ειδοποιήσεις με κλειστή εφαρμογή, ο διακομιστής μας (Cloudflare) κρατά μόνο τη διεύθυνση ειδοποιήσεων που δίνει ο browser σου και τις ημερομηνίες υπενθύμισης, όχι ονόματα, ποσά ή προϊόντα. Διαγράφονται όταν απενεργοποιήσεις τις ειδοποιήσεις, και αλλιώς λήγουν αυτόματα μετά από 70 μέρες χωρίς ενημέρωση.</p>
+
+<h2>Αντίγραφο ασφαλείας στο Google Drive</h2>
+<p>Αν το ενεργοποιήσεις, η εφαρμογή ζητά μόνο την άδεια <code>drive.appdata</code>: αποθηκεύει το αντίγραφο σε έναν κρυφό φάκελο της εφαρμογής στο δικό σου Google Drive. Δεν βλέπει ούτε αλλάζει κανένα άλλο αρχείο σου. Το αντίγραφο πάει απευθείας από τη συσκευή σου στο Drive σου, δεν περνά από δικούς μας διακομιστές. Μπορείς να αποσυνδεθείς από τις Ρυθμίσεις («Αποσύνδεση από Drive»). Τα αντίγραφα που ήδη υπάρχουν μένουν στο Drive σου και τα σβήνεις από τις ρυθμίσεις του Google Drive («Διαχείριση εφαρμογών»). Την πρόσβαση την ανακαλείς και από τη σελίδα <a href="https://myaccount.google.com/permissions" rel="noopener">Λογαριασμός Google › Εφαρμογές τρίτων</a>.</p>
+
+<h2>Ανώνυμα στατιστικά</h2>
+<ul>
+<li>Χρησιμοποιούμε το Cloudflare Web Analytics, που λειτουργεί χωρίς cookies, για να ξέρουμε πόσοι μπαίνουν και αν η εφαρμογή είναι γρήγορη.</li>
+<li>Μετράμε ανώνυμα από πού ήρθες (π.χ. TikTok, Reddit), μόνο ως συνολικό αριθμό. Στέλνεται μία λέξη (η πηγή) και το είδος της ενέργειας (επίσκεψη ή νέος λογαριασμός), χωρίς email, αναγνωριστικό χρήστη ή στοιχεία συσκευής.</li>
+</ul>
+
+<h2>Διαγραφή των δεδομένων σου</h2>
+<ul>
+<li><strong>Ρυθμίσεις › Για προχωρημένους › Διαγραφή όλων</strong>: σβήνει απόθεμα, λίστες και έξοδα από τη συσκευή. Αν είσαι συνδεδεμένος, σβήνονται και από τον συγχρονισμό (Firestore).</li>
+<li><strong>Αποχώρηση από το κοινό σπίτι</strong> ή <strong>Αποσύνδεση</strong> από τις Ρυθμίσεις, όποτε θέλεις.</li>
+<li>Για να διαγραφεί εντελώς και ο λογαριασμός σύνδεσης (το email σου στο Firebase), στείλε αίτημα στην επικοινωνία παρακάτω.</li>
+</ul>
+
+<h2>Επικοινωνία</h2>
+<p id="contact">Για ερωτήσεις ή αίτημα διαγραφής λογαριασμού, επικοινώνησε με τον δημιουργό της εφαρμογής μέσω του email υποστήριξης που εμφανίζεται στην οθόνη σύνδεσης με Google.</p>
+
+<h2>Αλλαγές</h2>
+<p>Αν αλλάξει κάτι σε αυτή τη σελίδα, θα ενημερωθεί η ημερομηνία παραπάνω.</p>
+</article>
+
+<article class="card" lang="en" id="en">
+<h1>Privacy policy (English)</h1>
+<p class="muted">Spitothiki · https://spitothiki.web.app · Last updated: 28 October 2026</p>
+<p>Spitothiki is a free household app for pantry, shopping and expenses. No ads, no selling of data, no tracking cookies.</p>
+<ul>
+<li><strong>On your device:</strong> your data stays on your device unless you sign in. Photos and PDFs are read on the device and are not uploaded.</li>
+<li><strong>If you sign in:</strong> Firebase Authentication (Google) keeps your email (and name with Google sign-in); your data syncs to Firebase Firestore and only members of your household can access it.</li>
+<li><strong>Receipt QR codes:</strong> the receipt link passes through our small Cloudflare Worker only to be read. We do not keep items, amounts or your IP address, only an anonymous count (e.g. “supermarket, success”).</li>
+<li><strong>Barcodes:</strong> only the barcode number is sent to Open Food Facts.</li>
+<li><strong>Notifications:</strong> our Cloudflare server keeps only your browser's push address and the reminder dates, no names, amounts or products. Removed when you turn notifications off, otherwise they expire after 70 days.</li>
+<li><strong>Google Drive backup:</strong> uses only the <code>drive.appdata</code> scope, a hidden app folder in your own Drive; the app cannot see your other files. You can disconnect in Settings and revoke access at <a href="https://myaccount.google.com/permissions" rel="noopener">myaccount.google.com/permissions</a>.</li>
+<li><strong>Anonymous statistics:</strong> cookieless Cloudflare Web Analytics, and an anonymous count of where visitors came from (one word, no personal data).</li>
+<li><strong>Deleting your data:</strong> Settings › Advanced › Delete all (also removes synced data if you are signed in). To delete your sign-in account entirely, contact us.</li>
+<li><strong>Contact:</strong> via the support email shown on the Google sign-in screen.</li>
+</ul>
+</article>
+</main>
+</body>
+</html>
