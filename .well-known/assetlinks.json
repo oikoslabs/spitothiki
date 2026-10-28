@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.oikoslabs.spitothiki",
+      "sha256_cert_fingerprints": [
+        "35:15:F5:0B:0F:5F:B6:42:40:F9:4C:F0:A5:31:36:3B:2F:B9:98:7C:FA:F9:D4:BA:5B:41:BD:9C:3D:36:43:3F"
+      ]
+    }
+  }
+]

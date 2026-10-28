@@ -6,7 +6,7 @@ import worker, { allowedOrigin } from '../stats/worker.js';
 const memory = (init = {}) => { const m = new Map(Object.entries(init)); return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), m }; };
 
 test('source: allowlist, case, utm_source=sofisstore, unknown -> other, none -> direct', () => {
-  assert.deepEqual(SOURCES, ['tiktok', 'facebook', 'instagram', 'telegram', 'viber', 'reddit', 'pinterest', 'sofisstore']);
+  assert.deepEqual(SOURCES, ['tiktok', 'facebook', 'instagram', 'telegram', 'viber', 'reddit', 'pinterest', 'sofisstore', 'play']);
   for (const s of SOURCES) assert.equal(parseSource(`?src=${s}`), s);
   assert.equal(parseSource('?src=TikTok'), 'tiktok');
   assert.equal(parseSource('?utm_source=sofisstore&utm_medium=link'), 'sofisstore');
