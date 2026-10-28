@@ -89,7 +89,7 @@ test('ΑΑΔΕ cash-register QR has no amount → needs the amount (never a 0 �
   assert.equal(e.purchase.id, 'pur-rcpt-demo');
 });
 
-test('v1.8.4 manual expense: «Τι αγόρασες;» product group, validated, default Άλλο', () => {
+test('v1.8.4 manual expense: «Είδος προϊόντος» (was «Τι αγόρασες;») product group, validated, default Άλλο', () => {
   assert.equal(createManualExpense({ amount: '12', store: 'Χασάπης' }, '2026-10-27', NOW).purchase.category, 'Άλλο');
   assert.equal(createManualExpense({ amount: '12', category: 'Κρέας & ψάρι' }, '2026-10-27', NOW).purchase.category, 'Κρέας & ψάρι');
   assert.equal(createManualExpense({ amount: '12', category: 'Γαλακτοκομικά' }, '2026-10-27', NOW).purchase.category, 'Γαλακτοκομικά');
@@ -130,4 +130,42 @@ test('v1.8.4 manual expense group shows in the spending bars and survives an edi
   const old = createManualExpense({ amount: '5', store: 'Φούρνος' }, '2026-10-27', NOW);
   const s2 = applyReceiptEdit(addManualExpense({ receipts: [], purchases: [] }, old), old.receipt.id, { store: 'Φούρνος', date: '2026-10-27', total: '6' }, NOW);
   assert.equal(s2.purchases[0].category, 'Άλλο');
+});
+
+test('v1.8.6 one name per idea: «Είδος προϊόντος» (Γαλακτοκομικά…) vs «Κατηγορία εξόδου» (Αγορές, Ρούχα…)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { dictionaries } = await import('../src/i18n.js');
+  const app = readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  // product groups: same label in add-product dialog, list/recurring form, receipt lines, manual expense, receipt edit
+  assert.match(html, /<label class="field-label" for="item-category">Είδος προϊόντος<\/label>/);
+  assert.match(app, /aria-label="Είδος προϊόντος"><option value="">Είδος προϊόντος: αυτόματα<\/option>/);
+  assert.match(app, /class="field-input receipt-category" name="category" aria-label="Είδος προϊόντος"/);
+  assert.match(app, /for="manual-group">\$\{escapeHtml\(t\('Είδος προϊόντος'\)\)\}/);
+  assert.match(app, /for="re-group">\$\{escapeHtml\(t\('Είδος προϊόντος'\)\)\}/);
+  assert.doesNotMatch(app, /for="(manual|re)-group">\$\{escapeHtml\(t\('Τι αγόρασες;'\)\)\}/);
+  assert.doesNotMatch(app, /Κατηγορία: αυτόματα/);
+  // expense categories: every picker explains where it ends up
+  for (const id of ['manual-expcat-hint', 'extras-expcat-hint']) assert.match(app, new RegExp(`expCatHint\\('${id}'\\)`));
+  assert.match(app, /id="re-expcat-hint"/);
+  // the product-type bars say they include purchases moved to own categories
+  assert.match(app, /t\('Αγορές ανά είδος προϊόντος'\)/);
+  assert.match(app, /renderOwnCatNote\(spending\)/);
+  for (const key of ['Είδος προϊόντος', 'Είδος προϊόντος: αυτόματα', 'Φίλτρο είδους προϊόντος', 'Αγορές ανά είδος προϊόντος',
+    'Σε ποια γραμμή του «Σύνολο εξόδων μήνα» μετράει. Μια δική σου κατηγορία (π.χ. Ρούχα) φαίνεται εκεί σε δική της γραμμή.',
+    'Μαζί και {amount} σε δικές σου κατηγορίες εξόδων (π.χ. Ρούχα), που στο «Σύνολο εξόδων μήνα» έχουν δική τους γραμμή.']) assert.ok(dictionaries.en[key], key);
+});
+
+test('v1.8.6 a manual expense in an own category: product-type bars keep it, «Σύνολο εξόδων μήνα» moves it to its own line (no data change)', () => {
+  const cats = [{ id: 'ec-1', name: 'Ρούχα', emoji: '👕', createdAt: NOW }];
+  const e = createManualExpense({ amount: '30', store: 'Zara', category: 'Άλλο', expenseCategory: 'ec-1' }, '2026-10-27', NOW);
+  const old = { id: 'pur-old', name: 'Γάλα', category: 'Γαλακτοκομικά', price: 2, date: '2026-10-20' }; // saved before v1.8.6: no expenseCategory
+  const purchases = [e.purchase, old];
+  const bars = monthlySpending(purchases, '2026-10');
+  assert.equal(bars.total, 32);
+  assert.deepEqual(bars.byCategory.map((r) => r.category), ['Άλλο', 'Γαλακτοκομικά']);
+  const own = expenseCategoryMonth({ purchases, extras: [], categories: cats }, '2026-10');
+  assert.equal(own.shopping, 2);
+  assert.equal(own.rows[0].total, 30);
+  assert.equal(own.shopping + own.rows[0].total, bars.total); // same money, no double counting
 });
