@@ -518,7 +518,7 @@ function renderPantry() {
     <div class="settings-actions page-actions">${renderReceiptButton()}</div>
     <section class="panel"><div class="toolbar"><label class="search-wrap"><span aria-hidden="true">⌕</span><input id="pantry-search" class="search-input" type="search" value="${escapeHtml(pantryQuery)}" placeholder="Αναζήτηση προϊόντος ή θέσης" aria-label="Αναζήτηση στο απόθεμα"></label><span class="inventory-count" id="inventory-count">${t('{count} προϊόντα', { count: state.items.length })}</span></div>
     ${pantryStatus === 'expiring' ? `<div class="active-filter" id="pantry-status-filter" role="status"><span>${escapeHtml(t('Εμφανίζονται μόνο όσα λήγουν μέσα σε 7 ημέρες ή έληξαν, πρώτα τα πιο επείγοντα.'))}</span><button type="button" class="filter-chip is-active" data-action="clear-pantry-status" aria-label="${escapeHtml(t('Κατάργηση φίλτρου: Λήγουν ή έληξαν'))}">◷ ${escapeHtml(t('Λήγουν ή έληξαν'))} ×</button></div>` : ''}
-    <div class="filter-row" aria-label="Φίλτρο κατηγορίας">${categories.map((category) => `<button type="button" class="filter-chip ${pantryCategory === category ? 'is-active' : ''}" data-action="filter-category" data-category="${escapeHtml(category)}" aria-pressed="${pantryCategory === category}">${category === 'Όλα' ? '' : `<span aria-hidden="true">${CATEGORY_ICONS[category] || '🧺'}</span> `}${escapeHtml(category)}</button>`).join('')}</div>
+    <div class="filter-row" aria-label="Φίλτρο είδους προϊόντος">${categories.map((category) => `<button type="button" class="filter-chip ${pantryCategory === category ? 'is-active' : ''}" data-action="filter-category" data-category="${escapeHtml(category)}" aria-pressed="${pantryCategory === category}">${category === 'Όλα' ? '' : `<span aria-hidden="true">${CATEGORY_ICONS[category] || '🧺'}</span> `}${escapeHtml(category)}</button>`).join('')}</div>
     <div id="inventory-list" class="inventory-list"></div></section>`;
 }
 
@@ -545,7 +545,7 @@ function renderStoreBar() {
   if (!storesOpen) return bar;
   const order = current ? storeOrder(current.order) : [];
   return `${bar}<div class="store-manager" id="store-manager"><form id="store-form" class="store-form" novalidate><input class="field-input" name="name" maxlength="40" placeholder="π.χ. Σουπερμάρκετ της γειτονιάς" aria-label="Όνομα καταστήματος"><button class="button button-quiet" type="submit">＋ Νέο κατάστημα</button></form>
-    ${current ? `<p class="field-hint">${escapeHtml(t('Σειρά διαδρόμων στο «{name}»: βάλε τις κατηγορίες με τη σειρά που περπατάς.', { name: current.name }))}</p><ol class="aisle-list">${order.map((category, index) => `<li class="aisle-row"><span class="aisle-number">${index + 1}</span><span class="aisle-name">${escapeHtml(categoryLabel(category))}</span><button class="icon-button" type="button" data-action="aisle-up" data-category="${escapeHtml(category)}" ${index === 0 ? 'disabled' : ''} aria-label="${escapeHtml(t('Πιο νωρίς: {name}', { name: t(category) }))}">↑</button><button class="icon-button" type="button" data-action="aisle-down" data-category="${escapeHtml(category)}" ${index === order.length - 1 ? 'disabled' : ''} aria-label="${escapeHtml(t('Πιο αργά: {name}', { name: t(category) }))}">↓</button></li>`).join('')}</ol>
+    ${current ? `<p class="field-hint">${escapeHtml(t('Σειρά διαδρόμων στο «{name}»: βάλε τα είδη προϊόντων με τη σειρά που περπατάς.', { name: current.name }))}</p><ol class="aisle-list">${order.map((category, index) => `<li class="aisle-row"><span class="aisle-number">${index + 1}</span><span class="aisle-name">${escapeHtml(categoryLabel(category))}</span><button class="icon-button" type="button" data-action="aisle-up" data-category="${escapeHtml(category)}" ${index === 0 ? 'disabled' : ''} aria-label="${escapeHtml(t('Πιο νωρίς: {name}', { name: t(category) }))}">↑</button><button class="icon-button" type="button" data-action="aisle-down" data-category="${escapeHtml(category)}" ${index === order.length - 1 ? 'disabled' : ''} aria-label="${escapeHtml(t('Πιο αργά: {name}', { name: t(category) }))}">↓</button></li>`).join('')}</ol>
     <details class="vm-settings" id="vm-settings"><summary>${escapeHtml(t('Barcode ζυγιζόμενων (20–29)'))}</summary><p class="field-hint">${escapeHtml(t('Οι ζυγαριές του καταστήματος τυπώνουν τιμή ή βάρος μέσα στον barcode. Με το «Αυτόματα» η εφαρμογή το καταλαβαίνει μόνη της.'))}</p><div class="vm-grid">${['20','21','22','23','24','25','26','27','28','29'].map((prefix) => `<label class="vm-row"><span data-no-i18n>${prefix}…</span><select class="field-input vm-mode" data-prefix="${prefix}" aria-label="${escapeHtml(t('Πρόθεμα {prefix}', { prefix }))}">${VM_MODES.map((mode) => `<option value="${mode}" ${(current.vm?.[prefix] || 'auto') === mode ? 'selected' : ''}>${escapeHtml(t({ auto: 'Αυτόματα', price: 'Τιμή', weight: 'Βάρος' }[mode]))}</option>`).join('')}</select></label>`).join('')}</div></details>
     <div class="settings-actions"><button class="button button-quiet" type="button" data-action="delete-store">${escapeHtml(t('Διαγραφή καταστήματος «{name}»', { name: current.name }))}</button></div>` : '<p class="field-hint">Διάλεξε ή φτιάξε ένα κατάστημα για να ορίσεις τη σειρά των διαδρόμων.</p>'}</div>`;
 }
@@ -1231,9 +1231,9 @@ function runRecurring() {
   if (result.added.length) showToast(t('Μπήκαν στη λίστα (επαναλαμβανόμενα): {names}', { names: result.added.map((row) => row.name).join(', ') }));
 }
 
-// v1.6.5: one add form for «Τι χρειάζεται το σπίτι» and «Επαναλαμβανόμενα» (same look, both with Κατηγορία).
+// v1.6.5: one add form for «Τι χρειάζεται το σπίτι» and «Επαναλαμβανόμενα» (same look, both with Είδος προϊόντος).
 function renderItemAddForm({ id, label, placeholder, extra = '', voice = false }) {
-  return `<form id="${id}" class="item-add-form${extra ? ' has-extra' : ''}" novalidate><input class="field-input item-add-name" name="name" required maxlength="80" placeholder="${placeholder}" aria-label="${label}"><input class="field-input" name="quantity" type="number" min="0.1" max="${MAX_QUANTITY}" step="0.1" value="1" aria-label="Ποσότητα"><select class="field-input unit-select" name="unit" aria-label="Μονάδα">${unitOptions()}</select><select class="field-input category-select" name="category" aria-label="Κατηγορία"><option value="">Κατηγορία: αυτόματα</option>${CATEGORIES.map((category) => `<option value="${escapeHtml(category)}">${escapeHtml(categoryLabel(category))}</option>`).join('')}</select>${extra}<div class="item-add-actions"><button class="button button-primary" type="submit">＋ Προσθήκη</button>${voice ? '<button class="button button-quiet voice-button" type="button" data-action="voice-add" aria-label="Προσθήκη με φωνή" title="Προσθήκη με φωνή">🎤</button>' : ''}</div></form>`;
+  return `<form id="${id}" class="item-add-form${extra ? ' has-extra' : ''}" novalidate><input class="field-input item-add-name" name="name" required maxlength="80" placeholder="${placeholder}" aria-label="${label}"><input class="field-input" name="quantity" type="number" min="0.1" max="${MAX_QUANTITY}" step="0.1" value="1" aria-label="Ποσότητα"><select class="field-input unit-select" name="unit" aria-label="Μονάδα">${unitOptions()}</select><select class="field-input category-select" name="category" aria-label="Είδος προϊόντος"><option value="">Είδος προϊόντος: αυτόματα</option>${CATEGORIES.map((category) => `<option value="${escapeHtml(category)}">${escapeHtml(categoryLabel(category))}</option>`).join('')}</select>${extra}<div class="item-add-actions"><button class="button button-primary" type="submit">＋ Προσθήκη</button>${voice ? '<button class="button button-quiet voice-button" type="button" data-action="voice-add" aria-label="Προσθήκη με φωνή" title="Προσθήκη με φωνή">🎤</button>' : ''}</div></form>`;
 }
 
 function renderRecurringPanel() {
@@ -1405,7 +1405,7 @@ function renderReceiptReview() {
     <input class="field-input receipt-name" name="name" value="${escapeHtml(line.name)}" maxlength="80" aria-label="Όνομα προϊόντος">
     <input class="field-input receipt-qty" name="quantity" type="number" min="0" step="0.001" value="${escapeHtml(line.quantity)}" aria-label="Ποσότητα"><select class="field-input receipt-unit" name="unit" aria-label="Μονάδα">${unitOptions(line.unit)}</select>
     <input class="field-input receipt-price" name="price" type="number" min="0" step="0.01" value="${escapeHtml(line.price.toFixed(2))}" aria-label="Τιμή">
-    <select class="field-input receipt-category" name="category" aria-label="Κατηγορία">${CATEGORIES.map((category) => `<option value="${escapeHtml(category)}" ${category === line.category ? 'selected' : ''}>${escapeHtml(categoryLabel(category))}</option>`).join('')}</select></div>`).join('');
+    <select class="field-input receipt-category" name="category" aria-label="Είδος προϊόντος">${CATEGORIES.map((category) => `<option value="${escapeHtml(category)}" ${category === line.category ? 'selected' : ''}>${escapeHtml(categoryLabel(category))}</option>`).join('')}</select></div>`).join('');
   const doubtful = receipt.lines.filter((line) => line.doubtful).length;
   const photoNote = receiptState.photo ? `<p class="field-hint" id="receipt-photo-note">${escapeHtml(t('Διαβάστηκε από φωτογραφία — έλεγξε ονόματα και ποσά πριν την εισαγωγή.'))}${doubtful ? ` <strong class="doubtful-hint">${escapeHtml(t('{count} γραμμές θέλουν έλεγχο (σημειωμένες).', { count: doubtful }))}</strong>` : ''}${receipt.totalMismatch ? ` ${escapeHtml(t('Το άθροισμα των ειδών ({sum}) διαφέρει από το σύνολο.', { sum: money(receipt.linesTotal) }))}` : ''}</p>` : '';
   return `${head}${dup}${renderTransportReceiptOffer()}${renderTripLink()}${photoNote}<form id="receipt-review-form" novalidate><input type="hidden" name="mode" value="lines">
@@ -1427,13 +1427,13 @@ function renderReceiptManual() {
     <label class="field-label" for="manual-amount">${escapeHtml(t('Ποσό (€)'))}</label><input class="field-input" id="manual-amount" name="amount" type="number" min="0.01" max="100000" step="0.01" inputmode="decimal" required placeholder="€" value="${escapeHtml(m.amount ?? '')}">
     <label class="field-label" for="manual-store">${escapeHtml(t('Κατάστημα (προαιρετικό)'))}</label><input class="field-input" id="manual-store" name="store" maxlength="80" autocomplete="off" list="manual-stores" placeholder="${escapeHtml(t('π.χ. Κρεοπωλείο, λαϊκή'))}" value="${escapeHtml(m.store || '')}"><datalist id="manual-stores">${stores.map((n) => `<option value="${escapeHtml(n)}"></option>`).join('')}</datalist>
     <label class="field-label" for="manual-date">${escapeHtml(t('Ημερομηνία'))}</label><input class="field-input" id="manual-date" name="date" type="date" required value="${escapeHtml(m.date || localDateKey())}" max="${escapeHtml(localDateKey())}">
-    <label class="field-label" for="manual-group">${escapeHtml(t('Τι αγόρασες;'))}</label><select class="field-input" id="manual-group" name="category">${groupOptions(m.category || guessManualCategory(m.store) || 'Άλλο')}</select>
-    <label class="field-label" for="manual-expcat">${escapeHtml(t('Κατηγορία εξόδου'))}</label><select class="field-input expcat-select" id="manual-expcat" name="expenseCategory" data-prev="">${expCatOptions('', 'receipt')}</select>${expCatInlineRow()}
+    <label class="field-label" for="manual-group">${escapeHtml(t('Είδος προϊόντος'))}</label><select class="field-input" id="manual-group" name="category">${groupOptions(m.category || guessManualCategory(m.store) || 'Άλλο')}</select>
+    <label class="field-label" for="manual-expcat">${escapeHtml(t('Κατηγορία εξόδου'))}</label><select class="field-input expcat-select" id="manual-expcat" name="expenseCategory" data-prev="">${expCatOptions('', 'receipt')}</select>${expCatHint('manual-expcat-hint')}${expCatInlineRow()}
     <p class="form-error" id="manual-error" role="alert" hidden></p>
     <div class="dialog-actions">${transport}<button class="button button-quiet" type="button" data-action="receipt-reset">${escapeHtml(t('Πίσω'))}</button><button class="button button-primary" type="submit" id="manual-save">${escapeHtml(t('Αποθήκευση'))}</button></div></form>
     ${m.reason === 'aade' ? `<p class="field-hint">${escapeHtml(t('Θες και τα είδη; Βγάλε φωτογραφία την απόδειξη:'))}</p>${photoButtons()}` : ''}`;
 }
-// v1.8.4: product group («Τι αγόρασες;»), same groups/emoji as the items of a scanned receipt.
+// v1.8.4: product group («Είδος προϊόντος» since v1.8.6), same groups/emoji as the items of a scanned receipt.
 const groupOptions = (selected) => CATEGORIES.map((c) => `<option value="${escapeHtml(c)}"${c === manualCategory(selected) ? ' selected' : ''}>${escapeHtml(categoryLabel(c))}</option>`).join('');
 function openManualExpense(prefill = {}) {
   const dialog = document.querySelector('#receipt-dialog');
@@ -2361,11 +2361,11 @@ function renderExtrasForm() {
   if (!cats.length && !d.id) return '';
   return `<details class="panel collapsible" id="extras-add" ${d.id || openPanels.has('extras-add') ? 'open' : ''}><summary><h2>${escapeHtml(t(d.id ? 'Επεξεργασία εξόδου' : 'Καταχώριση με το χέρι'))}</h2>${d.id ? '' : `<span class="field-hint">${escapeHtml(t('Για άλλη μέρα, άλλη τιμή ή σημείωση.'))}</span>`}</summary>
     <form id="extras-form" novalidate><input type="hidden" name="entryId" value="${escapeHtml(d.id || '')}">
-      <div class="field-row"><div><label class="field-label" for="extras-category">${escapeHtml(t('Κατηγορία'))}</label><select class="field-input" id="extras-category" name="category">${opts}</select></div>
+      <div class="field-row"><div><label class="field-label" for="extras-category">${escapeHtml(t('Είδος'))}</label><select class="field-input" id="extras-category" name="category">${opts}</select></div>
         <div><label class="field-label" for="extras-amount">${escapeHtml(t('Ποσό (€)'))}</label><input class="field-input" id="extras-amount" name="amount" type="number" min="0" max="10000" step="0.01" inputmode="decimal" required value="${escapeHtml(d.amount ?? '')}"></div></div>
       <div class="field-row"><div><label class="field-label" for="extras-qty">${escapeHtml(t('Τεμάχια'))}</label><input class="field-input" id="extras-qty" name="qty" type="number" min="1" max="99" step="1" inputmode="numeric" value="${escapeHtml(d.qty ?? 1)}"></div>
         <div><label class="field-label" for="extras-date">${escapeHtml(t('Ημερομηνία'))}</label><input class="field-input" id="extras-date" name="date" type="date" required value="${escapeHtml(d.date || localDateKey())}"></div></div>
-      <label class="field-label" for="extras-expcat">${escapeHtml(t('Κατηγορία εξόδου'))}</label><select class="field-input expcat-select" id="extras-expcat" name="expenseCategory" data-prev="${escapeHtml(d.expenseCategory || '')}">${expCatOptions(d.expenseCategory || '', 'extra')}</select>${expCatInlineRow()}
+      <label class="field-label" for="extras-expcat">${escapeHtml(t('Κατηγορία εξόδου'))}</label><select class="field-input expcat-select" id="extras-expcat" name="expenseCategory" data-prev="${escapeHtml(d.expenseCategory || '')}">${expCatOptions(d.expenseCategory || '', 'extra')}</select>${expCatHint('extras-expcat-hint')}${expCatInlineRow()}
       <label class="field-label" for="extras-note">${escapeHtml(t('Σημείωση'))}</label><input class="field-input" id="extras-note" name="note" maxlength="80" placeholder="${escapeHtml(t('π.χ. καφές με συνάδελφο'))}" value="${escapeHtml(d.note || '')}">
       <p class="field-hint">${escapeHtml(t('Το ποσό είναι το σύνολο για όλα τα τεμάχια.'))}</p>
       <p class="form-error" id="extras-error" role="alert" hidden></p>
@@ -2782,6 +2782,15 @@ function openReceiptDetails(id) {
   dialog.showModal();
 }
 
+// v1.8.6: purchases moved to the user's own expense categories still count here by product type;
+// say so, because «Σύνολο εξόδων μήνα» shows them on their own line instead of «Αγορές».
+function renderOwnCatNote(spending) {
+  if (!expCats().length) return '';
+  const own = expenseCategoryMonth({ purchases: state.purchases || [], extras: [], categories: state.expenseCategories || [] }, insightsMonth);
+  const moved = Math.round(own.rows.reduce((sum, r) => sum + r.total, 0) * 100) / 100;
+  if (!(moved > 0) || !spending.count) return '';
+  return `<p class="field-hint" id="spending-own-note">${escapeHtml(t('Μαζί και {amount} σε δικές σου κατηγορίες εξόδων (π.χ. Ρούχα), που στο «Σύνολο εξόδων μήνα» έχουν δική τους γραμμή.', { amount: money(moved) }))}</p>`;
+}
 function renderInsights() {
   const spending = monthlySpending(state.purchases || [], insightsMonth);
   const previous = monthlySpending(state.purchases || [], shiftMonth(insightsMonth, -1));
@@ -2791,9 +2800,9 @@ function renderInsights() {
     <div class="settings-actions"><button class="button button-quiet" type="button" data-view="receipts" id="insights-receipts">🧾 ${escapeHtml(t('Αποδείξεις'))} (${(state.receipts || []).length})</button></div>
     <div class="month-switch" role="group" aria-label="Μήνας"><button class="icon-button" type="button" data-action="insights-month" data-delta="-1" aria-label="Προηγούμενος μήνας">‹</button><strong id="insights-month" data-no-i18n>${escapeHtml(monthLabel(insightsMonth))}</strong><button class="icon-button" type="button" data-action="insights-month" data-delta="1" aria-label="Επόμενος μήνας" ${isCurrent ? 'disabled' : ''}>›</button></div>
     <div class="settings-grid insights-grid">${renderMonthTotals(spending)}${renderWhoPaid()}
-    <section class="panel settings-card" id="spending-card"><span class="stat-icon blue">€</span><h2>Έξοδα</h2>
+    <section class="panel settings-card" id="spending-card"><span class="stat-icon blue">€</span><h2>${escapeHtml(t('Αγορές ανά είδος προϊόντος'))}</h2>
       <p class="big-number" id="spending-total">${escapeHtml(money(spending.total))}</p>
-      <p class="field-hint">${escapeHtml(t('{count} αγορές με τιμή · προηγούμενος μήνας: {prev}', { count: spending.count, prev: money(previous.total) }))}</p>
+      <p class="field-hint">${escapeHtml(t('{count} αγορές με τιμή · προηγούμενος μήνας: {prev}', { count: spending.count, prev: money(previous.total) }))}</p>${renderOwnCatNote(spending)}
       ${spending.byCategory.length ? renderBars(spending.byCategory.map((row) => ({ label: categoryLabel(row.category), value: row.total })), money) : '<p class="subtle-empty">Όταν τσεκάρεις κάτι ως αγορασμένο, γράψε την τιμή του (€) στη λίστα αγορών για να βλέπεις εδώ τα έξοδα.</p>'}</section>
     <section class="panel settings-card" id="waste-card"><span class="stat-icon amber">🗑</span><h2>Σπατάλη τροφίμων</h2>
       <p class="big-number" id="waste-total">${waste.count}</p>
@@ -2817,6 +2826,8 @@ function expCatOptions(selected, mode) {
   return [...base, ...cats.map((c) => [c.id, expCatLabel(c)]), ['__new', t('＋ Νέα κατηγορία…')]]
     .map(([v, label]) => `<option value="${escapeHtml(v)}" data-no-i18n${v === sel ? ' selected' : ''}>${escapeHtml(label)}</option>`).join('');
 }
+// v1.8.6: one line under every «Κατηγορία εξόδου» so it is not mixed up with «Είδος προϊόντος».
+const expCatHint = (id) => `<p class="field-hint expcat-hint" id="${id}">${escapeHtml(t('Σε ποια γραμμή του «Σύνολο εξόδων μήνα» μετράει. Μια δική σου κατηγορία (π.χ. Ρούχα) φαίνεται εκεί σε δική της γραμμή.'))}</p>`;
 function expCatInlineRow() {
   return `<div class="expcat-new" hidden><label class="field-label" for="expcat-new-name">${escapeHtml(t('Νέα κατηγορία εξόδων'))}</label>
     <div class="expcat-new-row"><input class="field-input extras-emoji-input" id="expcat-new-emoji" maxlength="16" placeholder="${EXPENSE_CAT_DEFAULT_EMOJI}" aria-label="${escapeHtml(t('Εικονίδιο (προαιρετικό)'))}"><input class="field-input" id="expcat-new-name" maxlength="40" placeholder="${escapeHtml(t('π.χ. Ρούχα'))}" autocomplete="off"><button class="button button-primary" type="button" data-action="expcat-inline-add">${escapeHtml(t('Προσθήκη'))}</button><button class="button button-quiet" type="button" data-action="expcat-inline-cancel">${escapeHtml(t('Άκυρο'))}</button></div>
@@ -2872,7 +2883,7 @@ function renderExpenseCats() {
   return `<details class="panel collapsible extras-cats" id="expense-cats" ${expCatEdit || openPanels.has('expense-cats') ? 'open' : ''}><summary><h2>🏷️ ${escapeHtml(t('Οι κατηγορίες εξόδων μου'))}</h2><span class="field-hint">${escapeHtml(t('Φτιάξε δικές σου κατηγορίες (π.χ. Ρούχα) και μετέφερε έξοδα με «✎ Διόρθωση».'))}</span></summary>
     ${cats.length ? `<ul class="waste-top" id="expcat-list">${cats.map(row).join('')}</ul>` : `<p class="subtle-empty">${escapeHtml(t('Δεν έχεις ακόμα δικές σου κατηγορίες.'))}</p>`}
     <form class="extras-cat-form" id="expcat-form" novalidate><input class="field-input extras-emoji-input" name="emoji" maxlength="16" placeholder="${EXPENSE_CAT_DEFAULT_EMOJI}" aria-label="${escapeHtml(t('Εικονίδιο (προαιρετικό)'))}"><input class="field-input" name="name" id="expcat-name" maxlength="40" placeholder="${escapeHtml(t('π.χ. Ρούχα'))}" aria-label="${escapeHtml(t('Όνομα κατηγορίας'))}" autocomplete="off"><button class="button button-primary" type="submit" id="expcat-add">${escapeHtml(t('＋ Προσθήκη'))}</button><p class="form-error" role="alert" hidden></p></form>
-    <p class="field-hint">${escapeHtml(t('Μεταφορά εξόδου: άνοιξε την απόδειξη (🧾 Αποδείξεις) ή το μικροέξοδο και πάτα «✎ Διόρθωση». Αν σβήσεις μια κατηγορία, τα έξοδά της γυρίζουν στις Αγορές ή στα Μικροέξοδα.'))}</p></details>`;
+    <p class="field-hint">${escapeHtml(t('Κάθε κατηγορία φαίνεται σε δική της γραμμή στο «Σύνολο εξόδων μήνα». Δεν αλλάζει το είδος προϊόντος (π.χ. Γαλακτοκομικά). Μεταφορά εξόδου: άνοιξε την απόδειξη (🧾 Αποδείξεις) ή το μικροέξοδο και πάτα «✎ Διόρθωση». Αν σβήσεις μια κατηγορία, τα έξοδά της γυρίζουν στις Αγορές ή στα Μικροέξοδα.'))}</p></details>`;
 }
 
 function makeDemoItems() {
@@ -2967,13 +2978,13 @@ function openReceiptEdit(id) {
     <label class="field-label" for="re-store">${escapeHtml(t('Κατάστημα'))}</label><input class="field-input" id="re-store" name="store" value="${escapeHtml(r.store || '')}" maxlength="80">
     <label class="field-label" for="re-date">${escapeHtml(t('Ημερομηνία'))}</label><input class="field-input" id="re-date" name="date" type="date" value="${escapeHtml(r.date || '')}">
     ${hasSpend ? `<label class="field-label" for="re-expcat">${escapeHtml(t('Κατηγορία εξόδου'))}</label><select class="field-input expcat-select" id="re-expcat" data-prev="${escapeHtml(r.expenseCategory || '')}">${expCatOptions(r.expenseCategory || '', 'receipt')}</select>
-    <p class="field-hint">${escapeHtml(t('Πού μετράει στο «Σύνολο εξόδων». Αν ένα είδος είναι αλλού (π.χ. ένα ρούχο), άλλαξέ το στη γραμμή του.'))}</p>${expCatInlineRow()}` : ''}
+    <p class="field-hint" id="re-expcat-hint">${escapeHtml(t('Σε ποια γραμμή του «Σύνολο εξόδων μήνα» μετράει. Μια δική σου κατηγορία (π.χ. Ρούχα) φαίνεται εκεί σε δική της γραμμή. Αν ένα προϊόν πάει αλλού (π.χ. ένα ρούχο), άλλαξέ το στη γραμμή του.'))}</p>${expCatInlineRow()}` : ''}
     ${items.length ? `<p class="field-hint">${escapeHtml(t('Ξετσέκαρε ό,τι θες να αφαιρεθεί. Το σύνολο υπολογίζεται από τα είδη.'))}</p><div class="receipt-lines" id="receipt-edit-lines">${items.map((it, i) => `<div class="receipt-line receipt-edit-line" data-line="${i}"><input class="shopping-check" type="checkbox" name="use" checked aria-label="${escapeHtml(t('Κράτα: {name}', { name: it.name }))}">
       <input class="field-input receipt-name" name="name" value="${escapeHtml(it.name)}" maxlength="80" aria-label="${escapeHtml(t('Όνομα προϊόντος'))}">
       <input class="field-input receipt-qty" name="quantity" type="number" min="0" step="0.001" value="${escapeHtml(String(it.quantity ?? 1))}" aria-label="${escapeHtml(t('Ποσότητα'))}">
       <input class="field-input receipt-price" name="price" type="number" min="0" step="0.01" inputmode="decimal" value="${escapeHtml((Number(it.price) || 0).toFixed(2))}" aria-label="${escapeHtml(t('Τιμή'))}">${hasSpend ? `<select class="field-input receipt-expcat expcat-select" name="itemCategory" data-prev="${escapeHtml(it.expenseCategory || '')}" aria-label="${escapeHtml(t('Κατηγορία εξόδου: {name}', { name: it.name }))}"${expCats().length || it.expenseCategory ? '' : ' hidden'}>${expCatOptions(it.expenseCategory || '', 'item')}</select>` : ''}</div>`).join('')}</div>
       <p class="field-hint" id="receipt-edit-sum"></p>`
-      : `<label class="field-label" for="re-total">${escapeHtml(t('Σύνολο (€)'))}</label><input class="field-input" id="re-total" name="total" type="number" min="0" step="0.01" inputmode="decimal" value="${escapeHtml((Number(r.total) || 0).toFixed(2))}">${whole ? `<label class="field-label" for="re-group">${escapeHtml(t('Τι αγόρασες;'))}</label><select class="field-input" id="re-group" name="category">${groupOptions(whole.category)}</select>` : ''}`}
+      : `<label class="field-label" for="re-total">${escapeHtml(t('Σύνολο (€)'))}</label><input class="field-input" id="re-total" name="total" type="number" min="0" step="0.01" inputmode="decimal" value="${escapeHtml((Number(r.total) || 0).toFixed(2))}">${whole ? `<label class="field-label" for="re-group">${escapeHtml(t('Είδος προϊόντος'))}</label><select class="field-input" id="re-group" name="category">${groupOptions(whole.category)}</select>` : ''}`}
     <div class="dialog-actions"><button class="button button-quiet" type="button" data-action="receipt-open" data-id="${escapeHtml(r.id)}">${escapeHtml(t('Άκυρο'))}</button><button class="button button-primary" type="submit" id="receipt-edit-save">${escapeHtml(t('Αποθήκευση αλλαγών'))}</button></div></form>`;
   updateReceiptEditSum();
   dialog.querySelector('#re-store')?.focus();

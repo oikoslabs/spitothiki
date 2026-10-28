@@ -1065,7 +1065,17 @@ const EN = {
   "Μετράμε ανώνυμα από ποια σελίδα ήρθες (π.χ. TikTok, Facebook), μόνο ως συνολικό αριθμό. Χωρίς προσωπικά στοιχεία και χωρίς να δίνουμε τίποτα σε τρίτους.": "We anonymously count which page you came from (e.g. TikTok, Facebook), only as a total number. No personal data, and nothing is shared with third parties.",
   // v1.8.5
   "Αναζήτηση στοιχείων…": "Looking up details…",
-  "Δεν βρέθηκαν στοιχεία για αυτό το προϊόν. Μπορείς να γράψεις εσύ το όνομα.": "No details found for this product. You can type the name yourself."
+  "Δεν βρέθηκαν στοιχεία για αυτό το προϊόν. Μπορείς να γράψεις εσύ το όνομα.": "No details found for this product. You can type the name yourself.",
+  // v1.8.6
+  "Είδος προϊόντος": "Product type",
+  "Είδος προϊόντος: αυτόματα": "Product type: automatic",
+  "Φίλτρο είδους προϊόντος": "Product type filter",
+  "Σειρά διαδρόμων στο «{name}»: βάλε τα είδη προϊόντων με τη σειρά που περπατάς.": "Aisle order in “{name}”: put the product types in the order you walk.",
+  "Αγορές ανά είδος προϊόντος": "Purchases by product type",
+  "Σε ποια γραμμή του «Σύνολο εξόδων μήνα» μετράει. Μια δική σου κατηγορία (π.χ. Ρούχα) φαίνεται εκεί σε δική της γραμμή.": "Which line of «Total spending this month» it counts in. A category of your own (e.g. Clothes) shows there on its own line.",
+  "Σε ποια γραμμή του «Σύνολο εξόδων μήνα» μετράει. Μια δική σου κατηγορία (π.χ. Ρούχα) φαίνεται εκεί σε δική της γραμμή. Αν ένα προϊόν πάει αλλού (π.χ. ένα ρούχο), άλλαξέ το στη γραμμή του.": "Which line of «Total spending this month» it counts in. A category of your own (e.g. Clothes) shows there on its own line. If one product belongs elsewhere (e.g. a piece of clothing), change it on its line.",
+  "Κάθε κατηγορία φαίνεται σε δική της γραμμή στο «Σύνολο εξόδων μήνα». Δεν αλλάζει το είδος προϊόντος (π.χ. Γαλακτοκομικά). Μεταφορά εξόδου: άνοιξε την απόδειξη (🧾 Αποδείξεις) ή το μικροέξοδο και πάτα «✎ Διόρθωση». Αν σβήσεις μια κατηγορία, τα έξοδά της γυρίζουν στις Αγορές ή στα Μικροέξοδα.": "Each category shows on its own line in «Total spending this month». It doesn’t change the product type (e.g. Dairy). To move an expense: open the receipt (🧾 Receipts) or the small expense and tap «✎ Edit». If you delete a category, its expenses go back to Purchases or Small expenses.",
+  "Μαζί και {amount} σε δικές σου κατηγορίες εξόδων (π.χ. Ρούχα), που στο «Σύνολο εξόδων μήνα» έχουν δική τους γραμμή.": "Includes {amount} in categories of your own (e.g. Clothes), which have their own line in «Total spending this month»."
 };
 
 export const dictionaries = { el: Object.fromEntries(Object.keys(EN).map((key) => [key, key])), en: EN };
