@@ -1,11 +1,14 @@
 [
   {
-    "relation": ["delegate_permission/common.handle_all_urls"],
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
     "target": {
       "namespace": "android_app",
       "package_name": "com.oikoslabs.spitothiki",
       "sha256_cert_fingerprints": [
-        "35:15:F5:0B:0F:5F:B6:42:40:F9:4C:F0:A5:31:36:3B:2F:B9:98:7C:FA:F9:D4:BA:5B:41:BD:9C:3D:36:43:3F"
+        "35:15:F5:0B:0F:5F:B6:42:40:F9:4C:F0:A5:31:36:3B:2F:B9:98:7C:FA:F9:D4:BA:5B:41:BD:9C:3D:36:43:3F",
+        "52:70:D2:5A:F9:9E:5D:7B:A2:50:C0:2F:E1:4F:0F:38:B1:5A:98:5D:C8:2E:08:6B:B4:AC:54:0B:AF:DC:3B:A4"
       ]
     }
   }
