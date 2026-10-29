@@ -20,7 +20,7 @@ test('v1.9.0 empty home: starter card with scan button and examples link, only w
   assert.match(app, /id="starter-scan"/);
   assert.match(app, /data-action="load-demo" id="starter-demo"/);
   assert.match(app, /renderStarterCard\(\)\}\$\{renderProtectCard\(\)\}/);
-  assert.match(app, /protectOpts = \(\) => \(\{[^\n]*hasData: hasAnyData\(state\)/);
+  assert.match(app, /protectOpts = \(\) => \(\{[^\n]*hasData: hasRealData\(state\)/);
 });
 
 test('v1.9.0 onboarding: one sentence + language first, the rest optional, examples at the end', () => {
@@ -41,4 +41,13 @@ test('v1.9.0 English mode: version line, footer and new strings are translated',
     assert.ok(dictionaries.en[k], k);
   assert.match(html, /<span>ΕΚΔΟΣΗ<\/span> <span data-no-i18n>1\.9\.1<\/span>/);
   assert.match(html, /<span>Απλά, για το σπίτι\.<\/span> · <span id="app-version"><span>Έκδοση<\/span>/);
+});
+
+test('v1.9.1 example data alone never triggers the «only on this phone» warning', async () => {
+  const { hasRealData } = await import('../src/onboarding.js');
+  assert.equal(hasRealData({ items: [{ name: 'Γάλα', demo: true }] }), false);
+  assert.equal(hasRealData({ items: [{ name: 'Γάλα', demo: true }, { name: 'Ψωμί' }] }), true);
+  assert.equal(hasRealData({ items: [{ name: 'Γάλα', demo: true }], receipts: [{ id: 1 }] }), true);
+  assert.match(app, /hasData: hasRealData\(state\)/);
+  assert.match(app, /\.map\(\(item\) => \(\{ \.\.\.item, demo: true \}\)\)/);
 });

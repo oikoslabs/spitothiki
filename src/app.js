@@ -10,7 +10,7 @@ import { showSigninCard } from './features.js';
 import { routeCode, parseStoreReceiptBarcode } from './scan-router.js';
 import { deleteReceipt, listReceipts, receiptCategory, receiptItems, receiptMonths } from './receipts.js';
 import { PROTECT_SEEN_KEY, PROTECT_SNOOZE_KEY, authKnown, showProtectCard, showProtectSheet, snoozeUntilFrom, storageMode } from './protect.js';
-import { BILL_PRESETS, ONBOARD_KEY, PRESETS_KEY, pendingPresets, shouldOnboard, hasData as hasAnyData } from './onboarding.js';
+import { BILL_PRESETS, ONBOARD_KEY, PRESETS_KEY, pendingPresets, shouldOnboard, hasData as hasAnyData, hasRealData } from './onboarding.js';
 import { applyDisplayPrefs, highContrast, setHighContrast, setTextSize, textSize } from './prefs.js';
 import { RECURRING_INTERVALS, applyRecurring, createRecurring, dueFromSnapshot, expirySnapshot, parseVoiceItems } from './features.js';
 import { MEAL_SLOTS, copyPreviousWeek, createMeal, recipeFromMealDb, shiftDays, weekDays, weekShoppingNeeds, weekStart } from './mealplan.js';
@@ -309,7 +309,7 @@ function renderBackupReminder() {
 
 // v1.5.1: one «protect your data» card, replacing the separate sign-in and backup cards. Shown only while the
 // user is neither signed in nor has Google Drive backup on; hidden entirely once either is active.
-const protectOpts = () => ({ signedIn: Boolean(syncStatus.user), driveOn: driveOn(), known: authKnown(syncStatus), hasData: hasAnyData(state) });
+const protectOpts = () => ({ signedIn: Boolean(syncStatus.user), driveOn: driveOn(), known: authKnown(syncStatus), hasData: hasRealData(state) });
 const PROTECT_LINE = 'Συνδέσου ή σύνδεσε Google Drive για να μη χαθούν.';
 function protectButtons(prefix) {
   const signin = syncStatus.state === 'disabled' ? '' : `<button class="button button-primary" type="button" data-action="${prefix}-signin" id="${prefix}-signin">${escapeHtml(t('Σύνδεση'))}</button>`;
@@ -2931,7 +2931,7 @@ function makeDemoItems() {
     createPantryItem({ name: 'Ρύζι', quantity: 2, unit: 'πακέτα', minimum: 1, category: 'Ξηρά τρόφιμα', location: 'Ντουλάπι' }),
     createPantryItem({ name: 'Γιαούρτι', quantity: 2, unit: 'τεμ.', minimum: 2, category: 'Γαλακτοκομικά', location: 'Ψυγείο', expiry: addDays(1) }),
     createPantryItem({ name: 'Ελαιόλαδο', quantity: 1, unit: 'λίτρα', minimum: 1, category: 'Ξηρά τρόφιμα', location: 'Ντουλάπι' })
-  ];
+  ].map((item) => ({ ...item, demo: true }));
 }
 
 // v1.4: export asks for an optional password → encrypted .spitobak (else plain .json). Web Share on Android.
