@@ -10,7 +10,7 @@ import { showSigninCard } from './features.js';
 import { routeCode, parseStoreReceiptBarcode } from './scan-router.js';
 import { deleteReceipt, listReceipts, receiptCategory, receiptItems, receiptMonths } from './receipts.js';
 import { PROTECT_SEEN_KEY, PROTECT_SNOOZE_KEY, authKnown, showProtectCard, showProtectSheet, snoozeUntilFrom, storageMode } from './protect.js';
-import { BILL_PRESETS, ONBOARD_KEY, PRESETS_KEY, pendingPresets, shouldOnboard } from './onboarding.js';
+import { BILL_PRESETS, ONBOARD_KEY, PRESETS_KEY, pendingPresets, shouldOnboard, hasData as hasAnyData } from './onboarding.js';
 import { applyDisplayPrefs, highContrast, setHighContrast, setTextSize, textSize } from './prefs.js';
 import { RECURRING_INTERVALS, applyRecurring, createRecurring, dueFromSnapshot, expirySnapshot, parseVoiceItems } from './features.js';
 import { MEAL_SLOTS, copyPreviousWeek, createMeal, recipeFromMealDb, shiftDays, weekDays, weekShoppingNeeds, weekStart } from './mealplan.js';
@@ -68,18 +68,23 @@ const CATEGORY_ICONS = {
   'Καθαριότητα': '🧽', 'Άλλο': '🧺'
 };
 
-function showToast(message, { undo = null } = {}) {
+function showToast(message, { undo = null, scan = false } = {}) {
   toast.textContent = t(message);
   toastUndo = undo;
+  if (scan) { // v1.9.0: «Σκάναρε τώρα» button (opens the scanner)
+    const button = document.createElement('button');
+    button.type = 'button'; button.className = 'toast-undo'; button.dataset.action = 'quick'; button.dataset.quick = 'scan'; button.textContent = t('Σκάναρε τώρα');
+    toast.append(' ', button);
+  }
   if (undo) {
     const button = document.createElement('button');
     button.type = 'button'; button.className = 'toast-undo'; button.dataset.action = 'toast-undo'; button.textContent = t('Αναίρεση');
     toast.append(' ', button);
   }
-  toast.classList.toggle('has-undo', Boolean(undo));
+  toast.classList.toggle('has-undo', Boolean(undo || scan));
   toast.classList.add('is-visible');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { toast.classList.remove('is-visible'); toastUndo = null; }, undo ? 7000 : 2600);
+  toastTimer = setTimeout(() => { toast.classList.remove('is-visible'); toastUndo = null; }, undo || scan ? 8000 : 2600);
 }
 let toastUndo = null;
 // Reversible delete: do it at once and offer «Αναίρεση» in the toast (only the lists that changed are restored).
@@ -129,6 +134,7 @@ function runAutoList() {
   return { changed: true, added: r.added };
 }
 
+let demoLoading = false;
 function persist() {
   try {
     const auto = runAutoList();
@@ -138,6 +144,7 @@ function persist() {
     sync?.push();
     scheduleBackgroundSnapshot();
     requestPersistentStorage();
+    if (!demoLoading) setTimeout(maybeProtectSheet, 600); // v1.9.0: asked only once something is saved
     return true;
   } catch {
     showToast('Δεν ήταν δυνατή η αποθήκευση στη συσκευή.');
@@ -302,7 +309,7 @@ function renderBackupReminder() {
 
 // v1.5.1: one «protect your data» card, replacing the separate sign-in and backup cards. Shown only while the
 // user is neither signed in nor has Google Drive backup on; hidden entirely once either is active.
-const protectOpts = () => ({ signedIn: Boolean(syncStatus.user), driveOn: driveOn(), known: authKnown(syncStatus) });
+const protectOpts = () => ({ signedIn: Boolean(syncStatus.user), driveOn: driveOn(), known: authKnown(syncStatus), hasData: hasAnyData(state) });
 const PROTECT_LINE = 'Συνδέσου ή σύνδεσε Google Drive για να μη χαθούν.';
 function protectButtons(prefix) {
   const signin = syncStatus.state === 'disabled' ? '' : `<button class="button button-primary" type="button" data-action="${prefix}-signin" id="${prefix}-signin">${escapeHtml(t('Σύνδεση'))}</button>`;
@@ -317,6 +324,13 @@ function renderProtectCard() {
     <div class="protect-actions">${protectButtons('protect')}</div>
     <button class="icon-button signin-close" type="button" data-action="protect-snooze" aria-label="${escapeHtml(t('Απόκρυψη για 14 ημέρες'))}" title="${escapeHtml(t('Απόκρυψη για 14 ημέρες'))}">×</button></section>`;
 }
+// v1.9.0: empty app → one clear first step instead of the «only on this phone» warning. Gone after the first save.
+function renderStarterCard() {
+  if (hasAnyData(state)) return '';
+  return `<section class="signin-card starter-card" id="home-starter-card" aria-labelledby="home-starter-title"><span class="signin-icon" aria-hidden="true">📷</span>
+    <div class="signin-text"><h2 id="home-starter-title">${escapeHtml(t('Ξεκίνα: σκάναρε το QR μιας απόδειξης'))}</h2><p>${escapeHtml(t('Τα προϊόντα και τα έξοδα μπαίνουν μόνα τους. Χωρίς λογαριασμό.'))}</p></div>
+    <div class="protect-actions"><button class="button button-primary" type="button" data-action="quick" data-quick="scan" id="starter-scan">📷 ${escapeHtml(t('Σκάναρε απόδειξη'))}</button><button class="text-button" type="button" data-action="load-demo" id="starter-demo">${escapeHtml(t('ή δες με παραδείγματα'))}</button></div></section>`;
+}
 function storageBadge() {
   if (!authKnown(syncStatus) && !driveOn()) return '';
   return storageMode(protectOpts()) === 'synced'
@@ -328,6 +342,17 @@ function renderProtectSheet() {
     <p>${escapeHtml(t(PROTECT_LINE))}</p>
     <p class="field-hint">${escapeHtml(t('Αν αλλάξεις κινητό ή σβηστούν τα δεδομένα του browser, χωρίς σύνδεση ή Drive χάνονται. Η σύνδεση κρατά τα πάντα και σε άλλες συσκευές· το Google Drive κρατά κρυπτογραφημένο αντίγραφο στο δικό σου Drive.'))}</p>
     <div class="choice-actions protect-sheet-actions">${protectButtons('sheet')}<button class="button button-quiet" type="button" data-action="sheet-later" id="sheet-later">${escapeHtml(t('Αργότερα'))}</button></div>`;
+}
+// v1.9.0: right after a sign-in in this tab (also after the Google redirect), point to the first step.
+const SIGNIN_WATCH_KEY = 'spitothiki:signin-watch';
+function noteSignin(status) {
+  try {
+    if (!status.user && status.state === 'signed-out') sessionStorage.setItem(SIGNIN_WATCH_KEY, '1');
+    else if (status.user && !syncStatus.user && sessionStorage.getItem(SIGNIN_WATCH_KEY)) {
+      sessionStorage.removeItem(SIGNIN_WATCH_KEY);
+      if (!(state.receipts || []).length) setTimeout(() => showToast(t('Έτοιμο! Τώρα σκάναρε την πρώτη σου απόδειξη'), { scan: true }), 400);
+    }
+  } catch {}
 }
 function maybeProtectSheet() {
   if (navigator.webdriver && !window.__spitoProtect) return; // automated tests opt in explicitly
@@ -475,7 +500,7 @@ function renderOverview() {
   const due = billsDue(state.bills || [], today);
   return `<section class="hero-panel home-hero"><div class="hero-copy"><p class="eyebrow">ΜΙΚΡΕΣ ΣΥΝΗΘΕΙΕΣ, ΠΙΟ ΗΡΕΜΟ ΣΠΙΤΙ</p><h1>Η Σπιτοθήκη σου<br>με μια ματιά</h1><p>Τι έχεις στο σπίτι, τι λήγει, τι χρειάζεται η λίστα και πόσα ξοδεύεις κάθε μήνα.</p></div><div class="hero-illustration" aria-hidden="true"><span>🫒</span></div></section>
     ${summary.expired ? `<div class="alert-banner" role="status">${t(summary.expired === 1 ? '⚠️ Έχεις {count} προϊόν που έχει λήξει. Έλεγξέ τα πριν τα χρησιμοποιήσεις.' : '⚠️ Έχεις {count} προϊόντα που έχουν λήξει. Έλεγξέ τα πριν τα χρησιμοποιήσεις.', { count: summary.expired })}</div>` : ''}
-    ${renderProtectCard()}
+    ${renderStarterCard()}${renderProtectCard()}
     <section class="stats-grid home-stats" aria-label="Σύνοψη αποθέματος">
       <button class="stat-card" type="button" data-action="home-card" data-card="all" id="home-card-all"><span class="stat-icon">🧺</span><div><strong>${summary.products}</strong><span>προϊόντα στο σπίτι</span></div></button>
       <button class="stat-card" type="button" data-action="home-card" data-card="expiring" id="home-card-expiring"><span class="stat-icon amber">◷</span><div><strong>${summary.expiringSoon + summary.expired}</strong><span>λήγουν ή έληξαν</span></div></button>
@@ -704,7 +729,7 @@ async function startSync() {
       getState: () => state,
       setState: (next) => { state = next; try { saveState(state); } catch {} renderApp(); },
       onNewHousehold: () => { sourceSignup(); },
-      onStatus: (status) => { syncStatus = status; if (status.user) requestPersistentStorage(); ensureMyName(); if (activeView === 'settings' || activeView === 'overview' || activeView === 'insights') renderApp(); maybeProtectSheet(); }
+      onStatus: (status) => { noteSignin(status); syncStatus = status; if (status.user) requestPersistentStorage(); ensureMyName(); if (activeView === 'settings' || activeView === 'overview' || activeView === 'insights') renderApp(); maybeProtectSheet(); }
     });
   } catch {
     syncStatus = { state: 'error', message: navigator.onLine === false ? 'Χωρίς σύνδεση: ο συγχρονισμός θα ξεκινήσει όταν επιστρέψει το internet.' : 'Δεν φόρτωσε το Firebase.' };
@@ -914,14 +939,18 @@ async function handleScanFile(file) {
 // ---------- First-run setup (3 questions) ----------
 const billPresetIds = () => { try { return JSON.parse(readKey(PRESETS_KEY) || '[]'); } catch { return []; } };
 let onboardPicks = new Set();
+let onboardMoreOpen = false;
 function renderOnboard() {
   const lang = getLang(); const size = textSize();
-  document.querySelector('#onboard-body').innerHTML = `<div class="dialog-heading"><div><p class="eyebrow">${escapeHtml(t('ΚΑΛΩΣ ΗΡΘΕΣ'))}</p><h2 id="onboard-title">${escapeHtml(t('Τέσσερις γρήγορες ερωτήσεις'))}</h2><p class="onboard-sub">${escapeHtml(t('Όλα αλλάζουν αργότερα από τις Ρυθμίσεις.'))}</p></div><button class="icon-button" type="button" data-action="onboard-skip" aria-label="${escapeHtml(t('Παράλειψη'))}">×</button></div>
-    <h3 class="settings-sub" id="ob-lang">1. ${escapeHtml(t('Γλώσσα'))}</h3><div class="theme-options" role="group" aria-labelledby="ob-lang" data-no-i18n>${[['el', 'Ελληνικά'], ['en', 'English']].map(([v, l]) => `<button type="button" class="filter-chip ${lang === v ? 'is-active' : ''}" data-action="onboard-lang" data-lang="${v}" lang="${v}" aria-pressed="${lang === v}">${l}</button>`).join('')}</div>
-    <h3 class="settings-sub" id="ob-bills">2. ${escapeHtml(t('Ποιους λογαριασμούς έχεις;'))}</h3><div class="theme-options onboard-bills" role="group" aria-labelledby="ob-bills">${BILL_PRESETS.map((p) => `<button type="button" class="filter-chip ${onboardPicks.has(p.id) ? 'is-active' : ''}" data-action="onboard-bill" data-id="${p.id}" aria-pressed="${onboardPicks.has(p.id)}">${p.icon} ${escapeHtml(t(p.name))}</button>`).join('')}</div>
-    <h3 class="settings-sub" id="ob-size">3. ${escapeHtml(t('Μέγεθος γραμμάτων'))}</h3><div class="theme-options size-options" role="group" aria-labelledby="ob-size">${[['normal', 'Κανονικά'], ['large', 'Μεγάλα'], ['xlarge', 'Πολύ μεγάλα']].map(([v, l]) => `<button type="button" class="filter-chip ${size === v ? 'is-active' : ''}" data-action="onboard-size" data-size="${v}" aria-pressed="${size === v}">${escapeHtml(t(l))}</button>`).join('')}</div>
-    <h3 class="settings-sub" id="ob-theme">4. ${escapeHtml(t('Θέμα'))}</h3><div class="theme-options" role="group" aria-labelledby="ob-theme">${[['auto', 'Αυτόματο'], ['light', 'Φωτεινό'], ['dark', 'Σκούρο']].map(([v, l]) => `<button type="button" class="filter-chip ${currentTheme() === v ? 'is-active' : ''}" data-action="onboard-theme" data-theme="${v}" aria-pressed="${currentTheme() === v}">${escapeHtml(t(l))}</button>`).join('')}</div>
-    <div class="choice-actions onboard-actions"><button class="button button-primary" type="button" data-action="onboard-done" id="onboard-done">${escapeHtml(t('Ξεκίνα'))}</button><button class="button button-quiet" type="button" data-action="onboard-skip">${escapeHtml(t('Παράλειψη'))}</button></div>`;
+  document.querySelector('#onboard-body').innerHTML = `<div class="dialog-heading"><div><p class="eyebrow">${escapeHtml(t('ΚΑΛΩΣ ΗΡΘΕΣ'))}</p><h2 id="onboard-title">${escapeHtml(t('Καλώς ήρθες στη Σπιτοθήκη'))}</h2><p class="onboard-sub" id="onboard-what">${escapeHtml(t('Σκανάρεις την απόδειξη και βλέπεις τι έχεις στο σπίτι, τι λήγει και πόσα ξοδεύεις. Χωρίς λογαριασμό.'))}</p></div><button class="icon-button" type="button" data-action="onboard-skip" aria-label="${escapeHtml(t('Παράλειψη'))}">×</button></div>
+    <h3 class="settings-sub" id="ob-lang">${escapeHtml(t('Γλώσσα'))}</h3><div class="theme-options" role="group" aria-labelledby="ob-lang" data-no-i18n>${[['el', 'Ελληνικά'], ['en', 'English']].map(([v, l]) => `<button type="button" class="filter-chip ${lang === v ? 'is-active' : ''}" data-action="onboard-lang" data-lang="${v}" lang="${v}" aria-pressed="${lang === v}">${l}</button>`).join('')}</div>
+    <details class="onboard-more" id="onboard-more" ${onboardMoreOpen ? 'open' : ''}><summary>${escapeHtml(t('Περισσότερες ρυθμίσεις (προαιρετικά)'))}</summary>
+    <h3 class="settings-sub" id="ob-bills">${escapeHtml(t('Ποιους λογαριασμούς έχεις;'))}</h3><div class="theme-options onboard-bills" role="group" aria-labelledby="ob-bills">${BILL_PRESETS.map((p) => `<button type="button" class="filter-chip ${onboardPicks.has(p.id) ? 'is-active' : ''}" data-action="onboard-bill" data-id="${p.id}" aria-pressed="${onboardPicks.has(p.id)}">${p.icon} ${escapeHtml(t(p.name))}</button>`).join('')}</div>
+    <h3 class="settings-sub" id="ob-size">${escapeHtml(t('Μέγεθος γραμμάτων'))}</h3><div class="theme-options size-options" role="group" aria-labelledby="ob-size">${[['normal', 'Κανονικά'], ['large', 'Μεγάλα'], ['xlarge', 'Πολύ μεγάλα']].map(([v, l]) => `<button type="button" class="filter-chip ${size === v ? 'is-active' : ''}" data-action="onboard-size" data-size="${v}" aria-pressed="${size === v}">${escapeHtml(t(l))}</button>`).join('')}</div>
+    <h3 class="settings-sub" id="ob-theme">${escapeHtml(t('Θέμα'))}</h3><div class="theme-options" role="group" aria-labelledby="ob-theme">${[['auto', 'Αυτόματο'], ['light', 'Φωτεινό'], ['dark', 'Σκούρο']].map(([v, l]) => `<button type="button" class="filter-chip ${currentTheme() === v ? 'is-active' : ''}" data-action="onboard-theme" data-theme="${v}" aria-pressed="${currentTheme() === v}">${escapeHtml(t(l))}</button>`).join('')}</div>
+    <p class="field-hint">${escapeHtml(t('Όλα αλλάζουν αργότερα από τις Ρυθμίσεις.'))}</p></details>
+    <div class="choice-actions onboard-actions"><button class="button button-primary" type="button" data-action="onboard-done" id="onboard-done">${escapeHtml(t('Ξεκίνα'))}</button><button class="button button-quiet" type="button" data-action="onboard-demo" id="onboard-demo">✨ ${escapeHtml(t('Δες με παραδείγματα'))}</button></div>`;
+  document.querySelector('#onboard-more')?.addEventListener('toggle', (e) => { onboardMoreOpen = e.target.open; });
 }
 function openOnboard() {
   onboardPicks = new Set(billPresetIds());
@@ -930,13 +959,14 @@ function openOnboard() {
   if (!dialog.open) dialog.showModal();
   dialog.querySelector('#onboard-done')?.focus();
 }
-function finishOnboard(save) {
+function finishOnboard(save, { demo = false } = {}) {
   if (save) writeKey(PRESETS_KEY, JSON.stringify([...onboardPicks]));
   writeKey(ONBOARD_KEY, '1');
   document.querySelector('#onboard-dialog').close();
   // Close first and let the phone paint, then do the heavy re-render (v1.6.10: the tap used to wait for renderApp).
   afterPaint(() => {
     renderApp();
+    if (demo) { loadDemoData(); return; }
     if (save) showToast(onboardPicks.size ? t('Έτοιμο! Οι λογαριασμοί σου είναι στους Λογαριασμούς, για να τους προσθέσεις με ένα πάτημα.') : t('Έτοιμο!'));
     setTimeout(maybeProtectSheet, 300);
   });
@@ -2886,6 +2916,7 @@ function renderExpenseCats() {
     <p class="field-hint">${escapeHtml(t('Κάθε κατηγορία φαίνεται σε δική της γραμμή στο «Σύνολο εξόδων μήνα». Δεν αλλάζει το είδος προϊόντος (π.χ. Γαλακτοκομικά). Μεταφορά εξόδου: άνοιξε την απόδειξη (🧾 Αποδείξεις) ή το μικροέξοδο και πάτα «✎ Διόρθωση». Αν σβήσεις μια κατηγορία, τα έξοδά της γυρίζουν στις Αγορές ή στα Μικροέξοδα.'))}</p></details>`;
 }
 
+function loadDemoData() { demoLoading = true; try { state = { ...state, items: makeDemoItems(), shopping: [] }; persist(); if (activeView !== 'overview') navigate('overview'); else renderApp(); showToast(storageMode(protectOpts()) === 'local' ? t('Τα παραδείγματα φορτώθηκαν. Τα δεδομένα σου είναι μόνο σε αυτό το κινητό: συνδέσου ή σύνδεσε Google Drive για να μη χαθούν.') : t('Τα παραδείγματα φορτώθηκαν.')); } finally { demoLoading = false; } }
 function makeDemoItems() {
   const today = localDateKey();
   const addDays = (amount) => { const date = new Date(`${today}T12:00:00`); date.setDate(date.getDate() + amount); return localDateKey(date); };
@@ -3214,6 +3245,7 @@ function handleAction(button) {
   else if (action === 'onboard-theme') { setTheme(button.dataset.theme); renderOnboard(); document.querySelector(`[data-action="onboard-theme"][data-theme="${button.dataset.theme}"]`)?.focus(); }
   else if (action === 'onboard-done') finishOnboard(true);
   else if (action === 'onboard-skip') finishOnboard(false);
+  else if (action === 'onboard-demo') { finishOnboard(true, { demo: true }); }
   else if (action === 'onboard-again') openOnboard();
   else if (action === 'bill-preset') openBillPreset(button.dataset.id);
   else if (action === 'choice') { const run = choiceHandlers[Number(button.dataset.index)]; document.querySelector('#choice-dialog').close(); run?.(); }
@@ -3306,7 +3338,7 @@ function handleAction(button) {
   else if (action === 'drive-restore') driveRestore();
   else if (action === 'drive-disconnect') driveDisconnect();
   else if (action === 'load-demo') {
-    const loadDemo = () => { state = { ...state, items: makeDemoItems(), shopping: [] }; persist(); renderApp(); showToast(storageMode(protectOpts()) === 'local' ? t('Τα παραδείγματα φορτώθηκαν. Τα δεδομένα σου είναι μόνο σε αυτό το κινητό: συνδέσου ή σύνδεσε Google Drive για να μη χαθούν.') : t('Τα παραδείγματα φορτώθηκαν.')); };
+    const loadDemo = loadDemoData;
     if (state.items.length || state.shopping.length) showConfirm('Τα τωρινά δεδομένα θα αντικατασταθούν από δοκιμαστικά προϊόντα.', loadDemo, 'Φόρτωση παραδειγμάτων;');
     else loadDemo();
   } else if (action === 'clear-data') {

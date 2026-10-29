@@ -82,7 +82,7 @@
 
       <div class="sidebar-bottom">
         <div class="privacy-card"><span class="privacy-icon" aria-hidden="true">🔒</span><div><strong>Τα δεδομένα σου είναι δικά σου</strong><p>Στη συσκευή σου και, αν συνδεθείς, ιδιωτικά μόνο με το νοικοκυριό σου.</p></div></div>
-        <span class="version-label">ΕΚΔΟΣΗ 1.8.9</span>
+        <span class="version-label"><span>ΕΚΔΟΣΗ</span> <span data-no-i18n>1.9.0</span></span>
       </div>
     </aside>
 
@@ -94,7 +94,7 @@
         <button class="button button-primary button-add" type="button" data-action="add-item"><span aria-hidden="true">＋</span> Προσθήκη προϊόντος</button>
       </header>
       <div id="view-content" class="view-content" tabindex="-1"></div>
-      <footer class="app-footer"><span>Απλά, για το σπίτι. · <span id="app-version" data-no-i18n>Έκδοση 1.8.9</span></span><button type="button" class="text-button" data-view="settings">Αντίγραφο ασφαλείας & απόρρητο</button></footer>
+      <footer class="app-footer"><span><span>Απλά, για το σπίτι.</span> · <span id="app-version"><span>Έκδοση</span> <span data-no-i18n>1.9.0</span></span></span><button type="button" class="text-button" data-view="settings">Αντίγραφο ασφαλείας & απόρρητο</button></footer>
     </main>
   </div>
 
@@ -168,6 +168,7 @@
     <div class="scan-wrap"><video id="scan-video" class="scan-video" playsinline muted></video><div class="scan-box" aria-hidden="true"></div></div>
     <div class="settings-actions"><button class="button button-quiet" type="button" id="scan-torch" data-action="scan-torch" aria-pressed="false" hidden>🔦 Φακός</button></div>
     <div class="settings-actions" id="scan-file-row" hidden><label class="button button-quiet file-button"><span>📎 Από φωτογραφία ή PDF</span><input type="file" accept="image/*,application/pdf,.pdf" class="visually-hidden" id="scan-file"></label></div>
+    <p class="field-hint scan-hint" id="scan-hint">Σκάναρε το QR της απόδειξης ή το barcode ενός προϊόντος</p>
     <p class="field-hint" id="scan-status" role="status">Στόχευσε τον barcode με την κάμερα.</p>
   </dialog>
 

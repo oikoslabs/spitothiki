@@ -21,7 +21,7 @@ test('v1.8.7 privacy.html: deployed (not in firebase.json ignore), cached by the
   for (const pattern of hosting.ignore) assert.ok(!['*.html', '**/*.html', 'privacy.html'].includes(pattern), pattern);
   const sw = read('sw.js');
   assert.match(sw, /'\.\/privacy\.html'/);
-  assert.match(sw, /CACHE_VERSION = 'v96'/);
+  assert.match(sw, /CACHE_VERSION = 'v97'/);
   assert.match(read('src/app.js'), /href="\.\/privacy\.html"/);
   assert.equal(dictionaries.en['Πλήρης πολιτική απορρήτου'], 'Full privacy policy');
 });

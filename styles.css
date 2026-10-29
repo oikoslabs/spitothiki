@@ -975,3 +975,11 @@ body:has(dialog[open]) .back-to-top-page { display: none; }
 /* v1.8.1: «📢 Νέα & tips στο Telegram» link in the sidebar and the phone menu (looks like the other items) */
 a.nav-item, a.menu-item { text-decoration: none; box-sizing: border-box; }
 a.menu-item { color: inherit; }
+
+/* v1.9.0 first run: starter card on an empty home, optional onboarding settings, scan hint */
+.starter-card .protect-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+@media (max-width: 480px) { .starter-card .protect-actions { grid-column: 1 / -1; } .starter-card .protect-actions .button { flex: 1 1 160px; } }
+.onboard-more { margin-top: 12px; }
+.onboard-more > summary { cursor: pointer; font-weight: 700; padding: 8px 0; }
+.scan-hint { font-weight: 700; margin-bottom: 0; }
+.onboard-more > summary::after { content: ' ▾'; } .onboard-more[open] > summary::after { content: ' ▴'; }
