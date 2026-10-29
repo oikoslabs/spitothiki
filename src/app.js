@@ -954,7 +954,8 @@ function renderOnboard() {
     <h3 class="settings-sub" id="ob-size">${escapeHtml(t('Μέγεθος γραμμάτων'))}</h3><div class="theme-options size-options" role="group" aria-labelledby="ob-size">${[['normal', 'Κανονικά'], ['large', 'Μεγάλα'], ['xlarge', 'Πολύ μεγάλα']].map(([v, l]) => `<button type="button" class="filter-chip ${size === v ? 'is-active' : ''}" data-action="onboard-size" data-size="${v}" aria-pressed="${size === v}">${escapeHtml(t(l))}</button>`).join('')}</div>
     <h3 class="settings-sub" id="ob-theme">${escapeHtml(t('Θέμα'))}</h3><div class="theme-options" role="group" aria-labelledby="ob-theme">${[['auto', 'Αυτόματο'], ['light', 'Φωτεινό'], ['dark', 'Σκούρο']].map(([v, l]) => `<button type="button" class="filter-chip ${currentTheme() === v ? 'is-active' : ''}" data-action="onboard-theme" data-theme="${v}" aria-pressed="${currentTheme() === v}">${escapeHtml(t(l))}</button>`).join('')}</div>
     <p class="field-hint">${escapeHtml(t('Όλα αλλάζουν αργότερα από τις Ρυθμίσεις.'))}</p></details>
-    <div class="choice-actions onboard-actions"><button class="button button-primary" type="button" data-action="onboard-done" id="onboard-done">${escapeHtml(t('Ξεκίνα'))}</button><button class="button button-quiet" type="button" data-action="onboard-demo" id="onboard-demo">✨ ${escapeHtml(t('Δες με παραδείγματα'))}</button></div>`;
+    <!-- v1.9.1: examples are offered on the starter card right after this, so a new user sees it -->
+    <div class="choice-actions onboard-actions"><button class="button button-primary" type="button" data-action="onboard-done" id="onboard-done">${escapeHtml(t('Ξεκίνα'))}</button></div>`;
   document.querySelector('#onboard-more')?.addEventListener('toggle', (e) => { onboardMoreOpen = e.target.open; });
 }
 function openOnboard() {

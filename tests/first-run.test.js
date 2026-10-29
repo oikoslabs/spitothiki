@@ -26,7 +26,8 @@ test('v1.9.0 empty home: starter card with scan button and examples link, only w
 test('v1.9.0 onboarding: one sentence + language first, the rest optional, examples at the end', () => {
   assert.match(app, /id="onboard-what"/);
   assert.match(app, /<details class="onboard-more"/);
-  assert.match(app, /data-action="onboard-demo"/);
+  assert.doesNotMatch(app, /data-action="onboard-demo"/); // v1.9.1: examples only on the starter card, so it is always seen
+  assert.match(app, /id="starter-demo"/);
   assert.match(app, /action === 'onboard-demo'/);
   assert.match(app, /data-action="load-demo">Φόρτωση παραδειγμάτων/); // Settings button kept
 });
