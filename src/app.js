@@ -327,9 +327,14 @@ function renderProtectCard() {
 // v1.9.0: empty app → one clear first step instead of the «only on this phone» warning. Gone after the first save.
 function renderStarterCard() {
   if (hasAnyData(state)) return '';
-  return `<section class="signin-card starter-card" id="home-starter-card" aria-labelledby="home-starter-title"><span class="signin-icon" aria-hidden="true">📷</span>
-    <div class="signin-text"><h2 id="home-starter-title">${escapeHtml(t('Ξεκίνα: σκάναρε το QR μιας απόδειξης'))}</h2><p>${escapeHtml(t('Τα προϊόντα και τα έξοδα μπαίνουν μόνα τους. Χωρίς λογαριασμό.'))}</p></div>
-    <div class="protect-actions"><button class="button button-primary" type="button" data-action="quick" data-quick="scan" id="starter-scan">📷 ${escapeHtml(t('Σκάναρε απόδειξη'))}</button><button class="text-button" type="button" data-action="load-demo" id="starter-demo">${escapeHtml(t('ή δες με παραδείγματα'))}</button></div></section>`;
+  const steps = ['Σκανάρεις το QR, σε δύο δευτερόλεπτα.', 'Βλέπεις πού πάνε τα λεφτά σου κάθε μήνα.', 'Ξέρεις τι έχεις στο σπίτι πριν πας για ψώνια.'];
+  return `<section class="signin-card starter-card" id="home-starter-card" aria-labelledby="home-starter-title">
+    <div class="starter-body"><h2 id="home-starter-title">${escapeHtml(t('Πέτα τις αποδείξεις στο συρτάρι. Σκάναρέ τες εδώ.'))}</h2>
+    <p>${escapeHtml(t('Σκανάρεις το QR της απόδειξης και η Σπιτοθήκη ξέρει τι αγόρασες, πόσο το πλήρωσες και τι έχεις στο ντουλάπι. Χωρίς να γράφεις τίποτα με το χέρι.'))}</p>
+    <p class="starter-example">${escapeHtml(t('Π.χ. σκάναρες την απόδειξη από τον Σκλαβενίτη: 14 προϊόντα, 38,40 €. Μπήκαν στα έξοδα του μήνα και στο ντουλάπι σου.'))}</p>
+    <ol class="starter-steps">${steps.map((x) => `<li>${escapeHtml(t(x))}</li>`).join('')}</ol>
+    <div class="starter-actions"><button class="button button-primary" type="button" data-action="quick" data-quick="scan" id="starter-scan">📷 ${escapeHtml(t('Σκάναρε την πρώτη σου απόδειξη'))}</button><button class="text-button" type="button" data-action="load-demo" id="starter-demo">${escapeHtml(t('ή δες με παραδείγματα'))}</button></div>
+    <p class="starter-note">${escapeHtml(t('Δωρεάν, χωρίς λογαριασμό και χωρίς κάρτα. Τα στοιχεία σου μένουν στο κινητό σου.'))}</p></div></section>`;
 }
 function storageBadge() {
   if (!authKnown(syncStatus) && !driveOn()) return '';
