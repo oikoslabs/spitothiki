@@ -1076,7 +1076,21 @@ const EN = {
   "Σε ποια γραμμή του «Σύνολο εξόδων μήνα» μετράει. Μια δική σου κατηγορία (π.χ. Ρούχα) φαίνεται εκεί σε δική της γραμμή.": "Which line of «Total spending this month» it counts in. A category of your own (e.g. Clothes) shows there on its own line.",
   "Σε ποια γραμμή του «Σύνολο εξόδων μήνα» μετράει. Μια δική σου κατηγορία (π.χ. Ρούχα) φαίνεται εκεί σε δική της γραμμή. Αν ένα προϊόν πάει αλλού (π.χ. ένα ρούχο), άλλαξέ το στη γραμμή του.": "Which line of «Total spending this month» it counts in. A category of your own (e.g. Clothes) shows there on its own line. If one product belongs elsewhere (e.g. a piece of clothing), change it on its line.",
   "Κάθε κατηγορία φαίνεται σε δική της γραμμή στο «Σύνολο εξόδων μήνα». Δεν αλλάζει το είδος προϊόντος (π.χ. Γαλακτοκομικά). Μεταφορά εξόδου: άνοιξε την απόδειξη (🧾 Αποδείξεις) ή το μικροέξοδο και πάτα «✎ Διόρθωση». Αν σβήσεις μια κατηγορία, τα έξοδά της γυρίζουν στις Αγορές ή στα Μικροέξοδα.": "Each category shows on its own line in «Total spending this month». It doesn’t change the product type (e.g. Dairy). To move an expense: open the receipt (🧾 Receipts) or the small expense and tap «✎ Edit». If you delete a category, its expenses go back to Purchases or Small expenses.",
-  "Μαζί και {amount} σε δικές σου κατηγορίες εξόδων (π.χ. Ρούχα), που στο «Σύνολο εξόδων μήνα» έχουν δική τους γραμμή.": "Includes {amount} in categories of your own (e.g. Clothes), which have their own line in «Total spending this month»."
+  "Μαζί και {amount} σε δικές σου κατηγορίες εξόδων (π.χ. Ρούχα), που στο «Σύνολο εξόδων μήνα» έχουν δική τους γραμμή.": "Includes {amount} in categories of your own (e.g. Clothes), which have their own line in «Total spending this month».",
+  // v1.9.0 first run
+  "Ξεκίνα: σκάναρε το QR μιας απόδειξης": "Start: scan the QR code on a receipt",
+  "Τα προϊόντα και τα έξοδα μπαίνουν μόνα τους. Χωρίς λογαριασμό.": "Products and spending are added by themselves. No account needed.",
+  "Σκάναρε απόδειξη": "Scan a receipt",
+  "ή δες με παραδείγματα": "or try it with examples",
+  "Δες με παραδείγματα": "Try it with examples",
+  "Καλώς ήρθες στη Σπιτοθήκη": "Welcome to Spitothiki",
+  "Σκανάρεις την απόδειξη και βλέπεις τι έχεις στο σπίτι, τι λήγει και πόσα ξοδεύεις. Χωρίς λογαριασμό.": "Scan your receipt and see what you have at home, what is expiring and how much you spend. No account needed.",
+  "Περισσότερες ρυθμίσεις (προαιρετικά)": "More settings (optional)",
+  "Σκάναρε το QR της απόδειξης ή το barcode ενός προϊόντος": "Scan the QR code on the receipt or a product’s barcode",
+  "Έτοιμο! Τώρα σκάναρε την πρώτη σου απόδειξη": "Done! Now scan your first receipt",
+  "Σκάναρε τώρα": "Scan now",
+  "ΕΚΔΟΣΗ": "VERSION",
+  "Έκδοση": "Version",
 };
 
 export const dictionaries = { el: Object.fromEntries(Object.keys(EN).map((key) => [key, key])), en: EN };

@@ -13,13 +13,14 @@ export function authKnown(status = {}) {
 }
 export const storageMode = (opts) => (isProtected(opts) ? 'synced' : 'local');
 
-export function showProtectCard({ signedIn, driveOn, known = true, snoozeUntil = 0, now = Date.now() } = {}) {
-  if (!known || isProtected({ signedIn, driveOn })) return false;
+// v1.9.0: never before the first saved thing (an empty app shows the «Ξεκίνα» card instead).
+export function showProtectCard({ signedIn, driveOn, known = true, snoozeUntil = 0, now = Date.now(), hasData = true } = {}) {
+  if (!hasData || !known || isProtected({ signedIn, driveOn })) return false;
   return !(snoozeUntil && now < Number(snoozeUntil));
 }
 export const snoozeUntilFrom = (now = Date.now(), days = PROTECT_SNOOZE_DAYS) => now + days * DAY;
 
 // One-time sheet: first use (after the 3 onboarding questions) or the first launch of v1.5.1 for an unprotected user.
-export function showProtectSheet({ signedIn, driveOn, known = true, seen = false, onboarding = false } = {}) {
-  return Boolean(known && !seen && !onboarding && !isProtected({ signedIn, driveOn }));
+export function showProtectSheet({ signedIn, driveOn, known = true, seen = false, onboarding = false, hasData = true } = {}) {
+  return Boolean(hasData && known && !seen && !onboarding && !isProtected({ signedIn, driveOn }));
 }
