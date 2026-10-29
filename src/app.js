@@ -10,7 +10,7 @@ import { showSigninCard } from './features.js';
 import { routeCode, parseStoreReceiptBarcode } from './scan-router.js';
 import { deleteReceipt, listReceipts, receiptCategory, receiptItems, receiptMonths } from './receipts.js';
 import { PROTECT_SEEN_KEY, PROTECT_SNOOZE_KEY, authKnown, showProtectCard, showProtectSheet, snoozeUntilFrom, storageMode } from './protect.js';
-import { BILL_PRESETS, ONBOARD_KEY, PRESETS_KEY, pendingPresets, shouldOnboard, hasData as hasAnyData } from './onboarding.js';
+import { BILL_PRESETS, ONBOARD_KEY, PRESETS_KEY, pendingPresets, shouldOnboard, hasData as hasAnyData, hasRealData } from './onboarding.js';
 import { applyDisplayPrefs, highContrast, setHighContrast, setTextSize, textSize } from './prefs.js';
 import { RECURRING_INTERVALS, applyRecurring, createRecurring, dueFromSnapshot, expirySnapshot, parseVoiceItems } from './features.js';
 import { MEAL_SLOTS, copyPreviousWeek, createMeal, recipeFromMealDb, shiftDays, weekDays, weekShoppingNeeds, weekStart } from './mealplan.js';
@@ -309,7 +309,7 @@ function renderBackupReminder() {
 
 // v1.5.1: one «protect your data» card, replacing the separate sign-in and backup cards. Shown only while the
 // user is neither signed in nor has Google Drive backup on; hidden entirely once either is active.
-const protectOpts = () => ({ signedIn: Boolean(syncStatus.user), driveOn: driveOn(), known: authKnown(syncStatus), hasData: hasAnyData(state) });
+const protectOpts = () => ({ signedIn: Boolean(syncStatus.user), driveOn: driveOn(), known: authKnown(syncStatus), hasData: hasRealData(state) });
 const PROTECT_LINE = 'Συνδέσου ή σύνδεσε Google Drive για να μη χαθούν.';
 function protectButtons(prefix) {
   const signin = syncStatus.state === 'disabled' ? '' : `<button class="button button-primary" type="button" data-action="${prefix}-signin" id="${prefix}-signin">${escapeHtml(t('Σύνδεση'))}</button>`;
@@ -327,9 +327,14 @@ function renderProtectCard() {
 // v1.9.0: empty app → one clear first step instead of the «only on this phone» warning. Gone after the first save.
 function renderStarterCard() {
   if (hasAnyData(state)) return '';
-  return `<section class="signin-card starter-card" id="home-starter-card" aria-labelledby="home-starter-title"><span class="signin-icon" aria-hidden="true">📷</span>
-    <div class="signin-text"><h2 id="home-starter-title">${escapeHtml(t('Ξεκίνα: σκάναρε το QR μιας απόδειξης'))}</h2><p>${escapeHtml(t('Τα προϊόντα και τα έξοδα μπαίνουν μόνα τους. Χωρίς λογαριασμό.'))}</p></div>
-    <div class="protect-actions"><button class="button button-primary" type="button" data-action="quick" data-quick="scan" id="starter-scan">📷 ${escapeHtml(t('Σκάναρε απόδειξη'))}</button><button class="text-button" type="button" data-action="load-demo" id="starter-demo">${escapeHtml(t('ή δες με παραδείγματα'))}</button></div></section>`;
+  const steps = ['Σκανάρεις το QR, σε δύο δευτερόλεπτα.', 'Βλέπεις πού πάνε τα λεφτά σου κάθε μήνα.', 'Ξέρεις τι έχεις στο σπίτι πριν πας για ψώνια.'];
+  return `<section class="signin-card starter-card" id="home-starter-card" aria-labelledby="home-starter-title">
+    <div class="starter-body"><h2 id="home-starter-title">${escapeHtml(t('Πέτα τις αποδείξεις στο συρτάρι. Σκάναρέ τες εδώ.'))}</h2>
+    <p>${escapeHtml(t('Σκανάρεις το QR της απόδειξης και η Σπιτοθήκη ξέρει τι αγόρασες, πόσο το πλήρωσες και τι έχεις στο ντουλάπι. Χωρίς να γράφεις τίποτα με το χέρι.'))}</p>
+    <p class="starter-example">${escapeHtml(t('Π.χ. σκάναρες την απόδειξη από τον Σκλαβενίτη: 14 προϊόντα, 38,40 €. Μπήκαν στα έξοδα του μήνα και στο ντουλάπι σου.'))}</p>
+    <ol class="starter-steps">${steps.map((x) => `<li>${escapeHtml(t(x))}</li>`).join('')}</ol>
+    <div class="starter-actions"><button class="button button-primary" type="button" data-action="quick" data-quick="scan" id="starter-scan">📷 ${escapeHtml(t('Σκάναρε την πρώτη σου απόδειξη'))}</button><button class="text-button" type="button" data-action="load-demo" id="starter-demo">${escapeHtml(t('ή δες με παραδείγματα'))}</button></div>
+    <p class="starter-note">${escapeHtml(t('Δωρεάν, χωρίς λογαριασμό και χωρίς κάρτα. Τα στοιχεία σου μένουν στο κινητό σου.'))}</p></div></section>`;
 }
 function storageBadge() {
   if (!authKnown(syncStatus) && !driveOn()) return '';
@@ -949,7 +954,8 @@ function renderOnboard() {
     <h3 class="settings-sub" id="ob-size">${escapeHtml(t('Μέγεθος γραμμάτων'))}</h3><div class="theme-options size-options" role="group" aria-labelledby="ob-size">${[['normal', 'Κανονικά'], ['large', 'Μεγάλα'], ['xlarge', 'Πολύ μεγάλα']].map(([v, l]) => `<button type="button" class="filter-chip ${size === v ? 'is-active' : ''}" data-action="onboard-size" data-size="${v}" aria-pressed="${size === v}">${escapeHtml(t(l))}</button>`).join('')}</div>
     <h3 class="settings-sub" id="ob-theme">${escapeHtml(t('Θέμα'))}</h3><div class="theme-options" role="group" aria-labelledby="ob-theme">${[['auto', 'Αυτόματο'], ['light', 'Φωτεινό'], ['dark', 'Σκούρο']].map(([v, l]) => `<button type="button" class="filter-chip ${currentTheme() === v ? 'is-active' : ''}" data-action="onboard-theme" data-theme="${v}" aria-pressed="${currentTheme() === v}">${escapeHtml(t(l))}</button>`).join('')}</div>
     <p class="field-hint">${escapeHtml(t('Όλα αλλάζουν αργότερα από τις Ρυθμίσεις.'))}</p></details>
-    <div class="choice-actions onboard-actions"><button class="button button-primary" type="button" data-action="onboard-done" id="onboard-done">${escapeHtml(t('Ξεκίνα'))}</button><button class="button button-quiet" type="button" data-action="onboard-demo" id="onboard-demo">✨ ${escapeHtml(t('Δες με παραδείγματα'))}</button></div>`;
+    <!-- v1.9.1: examples are offered on the starter card right after this, so a new user sees it -->
+    <div class="choice-actions onboard-actions"><button class="button button-primary" type="button" data-action="onboard-done" id="onboard-done">${escapeHtml(t('Ξεκίνα'))}</button></div>`;
   document.querySelector('#onboard-more')?.addEventListener('toggle', (e) => { onboardMoreOpen = e.target.open; });
 }
 function openOnboard() {
@@ -2926,7 +2932,7 @@ function makeDemoItems() {
     createPantryItem({ name: 'Ρύζι', quantity: 2, unit: 'πακέτα', minimum: 1, category: 'Ξηρά τρόφιμα', location: 'Ντουλάπι' }),
     createPantryItem({ name: 'Γιαούρτι', quantity: 2, unit: 'τεμ.', minimum: 2, category: 'Γαλακτοκομικά', location: 'Ψυγείο', expiry: addDays(1) }),
     createPantryItem({ name: 'Ελαιόλαδο', quantity: 1, unit: 'λίτρα', minimum: 1, category: 'Ξηρά τρόφιμα', location: 'Ντουλάπι' })
-  ];
+  ].map((item) => ({ ...item, demo: true }));
 }
 
 // v1.4: export asks for an optional password → encrypted .spitobak (else plain .json). Web Share on Android.

@@ -983,3 +983,12 @@ a.menu-item { color: inherit; }
 .onboard-more > summary { cursor: pointer; font-weight: 700; padding: 8px 0; }
 .scan-hint { font-weight: 700; margin-bottom: 0; }
 .onboard-more > summary::after { content: ' ▾'; } .onboard-more[open] > summary::after { content: ' ▴'; }
+
+/* v1.9.1 friendlier starter card */
+.starter-card { display: block; }
+.starter-body h2 { margin: 0 0 4px; font: 800 calc(16px * var(--text-scale))/1.25 var(--display); }
+.starter-body p { margin: 0 0 8px; color: var(--muted); font-size: calc(13px * var(--text-scale)); line-height: 1.4; }
+.starter-body .starter-example { padding: 7px 10px; border-left: 3px solid currentColor; border-radius: 6px; background: rgba(127,127,127,.09); font-size: calc(12px * var(--text-scale)); font-style: italic; }
+.starter-steps { margin: 0 0 10px; padding-left: 20px; font-size: calc(13px * var(--text-scale)); line-height: 1.45; }
+.starter-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+.starter-body .starter-note { margin: 8px 0 0; font-size: calc(11px * var(--text-scale)); }
