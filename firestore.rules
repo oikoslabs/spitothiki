@@ -18,10 +18,14 @@ service cloud.firestore {
       // Everyone starts with a personal household whose id is their uid.
       allow create: if signedIn() && hid == request.auth.uid
         && request.resource.data.ownerUid == request.auth.uid
-        && request.resource.data.members == [request.auth.uid];
+        && request.resource.data.members == [request.auth.uid]
+        && request.resource.data.keys().hasOnly(['ownerUid', 'members', 'createdAt']);
       allow update: if signedIn() && (
         // The owner can manage the household (not hand it over); other members can only leave (remove themselves).
-        (request.auth.uid == resource.data.ownerUid && request.resource.data.ownerUid == resource.data.ownerUid && request.resource.data.members.size() <= 20)
+        (request.auth.uid == resource.data.ownerUid && request.resource.data.ownerUid == resource.data.ownerUid
+          && request.resource.data.keys().hasOnly(['ownerUid', 'members', 'createdAt', 'lastJoinCode'])
+          && request.resource.data.members is list && request.resource.data.members.size() <= 20
+          && request.auth.uid in request.resource.data.members)
         || (request.auth.uid in resource.data.members && request.auth.uid != resource.data.ownerUid
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members'])
           && request.resource.data.members.toSet() == resource.data.members.toSet().difference([request.auth.uid].toSet()))
@@ -42,7 +46,11 @@ service cloud.firestore {
       match /records/{recordId} {
         allow read, delete: if isMember(hid);
         // Only the sync row shape is accepted (abuse guard).
-        allow create, update: if isMember(hid) && request.resource.data.keys().hasOnly(['kind', 'id', 'data', 'deleted', 'ts', 'by']) && request.resource.data.by == request.auth.uid;
+        allow create, update: if isMember(hid) && request.resource.data.keys().hasOnly(['kind', 'id', 'data', 'deleted', 'ts', 'by']) && request.resource.data.by == request.auth.uid
+          && request.resource.data.kind is string && request.resource.data.kind.size() <= 40
+          && request.resource.data.id is string && request.resource.data.id.size() <= 200
+          && request.resource.data.deleted is bool && request.resource.data.ts is number
+          && (request.resource.data.data == null || request.resource.data.data is map);
       }
       // Invite codes created by members; their existence is what lets someone join.
       match /invites/{code} {

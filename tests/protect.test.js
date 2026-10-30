@@ -43,6 +43,6 @@ test('home shows a single protect card (old sign-in/backup cards merged)', () =>
 });
 test('service worker cache bumped (v57+) and caches protect.js', () => {
   const sw = readFileSync(new URL('../sw.js', import.meta.url), 'utf8');
-  assert.match(sw, /CACHE_VERSION = 'v(5[7-9]|[6-9]\d)'/);
+  assert.match(sw, /CACHE_VERSION = 'v(5[7-9]|[6-9]\d|[1-9]\d{2})'/);
   assert.ok(sw.includes("'./src/protect.js'"));
 });

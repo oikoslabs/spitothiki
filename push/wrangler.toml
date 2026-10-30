@@ -10,8 +10,9 @@ binding = "PUSH_SUBS"
 id = "908a19e47cc44884b25dd51797fbf330"
 
 # 09:00 Athens all year: 06:00 UTC (summer) or 07:00 UTC (winter); the worker checks the Athens hour.
+# Privacy: no request logs (no IP, headers or user agent kept). Errors are visible with `wrangler tail` when needed.
 [observability]
-enabled = true
+enabled = false
 
 [triggers]
 crons = ["0 6 * * *", "0 7 * * *"]
