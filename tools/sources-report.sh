@@ -8,6 +8,6 @@ set -euo pipefail
 ACC=${CLOUDFLARE_ACCOUNT_ID:-509f96807f1c43e201c2a56cc6d65683}; DAYS=${1:-7}
 CF_API_TOKEN=${CF_API_TOKEN:-$(grep -s oauth_token ~/.config/.wrangler/config/default.toml | cut -d'"' -f2)}; : "${CF_API_TOKEN:?set CF_API_TOKEN or log in with wrangler}"
 SEL="SELECT blob2 AS source, SUM(IF(blob1 = 'visit', _sample_interval, 0)) AS visits, SUM(IF(blob1 = 'signup', _sample_interval, 0)) AS signups FROM spitothiki_sources"
-q() { echo "== $1"; curl -s "https://api.cloudflare.com/client/v4/accounts/$ACC/analytics_engine/sql" -H "Authorization: Bearer $CF_API_TOKEN" --data "$2 GROUP BY source ORDER BY visits DESC FORMAT PrettyCompact"; echo; }
+q() { echo "== $1"; curl -s "https://api.cloudflare.com/client/v4/accounts/$ACC/analytics_engine/sql" -H "Authorization: Bearer $CF_API_TOKEN" --data "$2 GROUP BY source ORDER BY visits DESC FORMAT JSONEachRow"; echo; }
 q "Last $DAYS days" "$SEL WHERE timestamp > NOW() - INTERVAL '$DAYS' DAY"
 q "All time (max ~90 days)" "$SEL"
