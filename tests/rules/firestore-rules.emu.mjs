@@ -3,6 +3,7 @@
 // (needs Java and `npm i --no-save @firebase/rules-unit-testing firebase`). Not part of `npm test`.
 import { test, before, after, beforeEach } from 'node:test';
 import { readFileSync } from 'node:fs';
+import assert from 'node:assert/strict';
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
 import { doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, collection, collectionGroup, query, where, arrayUnion, arrayRemove, serverTimestamp, Timestamp } from 'firebase/firestore';
 
@@ -113,4 +114,45 @@ test('records and household docs have shape limits', async () => {
   await assertSucceeds(setDoc(doc(db, 'households', V, 'records', 'gone'), { kind: 'items', id: 'gone', data: null, deleted: true, ts: 2, by: V }));
   await assertFails(updateDoc(doc(db, 'households', V), { junk: 'x'.repeat(200 * 1024) }));
   await assertSucceeds(updateDoc(doc(db, 'households', V), { members: [V] }));
+});
+
+// ---- v1.9.4 account deletion (src/account-delete.js with the real Firestore SDK) ----
+import * as fsmod from 'firebase/firestore';
+import { deleteAccountData } from '../../src/account-delete.js';
+const adminGet = async (path) => { let snap; await env.withSecurityRulesDisabled(async (ctx) => { snap = await getDoc(doc(ctx.firestore(), ...path)); }); return snap; };
+const exists = async (path) => (await adminGet(path)).exists();
+
+test('account deletion: sole member deletes records, invites, household and user doc', async () => {
+  const r = await deleteAccountData(fsmod, as(V), V, V);
+  assert.equal(r.deletedHousehold, true); assert.equal(r.deletedDocs, 3);
+  for (const p of [['households', V], ['households', V, 'records', 'r1'], ['households', V, 'invites', 'goodcode1'], ['users', V]]) assert.equal(await exists(p), false, p.join('/'));
+});
+test('account deletion: owner with another member hands the household over; data stays for them', async () => {
+  await assertSucceeds(updateDoc(doc(as(M), 'households', V), { members: arrayUnion(M), lastJoinCode: 'goodcode1' }));
+  const r = await deleteAccountData(fsmod, as(V), V, V);
+  assert.equal(r.handedOverTo, M);
+  const h = (await adminGet(['households', V])).data();
+  assert.equal(h.ownerUid, M); assert.deepEqual(h.members, [M]);
+  await assertSucceeds(getDoc(doc(as(M), 'households', V, 'records', 'r1')));
+  await assertFails(getDoc(doc(as(V), 'households', V, 'records', 'r1')));
+  assert.equal(await exists(['users', V]), false);
+});
+test('account deletion: a member of someone else\'s household leaves it, then deletes their own', async () => {
+  await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), 'households', M), { ownerUid: M, members: [M] }));
+  await assertSucceeds(updateDoc(doc(as(M), 'households', V), { members: arrayUnion(M), lastJoinCode: 'goodcode1' }));
+  const r = await deleteAccountData(fsmod, as(M), M, V);
+  assert.equal(r.leftHousehold, true); assert.equal(r.deletedHousehold, true);
+  const h = (await adminGet(['households', V])).data();
+  assert.deepEqual(h.members, [V]); assert.equal(h.ownerUid, V);
+});
+test('handover rule cannot be abused', async () => {
+  await assertSucceeds(updateDoc(doc(as(M), 'households', V), { members: arrayUnion(M), lastJoinCode: 'goodcode1' }));
+  // a non-owner member cannot take or give ownership
+  await assertFails(updateDoc(doc(as(M), 'households', V), { ownerUid: M, members: [M] }));
+  // an outsider cannot
+  await assertFails(updateDoc(doc(as(A), 'households', V), { ownerUid: A, members: [M] }));
+  // the owner cannot hand over to a non-member, nor stay in while handing over, nor drop others at the same time
+  await assertFails(updateDoc(doc(as(V), 'households', V), { ownerUid: A, members: [M] }));
+  await assertFails(updateDoc(doc(as(V), 'households', V), { ownerUid: M, members: [V, M] }));
+  await assertFails(updateDoc(doc(as(V), 'households', V), { ownerUid: M, members: [] }));
 });

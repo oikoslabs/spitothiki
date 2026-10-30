@@ -1,8 +1,9 @@
 // Import a utility bill from a PDF (or photo): text via pdf.js (lazy, SW-cached), OCR fallback via Tesseract.js.
 import { guessBillType, parseBillCode, validRf } from './bills.js';
 
-export const PDFJS_URL = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.4.299/build/pdf.min.mjs';
-export const PDFJS_WORKER_URL = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.4.299/build/pdf.worker.min.mjs';
+// v1.9.4: self-hosted pdf.js 6.4.299 (vendor/, fingerprints in vendor/SHA256SUMS).
+export const PDFJS_URL = new URL('../vendor/pdfjs-6.4.299/pdf.min.mjs', import.meta.url).href;
+export const PDFJS_WORKER_URL = new URL('../vendor/pdfjs-6.4.299/pdf.worker.min.mjs', import.meta.url).href;
 
 export const PROVIDERS = [
   { name: 'ΔΕΗ', type: 'electricity', re: /\bΔΕΗ\b|\bDEI\b|ΔΗΜΟΣΙΑ ΕΠΙΧΕΙΡΗΣΗ ΗΛΕΚΤΡΙΣΜΟΥ|\bPPC\b|MYDEI|DEI\.GR/ },

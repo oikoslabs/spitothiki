@@ -23,9 +23,9 @@ async function device(name) {
     const u = request.url();
     const js = (body) => request.respond({ status: 200, contentType: 'text/javascript', headers: { 'access-control-allow-origin': '*' }, body });
     if (u.endsWith('/src/firebase-config.js')) return js(CONFIG);
-    if (u.includes('gstatic.com/firebasejs/') && u.endsWith('firebase-app.js')) return js(fakeApp);
-    if (u.includes('gstatic.com/firebasejs/') && u.endsWith('firebase-auth.js')) return js(fakeAuth);
-    if (u.includes('gstatic.com/firebasejs/') && u.endsWith('firebase-firestore.js')) return js(fakeFirestore);
+    if (/gstatic\.com\/firebasejs\/|\/vendor\/firebase-/.test(u) && u.endsWith('firebase-app.js')) return js(fakeApp);
+    if (/gstatic\.com\/firebasejs\/|\/vendor\/firebase-/.test(u) && u.endsWith('firebase-auth.js')) return js(fakeAuth);
+    if (/gstatic\.com\/firebasejs\/|\/vendor\/firebase-/.test(u) && u.endsWith('firebase-firestore.js')) return js(fakeFirestore);
     return request.continue();
   });
   await page.goto(`${url}#settings`, { waitUntil: 'networkidle0' });

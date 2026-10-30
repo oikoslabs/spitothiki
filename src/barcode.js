@@ -1,6 +1,7 @@
 import { interpretCode } from './gs1.js';
 // Barcode scanning (camera) and product lookup through the Open Food Facts API.
-const ZXING_URL = 'https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/umd/zxing-browser.min.js';
+// v1.9.4: self-hosted (same bytes as the CDN file; SRI kept). Fingerprints in vendor/SHA256SUMS.
+const ZXING_URL = new URL('../vendor/zxing-browser-0.1.5/zxing-browser.min.js', import.meta.url).href;
 const ZXING_SRI = 'sha384-ylLhng89kD62+PVK1cjm4rAYg69zDlGrbbSfAE2Eb8Xqf8RoAQCMcRoUXZh7pAPC';
 const OFF_FIELDS = 'product_name,product_name_el,generic_name_el,brands,categories_tags,quantity';
 

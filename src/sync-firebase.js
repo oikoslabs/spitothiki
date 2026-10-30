@@ -1,7 +1,9 @@
 // Firebase adapter for the sync engine. Loaded only when firebase-config.js has a config.
 import { SyncEngine } from './sync-core.js';
+import { deleteAccountData, recentLogin } from './account-delete.js';
 
-const SDK = 'https://www.gstatic.com/firebasejs/13.0.0';
+// v1.9.4: self-hosted Firebase JS SDK 13.0.0 (vendor/, imports rewritten to relative paths).
+const SDK = new URL('../vendor/firebase-13.0.0', import.meta.url).href;
 const META_KEY = 'spitothiki:sync';
 
 export async function createFirebaseSync({ config, getState, setState, onStatus, onNewHousehold }) {
@@ -118,6 +120,18 @@ export async function createFirebaseSync({ config, getState, setState, onStatus,
       await fs.updateDoc(fs.doc(db, 'households', hid), { members: fs.arrayUnion(user.uid), lastJoinCode: code });
       await fs.setDoc(fs.doc(db, 'users', user.uid), { householdId: hid }, { merge: true });
       connect(hid);
+    },
+    // v1.9.4: delete the account (Firestore data as the rules allow, then the Firebase Auth user).
+    async deleteAccount() {
+      const current = authApi.currentUser;
+      if (!current) throw new Error('Συνδέσου πρώτα.');
+      if (!recentLogin(current.metadata?.lastSignInTime)) { const e = new Error('auth/requires-recent-login'); e.code = 'auth/requires-recent-login'; throw e; }
+      engine?.stop(); engine = null; stopMembers?.(); stopMembers = null;
+      const result = await deleteAccountData(fs, db, current.uid, householdId);
+      await auth.deleteUser(current);
+      try { localStorage.removeItem(META_KEY); } catch {}
+      try { await fs.terminate(db); await fs.clearIndexedDbPersistence(db); } catch {}
+      return result;
     },
     async leaveHousehold() {
       if (!user || !householdId || householdId === user.uid) return;

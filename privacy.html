@@ -23,7 +23,7 @@
 <a class="back" href="./">← Σπιτοθήκη</a>
 <article class="card" lang="el" id="el">
 <h1>Πολιτική απορρήτου</h1>
-<p class="muted">Σπιτοθήκη · https://spitothiki.web.app · Τελευταία ενημέρωση: 28 Οκτωβρίου 2026</p>
+<p class="muted">Σπιτοθήκη · https://spitothiki.web.app · Τελευταία ενημέρωση: 30 Οκτωβρίου 2026</p>
 <p>Η Σπιτοθήκη είναι μια δωρεάν εφαρμογή για το απόθεμα, τις αγορές και τα έξοδα του σπιτιού. Δεν έχει διαφημίσεις, δεν πουλάμε δεδομένα και δεν χρησιμοποιούμε cookies παρακολούθησης. Παρακάτω περιγράφουμε απλά τι γίνεται με τα δεδομένα σου.</p>
 
 <h2>Στη συσκευή σου</h2>
@@ -37,6 +37,12 @@
 
 <h2>Barcode</h2>
 <p>Όταν σκανάρεις barcode, στέλνεται μόνο ο αριθμός του barcode στο <a href="https://world.openfoodfacts.org/" rel="noopener">Open Food Facts</a> για να βρεθεί το όνομα του προϊόντος.</p>
+
+<h2>Συνταγές</h2>
+<p>Οι βασικές συνταγές είναι μέσα στην εφαρμογή. Αν ψάξεις νέα συνταγή, στέλνεται μόνο η λέξη αναζήτησης στο <a href="https://www.themealdb.com/" rel="noopener">TheMealDB</a>, και οι φωτογραφίες των συνταγών φορτώνουν από εκεί.</p>
+
+<h2>Άλλες υπηρεσίες</h2>
+<p>Όλα τα αρχεία της εφαρμογής (και οι βιβλιοθήκες για σάρωση, PDF και ανάγνωση φωτογραφιών) φορτώνουν από τον δικό μας χώρο (Firebase Hosting, Google). Η σύνδεση με Google και το αντίγραφο στο Drive χρησιμοποιούν τις σελίδες της Google (accounts.google.com, apis.google.com). Το «Δες στο posokanei.gov.gr» απλώς ανοίγει την επίσημη σελίδα.</p>
 
 <h2>Ειδοποιήσεις</h2>
 <p>Αν ενεργοποιήσεις ειδοποιήσεις με κλειστή εφαρμογή, ο διακομιστής μας (Cloudflare) κρατά μόνο τη διεύθυνση ειδοποιήσεων που δίνει ο browser σου και τις ημερομηνίες υπενθύμισης, όχι ονόματα, ποσά ή προϊόντα. Διαγράφονται όταν απενεργοποιήσεις τις ειδοποιήσεις, και αλλιώς λήγουν αυτόματα μετά από 70 μέρες χωρίς ενημέρωση.</p>
@@ -54,7 +60,8 @@
 <ul>
 <li><strong>Ρυθμίσεις › Για προχωρημένους › Διαγραφή όλων</strong>: σβήνει απόθεμα, λίστες και έξοδα από τη συσκευή. Αν είσαι συνδεδεμένος, σβήνονται και από τον συγχρονισμό (Firestore).</li>
 <li><strong>Αποχώρηση από το κοινό σπίτι</strong> ή <strong>Αποσύνδεση</strong> από τις Ρυθμίσεις, όποτε θέλεις.</li>
-<li>Για να διαγραφεί εντελώς και ο λογαριασμός σύνδεσης (το email σου στο Firebase), στείλε αίτημα στο <a href="mailto:oikoslabs.apps@gmail.com">oikoslabs.apps@gmail.com</a>.</li>
+<li><strong>Ρυθμίσεις › Συγχρονισμός συσκευών › Διαγραφή λογαριασμού</strong>: σβήνει οριστικά τον λογαριασμό σύνδεσης (το email σου στο Firebase) και τα δεδομένα σου στον συγχρονισμό. Αν μένεις μόνος στο σπίτι σου, σβήνονται όλα του. Αν έχουν μπει κι άλλα μέλη, το σπίτι και τα κοινά δεδομένα περνούν στο επόμενο μέλος. Σβήνονται και τα δεδομένα της συσκευής.</li>
+<li>Εναλλακτικά, στείλε αίτημα διαγραφής στο <a href="mailto:oikoslabs.apps@gmail.com">oikoslabs.apps@gmail.com</a>, από το email με το οποίο συνδέεσαι.</li>
 </ul>
 
 <h2>Πώς φτιάχτηκε</h2>
@@ -69,17 +76,19 @@
 
 <article class="card" lang="en" id="en">
 <h1>Privacy policy (English)</h1>
-<p class="muted">Spitothiki · https://spitothiki.web.app · Last updated: 28 October 2026</p>
+<p class="muted">Spitothiki · https://spitothiki.web.app · Last updated: 30 October 2026</p>
 <p>Spitothiki is a free household app for pantry, shopping and expenses. No ads, no selling of data, no tracking cookies.</p>
 <ul>
 <li><strong>On your device:</strong> your data stays on your device unless you sign in. Photos and PDFs are read on the device and are not uploaded.</li>
 <li><strong>If you sign in:</strong> Firebase Authentication (Google) keeps your email (and name with Google sign-in); your data syncs to Firebase Firestore and only members of your household can access it.</li>
 <li><strong>Receipt QR codes:</strong> the receipt link passes through our small Cloudflare Worker only to be read. We do not keep items, amounts or your IP address, only an anonymous count (e.g. “supermarket, success”).</li>
 <li><strong>Barcodes:</strong> only the barcode number is sent to Open Food Facts.</li>
+<li><strong>Recipes:</strong> the basic recipes are built in; if you search for a new recipe, only the search word is sent to <a href="https://www.themealdb.com/" rel="noopener">TheMealDB</a>, and recipe photos load from there.</li>
+<li><strong>Other services:</strong> all app files, including the scanning, PDF and OCR libraries, load from our own hosting (Firebase Hosting, Google). Google sign-in and the Drive backup use Google's pages (accounts.google.com, apis.google.com).</li>
 <li><strong>Notifications:</strong> our Cloudflare server keeps only your browser's push address and the reminder dates, no names, amounts or products. Removed when you turn notifications off, otherwise they expire after 70 days.</li>
 <li><strong>Google Drive backup:</strong> uses only the <code>drive.appdata</code> scope, a hidden app folder in your own Drive; the app cannot see your other files. You can disconnect in Settings and revoke access at <a href="https://myaccount.google.com/permissions" rel="noopener">myaccount.google.com/permissions</a>.</li>
 <li><strong>Anonymous statistics:</strong> cookieless Cloudflare Web Analytics, and an anonymous count of where visitors came from (one word, no personal data).</li>
-<li><strong>Deleting your data:</strong> Settings › Advanced › Delete all (also removes synced data if you are signed in). To delete your sign-in account entirely, email <a href="mailto:oikoslabs.apps@gmail.com">oikoslabs.apps@gmail.com</a>.</li>
+<li><strong>Deleting your data:</strong> Settings › Advanced › Delete all (also removes synced data if you are signed in). To delete your account: Settings › Device sync › Delete account (deletes your sign-in account and your synced data; if others share your home, it passes to the next member). Or email <a href="mailto:oikoslabs.apps@gmail.com">oikoslabs.apps@gmail.com</a>.</li>
 <li><strong>Contact:</strong> <a href="mailto:oikoslabs.apps@gmail.com">oikoslabs.apps@gmail.com</a>, for questions or account-deletion requests (please write from the email you sign in with).</li>
 </ul>
 </article>

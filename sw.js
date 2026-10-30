@@ -2,9 +2,9 @@
 // Strategy: network-first for everything from this site (HTML, JS, CSS, manifest), so a new
 // deploy shows up on the next load; the cache is only used when the network is unavailable.
 // Bump CACHE_VERSION when the list of shell files changes; old caches are deleted on activate.
-const CACHE_VERSION = 'v100';
+const CACHE_VERSION = 'v101';
 const CACHE = `spitothiki-${CACHE_VERSION}`;
-const OCR_CACHE = 'spitothiki-ocr';
+const OCR_CACHE = 'spitothiki-vendor'; // v1.9.4: was spitothiki-ocr (CDN copies), deleted on activate
 const SHARE_CACHE = 'spitothiki-share'; // a file shared to the app (Web Share Target), picked up by the page // Tesseract.js script/worker/core/language files, kept across versions
 const DATA_CACHE = 'spitothiki-data'; // written by the app: expiry snapshot for background checks
 // v1.8.9: Google Play app (TWA): /.well-known/assetlinks.json, source word 'play' (cache bumped).
@@ -19,7 +19,7 @@ const DATA_CACHE = 'spitothiki-data'; // written by the app: expiry snapshot for
 const SHORT_PATH = /^\/(tiktok|facebook|instagram|telegram|viber|reddit|pinterest|sofisstore|play)\/?$/i;
 const SHELL = [
   './', './index.html', './privacy.html', './styles.css', './manifest.webmanifest',
-  './src/app.js', './src/format.js', './src/theme.js', './src/i18n.js', './src/features.js', './src/recipes.js', './src/receipt.js', './src/receipt-photo.js', './src/mealplan.js', './src/diet-plan.js', './src/receipts.js', './src/diet-ui.js', './src/diet-i18n.js', './src/bills.js', './src/transport.js', './src/extras.js', './src/chores.js', './src/bar.js', './src/bill-pdf.js', './src/prefs.js', './src/scan-router.js', './src/onboarding.js', './src/cart.js', './src/shelf-price.js', './src/push.js', './src/auto-list.js', './src/price-compare.js', './src/recipe-data.js', './src/gs1.js', './src/back-to-top.js', './src/backup-crypto.js', './src/gdrive.js', './src/gdrive-auth.js', './src/drive-key.js', './src/receipt-edit.js', './src/manual-expense.js', './src/receipt-domains.js', './src/expense-cats.js', './src/whopaid.js', './src/offline.js', './src/protect.js', './src/domain.js', './src/storage.js', './src/barcode.js', './src/toll-barcode.js', './src/firebase-config.js', './src/sync-core.js', './src/sync-firebase.js', './src/source.js',
+  './src/app.js', './src/format.js', './src/theme.js', './src/i18n.js', './src/features.js', './src/recipes.js', './src/receipt.js', './src/receipt-photo.js', './src/mealplan.js', './src/diet-plan.js', './src/receipts.js', './src/diet-ui.js', './src/diet-i18n.js', './src/bills.js', './src/transport.js', './src/extras.js', './src/chores.js', './src/bar.js', './src/bill-pdf.js', './src/prefs.js', './src/scan-router.js', './src/onboarding.js', './src/cart.js', './src/shelf-price.js', './src/push.js', './src/auto-list.js', './src/price-compare.js', './src/recipe-data.js', './src/gs1.js', './src/back-to-top.js', './src/backup-crypto.js', './src/gdrive.js', './src/gdrive-auth.js', './src/drive-key.js', './src/receipt-edit.js', './src/manual-expense.js', './src/receipt-domains.js', './src/expense-cats.js', './src/whopaid.js', './src/offline.js', './src/protect.js', './src/domain.js', './src/storage.js', './src/barcode.js', './src/toll-barcode.js', './src/firebase-config.js', './src/sync-core.js', './src/sync-firebase.js', './src/source.js', './src/account-delete.js',
   './fonts/commissioner-greek.woff2', './fonts/commissioner-latin.woff2', './fonts/commissioner-latin-ext.woff2', './icons/icon-192.png', './icons/icon-512.png', './icons/icon.svg'
 ];
 
@@ -51,8 +51,9 @@ self.addEventListener('fetch', (event) => {
     })());
     return;
   }
-  // OCR engine files are versioned on the CDN: cache-first, so photo import works offline after first use.
-  if (request.method === 'GET' && url.hostname === 'cdn.jsdelivr.net' && /tesseract|pdfjs-dist/.test(url.pathname)) {
+  // v1.9.4: self-hosted libraries under /vendor/<name>-<version>/ never change: cache-first, on demand
+  // (not precached; Tesseract core + language data are ~8 MB and only load when OCR is used).
+  if (request.method === 'GET' && url.origin === self.location.origin && url.pathname.startsWith('/vendor/')) {
     event.respondWith(caches.open(OCR_CACHE).then(async (cache) => {
       const hit = await cache.match(request);
       if (hit) return hit;
