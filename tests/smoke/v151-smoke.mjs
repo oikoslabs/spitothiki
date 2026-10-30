@@ -20,9 +20,9 @@ async function device(seed = {}) {
     const u = request.url();
     const js = (body) => request.respond({ status: 200, contentType: 'text/javascript', headers: { 'access-control-allow-origin': '*' }, body });
     if (u.endsWith('/src/firebase-config.js')) return js(CONFIG);
-    if (u.includes('gstatic.com/firebasejs/') && u.endsWith('firebase-app.js')) return js(fakeApp);
-    if (u.includes('gstatic.com/firebasejs/') && u.endsWith('firebase-auth.js')) return js(fakeAuth);
-    if (u.includes('gstatic.com/firebasejs/') && u.endsWith('firebase-firestore.js')) return js(fakeFirestore);
+    if (/gstatic\.com\/firebasejs\/|\/vendor\/firebase-/.test(u) && u.endsWith('firebase-app.js')) return js(fakeApp);
+    if (/gstatic\.com\/firebasejs\/|\/vendor\/firebase-/.test(u) && u.endsWith('firebase-auth.js')) return js(fakeAuth);
+    if (/gstatic\.com\/firebasejs\/|\/vendor\/firebase-/.test(u) && u.endsWith('firebase-firestore.js')) return js(fakeFirestore);
     return request.continue();
   });
   pg.on('pageerror', (e) => errors.push(e.message));

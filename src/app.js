@@ -31,6 +31,7 @@ import { CHORE_SUGGESTIONS, choreDates, choreMembers, choreStatus, choreNotice, 
 import { decryptBackup, decryptWithKey, deriveDeviceKey, encryptBackup, encryptWithKey, readBackup } from './backup-crypto.js';
 import { DRIVE_AUTO_KEY, DRIVE_ENABLED_KEY, DRIVE_HASH_KEY, DRIVE_LAST_KEY, autoBackupDue, createDriveClient, stateHash } from './gdrive.js';
 import { forgetToken, getDriveToken } from './gdrive-auth.js';
+import { confirmWordOk } from './account-delete.js';
 import { clearDriveKey, loadDriveKey, saveDriveKey } from './drive-key.js';
 import { applyReceiptEdit } from './receipt-edit.js';
 import { addManualExpense, createManualExpense, guessManualCategory, manualCategory, needsAmount } from './manual-expense.js';
@@ -604,7 +605,7 @@ function renderShopping() {
 
 function renderSettings() {
   return `${renderHeader('Ρυθμίσεις', 'Διαχείριση και αντίγραφο ασφαλείας των δεδομένων σου.')}${storageBadge()}
-    <div class="settings-grid"><section class="panel settings-card" id="privacy"><span class="stat-icon">🔒</span><h2>Απόρρητο πρώτα</h2><p>Τα δεδομένα σου μένουν στη συσκευή σου και η εφαρμογή δουλεύει και χωρίς internet. Δεν υπάρχουν διαφημίσεις.</p><details class="privacy-details" id="privacy-details"><summary>Τι ακριβώς αποθηκεύεται και πού</summary><ul class="privacy-list"><li>Στη συσκευή σου: απόθεμα, λίστες, έξοδα, λογαριασμοί, μετακινήσεις, πρόγραμμα διατροφής και ρυθμίσεις. Δεν φεύγουν από εκεί αν δεν συνδεθείς.</li><li>Αν συνδεθείς: τα ίδια δεδομένα συγχρονίζονται στο Firebase (Google) και τα βλέπουν μόνο τα μέλη του νοικοκυριού σου. Μπορείς να αποσυνδεθείς ή να τα διαγράψεις όποτε θες.</li><li>Αποδείξεις με QR: ο σύνδεσμος της απόδειξης περνά από έναν μικρό διακομιστή μας (Cloudflare) μόνο για να διαβαστεί. Δεν κρατάμε τα είδη, τα ποσά ή τη διεύθυνση IP σου, μόνο ανώνυμη μέτρηση (π.χ. «σούπερ μάρκετ, επιτυχία»).</li><li>Φωτογραφίες και PDF (αποδείξεις, λογαριασμοί, πρόγραμμα διατροφής) διαβάζονται μέσα στο κινητό σου και δεν ανεβαίνουν πουθενά.</li><li>Barcode: στέλνεται μόνο ο αριθμός στο Open Food Facts. Οι συνταγές είναι μέσα στην εφαρμογή και δουλεύουν χωρίς internet. Ειδοποιήσεις με κλειστή εφαρμογή: ο διακομιστής μας (Cloudflare) κρατά μόνο τις ημερομηνίες υπενθύμισης, όχι ονόματα, ποσά ή προϊόντα.</li><li>Δεν υπάρχουν διαφημίσεις ούτε cookies παρακολούθησης. Χρησιμοποιούμε μόνο το ανώνυμο Cloudflare Web Analytics (χωρίς cookies) για να ξέρουμε πόσοι μπαίνουν και αν η εφαρμογή είναι γρήγορη.</li><li>Μετράμε ανώνυμα από ποια σελίδα ήρθες (π.χ. TikTok, Facebook), μόνο ως συνολικό αριθμό. Χωρίς προσωπικά στοιχεία και χωρίς να δίνουμε τίποτα σε τρίτους.</li><li>Η εφαρμογή φτιάχνεται από έναν άνθρωπο με τη βοήθεια AI. Εγώ αποφασίζω τι κάνει, τη δοκιμάζω καθημερινά και διορθώνω ό,τι βρεθεί. Η πρόσβαση στα δεδομένα ελέγχεται από κανόνες ασφαλείας και ο καθένας βλέπει μόνο τα δικά του.</li></ul></details><p class="privacy-policy-link" id="privacy-policy-link"><a href="./privacy.html" target="_blank" rel="noopener">Πλήρης πολιτική απορρήτου</a> · <a href="mailto:oikoslabs.apps@gmail.com" data-no-i18n>oikoslabs.apps@gmail.com</a></p><div class="privacy-note">Αν δεν έχεις συνδεθεί και καθαρίσεις τα δεδομένα του browser ή αλλάξεις συσκευή, χρησιμοποίησε αντίγραφο ασφαλείας.</div></section>
+    <div class="settings-grid"><section class="panel settings-card" id="privacy"><span class="stat-icon">🔒</span><h2>Απόρρητο πρώτα</h2><p>Τα δεδομένα σου μένουν στη συσκευή σου και η εφαρμογή δουλεύει και χωρίς internet. Δεν υπάρχουν διαφημίσεις.</p><details class="privacy-details" id="privacy-details"><summary>Τι ακριβώς αποθηκεύεται και πού</summary><ul class="privacy-list"><li>Στη συσκευή σου: απόθεμα, λίστες, έξοδα, λογαριασμοί, μετακινήσεις, πρόγραμμα διατροφής και ρυθμίσεις. Δεν φεύγουν από εκεί αν δεν συνδεθείς.</li><li>Αν συνδεθείς: τα ίδια δεδομένα συγχρονίζονται στο Firebase (Google) και τα βλέπουν μόνο τα μέλη του νοικοκυριού σου. Μπορείς να αποσυνδεθείς ή να τα διαγράψεις όποτε θες.</li><li>Αποδείξεις με QR: ο σύνδεσμος της απόδειξης περνά από έναν μικρό διακομιστή μας (Cloudflare) μόνο για να διαβαστεί. Δεν κρατάμε τα είδη, τα ποσά ή τη διεύθυνση IP σου, μόνο ανώνυμη μέτρηση (π.χ. «σούπερ μάρκετ, επιτυχία»).</li><li>Φωτογραφίες και PDF (αποδείξεις, λογαριασμοί, πρόγραμμα διατροφής) διαβάζονται μέσα στο κινητό σου και δεν ανεβαίνουν πουθενά.</li><li>Barcode: στέλνεται μόνο ο αριθμός στο Open Food Facts. Οι βασικές συνταγές είναι μέσα στην εφαρμογή. Αν ψάξεις νέα συνταγή, στέλνεται μόνο η λέξη αναζήτησης στο TheMealDB. Ειδοποιήσεις με κλειστή εφαρμογή: ο διακομιστής μας (Cloudflare) κρατά μόνο τις ημερομηνίες υπενθύμισης, όχι ονόματα, ποσά ή προϊόντα.</li><li>Δεν υπάρχουν διαφημίσεις ούτε cookies παρακολούθησης. Χρησιμοποιούμε μόνο το ανώνυμο Cloudflare Web Analytics (χωρίς cookies) για να ξέρουμε πόσοι μπαίνουν και αν η εφαρμογή είναι γρήγορη.</li><li>Μετράμε ανώνυμα από ποια σελίδα ήρθες (π.χ. TikTok, Facebook), μόνο ως συνολικό αριθμό. Χωρίς προσωπικά στοιχεία και χωρίς να δίνουμε τίποτα σε τρίτους.</li><li>Η εφαρμογή φτιάχνεται από έναν άνθρωπο με τη βοήθεια AI. Εγώ αποφασίζω τι κάνει, τη δοκιμάζω καθημερινά και διορθώνω ό,τι βρεθεί. Η πρόσβαση στα δεδομένα ελέγχεται από κανόνες ασφαλείας και ο καθένας βλέπει μόνο τα δικά του.</li></ul></details><p class="privacy-policy-link" id="privacy-policy-link"><a href="./privacy.html" target="_blank" rel="noopener">Πλήρης πολιτική απορρήτου</a> · <a href="mailto:oikoslabs.apps@gmail.com" data-no-i18n>oikoslabs.apps@gmail.com</a></p><div class="privacy-note">Αν δεν έχεις συνδεθεί και καθαρίσεις τα δεδομένα του browser ή αλλάξεις συσκευή, χρησιμοποίησε αντίγραφο ασφαλείας.</div></section>
     <section class="panel settings-card"><span class="stat-icon">◐</span><h2>Εμφάνιση</h2><p>Θέμα, μέγεθος γραμμάτων και αντίθεση. Ισχύουν σε όλη την εφαρμογή, σε αυτή τη συσκευή.</p><div class="theme-options" role="group" aria-label="Θέμα">${[['auto', 'Αυτόματο'], ['light', 'Φωτεινό'], ['dark', 'Σκούρο']].map(([value, label]) => `<button type="button" class="filter-chip ${currentTheme() === value ? 'is-active' : ''}" data-action="set-theme" data-theme="${value}" aria-pressed="${currentTheme() === value}">${label}</button>`).join('')}</div>
       <h3 class="settings-sub" id="text-size-label">Μέγεθος γραμμάτων</h3><div class="theme-options size-options" role="group" aria-labelledby="text-size-label">${[['normal', 'Κανονικά'], ['large', 'Μεγάλα'], ['xlarge', 'Πολύ μεγάλα']].map(([value, label]) => `<button type="button" class="filter-chip ${textSize() === value ? 'is-active' : ''}" data-action="set-text-size" data-size="${value}" aria-pressed="${textSize() === value}">${label}</button>`).join('')}</div>
       <label class="check-row"><input type="checkbox" id="high-contrast" ${highContrast() ? 'checked' : ''}> <span>Υψηλή αντίθεση (πιο έντονα γράμματα και περιγράμματα)</span></label></section>
@@ -775,8 +776,32 @@ function renderSyncCard() {
         <li>Τώρα βλέπετε και οι δύο τα ίδια. Μπορείς από το δικό σου κινητό να του βάζεις λογαριασμούς, λίστα αγορών και ημερομηνίες λήξης, κι εκείνος τα βλέπει αμέσως.</li>
       </ol>
       <p class="field-hint">Όσο είσαι μέσα στο σπίτι του, βλέπεις τα δικά του δεδομένα. Για να γυρίσεις στα δικά σου, πάτα «Αποχώρηση από το κοινό σπίτι».</p>
+    </details>
+    <details class="relative-help account-delete" id="account-delete"><summary>Διαγραφή λογαριασμού</summary>
+      <p>Σβήνει οριστικά τον λογαριασμό σου (email και σύνδεση) και τα δεδομένα σου στον συγχρονισμό. Αν μένεις μόνος στο σπίτι σου, σβήνονται όλα του. Αν έχουν μπει κι άλλοι, το σπίτι και τα κοινά δεδομένα περνούν στο επόμενο μέλος. Σβήνονται και τα δεδομένα αυτής της συσκευής. Δεν αναιρείται.</p>
+      <form id="account-delete-form" class="sync-join-form" novalidate><label class="field-label" for="account-delete-word">Για επιβεβαίωση, γράψε ΔΙΑΓΡΑΦΗ</label><input class="field-input" id="account-delete-word" name="word" autocomplete="off" autocapitalize="characters" placeholder="ΔΙΑΓΡΑΦΗ"><button class="button button-danger" type="submit">Διαγραφή λογαριασμού</button></form>
     </details></section>`;
 }
+
+// v1.9.4: delete the account, then everything on this device, then reload.
+async function deleteAccountNow() {
+  showToast('Διαγραφή λογαριασμού…');
+  try { await sync.deleteAccount(); }
+  catch (error) {
+    if (error?.code === 'auth/requires-recent-login') {
+      try { await sync.signOut(); } catch {}
+      showConfirm('Για την ασφάλειά σου, συνδέσου ξανά και μετά πάτα πάλι «Διαγραφή λογαριασμού».', null, 'Χρειάζεται νέα σύνδεση');
+      return;
+    }
+    showToast(authMessage(error)); return;
+  }
+  try { stopPush(); } catch {}
+  try { forgetToken(); } catch {}
+  try { Object.keys(localStorage).filter((k) => k.startsWith('spitothiki')).forEach((k) => localStorage.removeItem(k)); } catch {}
+  try { sessionStorage.setItem('spitothiki:account-deleted', '1'); } catch {}
+  location.reload();
+}
+try { if (sessionStorage.getItem('spitothiki:account-deleted')) { sessionStorage.removeItem('spitothiki:account-deleted'); setTimeout(() => showToast('Ο λογαριασμός σου και τα δεδομένα σου διαγράφηκαν.'), 800); } } catch {}
 
 async function syncAction(fn, success) {
   try { const result = await fn(); if (success) showToast(typeof success === 'function' ? success(result) : success); }
@@ -3547,6 +3572,13 @@ document.addEventListener('submit', (event) => {
     if (mode === 'reset') { syncAction(() => sync.resetPassword(email), 'Σου στείλαμε email για νέο κωδικό.'); return; }
     if (password.length < 6) { showToast('Ο κωδικός θέλει τουλάχιστον 6 χαρακτήρες.'); return; }
     syncAction(() => mode === 'signup' ? sync.signUpWithEmail(email, password) : sync.signInWithEmail(email, password));
+    return;
+  }
+  if (event.target.id === 'account-delete-form') { // v1.9.4: typed word + a second confirm
+    event.preventDefault();
+    if (!syncStatus.user || !sync) { showToast('Συνδέσου πρώτα.'); return; }
+    if (!confirmWordOk(event.target.elements.word.value)) { showToast('Γράψε ΔΙΑΓΡΑΦΗ για να συνεχίσεις.'); return; }
+    showConfirm('Τελευταία ερώτηση: να διαγραφεί οριστικά ο λογαριασμός σου και τα δεδομένα σου; Δεν αναιρείται.', () => deleteAccountNow(), 'Διαγραφή λογαριασμού;');
     return;
   }
   if (event.target.id === 'sync-join-form') {

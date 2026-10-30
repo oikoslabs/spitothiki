@@ -1,7 +1,10 @@
 // Receipt photo import: OCR (Tesseract.js, loaded lazily from a CDN and cached by the SW) + a text parser for Greek till receipts.
 import { makeLine } from './receipt.js';
 
-export const TESSERACT_URL = 'https://cdn.jsdelivr.net/npm/tesseract.js@7.0.0/dist/tesseract.esm.min.js';
+// v1.9.4: self-hosted Tesseract.js 7.0.0 + core + ell/eng data (vendor/), loaded only when OCR is used.
+const TESS = new URL('../vendor/tesseract-7.0.0/', import.meta.url).href;
+export const TESSERACT_URL = `${TESS}tesseract.esm.min.js`;
+export const TESSERACT_PATHS = { workerPath: `${TESS}worker.min.js`, corePath: `${TESS}core`, langPath: `${TESS}lang`, workerBlobURL: false };
 const VAT_RATES = new Set([4, 6, 9, 13, 17, 24]);
 const NOT_ITEM = /ΣΥΝΟΛ|ΦΠΑ|Φ\.Π\.Α|ΑΞΙΑ|ΜΕΤΡΗΤ|ΕΚΠΤΩΣ|ΠΛΗΘΟΣ|ΠΟΣΟΤ|ΑΦΜ|Α\.Φ\.Μ|ΤΗΛ|ΡΕΣΤΑ|ΚΑΡΤΑ|ΠΛΗΡΩΤ|ΤΙΜΗ|ΕΙΔΗ|TOTAL|CASH|VISA|ΑΡ\.|ΗΜΕΡΟΜ|ΩΡΑ/;
 const NOT_STORE = /ΑΠΟΔΕΙΞ|ΑΦΜ|Α\.Φ\.Μ|ΔΟΥ|Δ\.Ο\.Υ|Φ\.?Α\.?Ε|ΤΗΛ|ΑΡ\.|ΗΜΕΡΟΜ|ΠΑΡΑΣΤΑΤ|ΤΙΜΟΛΟΓ|ΕΙΔΗ|^EST|NUTS/;
@@ -105,7 +108,7 @@ export async function getWorker(onProgress) {
     workerPromise = (async () => {
       const Tesseract = await import(TESSERACT_URL);
       const createWorker = Tesseract.createWorker || Tesseract.default?.createWorker;
-      return createWorker(['ell', 'eng'], 1, { logger: (m) => onProgress?.(m) });
+      return createWorker(['ell', 'eng'], 1, { ...TESSERACT_PATHS, logger: (m) => onProgress?.(m) });
     })().catch((error) => { workerPromise = null; throw error; });
   }
   return workerPromise;

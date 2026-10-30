@@ -1,0 +1,13 @@
+31144da41d5d92127eb9d46c514c2da16117a50ec4d016b986973c1af4d459cf  ./firebase-13.0.0/firebase-app.js
+4efb4436232a15e04a2f876628b872140a837f7167af8660fbf94d5247f480d1  ./firebase-13.0.0/firebase-auth.js
+b57e6a7d7a85d5a5af3c59f013b68c09dc0d060dd2c88184b4f18ac7df0ce90a  ./firebase-13.0.0/firebase-firestore.js
+57456c8e0c81e46be31174b499ef77f2b9f5ee46d04412ba627320a36755d4c2  ./pdfjs-6.4.299/pdf.min.mjs
+9536359f1b8367850d485731ca1d5e45c159a7b7a0912325e539937aa21ceb18  ./pdfjs-6.4.299/pdf.worker.min.mjs
+eef5f8b2f8e20e150680b20adaec4a60babafee3adbe8a94583c81fee46e8680  ./tesseract-7.0.0/core/tesseract-core-lstm.wasm.js
+861a536cf9ef8e63cb644d57bab39c388f37f7d6b6f60024b741c5f6b39a59b3  ./tesseract-7.0.0/core/tesseract-core-relaxedsimd-lstm.wasm.js
+c58b46a4c796c0b8afccf77591d5b875b6896b45d402bbce8caa6f5362447b38  ./tesseract-7.0.0/core/tesseract-core-simd-lstm.wasm.js
+e8a293abb398ec479176c1575aef24e2bacb0611c713f3fa996f97f0cd996fb3  ./tesseract-7.0.0/lang/ell.traineddata.gz
+45b4cb346724ac1774f1c36f42f182b887bcdb28ebe63e6fff90ac41f3fcff91  ./tesseract-7.0.0/lang/eng.traineddata.gz
+64871d76c75609fd5413b88a8171e2ef40deedd77d5875ba23df104b2d05eb29  ./tesseract-7.0.0/tesseract.esm.min.js
+576b7df7e3393e137e51849357c9adb53fe7ac1bb69bfa06cf3d61520f182c6d  ./tesseract-7.0.0/worker.min.js
+b5ad3df920738ca7adcb74508d7e6b6a5b9024993fb9a0c702da1ad8964eca07  ./zxing-browser-0.1.5/zxing-browser.min.js
