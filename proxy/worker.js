@@ -70,12 +70,21 @@ async function handle(request, info, env) {
     if (target.protocol !== 'https:' || target.username || target.password || target.port) return new Response('Only plain https URLs', { status: 400, headers });
     info.host = target.hostname.toLowerCase();
     if (!allowedHost(target.hostname)) { info.host = 'blocked'; return new Response('Domain not allowed', { status: 403, headers }); }
-    const upstream = await fetch(target.href, { method: 'GET', redirect: 'follow', headers: { accept: 'application/xml, text/xml, */*', 'user-agent': 'SpitothikiReceiptProxy/1.0' }, cf: { cacheTtl: 300 } });
-    // Re-check after redirects so a provider redirect can't take us elsewhere.
-    if (!allowedHost(new URL(upstream.url).hostname)) return new Response('Redirect not allowed', { status: 403, headers });
+    // Follow redirects by hand (max 5) and check every hop BEFORE requesting it, so a provider redirect
+    // can never make the proxy contact a host outside the allow-list.
+    let upstream; let hop = target;
+    for (let i = 0; ; i += 1) {
+      upstream = await fetch(hop.href, { method: 'GET', redirect: 'manual', headers: { accept: 'application/xml, text/xml, */*', 'user-agent': 'SpitothikiReceiptProxy/1.0' }, cf: { cacheTtl: 300 } });
+      const loc = upstream.status >= 300 && upstream.status < 400 ? upstream.headers.get('location') : null;
+      if (!loc) break;
+      if (i >= 5) return new Response('Too many redirects', { status: 502, headers });
+      try { hop = new URL(loc, hop); } catch { return new Response('Bad redirect', { status: 502, headers }); }
+      if (hop.protocol !== 'https:' || hop.username || hop.password || hop.port || !allowedHost(hop.hostname)) return new Response('Redirect not allowed', { status: 403, headers });
+    }
+    if (!allowedHost(new URL(upstream.url || hop.href).hostname)) return new Response('Redirect not allowed', { status: 403, headers });
     const body = await upstream.arrayBuffer();
     if (body.byteLength > MAX_BYTES) return new Response('Too large', { status: 413, headers });
-    try { Object.assign(info, classify(new TextDecoder().decode(body.slice(0, 200000)), new URL(upstream.url).hostname)); } catch {}
+    try { Object.assign(info, classify(new TextDecoder().decode(body.slice(0, 200000)), new URL(upstream.url || hop.href).hostname)); } catch {}
     return new Response(body, { status: upstream.status, headers: { ...headers, 'content-type': upstream.headers.get('content-type') || 'application/xml', 'cache-control': 'private, max-age=300' } });
   }
 }

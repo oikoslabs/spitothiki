@@ -40,7 +40,7 @@ test('v1.9.0 scan hint and «Έτοιμο!» after sign-in with a scan button', 
 test('v1.9.0 English mode: version line, footer and new strings are translated', () => {
   for (const k of ['ΕΚΔΟΣΗ', 'Έκδοση', 'Απλά, για το σπίτι.', 'Πέτα τις αποδείξεις στο συρτάρι. Σκάναρέ τες εδώ.', 'Σκάναρε την πρώτη σου απόδειξη', 'Δωρεάν, χωρίς λογαριασμό και χωρίς κάρτα. Τα στοιχεία σου μένουν στο κινητό σου.', 'ή δες με παραδείγματα', 'Σκάναρε το QR της απόδειξης ή το barcode ενός προϊόντος', 'Περισσότερες ρυθμίσεις (προαιρετικά)', 'Σκάναρε τώρα'])
     assert.ok(dictionaries.en[k], k);
-  assert.match(html, /<span>ΕΚΔΟΣΗ<\/span> <span data-no-i18n>1\.9\.2<\/span>/);
+  assert.match(html, /<span>ΕΚΔΟΣΗ<\/span> <span data-no-i18n>1\.9\.3<\/span>/);
   assert.match(html, /<span>Απλά, για το σπίτι\.<\/span> · <span id="app-version"><span>Έκδοση<\/span>/);
 });
 

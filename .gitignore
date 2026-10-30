@@ -6,3 +6,5 @@ node_modules/
 .DS_Store
 Thumbs.db
 .firebase/
+firestore-debug.log
+tests/rules/node_modules
