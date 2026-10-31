@@ -3,12 +3,12 @@ import { decodeImageCodes, lookupBarcode, normalizeBarcode, startScanner } from 
 import { isUrlCode, lastTollAmount, parseTollBarcode, parseTollText, tollAmountFromText } from './toll-barcode.js';
 import { authProviders, firebaseConfig } from './firebase-config.js';
 import { loadState, parseBackup, saveState } from './storage.js';
-import { fetchReceipt, receiptId } from './receipt.js';
+import { fetchReceipt, findRelatedReceipt, receiptId } from './receipt.js';
 import { ingredientName, pantryIngredients, recipeCat, scoreRecipe, suggestBuiltin } from './recipes.js';
 import { CATEGORIES, WASTE_REASONS, applyWaste, createStore, createWaste, groupByStore, monthKey, rowCategory, monthlySpending, moveCategory, purchaseFor, shiftMonth, storeOrder, wasteStats } from './features.js';
 import { showSigninCard } from './features.js';
 import { routeCode, parseStoreReceiptBarcode } from './scan-router.js';
-import { deleteReceipt, listReceipts, receiptCategory, receiptItems, receiptMonths } from './receipts.js';
+import { deleteReceipt, isStaleReceipt, listReceipts, receiptCategory, receiptItems, receiptMonths } from './receipts.js';
 import { PROTECT_SEEN_KEY, PROTECT_SNOOZE_KEY, authKnown, showProtectCard, showProtectSheet, snoozeUntilFrom, storageMode } from './protect.js';
 import { BILL_PRESETS, ONBOARD_KEY, PRESETS_KEY, pendingPresets, shouldOnboard, hasData as hasAnyData, hasRealData } from './onboarding.js';
 import { applyDisplayPrefs, highContrast, setHighContrast, setTextSize, textSize } from './prefs.js';
@@ -1434,11 +1434,13 @@ async function loadReceipt(link, { fromQueue = false } = {}) {
     const receipt = await fetchReceipt(receiptState.link, { proxy: receiptProxy() });
     if (fromQueue || loadQueue().some((e) => e.link === receiptState.link)) saveQueue(dequeue(loadQueue(), receiptState.link));
     const id = await receiptId(receipt, receipt.sourceUrl);
-    const duplicate = (state.receipts || []).find((entry) => entry.id === id);
+    // v1.9.7: a saved record whose expenses were all deleted no longer blocks scanning it again.
+    const duplicate = (state.receipts || []).find((entry) => entry.id === id && !isStaleReceipt(entry, state));
+    const related = duplicate ? null : findRelatedReceipt(receipt, state.receipts || [], id);
     // v1.8.0: a scan with neither items nor an amount (ΑΑΔΕ cash-register QR) asks for the amount — never a 0 € expense.
     if (needsAmount(receipt) && receiptTarget !== 'transport' && !duplicate) {
       receiptState = { step: 'manual', receipt, id, guess: classifyReceipt(receipt), target: receiptTarget, manual: { id, url: receipt.sourceUrl, format: receipt.format, date: receipt.date, store: receipt.issuerName, reason: 'aade' } };
-    } else receiptState = { step: 'review', receipt, id, duplicate, trip: tripForReceipt(state.trips || [], receipt), target: receiptTarget, guess: classifyReceipt(receipt) };
+    } else receiptState = { step: 'review', receipt, id, duplicate, related, trip: tripForReceipt(state.trips || [], receipt), target: receiptTarget, guess: classifyReceipt(receipt) };
   } catch (error) {
     receiptState = { step: 'start', link: receiptState.link, error: t(error.message || 'Η αναζήτηση απέτυχε.'), unsupported: Boolean(error.unsupported), cors: Boolean(error.cors), canQueue: Boolean(error.cors) && !error.status && !/πολλές αναζητήσεις/i.test(error.message || '') };
   }
@@ -1466,13 +1468,21 @@ function renderTripLink() {
     <label class="check-row"><input type="checkbox" name="linkTrip" checked form="receipt-review-form"> <span>${escapeHtml(t('Σύνδεση με το καλάθι: τα έξοδα της απόδειξης αντικαθιστούν την εκτίμηση (χωρίς διπλή καταμέτρηση)'))}</span></label></div>`;
 }
 
+// v1.9.7: the receipt says it replaces an already-saved order slip («Σχετικά παραστατικά») → ask, pre-ticked.
+function renderRelatedOffer() {
+  const { related, duplicate } = receiptState;
+  if (!related || duplicate) return '';
+  return `<div class="alert-banner receipt-related" id="receipt-related" role="status"><p>${escapeHtml(t('Αυτή η απόδειξη αντικαθιστά το δελτίο παραγγελίας που έχεις ήδη καταχωρήσει ({store}, {date}, {total}).', { store: related.store || t('Κατάστημα'), date: formatDate(related.date), total: money(related.total) }))}</p>
+    <label class="check-row"><input type="checkbox" name="replaceRelated" id="receipt-replace-related" checked form="receipt-review-form"> <span>${escapeHtml(t('Αντικατάσταση του δελτίου (χωρίς διπλό έξοδο)'))}</span></label></div>`;
+}
+
 function renderReceiptReview() {
   const { receipt, duplicate } = receiptState;
   const store = receipt.issuerName || (receipt.issuerVat ? t('ΑΦΜ {vat}', { vat: receipt.issuerVat }) : t('Άγνωστο κατάστημα'));
   const head = `<div class="receipt-summary"><div><strong class="product-name" id="receipt-store">${escapeHtml(store)}</strong><span class="field-hint">${escapeHtml(receipt.date ? formatDate(receipt.date) : '')}${receipt.lines.length ? ` · ${escapeHtml(t('{count} είδη', { count: receipt.lines.length }))}` : ''}</span></div><strong class="big-number" id="receipt-total">${escapeHtml(money(receipt.total))}</strong></div>`;
-  const dup = duplicate ? `<div class="alert-banner" id="receipt-duplicate" role="status"><p>${escapeHtml(t('Αυτή η απόδειξη έχει ήδη εισαχθεί ({date}).', { date: formatDate(String(duplicate.importedAt || duplicate.date || '').slice(0, 10)) }))}</p><div class="settings-actions"><button class="button button-quiet" type="button" data-action="receipt-save-anyway" id="receipt-save-anyway">${escapeHtml(t('Αποθήκευση ξανά'))}</button></div></div>` : '';
+  const dup = duplicate ? `<div class="alert-banner" id="receipt-duplicate" role="status"><p>${escapeHtml(t('Αυτή η απόδειξη είναι ήδη καταχωρημένη ({date}, {total}). Τη βρίσκεις στις «🧾 Αποδείξεις».', { date: formatDate(String(duplicate.importedAt || duplicate.date || '').slice(0, 10)), total: money(duplicate.total) }))}</p><div class="settings-actions"><button class="button button-quiet" type="button" data-action="receipt-save-anyway" id="receipt-save-anyway">${escapeHtml(t('Αποθήκευση ξανά'))}</button></div></div>` : '';
   if (!receipt.lines.length) {
-    return `${head}${dup}${renderTransportReceiptOffer()}${renderTripLink()}<p class="field-hint" id="receipt-aade-note">Οι αποδείξεις με QR της ΑΑΔΕ (ταμειακές) δεν περιέχουν τα είδη στο QR, μόνο το σύνολο. Για να περάσουν τα είδη, βγάλε φωτογραφία την απόδειξη — ή κατέγραψε μόνο το ποσό ως έξοδο.</p>${photoButtons()}
+    return `${head}${dup}${renderRelatedOffer()}${renderTransportReceiptOffer()}${renderTripLink()}<p class="field-hint" id="receipt-aade-note">Οι αποδείξεις με QR της ΑΑΔΕ (ταμειακές) δεν περιέχουν τα είδη στο QR, μόνο το σύνολο. Για να περάσουν τα είδη, βγάλε φωτογραφία την απόδειξη — ή κατέγραψε μόνο το ποσό ως έξοδο.</p>${photoButtons()}
       <form id="receipt-review-form" novalidate><input type="hidden" name="mode" value="total"><div class="dialog-actions"><button class="button button-quiet" type="button" data-action="receipt-reset">Πίσω</button><button class="button button-primary" type="submit" ${duplicate ? 'disabled' : ''}>${receiptState.target === 'transport' || ['tolls', 'fuel'].includes(receiptState.guess?.type) ? `🚗 ${escapeHtml(t('Καταχώριση στις Μετακινήσεις'))}` : 'Καταγραφή εξόδου'}</button></div></form>`;
   }
   const rows = receipt.lines.map((line, index) => `<div class="receipt-line${line.doubtful ? ' is-doubtful' : ''}" data-line="${index}"${line.doubtful ? ` title="${escapeHtml(t('Έλεγξε αυτή τη γραμμή: ποσότητα × τιμή δεν ταιριάζει με το ποσό.'))}"` : ''}><input class="shopping-check" type="checkbox" name="use" checked aria-label="${escapeHtml(t('Εισαγωγή: {name}', { name: line.name }))}">
@@ -1482,9 +1492,9 @@ function renderReceiptReview() {
     <select class="field-input receipt-category" name="category" aria-label="Είδος προϊόντος">${CATEGORIES.map((category) => `<option value="${escapeHtml(category)}" ${category === line.category ? 'selected' : ''}>${escapeHtml(categoryLabel(category))}</option>`).join('')}</select></div>`).join('');
   const doubtful = receipt.lines.filter((line) => line.doubtful).length;
   const photoNote = receiptState.photo ? `<p class="field-hint" id="receipt-photo-note">${escapeHtml(t('Διαβάστηκε από φωτογραφία — έλεγξε ονόματα και ποσά πριν την εισαγωγή.'))}${doubtful ? ` <strong class="doubtful-hint">${escapeHtml(t('{count} γραμμές θέλουν έλεγχο (σημειωμένες).', { count: doubtful }))}</strong>` : ''}${receipt.totalMismatch ? ` ${escapeHtml(t('Το άθροισμα των ειδών ({sum}) διαφέρει από το σύνολο.', { sum: money(receipt.linesTotal) }))}` : ''}</p>` : '';
-  return `${head}${dup}${renderTransportReceiptOffer()}${renderTripLink()}${photoNote}<form id="receipt-review-form" novalidate><input type="hidden" name="mode" value="lines">
+  return `${head}${dup}${renderRelatedOffer()}${renderTransportReceiptOffer()}${renderTripLink()}${photoNote}<form id="receipt-review-form" novalidate><input type="hidden" name="mode" value="lines">
     <div class="receipt-lines" id="receipt-lines">${rows}</div>
-    <label class="check-row"><input type="checkbox" name="toPantry" ${receiptState.trip && !duplicate ? '' : 'checked'}> <span>Πρόσθεσε στο απόθεμα (ενώνεται με ίδια προϊόντα)</span></label>${receiptState.trip && !duplicate ? `<p class="field-hint">${escapeHtml(t('Τα προϊόντα του καλαθιού έχουν ήδη μπει στο απόθεμα.'))}</p>` : ''}
+    <label class="check-row"><input type="checkbox" name="toPantry" ${(receiptState.trip || receiptState.related) && !duplicate ? '' : 'checked'}> <span>Πρόσθεσε στο απόθεμα (ενώνεται με ίδια προϊόντα)</span></label>${receiptState.trip && !duplicate ? `<p class="field-hint">${escapeHtml(t('Τα προϊόντα του καλαθιού έχουν ήδη μπει στο απόθεμα.'))}</p>` : ''}
     <label class="check-row"><input type="checkbox" name="toSpending" checked> <span>Κατέγραψε τα έξοδα στο Σύνολο εξόδων</span></label>
     <div class="dialog-actions"><button class="button button-quiet" type="button" data-action="receipt-reset">Πίσω</button><button class="button button-primary" type="submit" ${duplicate ? 'disabled' : ''}>Εισαγωγή</button></div></form>`;
 }
@@ -1587,7 +1597,11 @@ function importReceipt(form) {
     state.purchases = state.purchases.filter((purchase) => purchase.tripId !== linkTrip.id);
     state.trips = (state.trips || []).map((trip) => (trip.id === linkTrip.id ? { ...trip, receiptId: id, receiptTotal: receipt.total, updatedAt: now } : trip));
   }
-  state.receipts = [...(state.receipts || []), { id, date, total: receipt.total, store: storeName, issuerVat: receipt.issuerVat || '', format: receipt.format, lines: receipt.lines.length, items: receipt.lines.slice(0, 80).map((l) => ({ name: l.name, quantity: l.quantity, unit: l.unit, price: l.price })), ...(receipt.sourceUrl ? { url: receipt.sourceUrl } : {}), importedAt: now }];
+  // v1.9.7: replace the order slip this receipt supersedes (user ticked it), and any stale record with the same id.
+  const replace = receiptState.related && form.elements.replaceRelated?.checked ? receiptState.related.id : '';
+  if (replace) Object.assign(state, deleteReceipt(state, replace));
+  const refs = { ...(receipt.mark ? { mark: receipt.mark } : {}), ...(receipt.series ? { series: receipt.series } : {}), ...(receipt.number ? { number: receipt.number } : {}), ...(receipt.invoiceType ? { invoiceType: receipt.invoiceType } : {}) };
+  state.receipts = [...(state.receipts || []).filter((r) => r.id !== id), { id, date, total: receipt.total, store: storeName, issuerVat: receipt.issuerVat || '', format: receipt.format, ...refs, lines: receipt.lines.length, items: receipt.lines.slice(0, 80).map((l) => ({ name: l.name, quantity: l.quantity, unit: l.unit, price: l.price })), ...(receipt.sourceUrl ? { url: receipt.sourceUrl } : {}), importedAt: now }];
   if (!persist()) return;
   document.querySelector('#receipt-dialog').close();
   renderApp();
@@ -2128,7 +2142,7 @@ function renderMisfiledBanner() {
 
 function renderTransportReceiptOffer() {
   const { guess, target, duplicate } = receiptState;
-  if (duplicate && duplicate.format !== 'transport' && !(state.transport || []).some((e) => e.receiptId === duplicate.id)) return `<div class="alert-banner receipt-transport" id="receipt-move" role="status"><p>${escapeHtml(t('Αυτή η απόδειξη είχε μπει στα ψώνια. Θες να μεταφερθεί στις Μετακινήσεις;'))}</p><div class="settings-actions"><button class="button button-primary" type="button" data-action="receipt-move-transport" data-id="${escapeHtml(duplicate.id)}">🚗 ${escapeHtml(t('Μεταφορά στις Μετακινήσεις'))}</button></div></div>`;
+  if (duplicate && duplicate.format !== 'transport' && looksLikeTransport(duplicate) && !(state.transport || []).some((e) => e.receiptId === duplicate.id)) return `<div class="alert-banner receipt-transport" id="receipt-move" role="status"><p>${escapeHtml(t('Αυτή η απόδειξη είχε μπει στα ψώνια. Θες να μεταφερθεί στις Μετακινήσεις;'))}</p><div class="settings-actions"><button class="button button-primary" type="button" data-action="receipt-move-transport" data-id="${escapeHtml(duplicate.id)}">🚗 ${escapeHtml(t('Μεταφορά στις Μετακινήσεις'))}</button></div></div>`;
   if (duplicate || (!guess && target !== 'transport')) return '';
   const label = guess?.type === 'tolls' ? t('Μοιάζει με απόδειξη διοδίων.') : guess?.type === 'fuel' ? t('Μοιάζει με απόδειξη καυσίμων.') : '';
   return `<div class="alert-banner receipt-transport" id="receipt-transport" role="status"><p>${escapeHtml(label)} ${escapeHtml(t('Θες να την καταχωρίσεις ως έξοδο μετακίνησης αντί για προϊόντα;'))}</p><div class="settings-actions"><button class="button button-primary" type="button" data-action="receipt-to-transport">🚗 ${escapeHtml(t('Καταχώριση στις Μετακινήσεις'))}</button></div></div>`;

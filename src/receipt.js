@@ -104,7 +104,10 @@ export function parseMyData(xml) {
     format: 'myDATA',
     issuerVat: val(invoice, 'issuer', 'vatNumber'), issuerName: '',
     date: val(header, 'issueDate').slice(0, 10), series: val(header, 'series'), number: val(header, 'aa'),
-    uid: val(invoice, 'uid') || val(invoice, 'mark'), total: round2(total), lines
+    uid: val(invoice, 'uid') || val(invoice, 'mark'), total: round2(total), lines,
+    // v1.9.7: links to an earlier document (restaurant order slip → retail receipt) so the slip can be replaced, not doubled.
+    mark: val(invoice, 'mark'), invoiceType: val(header, 'invoiceType'),
+    connectedMarks: kids(header, 'multipleConnectedMarks').map((n) => n.text).filter(Boolean), related: []
   };
 }
 
@@ -125,8 +128,34 @@ export function parseUbl(xml) {
     format: 'EN16931',
     issuerVat: val(supplier, 'PartyTaxScheme', 'CompanyID').replace(/^EL/, ''), issuerName: val(supplier, 'PartyName', 'Name') || val(supplier, 'PartyLegalEntity', 'RegistrationName'),
     date: val(root, 'IssueDate').slice(0, 10), series: '', number: id, uid: id,
-    total: round2(num(val(totals, 'PayableAmount')) || num(val(totals, 'TaxInclusiveAmount')) || lines.reduce((s, l) => s + l.price, 0)), lines
+    total: round2(num(val(totals, 'PayableAmount')) || num(val(totals, 'TaxInclusiveAmount')) || lines.reduce((s, l) => s + l.price, 0)), lines,
+    ...ublRefs(root)
   };
+}
+
+// v1.9.7: IMPACT puts the mark and «Σχετικά παραστατικά» (e.g. «ΔΠΑ 38258,» = order slip) in AdditionalDocumentReference.
+function ublRefs(root) {
+  const refs = kids(root, 'AdditionalDocumentReference').map((r) => ({ id: val(r, 'ID'), what: val(r, 'DocumentDescription') }));
+  const mark = refs.find((r) => /M\.?AR\.?K/i.test(r.what))?.id || '';
+  const related = refs.filter((r) => /DELTIO|ΣΧΕΤ|RELATED/i.test(r.what)).flatMap((r) => r.id.split(/[,;]/)).map((x) => x.trim()).filter(Boolean);
+  return { mark, related, connectedMarks: [] };
+}
+
+// Normalised «series number» of a document, for matching «ΔΠΑ 38258» against a saved slip.
+export const docRef = (series, number) => normalizeSearch(`${series || ''} ${number || ''}`).replace(/[\s_.\-/]+/g, ' ').trim();
+
+// v1.9.7: a saved order slip / earlier document that this receipt replaces (same shop, linked mark or «Σχετικά παραστατικά»).
+// Older saved receipts have no mark/series: then the same shop + same day + same total counts, only if the receipt says it has a related document.
+export function findRelatedReceipt(receipt, saved = [], selfId = '') {
+  const marks = new Set((receipt.connectedMarks || []).map(String));
+  const refs = new Set((receipt.related || []).map((r) => docRef('', r)));
+  if (!marks.size && !refs.size) return null;
+  const vat = String(receipt.issuerVat || '');
+  const same = saved.filter((r) => r.id !== selfId && r.format !== 'transport' && (!vat || !r.issuerVat || String(r.issuerVat) === vat));
+  return same.find((r) => r.mark && marks.has(String(r.mark)))
+    || same.find((r) => r.number && refs.has(docRef(r.series, r.number)))
+    || same.find((r) => !r.mark && !r.number && vat && String(r.issuerVat) === vat && r.date === receipt.date && Math.abs(Number(r.total) - Number(receipt.total)) < 0.005)
+    || null;
 }
 
 // ---------- URLs ----------
@@ -192,7 +221,7 @@ async function getText(url, { fetchImpl, proxy, known = true }) {
   const attempt = async (target) => {
     let res;
     const signal = typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(FETCH_TIMEOUT_MS) : undefined;
-    try { res = await fetchImpl(target, { headers: { accept: 'application/xml, text/xml, */*' }, ...(signal ? { signal } : {}) }); }
+    try { res = await fetchImpl(target, { headers: { accept: 'application/xml, text/xml, */*' }, cache: 'no-store', ...(signal ? { signal } : {}) }); }
     catch (error) { throw Object.assign(error instanceof Error ? error : new Error(String(error)), { network: true }); }
     if (!res.ok) { const error = new Error(`HTTP ${res.status}`); error.status = res.status; try { error.body = String(await res.text()).slice(0, 300); } catch {} throw error; }
     return res.text();
@@ -224,6 +253,7 @@ export async function fetchReceipt(input, { fetchImpl = fetch, proxy = '' } = {}
   }
   if (!receipt?.lines.length && ubl?.lines.length) receipt = ubl;
   else if (receipt && ubl?.issuerName) receipt.issuerName = ubl.issuerName;
+  if (receipt && ubl && receipt !== ubl) { receipt.related = ubl.related || []; receipt.mark ||= ubl.mark || ''; }
   if (!receipt || (!receipt.lines.length && !(receipt.total > 0))) {
     // Body arrived but isn't receipt data (e.g. an HTML page) → unsupported layout; otherwise judge by the error.
     const kind = receipt || !known ? 'unsupported'

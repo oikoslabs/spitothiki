@@ -25,3 +25,11 @@ export function listReceipts(receipts = [], month = '') {
 export function deleteReceipt(state, id) {
   return { receipts: (state.receipts || []).filter((r) => r.id !== id), purchases: (state.purchases || []).filter((p) => p.receiptId !== id) };
 }
+
+// v1.9.7: a saved receipt with no expense, transport entry or basket left (all deleted) — scanning it again is allowed.
+export function isStaleReceipt(r, state = {}) {
+  if (!r || r.format === 'transport') return false;
+  return !(state.purchases || []).some((p) => p.receiptId === r.id)
+    && !(state.transport || []).some((e) => e.receiptId === r.id)
+    && !(state.trips || []).some((t) => t.receiptId === r.id);
+}
