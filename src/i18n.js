@@ -93,6 +93,7 @@ const EN = {
   "Πλήρης πολιτική απορρήτου": "Full privacy policy",
   "Αν δεν έχεις συνδεθεί και καθαρίσεις τα δεδομένα του browser ή αλλάξεις συσκευή, χρησιμοποίησε αντίγραφο ασφαλείας.": "If you are not signed in and you clear browser data or change device, use a backup.",
   "Πολλές αναζητήσεις αυτή τη στιγμή. Δοκίμασε ξανά σε λίγα λεπτά ή σκάναρε τη φωτογραφία της απόδειξης.": "Too many lookups right now. Try again in a few minutes or scan a photo of the receipt.",
+  "Η απόδειξη δεν έχει ανέβει ακόμα στον πάροχο. Συνήθως εμφανίζεται λίγα λεπτά μετά την πληρωμή. Δοκίμασε ξανά σε λίγο.": "The receipt isn't published by the provider yet. It usually appears a few minutes after payment. Try again shortly.",
   "Η υπηρεσία αποδείξεων δεν απαντά αυτή τη στιγμή. Δοκίμασε ξανά αργότερα ή σκάναρε τη φωτογραφία της απόδειξης.": "The receipt service is not responding right now. Try again later or scan a photo of the receipt.",
   "Ο συγχρονισμός έφτασε το ημερήσιο όριο. Τα δεδομένα σου μένουν στη συσκευή και θα συγχρονιστούν αργότερα.": "Sync reached its daily limit. Your data stays on the device and will sync later.",
   "Ο συγχρονισμός δεν είναι διαθέσιμος τώρα. Τα δεδομένα σου μένουν στη συσκευή.": "Sync is not available right now. Your data stays on the device.",
