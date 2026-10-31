@@ -43,6 +43,7 @@ import { getLang, locale, setLang, t, translateDom, untranslatedGreek } from './
 import { daysUntil, escapeHtml, expiryLabel, formatDate, localDateKey, readKey, writeKey } from './format.js';
 import { THEME_KEY, applyTheme, currentTheme } from './theme.js';
 import { initSource, sourceSignup } from './source.js';
+import { TESTER_KEY, TWA_SESSION_KEY, isPlayApp, showTesterCard, testerMailto } from './tester-card.js';
 
 const viewRoot = document.querySelector('#view-content');
 const itemDialog = document.querySelector('#item-dialog');
@@ -53,6 +54,8 @@ const toast = document.querySelector('#toast');
 
 // v1.8.2: anonymous source count (first open only; devices used before are 'existing'). Never blocks the app.
 const sourceHasData = (() => { try { return Boolean(localStorage.getItem('spitothiki:v1') || localStorage.getItem(ONBOARD_KEY)); } catch { return false; } })();
+// v1.9.5: read before initSource() cleans ?src=play from the address.
+const testerCtx = (() => { let session = null; try { session = sessionStorage; } catch {} const play = isPlayApp({ search: location.search, referrer: document.referrer, session }); if (play) { try { session?.setItem(TWA_SESSION_KEY, '1'); } catch {} } return play; })();
 initSource({ hasData: sourceHasData });
 let state = loadState();
 const VIEWS = ['overview', 'pantry', 'shopping', 'cart', 'cook', 'bills', 'transport', 'extras', 'chores', 'insights', 'receipts', 'settings'];
@@ -325,6 +328,16 @@ function renderProtectCard() {
     <div class="protect-actions">${protectButtons('protect')}</div>
     <button class="icon-button signin-close" type="button" data-action="protect-snooze" aria-label="${escapeHtml(t('Απόκρυψη για 14 ημέρες'))}" title="${escapeHtml(t('Απόκρυψη για 14 ημέρες'))}">×</button></section>`;
 }
+// v1.9.5: Play Store tester invite (Android browser only, not in the Play app; gone for good after × or click).
+function renderTesterCard() {
+  let done = false; try { done = localStorage.getItem(TESTER_KEY) === '1'; } catch {}
+  if (!showTesterCard({ userAgent: navigator.userAgent, playApp: testerCtx, done })) return '';
+  const href = testerMailto(t('Δοκιμαστής Σπιτοθήκης'), t('Γεια σας! Θέλω να γίνω δοκιμαστής της Σπιτοθήκης στο Google Play. Το Gmail που χρησιμοποιώ στο Google Play είναι: '));
+  return `<section class="signin-card tester-card" id="home-tester-card" aria-labelledby="home-tester-title"><span class="signin-icon" aria-hidden="true">📱</span>
+    <div class="signin-text"><h2 id="home-tester-title">${escapeHtml(t('Βοήθησε να βγει η Σπιτοθήκη στο Play Store!'))}</h2><p>${escapeHtml(t('Χρειαζόμαστε δοκιμαστές με Android για 14 μέρες. Το email σου χρησιμοποιείται μόνο για να μπεις στη λίστα δοκιμαστών.'))}</p></div>
+    <a class="button button-primary" href="${escapeHtml(href)}" data-action="tester-done" id="home-tester-join">${escapeHtml(t('Γίνε δοκιμαστής'))}</a>
+    <button class="icon-button signin-close" type="button" data-action="tester-done" aria-label="${escapeHtml(t('Απόκρυψη'))}" title="${escapeHtml(t('Απόκρυψη'))}">×</button></section>`;
+}
 // v1.9.0: empty app → one clear first step instead of the «only on this phone» warning. Gone after the first save.
 function renderStarterCard() {
   if (hasAnyData(state)) return '';
@@ -506,7 +519,7 @@ function renderOverview() {
   const due = billsDue(state.bills || [], today);
   return `<section class="hero-panel home-hero"><div class="hero-copy"><p class="eyebrow">ΜΙΚΡΕΣ ΣΥΝΗΘΕΙΕΣ, ΠΙΟ ΗΡΕΜΟ ΣΠΙΤΙ</p><h1>Η Σπιτοθήκη σου<br>με μια ματιά</h1><p>Τι έχεις στο σπίτι, τι λήγει, τι χρειάζεται η λίστα και πόσα ξοδεύεις κάθε μήνα.</p></div><div class="hero-illustration" aria-hidden="true"><span>🫒</span></div></section>
     ${summary.expired ? `<div class="alert-banner" role="status">${t(summary.expired === 1 ? '⚠️ Έχεις {count} προϊόν που έχει λήξει. Έλεγξέ τα πριν τα χρησιμοποιήσεις.' : '⚠️ Έχεις {count} προϊόντα που έχουν λήξει. Έλεγξέ τα πριν τα χρησιμοποιήσεις.', { count: summary.expired })}</div>` : ''}
-    ${renderStarterCard()}${renderProtectCard()}
+    ${renderStarterCard()}${renderProtectCard()}${renderTesterCard()}
     <section class="stats-grid home-stats" aria-label="Σύνοψη αποθέματος">
       <button class="stat-card" type="button" data-action="home-card" data-card="all" id="home-card-all"><span class="stat-icon">🧺</span><div><strong>${summary.products}</strong><span>προϊόντα στο σπίτι</span></div></button>
       <button class="stat-card" type="button" data-action="home-card" data-card="expiring" id="home-card-expiring"><span class="stat-icon amber">◷</span><div><strong>${summary.expiringSoon + summary.expired}</strong><span>λήγουν ή έληξαν</span></div></button>
@@ -3348,6 +3361,7 @@ function handleAction(button) {
   } else if (action === 'clear-pantry-status') { pantryStatus = ''; renderApp(); }
   else if (action === 'home-signin' || action === 'protect-signin') goToSignin();
   else if (action === 'protect-drive') driveConnect();
+  else if (action === 'tester-done') { writeKey(TESTER_KEY, '1'); if (button.tagName !== 'A') renderApp(); else setTimeout(renderApp, 300); }
   else if (action === 'protect-snooze') { writeKey(PROTECT_SNOOZE_KEY, String(snoozeUntilFrom())); renderApp(); }
   else if (action === 'sheet-signin') { closeProtectSheet(); goToSignin(); }
   else if (action === 'sheet-drive') { closeProtectSheet(); driveConnect(); }

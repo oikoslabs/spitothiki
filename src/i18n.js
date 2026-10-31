@@ -310,6 +310,13 @@ const EN = {
   'Το αντίγραφο εισήχθη.': 'Backup imported.', 'Εισαγωγή αντιγράφου;': 'Import backup?', 'Δεν ήταν δυνατή η εισαγωγή.': 'Import failed.',
   'Δεν ήταν δυνατή η ανάγνωση του αρχείου.': 'Could not read the file.', 'Οι αλλαγές αποθηκεύτηκαν.': 'Changes saved.', 'Το προϊόν προστέθηκε.': 'Product added.',
   'Έλεγξε τα στοιχεία και δοκίμασε ξανά.': 'Check the details and try again.', 'Γράψε το email σου.': 'Enter your email.',
+  // v1.9.5 Play tester invite
+  "Βοήθησε να βγει η Σπιτοθήκη στο Play Store!": "Help Spitothiki launch on the Play Store!",
+  "Χρειαζόμαστε δοκιμαστές με Android για 14 μέρες. Το email σου χρησιμοποιείται μόνο για να μπεις στη λίστα δοκιμαστών.": "We need Android testers for 14 days. Your email is used only to add you to the tester list.",
+  "Γίνε δοκιμαστής": "Become a tester",
+  "Δοκιμαστής Σπιτοθήκης": "Spitothiki tester",
+  "Γεια σας! Θέλω να γίνω δοκιμαστής της Σπιτοθήκης στο Google Play. Το Gmail που χρησιμοποιώ στο Google Play είναι: ": "Hi! I would like to become a Spitothiki tester on Google Play. The Gmail I use on Google Play is: ",
+  "Απόκρυψη": "Hide",
   // v1.9.4 account deletion
   'Διαγραφή λογαριασμού': 'Delete account',
   'Σβήνει οριστικά τον λογαριασμό σου (email και σύνδεση) και τα δεδομένα σου στον συγχρονισμό. Αν μένεις μόνος στο σπίτι σου, σβήνονται όλα του. Αν έχουν μπει κι άλλοι, το σπίτι και τα κοινά δεδομένα περνούν στο επόμενο μέλος. Σβήνονται και τα δεδομένα αυτής της συσκευής. Δεν αναιρείται.': 'Permanently deletes your account (email and sign-in) and your synced data. If you are alone in your home, all of it is deleted. If others have joined, the home and the shared data pass to the next member. The data on this device is deleted too. This cannot be undone.',
