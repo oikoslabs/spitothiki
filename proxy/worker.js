@@ -74,7 +74,7 @@ async function handle(request, info, env) {
     // can never make the proxy contact a host outside the allow-list.
     let upstream; let hop = target;
     for (let i = 0; ; i += 1) {
-      upstream = await fetch(hop.href, { method: 'GET', redirect: 'manual', headers: { accept: 'application/xml, text/xml, */*', 'user-agent': 'SpitothikiReceiptProxy/1.0' }, cf: { cacheTtl: 300 } });
+      upstream = await fetch(hop.href, { method: 'GET', redirect: 'manual', headers: { accept: 'application/xml, text/xml, */*', 'user-agent': 'SpitothikiReceiptProxy/1.0' }, cf: { cacheTtlByStatus: { '200-299': 300, '300-599': 0 } } });
       const loc = upstream.status >= 300 && upstream.status < 400 ? upstream.headers.get('location') : null;
       if (!loc) break;
       if (i >= 5) return new Response('Too many redirects', { status: 502, headers });
@@ -85,6 +85,6 @@ async function handle(request, info, env) {
     const body = await upstream.arrayBuffer();
     if (body.byteLength > MAX_BYTES) return new Response('Too large', { status: 413, headers });
     try { Object.assign(info, classify(new TextDecoder().decode(body.slice(0, 200000)), new URL(upstream.url || hop.href).hostname)); } catch {}
-    return new Response(body, { status: upstream.status, headers: { ...headers, 'content-type': upstream.headers.get('content-type') || 'application/xml', 'cache-control': 'private, max-age=300' } });
+    return new Response(body, { status: upstream.status, headers: { ...headers, 'content-type': upstream.headers.get('content-type') || 'application/xml', 'cache-control': upstream.ok ? 'private, max-age=300' : 'no-store' } });
   }
 }

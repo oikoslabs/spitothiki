@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Invoice xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2" xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2" xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2">
+  <cbc:ID>999999999|31/10/2026|0|11.1|ΑΛΠ_Α|1001</cbc:ID>
+  <cbc:IssueDate>2026-10-31</cbc:IssueDate>
+  <cac:AdditionalDocumentReference><cbc:ID>400000000000001</cbc:ID><cbc:DocumentDescription>##M.AR.K##</cbc:DocumentDescription></cac:AdditionalDocumentReference>
+  <cac:AdditionalDocumentReference><cbc:ID>ΔΠΑ 38258,</cbc:ID><cbc:DocumentDescription>##DELTIO.APOSTOL##</cbc:DocumentDescription></cac:AdditionalDocumentReference>
+  <cac:AccountingSupplierParty><cac:Party><cac:PartyName><cbc:Name>DEMO GRILL</cbc:Name></cac:PartyName><cac:PartyTaxScheme><cbc:CompanyID>EL999999999</cbc:CompanyID></cac:PartyTaxScheme></cac:Party></cac:AccountingSupplierParty>
+  <cac:LegalMonetaryTotal><cbc:PayableAmount>32.50</cbc:PayableAmount></cac:LegalMonetaryTotal>
+  <cac:InvoiceLine><cbc:InvoicedQuantity unitCode="H87">1</cbc:InvoicedQuantity><cbc:LineExtensionAmount>28.76</cbc:LineExtensionAmount><cac:Item><cbc:Name>DEMO</cbc:Name><cac:ClassifiedTaxCategory><cbc:Percent>13</cbc:Percent></cac:ClassifiedTaxCategory></cac:Item></cac:InvoiceLine>
+</Invoice>
