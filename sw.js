@@ -2,11 +2,12 @@
 // Strategy: network-first for everything from this site (HTML, JS, CSS, manifest), so a new
 // deploy shows up on the next load; the cache is only used when the network is unavailable.
 // Bump CACHE_VERSION when the list of shell files changes; old caches are deleted on activate.
-const CACHE_VERSION = 'v106';
+const CACHE_VERSION = 'v107';
 const CACHE = `spitothiki-${CACHE_VERSION}`;
 const OCR_CACHE = 'spitothiki-vendor'; // v1.9.4: was spitothiki-ocr (CDN copies), deleted on activate
 const SHARE_CACHE = 'spitothiki-share'; // a file shared to the app (Web Share Target), picked up by the page // Tesseract.js script/worker/core/language files, kept across versions
 const DATA_CACHE = 'spitothiki-data'; // written by the app: expiry snapshot for background checks
+// v1.9.10: «Νέα» badge on recently added recipes (cache bumped).
 // v1.9.9: visible version label was stuck at 1.9.4, now 1.9.9 (cache bumped).
 // v1.8.9: Google Play app (TWA): /.well-known/assetlinks.json, source word 'play' (cache bumped).
 // v1.9.0: first run (starter card, shorter onboarding, scan hint, sign-in next step), English leftovers (cache bumped).

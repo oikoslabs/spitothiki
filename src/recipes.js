@@ -1,7 +1,16 @@
 // "What do I cook?": suggestions from the pantry, preferring items that expire soon.
 // Built-in Greek recipes work offline; TheMealDB (free, no key) adds more ideas when online.
 import { expiryStatus, normalizeSearch } from './domain.js';
-import { GREEK_MORE, RAW_RECIPES } from './recipe-data.js';
+import { GREEK_MORE, NEW_RECIPE_DAYS, RAW_RECIPES, RECIPE_BATCHES } from './recipe-data.js';
+
+const ADDED_ON = Object.fromEntries(Object.entries(RECIPE_BATCHES).flatMap(([date, ids]) => ids.map((id) => [id, date])));
+// v1.9.10: true for NEW_RECIPE_DAYS days from the batch date (dates are YYYY-MM-DD, local).
+export function isNewRecipe(recipe, today) {
+  const added = recipe?.addedOn || ADDED_ON[recipe?.id];
+  if (!added || !today) return false;
+  const days = (Date.parse(`${today}T00:00:00Z`) - Date.parse(`${added}T00:00:00Z`)) / 86400000;
+  return days >= 0 && days < NEW_RECIPE_DAYS;
+}
 
 // Canonical ingredients: Greek/English names (first = display) and aliases matched against pantry names.
 export const INGREDIENTS = {
