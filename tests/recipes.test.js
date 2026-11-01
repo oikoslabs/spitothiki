@@ -59,3 +59,11 @@ test('v1.3 recipe set: Greek + raw/fruit sections, unique ids', () => {
   assert.ok(BUILTIN_RECIPES.filter((r) => (r.cat || 'greek') === 'greek').length >= 40);
   assert.ok(BUILTIN_RECIPES.filter((r) => r.cat === 'raw').length >= 15);
 });
+
+test('v1.9.8 recipes (1/11/2026) are bundled once, Greek steps, right section', () => {
+  const byId = Object.fromEntries(BUILTIN_RECIPES.map((r) => [r.id, r]));
+  for (const id of ['dakos', 'tyri-saganaki', 'patates-lemonates', 'fasolia-piaz', 'revithokeftedes']) assert.equal(byId[id]?.cat, 'greek', id);
+  for (const id of ['apple-carrot-salad', 'green-smoothie', 'orange-cinnamon']) assert.equal(byId[id]?.cat, 'raw', id);
+  const names = BUILTIN_RECIPES.map((r) => r.name.el);
+  assert.equal(new Set(names).size, names.length);
+});
