@@ -4,7 +4,7 @@ import { isUrlCode, lastTollAmount, parseTollBarcode, parseTollText, tollAmountF
 import { authProviders, firebaseConfig } from './firebase-config.js';
 import { loadState, parseBackup, saveState } from './storage.js';
 import { fetchReceipt, findRelatedReceipt, receiptId } from './receipt.js';
-import { ingredientName, pantryIngredients, recipeCat, scoreRecipe, suggestBuiltin } from './recipes.js';
+import { ingredientName, isNewRecipe, pantryIngredients, recipeCat, scoreRecipe, suggestBuiltin } from './recipes.js';
 import { CATEGORIES, WASTE_REASONS, applyWaste, createStore, createWaste, groupByStore, monthKey, rowCategory, monthlySpending, moveCategory, purchaseFor, shiftMonth, storeOrder, wasteStats } from './features.js';
 import { showSigninCard } from './features.js';
 import { routeCode, parseStoreReceiptBarcode } from './scan-router.js';
@@ -1658,7 +1658,7 @@ function renderRecipeCard(recipe, pantry) {
     return `<span class="ingredient-chip ${kind}${urgent ? ' urgent' : ''}">${kind === 'have' ? (urgent ? '◷' : '✓') : '+'} ${escapeHtml(ingredientName(id, lang))}</span>`;
   };
   const missingCount = recipe.missing.length + (recipe.missingRaw || []).length;
-  return `<article class="panel recipe-card" data-recipe="${escapeHtml(recipe.id)}"><div class="recipe-head">${recipe.thumb ? `<img class="recipe-thumb" src="${escapeHtml(recipe.thumb)}/preview" alt="" loading="lazy">` : '<span class="stat-icon">🍲</span>'}<div><h3 class="recipe-name" data-no-i18n lang="${recipe.source === 'mealdb' ? 'en' : lang}">${escapeHtml(recipe.name[lang] || recipe.name.el)}</h3>
+  return `<article class="panel recipe-card" data-recipe="${escapeHtml(recipe.id)}"><div class="recipe-head">${recipe.thumb ? `<img class="recipe-thumb" src="${escapeHtml(recipe.thumb)}/preview" alt="" loading="lazy">` : '<span class="stat-icon">🍲</span>'}<div><h3 class="recipe-name" data-no-i18n lang="${recipe.source === 'mealdb' ? 'en' : lang}">${escapeHtml(recipe.name[lang] || recipe.name.el)}${recipe.source === 'builtin' && isNewRecipe(recipe, localDateKey()) ? ` <span class="new-badge">${escapeHtml(t('Νέα'))}</span>` : ''}</h3>
     <p class="field-hint">${recipe.source === 'mealdb' ? escapeHtml(t('Από TheMealDB (στα αγγλικά)')) : escapeHtml(t('Συνταγή της Σπιτοθήκης'))}${recipe.urgent.length ? ` · <strong class="recipe-urgent">${escapeHtml(t('χρησιμοποιεί ό,τι λήγει σύντομα'))}</strong>` : ''}</p></div></div>
     <p class="recipe-label">${escapeHtml(t('Έχεις ({count})', { count: recipe.matched.length }))}</p><div class="ingredient-chips">${recipe.matched.map((id) => chip(id, 'have')).join('')}</div>
     ${missingCount ? `<p class="recipe-label">${escapeHtml(t('Λείπουν ({count})', { count: missingCount }))}</p><div class="ingredient-chips" data-no-i18n>${recipe.missing.map((id) => chip(id, 'need')).join('')}${(recipe.missingRaw || []).map((name) => `<span class="ingredient-chip need" lang="en">+ ${escapeHtml(name)}</span>`).join('')}</div>` : `<p class="recipe-label ok">${escapeHtml(t('Τα έχεις όλα!'))}</p>`}
@@ -1753,7 +1753,7 @@ function renderCook() {
   const pantry = pantryIngredients(state.items, today);
   const inCat = (r) => recipeCat(r) === recipeFilter;
   const builtin = suggestBuiltin(state.items, today, 200).filter(inCat).slice(0, 12);
-  const rest = BUILTIN_RECIPES.filter((r) => inCat(r) && !builtin.some((b) => b.id === r.id)).map((r) => ({ ...r, source: 'builtin', ...scoreRecipe(r.ingredients, pantry, r.optional) })).sort((x, y) => x.name.el.localeCompare(y.name.el, 'el'));
+  const rest = BUILTIN_RECIPES.filter((r) => inCat(r) && !builtin.some((b) => b.id === r.id)).map((r) => ({ ...r, source: 'builtin', ...scoreRecipe(r.ingredients, pantry, r.optional) })).sort((x, y) => (isNewRecipe(y, today) - isNewRecipe(x, today)) || x.name.el.localeCompare(y.name.el, 'el'));
   shownRecipes = [...builtin, ...rest];
   const urgentNames = state.items.filter((item) => pantry[Object.keys(pantry).find((id) => pantry[id].items.includes(item))]?.urgency >= 1).map((item) => item.name);
   const chips = `<div class="segmented recipe-filter" role="group" aria-label="${escapeHtml(t('Είδος συνταγών'))}">${Object.entries(RECIPE_CATS).map(([id, label]) => `<button type="button" class="filter-chip${recipeFilter === id ? ' is-active' : ''}" aria-pressed="${recipeFilter === id}" data-action="recipe-filter" data-cat="${id}">${id === 'greek' ? '🇬🇷' : '🍓'} ${escapeHtml(t(label))}</button>`).join('')}</div>`;

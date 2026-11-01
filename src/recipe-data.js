@@ -3,6 +3,13 @@
 const g = (id, el, en, ingredients, steps, optional = []) => ({ id, name: { el, en }, cat: 'greek', ingredients, optional, steps: { el: steps } });
 const r = (id, el, en, ingredients, steps, optional = []) => ({ id, name: { el, en }, cat: 'raw', ingredients, optional, steps: { el: steps } });
 
+// v1.9.10: recipe batches by date added. A recipe added in the last NEW_RECIPE_DAYS days gets a small «Νέα» badge
+// and is listed first in «Όλες οι συνταγές». For a new batch, add one line here: 'YYYY-MM-DD': [ids].
+export const RECIPE_BATCHES = {
+  '2026-11-01': ['dakos', 'tyri-saganaki', 'patates-lemonates', 'fasolia-piaz', 'revithokeftedes', 'apple-carrot-salad', 'green-smoothie', 'orange-cinnamon'],
+};
+export const NEW_RECIPE_DAYS = 30;
+
 export const GREEK_MORE = [
   g('gemista', 'Γεμιστά', 'Stuffed tomatoes & peppers', ['tomato', 'pepper', 'rice', 'onion', 'parsley', 'potato', 'oil', 'salt'], 'Άδειασε ντομάτες και πιπεριές, κράτα την ψίχα. Σωτάρισε κρεμμύδι, ρίξε την ψίχα, ρύζι και μαϊντανό για 5′. Γέμισε τα λαχανικά, βάλε πατάτες ανάμεσα, λάδι και λίγο νερό. Ψήσε στους 190° περίπου 1 ώρα και 15′.', ['parsley', 'potato']),
   g('mousakas', 'Μουσακάς', 'Moussaka', ['eggplant', 'potato', 'mince', 'onion', 'tomato', 'milk', 'flour', 'butter', 'eggs', 'cheese'], 'Ψήσε στον φούρνο φέτες μελιτζάνας και πατάτας με λίγο λάδι. Κάνε σάλτσα με κιμά, κρεμμύδι και ντομάτα. Για την μπεσαμέλ λιώσε βούτυρο, ανακάτεψε αλεύρι, πρόσθεσε σιγά σιγά γάλα και στο τέλος αυγό και τυρί. Στρώσε πατάτες, μελιτζάνες, κιμά, μπεσαμέλ και ψήσε 45′ στους 180°.', ['potato']),

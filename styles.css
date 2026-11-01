@@ -993,3 +993,6 @@ a.menu-item { color: inherit; }
 .starter-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
 .starter-body .starter-note { margin: 8px 0 0; font-size: calc(11px * var(--text-scale)); }
 .tester-card { background: #fdf6e8; border-color: #ecd9b0; } :root[data-theme="dark"] .tester-card { background: #2c2618; border-color: #4a3f25; } @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .tester-card { background: #2c2618; border-color: #4a3f25; } } .tester-card a.button { text-decoration: none; text-align: center; }
+
+/* v1.9.10: small «Νέα» badge on recently added recipes */
+.new-badge { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; font-size: calc(11px * var(--text-scale)); font-weight: 700; vertical-align: middle; background: color-mix(in srgb, var(--accent, #2f7d4f) 15%, transparent); color: var(--accent, #2f7d4f); }
