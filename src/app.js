@@ -1603,11 +1603,35 @@ function importReceipt(form) {
   const replace = receiptState.related && form.elements.replaceRelated?.checked ? receiptState.related.id : '';
   if (replace) Object.assign(state, deleteReceipt(state, replace));
   const refs = { ...(receipt.mark ? { mark: receipt.mark } : {}), ...(receipt.series ? { series: receipt.series } : {}), ...(receipt.number ? { number: receipt.number } : {}), ...(receipt.invoiceType ? { invoiceType: receipt.invoiceType } : {}) };
+  const firstScan = !(state.receipts || []).some((r) => r.format !== 'transport');
   state.receipts = [...(state.receipts || []).filter((r) => r.id !== id), { id, date, total: receipt.total, store: storeName, issuerVat: receipt.issuerVat || '', format: receipt.format, ...refs, lines: receipt.lines.length, items: receipt.lines.slice(0, 80).map((l) => ({ name: l.name, quantity: l.quantity, unit: l.unit, price: l.price })), ...(receipt.sourceUrl ? { url: receipt.sourceUrl } : {}), importedAt: now }];
   if (!persist()) return;
   document.querySelector('#receipt-dialog').close();
   renderApp();
   showToast(t('Απόδειξη: {added} νέα, {merged} ενημερώθηκαν, έξοδα {spent}.', { added, merged, spent: money(Math.round(spent * 100) / 100) }));
+  if (firstScan) setTimeout(offerScanReminder, 1800);
+}
+
+// v1.9.13: after the first scanned receipt, ask once whether to turn on the scan reminder (same path as the Settings checkbox).
+const SCAN_PROMPT_KEY = 'spitothiki-scan-reminder-asked';
+function offerScanReminder() {
+  try { if (localStorage.getItem(SCAN_PROMPT_KEY)) return; } catch { return; }
+  if (notifySettings().scanNudge || !notificationsSupported() || Notification.permission === 'denied') return;
+  if (document.querySelector('dialog[open]')) { setTimeout(offerScanReminder, 2000); return; }
+  const remember = (answer) => { try { localStorage.setItem(SCAN_PROMPT_KEY, answer); } catch {} };
+  showChoice({ title: 'Να σου θυμίζω να σκανάρεις τα ψώνια σου;', message: t('Υπενθύμιση σκαναρίσματος, αν δεν σκανάρεις 7 μέρες (το πολύ μία την εβδομάδα)'), choices: [
+    { label: 'Ναι', primary: true, run: async () => {
+      remember('yes');
+      const s = notifySettings();
+      if (s.enabled && Notification.permission === 'granted') { saveNotifySettings({ scanNudge: true }); scheduleBackgroundSnapshot(); showToast(t('Η υπενθύμιση σκαναρίσματος ενεργοποιήθηκε.')); return; }
+      saveNotifySettings({ scanNudge: true });
+      await enableNotifications();
+      if (Notification.permission !== 'granted') { saveNotifySettings({ scanNudge: false }); return; }
+      scheduleBackgroundSnapshot();
+      showToast(t('Η υπενθύμιση σκαναρίσματος ενεργοποιήθηκε.'));
+    } },
+    { label: 'Όχι, ευχαριστώ', run: () => remember('no') },
+  ] });
 }
 
 function renderReceiptSettingsCard() {
