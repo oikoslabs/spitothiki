@@ -2,11 +2,12 @@
 // Strategy: network-first for everything from this site (HTML, JS, CSS, manifest), so a new
 // deploy shows up on the next load; the cache is only used when the network is unavailable.
 // Bump CACHE_VERSION when the list of shell files changes; old caches are deleted on activate.
-const CACHE_VERSION = 'v107';
+const CACHE_VERSION = 'v108';
 const CACHE = `spitothiki-${CACHE_VERSION}`;
 const OCR_CACHE = 'spitothiki-vendor'; // v1.9.4: was spitothiki-ocr (CDN copies), deleted on activate
 const SHARE_CACHE = 'spitothiki-share'; // a file shared to the app (Web Share Target), picked up by the page // Tesseract.js script/worker/core/language files, kept across versions
 const DATA_CACHE = 'spitothiki-data'; // written by the app: expiry snapshot for background checks
+// v1.9.11: opt-in weekly scan reminder (cache bumped).
 // v1.9.10: «Νέα» badge on recently added recipes (cache bumped).
 // v1.9.9: visible version label was stuck at 1.9.4, now 1.9.9 (cache bumped).
 // v1.8.9: Google Play app (TWA): /.well-known/assetlinks.json, source word 'play' (cache bumped).
@@ -91,7 +92,7 @@ self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   event.waitUntil((async () => {
     const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-    const view = event.notification.tag === 'spitothiki-bills' ? 'bills' : event.notification.tag === 'spitothiki-chores' ? 'chores' : event.notification.tag === 'spitothiki-push' ? 'overview' : 'pantry';
+    const view = event.notification.tag === 'spitothiki-bills' ? 'bills' : event.notification.tag === 'spitothiki-chores' ? 'chores' : ['spitothiki-push', 'spitothiki-scan'].includes(event.notification.tag) ? 'overview' : 'pantry';
     const existing = windows.find((client) => client.url.startsWith(self.registration.scope));
     if (existing) { await existing.focus(); return existing.navigate(`${self.registration.scope}#${view}`).catch(() => {}); }
     return self.clients.openWindow(`${self.registration.scope}#${view}`);
@@ -158,6 +159,8 @@ self.addEventListener('push', (event) => {
       }
       if (await backgroundExpiryCheck({ force: true })) return;
       const snap = await (await data.match('./__expiry.json'))?.json().catch(() => null);
+      // v1.9.11: opt-in scan nudge, only if nothing was scanned for 7 days.
+      if (snap?.scanNudge && (!snap.lastScan || addDaysKey(snap.lastScan, 7) <= todayKey())) return self.registration.showNotification(snap.scanTitle || 'Σκάναρες τα ψώνια σου;', { body: snap.scanBody || '', tag: 'spitothiki-scan', icon: 'icons/icon-192.png', badge: 'icons/icon-192.png', lang: snap.lang || 'el' });
       if (snap?.pushTitle) { title = snap.pushTitle; body = snap.pushBody || body; }
     } catch {}
     return self.registration.showNotification(title, { body, tag, icon: 'icons/icon-192.png', badge: 'icons/icon-192.png' });
