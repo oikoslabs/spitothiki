@@ -19,7 +19,7 @@ import { BILL_ICONS, BILL_PERIODS, BILL_TYPES, applyAutoPay, autoPayFor, incomeT
 import { findDuplicateBill, readBillFile } from './bill-pdf.js';
 import { initDietUi, renderDietSection } from './diet-ui.js';
 import { SHARED, cleanName, memberNames, monthBalance, monthExpenses, payerOf, setPayer, settlementsFor } from './whopaid.js';
-import { pushDates, pushSupported, pushSubscription, syncPush, stopPush } from './push.js';
+import { lastScanDate, pushDates, scanNudgeDates, pushSupported, pushSubscription, syncPush, stopPush } from './push.js';
 import { autoListAdds } from './auto-list.js';
 import { comparePrices, listComparison } from './price-compare.js';
 import { extractShelfPrice, lastReceiptPrice } from './shelf-price.js';
@@ -1077,6 +1077,7 @@ async function writeBackgroundSnapshot() {
     const snapshot = expirySnapshot(state.items, { days: settings.days, lang: getLang(), lastNotified: settings.lastNotified,
       titleOne: t('1 προϊόν λήγει σύντομα'), titleMany: t('{count} προϊόντα λήγουν σύντομα', { count: '{count}' }), more: t(' και {count} ακόμη', { count: '{count}' }) });
     Object.assign(snapshot, { pushTitle: t('Έχεις υπενθυμίσεις στη Σπιτοθήκη'), pushBody: t('Άνοιξε για λεπτομέρειες.'), lastBillNotified: settings.lastBillNotified, billTitleOne: t('1 λογαριασμός προς πληρωμή'), billTitleMany: t('{count} λογαριασμοί προς πληρωμή', { count: '{count}' }),
+      scanNudge: settings.scanNudge, lastScan: lastScanDate(state.receipts || []), scanTitle: t('Σκάναρες τα ψώνια σου;'), scanBody: t('Μια απόδειξη σε 5 δευτερόλεπτα, και τα έξοδα γράφονται μόνα τους.'),
       choreTitle: t('Σήμερα: {list}', { list: '{list}' }), lastChoreNotified: settings.lastChoreNotified, chores: (state.chores || []).filter((c) => c.remind).map((c) => ({ name: c.name, next: nextDue(c) })),
       bills: (state.bills || []).filter((bill) => !bill.paid && !bill.autoPay).map((bill) => ({ name: bill.name, due: bill.due, remind: bill.remind ?? 3, amount: money(bill.amount) })) });
     await cache.put(SNAPSHOT_URL, new Response(JSON.stringify(snapshot), { headers: { 'content-type': 'application/json' } }));
@@ -1123,7 +1124,7 @@ const pushErrorText = (error) => {
 async function refreshPush({ force = false, test = false } = {}) {
   if (!pushSupported() || !notifySettings().enabled || Notification.permission !== 'granted') { if (test) pushError = pushErrorText(null); return null; }
   try {
-    const dates = [...new Set([...pushDates({ bills: state.bills || [], items: state.items || [] }, { days: notifySettings().days, today: localDateKey() }), ...choreDates(state.chores || [], localDateKey())])].sort().slice(0, 120);
+    const dates = [...new Set([...pushDates({ bills: state.bills || [], items: state.items || [] }, { days: notifySettings().days, today: localDateKey() }), ...choreDates(state.chores || [], localDateKey()), ...(notifySettings().scanNudge ? scanNudgeDates(lastScanDate(state.receipts || []), localDateKey()) : [])])].sort().slice(0, 120);
     const sig = `${localDateKey()}|${dates.join(',')}`;
     let last = ''; try { last = localStorage.getItem(PUSH_KEY) || ''; } catch {}
     const existing = await pushSubscription(false);
@@ -1155,8 +1156,8 @@ async function testPush() {
 function notifySettings() {
   try {
     const saved = JSON.parse(localStorage.getItem(NOTIFY_KEY) || '{}');
-    return { enabled: Boolean(saved.enabled), days: Number.isInteger(saved.days) && saved.days >= 0 && saved.days <= 30 ? saved.days : 3, lastNotified: String(saved.lastNotified || ''), lastBillNotified: String(saved.lastBillNotified || '') };
-  } catch { return { enabled: false, days: 3, lastNotified: '', lastBillNotified: '' }; }
+    return { enabled: Boolean(saved.enabled), days: Number.isInteger(saved.days) && saved.days >= 0 && saved.days <= 30 ? saved.days : 3, lastNotified: String(saved.lastNotified || ''), lastBillNotified: String(saved.lastBillNotified || ''), scanNudge: Boolean(saved.scanNudge) };
+  } catch { return { enabled: false, days: 3, lastNotified: '', lastBillNotified: '', scanNudge: false }; }
 }
 
 function saveNotifySettings(changes) {
@@ -1235,6 +1236,7 @@ function renderNotificationCard() {
     <p class="field-hint" id="notify-status">${escapeHtml(t('Κατάσταση: {status}', { status: t(status) }))}</p>
     <label class="field-label" for="notify-days">Ειδοποίηση για λήξη μέσα σε (ημέρες)</label><input class="field-input notify-days" id="notify-days" type="number" min="0" max="30" step="1" value="${settings.days}" inputmode="numeric">
     <div class="settings-actions">${active ? '<button class="button button-quiet" type="button" data-action="disable-notifications">Απενεργοποίηση</button>' : `<button class="button button-primary" type="button" data-action="enable-notifications" ${permission === 'unsupported' || permission === 'denied' ? 'disabled' : ''}>Ενεργοποίηση ειδοποιήσεων</button>`}</div>
+    ${active ? `<label class="check-row" for="notify-scan"><input type="checkbox" id="notify-scan" ${settings.scanNudge ? 'checked' : ''}> <span>${escapeHtml(t('Υπενθύμιση σκαναρίσματος, αν δεν σκανάρεις 7 μέρες (το πολύ μία την εβδομάδα)'))}</span></label>` : ''}
     <p class="field-hint" id="notify-background">${backgroundSyncSupported() ? 'Έλεγχος στο παρασκήνιο: διαθέσιμος. Με την εφαρμογή εγκατεστημένη, ο browser ελέγχει περίπου μία φορά τη μέρα, όποτε κρίνει.' : 'Έλεγχος στο παρασκήνιο: δεν υποστηρίζεται από αυτόν τον browser. Ο έλεγχος γίνεται όταν ανοίγεις την εφαρμογή.'}</p>
     <p class="field-hint" id="notify-push">${escapeHtml(t(!pushSupported() ? 'Με κλειστή εφαρμογή: δεν υποστηρίζεται από αυτόν τον browser.' : permission === 'denied' ? 'Με κλειστή εφαρμογή: μπλοκαρισμένες. Άνοιξε Ρυθμίσεις Android → Εφαρμογές → Σπιτοθήκη (ή Chrome) → Ειδοποιήσεις → Να επιτρέπονται.' : !active ? 'Με κλειστή εφαρμογή: ενεργοποίησε τις ειδοποιήσεις για να έρχονται και με κλειστή εφαρμογή (κάθε πρωί στις 9:00).' : pushState === 'error' ? 'Με κλειστή εφαρμογή: πρόβλημα.' : pushState === 'on' ? 'Με κλειστή εφαρμογή: ενεργές. Κάθε πρωί στις 9:00 για λογαριασμούς και λήξεις.' : 'Με κλειστή εφαρμογή: έλεγχος…'))}${pushState === 'error' && pushError ? ` <strong class="form-error" id="notify-push-error">${escapeHtml(pushError)}</strong>` : ''}</p>
     ${active && pushSupported() ? `<div class="settings-actions"><button class="button button-primary" type="button" data-action="push-test">🔔 Δοκιμαστική ειδοποίηση</button></div><p class="field-hint">${escapeHtml(t('Αν δεν έρθει: Ρυθμίσεις Android → Εφαρμογές → Σπιτοθήκη (ή Chrome) → Ειδοποιήσεις → ενεργές, και απενεργοποίησε την «Εξοικονόμηση μπαταρίας» για την εφαρμογή.'))}</p>` : ''}</section>`;
@@ -3487,6 +3489,7 @@ document.addEventListener('change', (event) => {
 });
 
 document.addEventListener('input', (event) => {
+  if (event.target.id === 'notify-scan') { saveNotifySettings({ scanNudge: event.target.checked }); scheduleBackgroundSnapshot(); showToast(event.target.checked ? t('Η υπενθύμιση σκαναρίσματος ενεργοποιήθηκε.') : t('Η υπενθύμιση σκαναρίσματος απενεργοποιήθηκε.')); }
   if (event.target.id === 'notify-days') {
     const days = Math.round(Number(event.target.value));
     if (Number.isFinite(days) && days >= 0 && days <= 30) { saveNotifySettings({ days, lastNotified: '' }); scheduleBackgroundSnapshot(); }

@@ -24,6 +24,14 @@ export function pushDates({ bills = [], items = [] } = {}, { days = 3, today }) 
   return [...out].sort().slice(0, 120);
 }
 
+// v1.9.11: opt-in «Σκάναρες τα ψώνια σου;» nudge: 7 and 14 days after the last scan (or after today, if that
+// is older), so at most one a week and it stops after two if the app isn't opened. Only dates leave the phone.
+export function scanNudgeDates(lastScan, today) {
+  const base = DATE.test(String(lastScan || '')) && addDays(lastScan, 7) > today ? lastScan : today;
+  return [addDays(base, 7), addDays(base, 14)].filter((d) => d > today);
+}
+export const lastScanDate = (receipts = []) => receipts.reduce((max, r) => { const d = String(r?.importedAt || '').slice(0, 10); return DATE.test(d) && d > max ? d : max; }, '');
+
 export const pushSupported = () => typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window;
 
 function keyBytes(b64) { const s = b64.replace(/-/g, '+').replace(/_/g, '/'); const raw = atob(s + '='.repeat((4 - (s.length % 4)) % 4)); return Uint8Array.from(raw, (c) => c.charCodeAt(0)); }
