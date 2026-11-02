@@ -1,12 +1,15 @@
 // Service worker for offline use.
-// Strategy: network-first for everything from this site (HTML, JS, CSS, manifest), so a new
-// deploy shows up on the next load; the cache is only used when the network is unavailable.
-// Bump CACHE_VERSION when the list of shell files changes; old caches are deleted on activate.
-const CACHE_VERSION = 'v108';
+// Strategy (v1.9.12): cache-first for this site's files, so a repeat visit downloads almost nothing
+// (Firebase Hosting never answers 304 for compressed files, so «network-first» re-downloaded the whole app
+// on every open). A new deploy still shows up: the browser re-checks sw.js on every open, a new CACHE_VERSION
+// installs a fresh copy of the shell, and the page reloads once on «controllerchange».
+// Bump CACHE_VERSION on EVERY deploy that changes any app file; old caches are deleted on activate.
+const CACHE_VERSION = 'v109';
 const CACHE = `spitothiki-${CACHE_VERSION}`;
 const OCR_CACHE = 'spitothiki-vendor'; // v1.9.4: was spitothiki-ocr (CDN copies), deleted on activate
 const SHARE_CACHE = 'spitothiki-share'; // a file shared to the app (Web Share Target), picked up by the page // Tesseract.js script/worker/core/language files, kept across versions
 const DATA_CACHE = 'spitothiki-data'; // written by the app: expiry snapshot for background checks
+// v1.9.12: lighter: cache-first + no double download on first visit (cache bumped).
 // v1.9.11: opt-in weekly scan reminder (cache bumped).
 // v1.9.10: «Νέα» badge on recently added recipes (cache bumped).
 // v1.9.9: visible version label was stuck at 1.9.4, now 1.9.9 (cache bumped).
@@ -23,11 +26,18 @@ const SHORT_PATH = /^\/(tiktok|facebook|instagram|telegram|viber|reddit|pinteres
 const SHELL = [
   './', './index.html', './privacy.html', './styles.css', './manifest.webmanifest',
   './src/app.js', './src/format.js', './src/theme.js', './src/i18n.js', './src/features.js', './src/recipes.js', './src/receipt.js', './src/receipt-photo.js', './src/mealplan.js', './src/diet-plan.js', './src/receipts.js', './src/diet-ui.js', './src/diet-i18n.js', './src/bills.js', './src/transport.js', './src/extras.js', './src/chores.js', './src/bar.js', './src/bill-pdf.js', './src/prefs.js', './src/scan-router.js', './src/onboarding.js', './src/cart.js', './src/shelf-price.js', './src/push.js', './src/auto-list.js', './src/price-compare.js', './src/recipe-data.js', './src/gs1.js', './src/back-to-top.js', './src/backup-crypto.js', './src/gdrive.js', './src/gdrive-auth.js', './src/drive-key.js', './src/receipt-edit.js', './src/manual-expense.js', './src/receipt-domains.js', './src/expense-cats.js', './src/whopaid.js', './src/offline.js', './src/protect.js', './src/domain.js', './src/storage.js', './src/barcode.js', './src/toll-barcode.js', './src/firebase-config.js', './src/sync-core.js', './src/sync-firebase.js', './src/source.js', './src/account-delete.js', './src/tester-card.js',
-  './fonts/commissioner-greek.woff2', './fonts/commissioner-latin.woff2', './fonts/commissioner-latin-ext.woff2', './icons/icon-192.png', './icons/icon-512.png', './icons/icon.svg'
+  './fonts/commissioner-greek.woff2', './fonts/commissioner-latin.woff2', './icons/icon-192.png', './icons/icon.svg'
 ];
 
+// v1.9.12: first install takes the files the page just downloaded from the browser cache (short max-age in
+// firebase.json) instead of downloading the app a second time; an update always fetches fresh copies.
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL.map((url) => new Request(url, { cache: 'reload' })))).then(() => self.skipWaiting()));
+  event.waitUntil((async () => {
+    const update = (await caches.keys()).some((key) => /^spitothiki-v\d+$/.test(key) && key !== CACHE);
+    const cache = await caches.open(CACHE);
+    await cache.addAll(SHELL.map((url) => new Request(url, { cache: update ? 'reload' : 'default' })));
+    await self.skipWaiting();
+  })());
 });
 
 self.addEventListener('activate', (event) => {
@@ -66,22 +76,24 @@ self.addEventListener('fetch', (event) => {
     }));
     return;
   }
-  if (request.method !== 'GET' || url.origin !== self.location.origin) return;
+  if (request.method !== 'GET' || url.origin !== self.location.origin || url.pathname.startsWith('/__/')) return;
   event.respondWith((async () => {
+    const navigate = request.mode === 'navigate';
+    const short = navigate && url.pathname.match(SHORT_PATH);
+    if (!short) {
+      const cached = await caches.match(request, { ignoreSearch: navigate });
+      if (cached) return cached;
+    }
     try {
-      // no-cache: always revalidate with the server, bypassing the browser HTTP cache.
-      const response = await fetch(request, { cache: 'no-cache' });
-      if (response.ok) {
+      const response = await fetch(request);
+      if (response.ok && response.type === 'basic' && !response.redirected) {
         const copy = response.clone();
         caches.open(CACHE).then((cache) => cache.put(request, copy));
       }
       return response;
     } catch {
-      const cached = await caches.match(request, { ignoreSearch: request.mode === 'navigate' });
-      if (cached) return cached;
-      const short = request.mode === 'navigate' && url.pathname.match(SHORT_PATH);
       if (short) return Response.redirect(`${self.location.origin}/?src=${short[1].toLowerCase()}`, 302);
-      if (request.mode === 'navigate') return (await caches.match('./index.html')) || Response.error();
+      if (navigate) return (await caches.match('./index.html')) || Response.error();
       return Response.error();
     }
   })());
