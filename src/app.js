@@ -1603,13 +1603,13 @@ function importReceipt(form) {
   const replace = receiptState.related && form.elements.replaceRelated?.checked ? receiptState.related.id : '';
   if (replace) Object.assign(state, deleteReceipt(state, replace));
   const refs = { ...(receipt.mark ? { mark: receipt.mark } : {}), ...(receipt.series ? { series: receipt.series } : {}), ...(receipt.number ? { number: receipt.number } : {}), ...(receipt.invoiceType ? { invoiceType: receipt.invoiceType } : {}) };
-  const firstScan = !(state.receipts || []).some((r) => r.format !== 'transport');
   state.receipts = [...(state.receipts || []).filter((r) => r.id !== id), { id, date, total: receipt.total, store: storeName, issuerVat: receipt.issuerVat || '', format: receipt.format, ...refs, lines: receipt.lines.length, items: receipt.lines.slice(0, 80).map((l) => ({ name: l.name, quantity: l.quantity, unit: l.unit, price: l.price })), ...(receipt.sourceUrl ? { url: receipt.sourceUrl } : {}), importedAt: now }];
   if (!persist()) return;
   document.querySelector('#receipt-dialog').close();
   renderApp();
   showToast(t('Απόδειξη: {added} νέα, {merged} ενημερώθηκαν, έξοδα {spent}.', { added, merged, spent: money(Math.round(spent * 100) / 100) }));
-  if (firstScan) setTimeout(offerScanReminder, 1800);
+  // v1.9.14: also existing users: ask once after any saved receipt (not just the first).
+  setTimeout(offerScanReminder, 1800);
 }
 
 // v1.9.13: after the first scanned receipt, ask once whether to turn on the scan reminder (same path as the Settings checkbox).
