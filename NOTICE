@@ -1,8 +1,5 @@
 Σπιτοθήκη (Spitothiki)
-Copyright (C) 2026 Oikos Labs
+Copyright (c) 2026 Oikos Labs. All rights reserved.
 
-This program is free software: you can redistribute it and/or modify it under the terms of the
-GNU Affero General Public License as published by the Free Software Foundation, version 3 of the
-License, or (at your option) any later version. The full licence text is in LICENSE.
-
+Source-available for reading and privacy audit only; see LICENSE (Greek and English).
 The files in vendor/ are third-party libraries under their own licences (see vendor/README.md).

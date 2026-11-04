@@ -1,7 +1,7 @@
-// Receipt providers the app can read (shared by the app and the receipt proxy Worker, proxy/worker.js).
+// Receipt providers the app can read (shared by the app and the receipt proxy Worker, kept in the private repo oikoslabs/spitothiki-workers).
 // v1.8.0: the app checks a scanned link against this list BEFORE any lookup, so an unknown shop gets
 // «δεν υποστηρίζονται ακόμα» instead of a misleading «no internet». Pure, unit-tested.
-// To add a provider: add its registered domain here, then `cd proxy && npx wrangler deploy` and deploy the app.
+// To add a provider: add its registered domain here, then copy this file to the private workers repo, redeploy the proxy there, and deploy the app.
 
 // Registered domains of AADE-licensed e-invoicing providers (subdomains allowed).
 // Keep this list short and explicit: the proxy must never become an open relay.
