@@ -658,7 +658,7 @@ const EN = {
   'Δείξε περισσότερα ({count})': 'Show more ({count})',
   'Εισαγωγή': 'Import', 'Φόρτωση απόδειξης…': 'Loading receipt…', 'Απόδειξη': 'Receipt',
   'Απόδειξη: {added} νέα, {merged} ενημερώθηκαν, έξοδα {spent}.': 'Receipt: {added} new, {merged} updated, spending {spent}.',
-  'Σάρωση απόδειξης': 'Scan receipt', 'Οι ηλεκτρονικές αποδείξεις διαβάζονται απευθείας από τον πάροχο. Για παρόχους που δεν το επιτρέπουν, μπορείς να ορίσεις έναν δικό σου proxy (Cloudflare Worker, δες τον φάκελο proxy/).': 'E-receipts are read directly from the provider. For providers that do not allow it, you can set your own proxy (Cloudflare Worker, see the proxy/ folder).',
+  'Σάρωση απόδειξης': 'Scan receipt', 'Οι ηλεκτρονικές αποδείξεις διαβάζονται απευθείας από τον πάροχο. Για παρόχους που δεν το επιτρέπουν, χρησιμοποιείται ένας μικρός ιδιωτικός βοηθητικός server που δεν αποθηκεύει κανένα στοιχείο.': 'E-receipts are read directly from the provider. For providers that do not allow it, a small private helper server is used that stores no data.',
   'Διεύθυνση proxy': 'Proxy URL', 'Αποθήκευση': 'Save', 'Έχουν εισαχθεί {count} αποδείξεις.': '{count} receipts imported.', 'Δεν έχει εισαχθεί καμία απόδειξη ακόμα.': 'No receipts imported yet.',
   'Τα ψώνια στο απόθεμα με ένα QR': 'Groceries into the pantry with one QR', 'ΑΠΟΔΕΙΞΗ': 'RECEIPT',
   'Ο σύνδεσμος δεν είναι έγκυρος.': 'The link is not valid.', 'Δεν βρέθηκαν είδη σε αυτή την απόδειξη.': 'No items found on this receipt.',
