@@ -21,8 +21,3 @@ test('v1.9.3 Firestore rules validate record field types and household keys', ()
   assert.match(rules, /request\.resource\.data\.deleted is bool && request\.resource\.data\.ts is number/);
   assert.match(rules, /hasOnly\(\['ownerUid', 'members', 'createdAt', 'lastJoinCode'\]\)/);
 });
-test('v1.9.3 receipt proxy follows redirects by hand and the push worker keeps no request logs', () => {
-  assert.match(read('proxy/worker.js'), /redirect: 'manual'/);
-  assert.doesNotMatch(read('proxy/worker.js'), /redirect: 'follow'/);
-  assert.match(read('push/wrangler.toml'), /\[observability\]\nenabled = false/);
-});

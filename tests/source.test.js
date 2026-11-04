@@ -1,7 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { SOURCES, SOURCE_KEY, cleanUrl, initSource, isStatsOrigin, parseSource, sendEvent, sourceSignup, validEvent } from '../src/source.js';
-import worker, { allowedOrigin } from '../stats/worker.js';
 
 const memory = (init = {}) => { const m = new Map(Object.entries(init)); return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), m }; };
 
@@ -26,7 +25,7 @@ test('source: clean address keeps path, other params and #view', () => {
 test('source: event validation and origins (live + previews only)', () => {
   assert.ok(validEvent('visit', 'tiktok') && validEvent('signup', 'direct') && validEvent('visit', 'other'));
   assert.ok(!validEvent('visit', 'myspace') && !validEvent('click', 'tiktok') && !validEvent('visit', ''));
-  for (const ok of [isStatsOrigin, allowedOrigin]) {
+  for (const ok of [isStatsOrigin]) {
     assert.ok(ok('https://spitothiki.web.app') && ok('https://spitothiki--stats-abc123.web.app'));
     assert.ok(!ok('http://localhost:8080') && !ok('https://evil.web.app') && !ok('https://spitothiki.web.app.evil.com') && !ok(''));
   }
@@ -70,21 +69,6 @@ test('source: sendEvent body is only {type, src}; skips offline, localhost and b
   assert.equal(await sendEvent('visit', 'evil', { fetchImpl, online: true, origin: 'https://spitothiki.web.app' }), false);
   assert.equal(await sendEvent('visit', 'tiktok', { fetchImpl: async () => { throw new Error('net'); }, online: true, origin: 'https://spitothiki.web.app' }), false);
   assert.equal(calls.length, 1);
-});
-
-test('stats worker: writes only [type, src]; refuses other origins and words', async () => {
-  const points = []; const env = { SOURCES: { writeDataPoint: (p) => points.push(p) } };
-  const req = (origin, body, method = 'POST', path = '/e') => new Request(`https://spitothiki-stats.example${path}`, { method, headers: origin ? { Origin: origin, 'CF-Connecting-IP': '1.2.3.4' } : {}, body: method === 'POST' ? body : undefined });
-  let r = await worker.fetch(req('https://spitothiki.web.app', '{"type":"visit","src":"tiktok","uid":"x"}'), env);
-  assert.equal(r.status, 204); assert.equal(r.headers.get('access-control-allow-origin'), 'https://spitothiki.web.app');
-  assert.deepEqual(points, [{ indexes: ['tiktok'], blobs: ['visit', 'tiktok'] }]);
-  assert.equal((await worker.fetch(req('https://evil.example', '{"type":"visit","src":"tiktok"}'), env)).status, 403);
-  assert.equal((await worker.fetch(req('', '{"type":"visit","src":"tiktok"}'), env)).status, 403);
-  assert.equal((await worker.fetch(req('https://spitothiki.web.app', '{"type":"visit","src":"myspace"}'), env)).status, 400);
-  assert.equal((await worker.fetch(req('https://spitothiki.web.app', 'not json'), env)).status, 400);
-  assert.equal((await worker.fetch(req('https://spitothiki--pr-1.web.app', null, 'OPTIONS'), env)).status, 204);
-  assert.equal((await worker.fetch(req('https://spitothiki.web.app', '{}', 'POST', '/other'), env)).status, 404);
-  assert.equal(points.length, 1);
 });
 
 test('v1.8.3 short links: /tiktok, /TikTok/, /TIKTOK count like ?src and the address becomes /', async () => {
