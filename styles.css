@@ -28,6 +28,8 @@
 
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
+/* v1.9.17: stop Chrome/Android pull-to-refresh & rubber-band from hijacking scroll gestures */
+html, body { overscroll-behavior-y: none; }
 body { margin: 0; min-height: 100vh; background: var(--paper); color: var(--ink); font-family: var(--font); font-size: calc(15px * var(--text-scale)); line-height: 1.5; letter-spacing: .1px; }
 button, input, select { font: inherit; }
 button { color: inherit; }

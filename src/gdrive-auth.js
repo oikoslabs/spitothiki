@@ -17,7 +17,9 @@ export function forgetToken() {
   if (token?.value && globalThis.google?.accounts?.oauth2) { try { google.accounts.oauth2.revoke(token.value, () => {}); } catch {} }
   token = null;
 }
-// interactive=false → prompt '' (no screen if already granted); true → consent screen.
+// interactive=true → consent screen (user tapped «Σύνδεση»).
+// interactive=false → prompt 'none': never open the Google account picker (v1.9.17).
+// Empty prompt '' used to still show the account chooser on multi-account phones during silent auto-backup.
 export async function getDriveToken(force = false, { interactive = false } = {}) {
   if (!force && tokenValid(token)) return token.value;
   await loadGis();
@@ -31,6 +33,6 @@ export async function getDriveToken(force = false, { interactive = false } = {})
       },
       error_callback: (e) => reject(new Error(e?.type === 'popup_closed' ? 'Έκλεισες το παράθυρο της Google.' : e?.type === 'popup_failed_to_open' ? 'Ο browser μπλόκαρε το παράθυρο της Google.' : 'Η σύνδεση με το Google Drive δεν ολοκληρώθηκε.'))
     });
-    client.requestAccessToken({ prompt: interactive ? 'consent' : '' });
+    client.requestAccessToken({ prompt: interactive ? 'consent' : 'none' });
   });
 }

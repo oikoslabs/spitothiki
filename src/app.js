@@ -481,13 +481,14 @@ function driveDisconnect() {
     renderApp(); showToast('Αποσυνδέθηκες από το Google Drive.');
   }, 'Αποσύνδεση από Drive;');
 }
-// The Google token window needs a tap, so a due auto-backup runs on the first tap after opening the app.
+// The Google token window needs a real tap. v1.9.17: use click (not pointerdown) so the first
+// finger-down of a scroll does not fire silent Drive backup / Google account picker.
 let autoArmed = false;
 function maybeArmAutoBackup() {
   if (autoArmed || !navigator.onLine) return;
   if (!autoBackupDue({ enabled: driveOn(), auto: driveAuto(), hasKey: Boolean(driveKey), lastAt: numKey(DRIVE_LAST_KEY), lastHash: readKey(DRIVE_HASH_KEY) || '', hash: stateHash(state) })) return;
   autoArmed = true;
-  document.addEventListener('pointerdown', () => { driveBackupNow({ silent: true }); }, { once: true, capture: true });
+  document.addEventListener('click', () => { driveBackupNow({ silent: true }); }, { once: true, capture: true });
 }
 
 function goToSignin() {
@@ -498,7 +499,8 @@ function goToSignin() {
     card.scrollIntoView({ block: 'start' });
     card.classList.add('is-highlight');
     setTimeout(() => card.classList.remove('is-highlight'), 2500);
-    (card.querySelector('[data-action="sync-google"]') || card.querySelector('input[name="email"]'))?.focus({ preventScroll: true });
+    // v1.9.17: do not auto-focus the email field — Chrome/Android can open the Google
+    // account/password picker just from focusing an autocomplete=email input while scrolling.
   });
 }
 
