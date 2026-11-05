@@ -1,6 +1,7 @@
 // Firebase adapter for the sync engine. Loaded only when firebase-config.js has a config.
 import { SyncEngine } from './sync-core.js';
 import { deleteAccountData, recentLogin } from './account-delete.js';
+import { assertNotDisposableEmail } from './disposable-email.js';
 
 // v1.9.4: self-hosted Firebase JS SDK 13.0.0 (vendor/, imports rewritten to relative paths).
 const SDK = new URL('../vendor/firebase-13.0.0', import.meta.url).href;
@@ -104,7 +105,10 @@ export async function createFirebaseSync({ config, getState, setState, onStatus,
       catch (error) { if (error.code === 'auth/popup-blocked') await auth.signInWithRedirect(authApi, provider); else throw error; }
     },
     signInWithEmail: (email, password) => auth.signInWithEmailAndPassword(authApi, email, password),
-    signUpWithEmail: (email, password) => auth.createUserWithEmailAndPassword(authApi, email, password),
+    signUpWithEmail: (email, password) => {
+      assertNotDisposableEmail(email);
+      return auth.createUserWithEmailAndPassword(authApi, email, password);
+    },
     resetPassword: (email) => auth.sendPasswordResetEmail(authApi, email),
     signOut: () => auth.signOut(authApi),
     async createInvite() {

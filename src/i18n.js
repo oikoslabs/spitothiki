@@ -251,6 +251,7 @@ const EN = {
   'Διέγραψε όλα τα δεδομένα (απόθεμα, λίστες, έξοδα) από αυτή τη συσκευή.': 'Delete all data (pantry, lists, spending) from this device.', 'Διαγραφή όλων': 'Delete all',
   // Sync
   'Λάθος email ή κωδικός.': 'Wrong email or password.', 'Υπάρχει ήδη λογαριασμός με αυτό το email.': 'An account with this email already exists.',
+  'Δεν δέχομαι προσωρινά email. Χρησιμοποίησε κανονικό Gmail ή άλλο.': 'Temporary emails are not accepted. Please use a regular Gmail or another real address.',
   'Ο κωδικός θέλει τουλάχιστον 6 χαρακτήρες.': 'The password needs at least 6 characters.', 'Το email δεν είναι σωστό.': 'The email is not valid.',
   'Η σύνδεση ακυρώθηκε.': 'Sign-in was cancelled.', 'Το domain δεν έχει εγκριθεί στο Firebase (Authorized domains).': 'This domain is not authorised in Firebase (Authorized domains).',
   'Αυτός ο τρόπος σύνδεσης δεν έχει ενεργοποιηθεί στο Firebase.': 'This sign-in method is not enabled in Firebase.', 'Χωρίς σύνδεση στο internet.': 'No internet connection.',

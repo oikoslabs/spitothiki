@@ -32,6 +32,7 @@ import { decryptBackup, decryptWithKey, deriveDeviceKey, encryptBackup, encryptW
 import { DRIVE_AUTO_KEY, DRIVE_ENABLED_KEY, DRIVE_HASH_KEY, DRIVE_LAST_KEY, autoBackupDue, createDriveClient, stateHash } from './gdrive.js';
 import { forgetToken, getDriveToken } from './gdrive-auth.js';
 import { confirmWordOk } from './account-delete.js';
+import { DISPOSABLE_EMAIL_MSG, isDisposableEmail } from './disposable-email.js';
 import { clearDriveKey, loadDriveKey, saveDriveKey } from './drive-key.js';
 import { applyReceiptEdit } from './receipt-edit.js';
 import { addManualExpense, createManualExpense, guessManualCategory, manualCategory, needsAmount } from './manual-expense.js';
@@ -735,7 +736,8 @@ const AUTH_ERRORS = {
   'permission-denied': 'Δεν επιτρέπεται (έλεγξε τον κωδικό πρόσκλησης ή τους κανόνες του Firestore).', 'not-found': 'Δεν βρέθηκε το νοικοκυριό.',
   'resource-exhausted': 'Ο συγχρονισμός έφτασε το ημερήσιο όριο. Τα δεδομένα σου μένουν στη συσκευή και θα συγχρονιστούν αργότερα.',
   'unavailable': 'Ο συγχρονισμός δεν είναι διαθέσιμος τώρα. Τα δεδομένα σου μένουν στη συσκευή.', 'deadline-exceeded': 'Ο συγχρονισμός άργησε να απαντήσει. Θα ξαναδοκιμάσει μόνος του.',
-  'auth/too-many-requests': 'Πολλές προσπάθειες. Περίμενε λίγο και δοκίμασε ξανά.', 'auth/quota-exceeded': 'Η σύνδεση έφτασε το όριο για σήμερα. Δοκίμασε αργότερα: η εφαρμογή δουλεύει κανονικά και χωρίς σύνδεση.'
+  'auth/too-many-requests': 'Πολλές προσπάθειες. Περίμενε λίγο και δοκίμασε ξανά.', 'auth/quota-exceeded': 'Η σύνδεση έφτασε το όριο για σήμερα. Δοκίμασε αργότερα: η εφαρμογή δουλεύει κανονικά και χωρίς σύνδεση.',
+  'auth/disposable-email': DISPOSABLE_EMAIL_MSG
 };
 const authMessage = (error) => t(AUTH_ERRORS[error?.code] || error?.message || 'Κάτι πήγε στραβά.');
 
@@ -3626,6 +3628,8 @@ document.addEventListener('submit', (event) => {
     if (!email) { showToast('Γράψε το email σου.'); return; }
     if (mode === 'reset') { syncAction(() => sync.resetPassword(email), 'Σου στείλαμε email για νέο κωδικό.'); return; }
     if (password.length < 6) { showToast('Ο κωδικός θέλει τουλάχιστον 6 χαρακτήρες.'); return; }
+    // v1.9.16: block disposable/temp emails on new account creation (not Google, not existing sign-in).
+    if (mode === 'signup' && isDisposableEmail(email)) { showToast(DISPOSABLE_EMAIL_MSG); return; }
     syncAction(() => mode === 'signup' ? sync.signUpWithEmail(email, password) : sync.signInWithEmail(email, password));
     return;
   }
