@@ -33,6 +33,7 @@ import { DRIVE_AUTO_KEY, DRIVE_ENABLED_KEY, DRIVE_HASH_KEY, DRIVE_LAST_KEY, auto
 import { forgetToken, getDriveToken } from './gdrive-auth.js';
 import { confirmWordOk } from './account-delete.js';
 import { DISPOSABLE_EMAIL_MSG, isDisposableEmail } from './disposable-email.js';
+import { MARKETING_HINT, MARKETING_LABEL, readMarketingCheckbox } from './marketing-consent.js';
 import { clearDriveKey, loadDriveKey, saveDriveKey } from './drive-key.js';
 import { applyReceiptEdit } from './receipt-edit.js';
 import { addManualExpense, createManualExpense, guessManualCategory, manualCategory, needsAmount } from './manual-expense.js';
@@ -770,6 +771,7 @@ function renderSyncCard() {
   if (status.state === 'signed-out' || (status.state === 'error' && !status.user)) {
     return `${head}<p>Συνδέσου για να έχεις τα ίδια δεδομένα σε όλες τις συσκευές σου και για να τα μοιράζεσαι με τα μέλη του σπιτιού σου. Τα δεδομένα αυτής της συσκευής θα ενωθούν με όσα έχεις ήδη.</p>
       ${status.message ? `<p class="form-error" id="sync-status">${escapeHtml(t(AUTH_ERRORS[status.message] || status.message))}</p>` : '<p class="field-hint" id="sync-status">Αποσυνδεδεμένος</p>'}
+      ${(authProviders.includes('google') || authProviders.includes('password')) ? `<label class="check-row" for="marketing-optin"><input type="checkbox" id="marketing-optin" name="marketingOptIn" ${(authProviders.includes('password') ? 'form="sync-email-form" ' : '')}><span>${escapeHtml(t(MARKETING_LABEL))}</span></label><p class="field-hint">${escapeHtml(t(MARKETING_HINT))}</p>` : ''}
       ${authProviders.includes('google') ? '<div class="settings-actions"><button class="button button-primary" type="button" data-action="sync-google">Σύνδεση με Google</button></div>' : ''}
       ${authProviders.includes('password') ? `<form id="sync-email-form" class="sync-email-form" novalidate><input class="field-input" name="email" type="email" autocomplete="email" placeholder="Email" aria-label="Email" required><input class="field-input" name="password" type="password" autocomplete="current-password" placeholder="Κωδικός" aria-label="Κωδικός" minlength="6" required>
         <div class="settings-actions"><button class="button button-quiet" type="submit" name="mode" value="signin">Σύνδεση</button><button class="button button-quiet" type="submit" name="mode" value="signup">Νέος λογαριασμός</button><button class="text-button" type="submit" name="mode" value="reset">Ξέχασα τον κωδικό</button></div></form>` : ''}</section>`;
@@ -794,6 +796,9 @@ function renderSyncCard() {
       </ol>
       <p class="field-hint">Όσο είσαι μέσα στο σπίτι του, βλέπεις τα δικά του δεδομένα. Για να γυρίσεις στα δικά σου, πάτα «Αποχώρηση από το κοινό σπίτι».</p>
     </details>
+    <h3 class="settings-sub">${escapeHtml(t('Νέα για τη Σπιτοθήκη'))}</h3>
+    <label class="check-row" for="marketing-optin-settings"><input type="checkbox" id="marketing-optin-settings" ${status.marketingOptIn ? 'checked' : ''}><span>${escapeHtml(t(MARKETING_LABEL))}</span></label>
+    <p class="field-hint">${escapeHtml(t(MARKETING_HINT))}</p>
     <details class="relative-help account-delete" id="account-delete"><summary>Διαγραφή λογαριασμού</summary>
       <p>Σβήνει οριστικά τον λογαριασμό σου (email και σύνδεση) και τα δεδομένα σου στον συγχρονισμό. Αν μένεις μόνος στο σπίτι σου, σβήνονται όλα του. Αν έχουν μπει κι άλλοι, το σπίτι και τα κοινά δεδομένα περνούν στο επόμενο μέλος. Σβήνονται και τα δεδομένα αυτής της συσκευής. Δεν αναιρείται.</p>
       <form id="account-delete-form" class="sync-join-form" novalidate><label class="field-label" for="account-delete-word">Για επιβεβαίωση, γράψε ΔΙΑΓΡΑΦΗ</label><input class="field-input" id="account-delete-word" name="word" autocomplete="off" autocapitalize="characters" placeholder="ΔΙΑΓΡΑΦΗ"><button class="button button-danger" type="submit">Διαγραφή λογαριασμού</button></form>
@@ -3310,7 +3315,7 @@ function handleAction(button) {
   } else if (action === 'remove-shopping') {
     state.shopping = state.shopping.filter((entry) => entry.id !== id);
     persist(); renderApp(); showToast('Το προϊόν αφαιρέθηκε από τη λίστα.');
-  } else if (action === 'sync-google') syncAction(() => sync.signInWithGoogle());
+  } else if (action === 'sync-google') syncAction(() => sync.signInWithGoogle({ marketingOptIn: readMarketingCheckbox() }));
   else if (action === 'sync-signout') syncAction(() => sync.signOut(), 'Αποσυνδέθηκες. Τα δεδομένα μένουν σε αυτή τη συσκευή.');
   else if (action === 'sync-invite') syncAction(async () => {
     const code = await sync.createInvite();
@@ -3484,6 +3489,11 @@ document.addEventListener('change', (event) => {
     return;
   }
   if (event.target.matches?.('[data-bill-file]')) { importBillFile(event.target.files?.[0]); event.target.value = ''; return; }
+  if (event.target.id === 'marketing-optin-settings') {
+    const on = event.target.checked;
+    syncAction(async () => { await sync.setMarketingOptIn(on); }, on ? t('Θα λαμβάνεις περιστασιακά νέα για τη Σπιτοθήκη.') : t('Σταμάτησες τα νέα για τη Σπιτοθήκη.'));
+    return;
+  }
   if (event.target.id === 'auto-list-toggle') { try { localStorage.setItem(AUTO_LIST_KEY, event.target.checked ? '1' : '0'); } catch {} showToast(event.target.checked ? 'Η αυτόματη λίστα ενεργοποιήθηκε.' : 'Η αυτόματη λίστα απενεργοποιήθηκε.'); if (event.target.checked) persist(); return; }
   if (event.target.matches?.('[data-shelf-photo]')) { loadShelfPhoto(event.target.files?.[0]); event.target.value = ''; return; }
   if (event.target.id === 'cart-item-name') { refreshCartPriceChips(); return; }
@@ -3632,7 +3642,8 @@ document.addEventListener('submit', (event) => {
     if (password.length < 6) { showToast('Ο κωδικός θέλει τουλάχιστον 6 χαρακτήρες.'); return; }
     // v1.9.16: block disposable/temp emails on new account creation (not Google, not existing sign-in).
     if (mode === 'signup' && isDisposableEmail(email)) { showToast(DISPOSABLE_EMAIL_MSG); return; }
-    syncAction(() => mode === 'signup' ? sync.signUpWithEmail(email, password) : sync.signInWithEmail(email, password));
+    // v1.9.18: marketing checkbox applies only to new accounts; sign-in must not overwrite stored consent.
+    syncAction(() => mode === 'signup' ? sync.signUpWithEmail(email, password, { marketingOptIn: readMarketingCheckbox(event.target.ownerDocument) }) : sync.signInWithEmail(email, password));
     return;
   }
   if (event.target.id === 'account-delete-form') { // v1.9.4: typed word + a second confirm

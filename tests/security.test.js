@@ -21,3 +21,14 @@ test('v1.9.3 Firestore rules validate record field types and household keys', ()
   assert.match(rules, /request\.resource\.data\.deleted is bool && request\.resource\.data\.ts is number/);
   assert.match(rules, /hasOnly\(\['ownerUid', 'members', 'createdAt', 'lastJoinCode'\]\)/);
 });
+
+test('v1.9.18 Firestore users/{uid} allows marketing consent fields with ownership + types', () => {
+  const rules = read('firestore.rules');
+  assert.match(rules, /function isValidUser/);
+  assert.match(rules, /marketingOptIn/);
+  assert.match(rules, /marketingOptInAt/);
+  assert.match(rules, /marketingOptOutAt/);
+  assert.match(rules, /marketingConsentVersion/);
+  assert.match(rules, /request\.auth\.uid == uid && isValidUser/);
+  assert.match(rules, /optionalString\(data, 'marketingConsentSource', 40\)/);
+});

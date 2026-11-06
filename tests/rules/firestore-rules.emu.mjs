@@ -156,3 +156,28 @@ test('handover rule cannot be abused', async () => {
   await assertFails(updateDoc(doc(as(V), 'households', V), { ownerUid: M, members: [V, M] }));
   await assertFails(updateDoc(doc(as(V), 'households', V), { ownerUid: M, members: [] }));
 });
+
+test('v1.9.18 owner can store marketing opt-in on own user doc; attacker cannot', async () => {
+  const db = as(V);
+  await assertSucceeds(setDoc(doc(db, 'users', V), {
+    householdId: V,
+    marketingOptIn: true,
+    marketingOptInAt: serverTimestamp(),
+    marketingOptOutAt: null,
+    marketingConsentVersion: '1',
+    marketingConsentSource: 'email-signup'
+  }, { merge: true }));
+  await assertSucceeds(setDoc(doc(db, 'users', V), {
+    householdId: V,
+    marketingOptIn: false,
+    marketingOptOutAt: serverTimestamp(),
+    marketingConsentVersion: '1',
+    marketingConsentSource: 'settings'
+  }, { merge: true }));
+  // householdId-only merge still works after marketing fields exist
+  await assertSucceeds(setDoc(doc(db, 'users', V), { householdId: V }, { merge: true }));
+  await assertFails(setDoc(doc(as(A), 'users', V), { householdId: V, marketingOptIn: true }, { merge: true }));
+  await assertFails(setDoc(doc(db, 'users', V), { householdId: V, marketingOptIn: 'yes' }, { merge: true }));
+  await assertFails(setDoc(doc(db, 'users', V), { householdId: V, extra: 1 }, { merge: true }));
+  await assertFails(setDoc(doc(db, 'users', V), { householdId: V, marketingConsentSource: 'x'.repeat(50) }, { merge: true }));
+});
