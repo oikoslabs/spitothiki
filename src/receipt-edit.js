@@ -4,24 +4,48 @@
 // v1.8.4: edits.category = product group («Τι αγόρασες;») of a receipt with only a total (e.g. «＋ Έξοδο με το χέρι»).
 import { effectiveItemCategory, totalPurchaseCategory } from './expense-cats.js';
 import { CATEGORIES } from './features.js';
+import { parseAmount } from './manual-expense.js';
 const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
+
+// v1.9.19: an invalid amount (empty, text, negative, NaN/Infinity) is rejected instead of being saved as 0 €.
+// Greek decimals («12,50», «1.234,50») are accepted. Returns a Greek message key, or '' when the edit is valid.
+const isBlank = (v) => v == null || String(v).trim() === '';
+export function receiptEditError(edits = {}) {
+  const bad = (v) => { const n = parseAmount(v); return !Number.isFinite(n) ? 'invalid' : n < 0 ? 'negative' : ''; };
+  if (Array.isArray(edits.items)) {
+    for (const it of edits.items) {
+      if (!String(it?.name || '').trim() || isBlank(it.price)) continue;
+      const e = bad(it.price);
+      if (e) return e === 'negative' ? 'Η τιμή δεν μπορεί να είναι αρνητική.' : 'Έλεγξε τις τιμές: γράψε ποσό, π.χ. 2,50.';
+    }
+    return '';
+  }
+  if (Object.prototype.hasOwnProperty.call(edits, 'total')) {
+    if (isBlank(edits.total)) return 'Γράψε το ποσό, π.χ. 12,50.';
+    const e = bad(edits.total);
+    if (e) return e === 'negative' ? 'Το ποσό δεν μπορεί να είναι αρνητικό.' : 'Γράψε ένα έγκυρο ποσό, π.χ. 12,50.';
+  }
+  return '';
+}
+const amt = (v) => (isBlank(v) ? 0 : r2(parseAmount(v)));
 
 // edits: { store, date, total?, expenseCategory?, items: [{ name, quantity, price, expenseCategory? }] } (items index = original line index)
 export function applyReceiptEdit(state, id, edits, now = new Date().toISOString()) {
   const receipt = (state.receipts || []).find((r) => r.id === id);
   if (!receipt) return state;
+  if (receiptEditError(edits)) return state; // keep the saved record untouched
   const store = String(edits.store ?? receipt.store ?? '').trim();
   const date = /^\d{4}-\d{2}-\d{2}$/.test(String(edits.date || '')) ? edits.date : receipt.date;
   const receiptCat = edits.expenseCategory !== undefined ? String(edits.expenseCategory || '') : String(receipt.expenseCategory || '');
   const oldItems = Array.isArray(receipt.items) ? receipt.items : [];
   const items = Array.isArray(edits.items) ? edits.items.map((it, i) => {
     const cat = it.expenseCategory !== undefined ? String(it.expenseCategory || '') : String(oldItems[i]?.expenseCategory || '');
-    return { name: String(it.name || '').trim(), quantity: Math.max(0, Number(it.quantity) || 0), unit: it.unit, price: Math.max(0, r2(it.price)), ...(cat ? { expenseCategory: cat } : {}) };
+    return { name: String(it.name || '').trim(), quantity: Math.max(0, Number(it.quantity) || 0), unit: it.unit, price: amt(it.price), ...(cat ? { expenseCategory: cat } : {}) };
   }) : null;
   const catItems = items || oldItems;
   const withCat = (p, fields) => { const out = { ...p }; delete out.expenseCategory; delete out.expenseSplit; return { ...out, ...fields }; };
   const sum = items ? r2(items.reduce((s, it) => s + (it.name ? it.price : 0), 0)) : 0;
-  const total = edits.total != null && edits.total !== '' ? Math.max(0, r2(edits.total)) : (items && items.length ? sum : r2(receipt.total));
+  const total = edits.total != null && edits.total !== '' ? amt(edits.total) : (items && items.length ? sum : r2(receipt.total));
   const linked = (state.purchases || []).filter((p) => p.receiptId === id);
   const linePurchases = linked.some((p) => p.id.startsWith(`pur-${id}-`));
   const purchases = [];

@@ -998,3 +998,8 @@ a.menu-item { color: inherit; }
 
 /* v1.9.10: small «Νέα» badge on recently added recipes */
 .new-badge { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; font-size: calc(11px * var(--text-scale)); font-weight: 700; vertical-align: middle; background: color-mix(in srgb, var(--accent, #2f7d4f) 15%, transparent); color: var(--accent, #2f7d4f); }
+
+/* v1.9.19 */
+.field-error { color: #b3261e; font-weight: 600; margin: 8px 0 0; } :root[data-theme="dark"] .field-error { color: #ffb4ab; }
+.field-input[aria-invalid="true"] { border-color: #b3261e; }
+.tester-steps { margin: 8px 0; padding-left: 0; list-style: none; display: grid; gap: 10px; } .tester-steps li { display: grid; gap: 6px; }

@@ -35,8 +35,8 @@ import { confirmWordOk } from './account-delete.js';
 import { DISPOSABLE_EMAIL_MSG, isDisposableEmail } from './disposable-email.js';
 import { MARKETING_HINT, MARKETING_LABEL, readMarketingCheckbox } from './marketing-consent.js';
 import { clearDriveKey, loadDriveKey, saveDriveKey } from './drive-key.js';
-import { applyReceiptEdit } from './receipt-edit.js';
-import { addManualExpense, createManualExpense, guessManualCategory, manualCategory, needsAmount } from './manual-expense.js';
+import { applyReceiptEdit, receiptEditError } from './receipt-edit.js';
+import { addManualExpense, createManualExpense, guessManualCategory, manualCategory, needsAmount, parseAmount } from './manual-expense.js';
 import { EXPENSE_CAT_DEFAULT_EMOJI, NO_CATEGORY, createExpenseCategory, deleteExpenseCategory, effectiveItemCategory, expenseCategories, expenseCategoryMonth, upsertExpenseCategory, visibleSpendRows } from './expense-cats.js';
 import { BACKUP_SNOOZE_KEY, LAST_BACKUP_KEY, backupReminderDue, dequeue, enqueue, hasData, loadQueue, saveQueue } from './offline.js';
 import { TRANSPORT_ICONS, TRANSPORT_TYPES, applyTransportRecurring, classifyReceipt, consumptionFor, createTransport, createTransportRecurring, fuelStats, pricePerLiter, transportMonth } from './transport.js';
@@ -45,7 +45,7 @@ import { getLang, locale, setLang, t, translateDom, untranslatedGreek } from './
 import { daysUntil, escapeHtml, expiryLabel, formatDate, localDateKey, readKey, writeKey } from './format.js';
 import { THEME_KEY, applyTheme, currentTheme } from './theme.js';
 import { initSource, sourceSignup } from './source.js';
-import { TESTER_KEY, TWA_SESSION_KEY, isPlayApp, showTesterCard, testerMailto } from './tester-card.js';
+import { TESTER_KEY, TWA_SESSION_KEY, isPlayApp, showTesterCard, TESTER_GROUP_URL, TESTER_PLAY_URL } from './tester-card.js';
 
 const viewRoot = document.querySelector('#view-content');
 const itemDialog = document.querySelector('#item-dialog');
@@ -334,19 +334,21 @@ function renderProtectCard() {
 function renderTesterCard() {
   let done = false; try { done = localStorage.getItem(TESTER_KEY) === '1'; } catch {}
   if (!showTesterCard({ userAgent: navigator.userAgent, playApp: testerCtx, done })) return '';
-  const href = testerMailto(t('Δοκιμαστής Σπιτοθήκης'), t('Γεια σας! Θέλω να γίνω δοκιμαστής της Σπιτοθήκης στο Google Play. Το Gmail που χρησιμοποιώ στο Google Play είναι: '));
+  const link = (url, label, id) => `<a class="button button-primary" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" id="${id}">${escapeHtml(t(label))}</a>`;
   return `<section class="signin-card tester-card" id="home-tester-card" aria-labelledby="home-tester-title"><span class="signin-icon" aria-hidden="true">📱</span>
-    <div class="signin-text"><h2 id="home-tester-title">${escapeHtml(t('Βοήθησε να βγει η Σπιτοθήκη στο Play Store!'))}</h2><p>${escapeHtml(t('Χρειαζόμαστε δοκιμαστές με Android για 14 μέρες. Το email σου χρησιμοποιείται μόνο για να μπεις στη λίστα δοκιμαστών.'))}</p></div>
-    <a class="button button-primary" href="${escapeHtml(href)}" data-action="tester-done" id="home-tester-join">${escapeHtml(t('Γίνε δοκιμαστής'))}</a>
+    <div class="signin-text"><h2 id="home-tester-title">${escapeHtml(t('Βοήθησε να βγει η Σπιτοθήκη στο Play Store!'))}</h2><p>${escapeHtml(t('Χρειαζόμαστε δοκιμαστές με Android για 14 μέρες. Δύο βήματα, με τον ίδιο λογαριασμό Google και στα δύο:'))}</p>
+    <ol class="tester-steps"><li>${escapeHtml(t('Μπες στην ομάδα δοκιμαστών στο Google Groups (πάτα «Join group» / «Συμμετοχή στην ομάδα»).'))} ${link(TESTER_GROUP_URL, '1. Ομάδα δοκιμαστών', 'home-tester-group')}</li>
+    <li>${escapeHtml(t('Μετά άνοιξε τη σελίδα δοκιμής του Google Play, πάτα «Become a tester» και εγκατάστησε την εφαρμογή από το Play Store.'))} ${link(TESTER_PLAY_URL, '2. Δοκιμή στο Google Play', 'home-tester-play')}</li></ol>
+    <p class="field-hint">${escapeHtml(t('Η Σπιτοθήκη δεν μπορεί να δει αν ολοκλήρωσες τα βήματα. Αν σε ρωτήσει για λογαριασμό, διάλεξε αυτόν που έχεις στο Play Store. Κλείσε την κάρτα με το × όταν τελειώσεις.'))}</p></div>
     <button class="icon-button signin-close" type="button" data-action="tester-done" aria-label="${escapeHtml(t('Απόκρυψη'))}" title="${escapeHtml(t('Απόκρυψη'))}">×</button></section>`;
 }
 // v1.9.0: empty app → one clear first step instead of the «only on this phone» warning. Gone after the first save.
 function renderStarterCard() {
   if (hasAnyData(state)) return '';
-  const steps = ['Σκανάρεις το QR, σε δύο δευτερόλεπτα.', 'Βλέπεις πού πάνε τα λεφτά σου κάθε μήνα.', 'Ξέρεις τι έχεις στο σπίτι πριν πας για ψώνια.'];
+  const steps = ['Σκανάρεις το QR της απόδειξης.', 'Βλέπεις πού πάνε τα λεφτά σου κάθε μήνα.', 'Ξέρεις τι έχεις στο σπίτι πριν πας για ψώνια.'];
   return `<section class="signin-card starter-card" id="home-starter-card" aria-labelledby="home-starter-title">
     <div class="starter-body"><h2 id="home-starter-title">${escapeHtml(t('Πέτα τις αποδείξεις στο συρτάρι. Σκάναρέ τες εδώ.'))}</h2>
-    <p>${escapeHtml(t('Σκανάρεις το QR της απόδειξης και η Σπιτοθήκη ξέρει τι αγόρασες, πόσο το πλήρωσες και τι έχεις στο ντουλάπι. Χωρίς να γράφεις τίποτα με το χέρι.'))}</p>
+    <p>${escapeHtml(t('Σκανάρεις το QR της απόδειξης. Από τις υποστηριζόμενες ηλεκτρονικές αποδείξεις η Σπιτοθήκη παίρνει τα προϊόντα και το ποσό. Σε άλλες (π.χ. QR της ΑΑΔΕ) μπορεί να σου ζητήσει το ποσό, μια φωτογραφία ή να το γράψεις με το χέρι.'))}</p>
     <p class="starter-example">${escapeHtml(t('Π.χ. σκάναρες την απόδειξη από τον Σκλαβενίτη: 14 προϊόντα, 38,40 €. Μπήκαν στα έξοδα του μήνα και στο ντουλάπι σου.'))}</p>
     <ol class="starter-steps">${steps.map((x) => `<li>${escapeHtml(t(x))}</li>`).join('')}</ol>
     <div class="starter-actions"><button class="button button-primary" type="button" data-action="quick" data-quick="scan" id="starter-scan">📷 ${escapeHtml(t('Σκάναρε την πρώτη σου απόδειξη'))}</button><button class="text-button" type="button" data-action="load-demo" id="starter-demo">${escapeHtml(t('ή δες με παραδείγματα'))}</button></div>
@@ -533,7 +535,7 @@ function renderOverview() {
       <section class="panel" id="home-month"><div class="panel-heading"><div><h2>${escapeHtml(t('Τα έξοδα του μήνα'))}</h2><p data-no-i18n>${escapeHtml(monthLabel(month))}</p></div><button class="panel-link" type="button" data-view="insights">${escapeHtml(t('Αναλυτικά →'))}</button></div>
         <p class="big-number" id="home-month-total">${escapeHtml(money(totals.total))}</p>${renderHomeMonthRows(totals.rows)}
         ${due.length ? `<button class="alert-banner home-bills-due" type="button" data-view="bills">📄 ${escapeHtml((due.length === 1 ? t('1 λογαριασμός λήγει σύντομα ή έχει λήξει') : t('{count} λογαριασμοί λήγουν σύντομα ή έχουν λήξει', { count: due.length })))} ›</button>` : ''}</section>
-      <section class="panel quick-panel" id="home-quick"><div class="panel-heading"><div><h2>Γρήγορες κινήσεις</h2><p>Τα βασικά, χωρίς ψάξιμο</p></div></div><div class="quick-actions quick-grid">${renderQuickActions(['scan', 'list', 'extra', 'transport', 'bill', 'product'])}</div></section>
+      <section class="panel quick-panel" id="home-quick"><div class="panel-heading"><div><h2>Γρήγορες κινήσεις</h2><p>Τα βασικά, χωρίς ψάξιμο</p></div></div><div class="quick-actions quick-grid">${renderQuickActions(['scan', 'manual', 'list', 'extra', 'transport', 'product'])}</div></section>
       <section class="panel" id="home-expiry"><div class="panel-heading"><div><h2>Έλεγξε τις ημερομηνίες</h2><p>Ό,τι λήγει μέσα στις επόμενες 7 ημέρες</p></div><button class="panel-link" type="button" data-action="home-card" data-card="expiring">${escapeHtml(t('Όλα όσα λήγουν →'))}</button></div><div class="product-list">${upcoming.length ? upcoming.map(renderMiniProduct).join('') : renderEmpty('Όλα καλά εδώ', 'Δεν έχεις προϊόντα που λήγουν σύντομα.', 'add-item', 'Πρόσθεσε προϊόν', '🌿')}</div></section>
     </div>`;
 }
@@ -3106,9 +3108,10 @@ function openReceiptEdit(id) {
     ${items.length ? `<p class="field-hint">${escapeHtml(t('Ξετσέκαρε ό,τι θες να αφαιρεθεί. Το σύνολο υπολογίζεται από τα είδη.'))}</p><div class="receipt-lines" id="receipt-edit-lines">${items.map((it, i) => `<div class="receipt-line receipt-edit-line" data-line="${i}"><input class="shopping-check" type="checkbox" name="use" checked aria-label="${escapeHtml(t('Κράτα: {name}', { name: it.name }))}">
       <input class="field-input receipt-name" name="name" value="${escapeHtml(it.name)}" maxlength="80" aria-label="${escapeHtml(t('Όνομα προϊόντος'))}">
       <input class="field-input receipt-qty" name="quantity" type="number" min="0" step="0.001" value="${escapeHtml(String(it.quantity ?? 1))}" aria-label="${escapeHtml(t('Ποσότητα'))}">
-      <input class="field-input receipt-price" name="price" type="number" min="0" step="0.01" inputmode="decimal" value="${escapeHtml((Number(it.price) || 0).toFixed(2))}" aria-label="${escapeHtml(t('Τιμή'))}">${hasSpend ? `<select class="field-input receipt-expcat expcat-select" name="itemCategory" data-prev="${escapeHtml(it.expenseCategory || '')}" aria-label="${escapeHtml(t('Κατηγορία εξόδου: {name}', { name: it.name }))}"${expCats().length || it.expenseCategory ? '' : ' hidden'}>${expCatOptions(it.expenseCategory || '', 'item')}</select>` : ''}</div>`).join('')}</div>
+      <input class="field-input receipt-price" name="price" type="text" inputmode="decimal" autocomplete="off" value="${escapeHtml((Number(it.price) || 0).toFixed(2).replace('.', ','))}" aria-label="${escapeHtml(t('Τιμή'))}">${hasSpend ? `<select class="field-input receipt-expcat expcat-select" name="itemCategory" data-prev="${escapeHtml(it.expenseCategory || '')}" aria-label="${escapeHtml(t('Κατηγορία εξόδου: {name}', { name: it.name }))}"${expCats().length || it.expenseCategory ? '' : ' hidden'}>${expCatOptions(it.expenseCategory || '', 'item')}</select>` : ''}</div>`).join('')}</div>
       <p class="field-hint" id="receipt-edit-sum"></p>`
-      : `<label class="field-label" for="re-total">${escapeHtml(t('Σύνολο (€)'))}</label><input class="field-input" id="re-total" name="total" type="number" min="0" step="0.01" inputmode="decimal" value="${escapeHtml((Number(r.total) || 0).toFixed(2))}">${whole ? `<label class="field-label" for="re-group">${escapeHtml(t('Είδος προϊόντος'))}</label><select class="field-input" id="re-group" name="category">${groupOptions(whole.category)}</select>` : ''}`}
+      : `<label class="field-label" for="re-total">${escapeHtml(t('Σύνολο (€)'))}</label><input class="field-input" id="re-total" name="total" type="text" inputmode="decimal" autocomplete="off" aria-describedby="receipt-edit-error" value="${escapeHtml((Number(r.total) || 0).toFixed(2).replace('.', ','))}">${whole ? `<label class="field-label" for="re-group">${escapeHtml(t('Είδος προϊόντος'))}</label><select class="field-input" id="re-group" name="category">${groupOptions(whole.category)}</select>` : ''}`}
+    <p class="field-error" id="receipt-edit-error" role="alert" hidden></p>
     <div class="dialog-actions"><button class="button button-quiet" type="button" data-action="receipt-open" data-id="${escapeHtml(r.id)}">${escapeHtml(t('Άκυρο'))}</button><button class="button button-primary" type="submit" id="receipt-edit-save">${escapeHtml(t('Αποθήκευση αλλαγών'))}</button></div></form>`;
   updateReceiptEditSum();
   dialog.querySelector('#re-store')?.focus();
@@ -3124,12 +3127,22 @@ function readReceiptEdit(form) {
 function updateReceiptEditSum() {
   const form = document.querySelector('#receipt-edit-form'); const out = document.querySelector('#receipt-edit-sum');
   if (!form || !out) return;
-  const sum = (readReceiptEdit(form).items || []).reduce((s, it) => s + (it.name.trim() ? Math.max(0, Number(it.price) || 0) : 0), 0);
+  const sum = (readReceiptEdit(form).items || []).reduce((s, it) => s + (it.name.trim() ? Math.max(0, parseAmount(it.price) || 0) : 0), 0);
   out.textContent = t('Νέο σύνολο: {total}', { total: money(Math.round(sum * 100) / 100) });
 }
 function saveReceiptEdit(form) {
   const id = form.dataset.id;
-  const next = applyReceiptEdit(state, id, readReceiptEdit(form));
+  const edits = readReceiptEdit(form);
+  const error = receiptEditError(edits); const box = form.querySelector('#receipt-edit-error');
+  form.querySelectorAll('[aria-invalid]').forEach((el) => el.removeAttribute('aria-invalid'));
+  if (error) { // v1.9.19: never save a wrong amount as 0 €; the saved receipt stays as it was.
+    if (box) { box.textContent = t(error); box.hidden = false; }
+    const bad = form.querySelector('#re-total') || [...form.querySelectorAll('.receipt-edit-line')].find((row) => { const p = row.querySelector('[name="price"]').value; return row.querySelector('[name="use"]').checked && p.trim() && !(parseAmount(p) >= 0); })?.querySelector('[name="price"]');
+    if (bad) { bad.setAttribute('aria-invalid', 'true'); bad.focus(); }
+    return;
+  }
+  if (box) box.hidden = true;
+  const next = applyReceiptEdit(state, id, edits);
   state.receipts = next.receipts; state.purchases = next.purchases;
   if (!persist()) return;
   renderApp();
@@ -3410,7 +3423,7 @@ function handleAction(button) {
   } else if (action === 'clear-pantry-status') { pantryStatus = ''; renderApp(); }
   else if (action === 'home-signin' || action === 'protect-signin') goToSignin();
   else if (action === 'protect-drive') driveConnect();
-  else if (action === 'tester-done') { writeKey(TESTER_KEY, '1'); if (button.tagName !== 'A') renderApp(); else setTimeout(renderApp, 300); }
+  else if (action === 'tester-done') { writeKey(TESTER_KEY, '1'); renderApp(); }
   else if (action === 'protect-snooze') { writeKey(PROTECT_SNOOZE_KEY, String(snoozeUntilFrom())); renderApp(); }
   else if (action === 'sheet-signin') { closeProtectSheet(); goToSignin(); }
   else if (action === 'sheet-drive') { closeProtectSheet(); driveConnect(); }

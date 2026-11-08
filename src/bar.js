@@ -8,7 +8,7 @@ export const BAR_OPTIONS = [
   { id: 'transport', icon: '⛽', label: 'Μετακίνηση' }, { id: 'all', icon: '⚡', label: 'Κινήσεις' }, { id: 'view:chores', icon: '🧹', label: 'Δουλειές' },
   { id: 'view:pantry', icon: '▦', label: 'Απόθεμα' }, { id: 'view:shopping', icon: '📝', label: 'Λίστα' }, { id: 'view:bills', icon: '📄', label: 'Λογαριασμοί' },
   { id: 'view:transport', icon: '🚗', label: 'Μετακινήσεις' }, { id: 'view:extras', icon: '🧾', label: 'Μικροέξοδα' }, { id: 'view:insights', icon: '∑', label: 'Σύνολο' },
-  { id: 'cart', icon: '🛒', label: 'Καλάθι' }, { id: 'cook', icon: '🍳', label: 'Μαγείρεμα' }, { id: 'receipt', icon: '🧾', label: 'Απόδειξη' },
+  { id: 'cart', icon: '🛒', label: 'Καλάθι' }, { id: 'cook', icon: '🍳', label: 'Μαγείρεμα' }, { id: 'receipt', icon: '🧾', label: 'Απόδειξη' }, { id: 'manual', icon: '✍️', label: 'Με το χέρι' },
   { id: 'bill', icon: '➕', label: 'Νέος λογ/σμός' }, { id: 'product', icon: '＋', label: 'Προϊόν' }, { id: 'view:overview', icon: '⌂', label: 'Αρχική' },
   { id: 'view:settings', icon: '⚙', label: 'Ρυθμίσεις' }
 ];
