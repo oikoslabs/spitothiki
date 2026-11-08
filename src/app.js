@@ -348,10 +348,13 @@ function renderStarterCard() {
   const steps = ['Σκανάρεις το QR της απόδειξης.', 'Βλέπεις πού πάνε τα λεφτά σου κάθε μήνα.', 'Ξέρεις τι έχεις στο σπίτι πριν πας για ψώνια.'];
   return `<section class="signin-card starter-card" id="home-starter-card" aria-labelledby="home-starter-title">
     <div class="starter-body"><h2 id="home-starter-title">${escapeHtml(t('Πέτα τις αποδείξεις στο συρτάρι. Σκάναρέ τες εδώ.'))}</h2>
+    <p>${escapeHtml(t('Κάθε απόδειξη που σκανάρεις μπαίνει στα έξοδα του μήνα.'))}</p>
+    <div class="starter-actions"><button class="button button-primary" type="button" data-action="quick" data-quick="scan" id="starter-scan">📷 ${escapeHtml(t('Σκάναρε την πρώτη σου απόδειξη'))}</button><button class="text-button" type="button" data-action="load-demo" id="starter-demo">${escapeHtml(t('ή δες με παραδείγματα'))}</button></div>
+    <details class="starter-more" id="starter-more"><summary>${escapeHtml(t('Πώς δουλεύει;'))}</summary>
     <p>${escapeHtml(t('Σκανάρεις το QR της απόδειξης. Από τις υποστηριζόμενες ηλεκτρονικές αποδείξεις η Σπιτοθήκη παίρνει τα προϊόντα και το ποσό. Σε άλλες (π.χ. QR της ΑΑΔΕ) μπορεί να σου ζητήσει το ποσό, μια φωτογραφία ή να το γράψεις με το χέρι.'))}</p>
     <p class="starter-example">${escapeHtml(t('Π.χ. σκάναρες την απόδειξη από τον Σκλαβενίτη: 14 προϊόντα, 38,40 €. Μπήκαν στα έξοδα του μήνα και στο ντουλάπι σου.'))}</p>
     <ol class="starter-steps">${steps.map((x) => `<li>${escapeHtml(t(x))}</li>`).join('')}</ol>
-    <div class="starter-actions"><button class="button button-primary" type="button" data-action="quick" data-quick="scan" id="starter-scan">📷 ${escapeHtml(t('Σκάναρε την πρώτη σου απόδειξη'))}</button><button class="text-button" type="button" data-action="load-demo" id="starter-demo">${escapeHtml(t('ή δες με παραδείγματα'))}</button></div>
+    </details>
     <p class="starter-note">${escapeHtml(t('Δωρεάν, χωρίς λογαριασμό και χωρίς κάρτα. Τα στοιχεία σου μένουν στο κινητό σου.'))}</p></div></section>`;
 }
 function storageBadge() {
@@ -514,6 +517,27 @@ function renderHomeMonthRows(rows) {
   return `${renderBars(shown, money)}${more ? `<button class="text-button home-month-more" type="button" data-view="insights" id="home-month-more">${escapeHtml(t('+{count} ακόμα →', { count: more }))}</button>` : ''}`;
 }
 
+// Friendly home (preview): three big primary actions first, everything else grouped and quieter below.
+// Same data-quick ids as before, so every action, the bottom bar and the ⚡ sheet keep working unchanged.
+const HOME_PRIMARY = [
+  { id: 'scan', icon: '📷', label: 'Σκάναρε απόδειξη', hint: 'ή λογαριασμό, διόδια, προϊόν' },
+  { id: 'manual', icon: '✍️', label: 'Έξοδο με το χέρι', hint: 'Χωρίς απόδειξη' },
+  { id: 'list', icon: '✓', label: 'Λίστα αγορών', hint: 'Πρόσθεσε κάτι που χρειάζεσαι' }
+];
+const HOME_GROUPS = [
+  { title: 'Έξοδα', ids: ['extra', 'transport', 'bill', 'rent'] },
+  { title: 'Σπίτι & ψώνια', ids: ['product', 'cart', 'cook'] }
+];
+function renderHomePrimary() {
+  return `<section class="home-primary" id="home-quick" aria-labelledby="home-primary-title"><h2 class="visually-hidden" id="home-primary-title">${escapeHtml(t('Βασικές κινήσεις'))}</h2>
+    <div class="home-primary-grid">${HOME_PRIMARY.map((a) => `<button class="quick-action home-primary-action" type="button" data-action="quick" data-quick="${a.id}" id="home-primary-${a.id}"><span class="quick-action-icon" aria-hidden="true">${a.icon}</span><span class="home-primary-text"><strong>${escapeHtml(t(a.label))}</strong><small>${escapeHtml(t(a.hint))}</small></span></button>`).join('')}</div></section>`;
+}
+function renderHomeMore() {
+  const chip = (id) => { const a = QUICK_ACTIONS.find((x) => x.id === id); return a ? `<button class="home-more-chip" type="button" data-action="quick" data-quick="${a.id}"><span aria-hidden="true">${a.icon}</span> ${escapeHtml(t(a.label))}</button>` : ''; };
+  return `<section class="panel home-more" id="home-more" aria-labelledby="home-more-title"><div class="panel-heading"><div><h2 id="home-more-title">${escapeHtml(t('Περισσότερα'))}</h2></div><button class="panel-link" type="button" data-action="quick" data-quick="all" aria-haspopup="dialog">${escapeHtml(t('Όλες οι κινήσεις →'))}</button></div>
+    ${HOME_GROUPS.map((g, i) => `<div class="home-more-group" role="group" aria-labelledby="home-more-g${i}"><h3 id="home-more-g${i}">${escapeHtml(t(g.title))}</h3><div class="home-more-chips">${g.ids.map(chip).join('')}</div></div>`).join('')}</section>`;
+}
+
 function renderOverview() {
   const today = localDateKey();
   const summary = pantrySummary(state.items, today);
@@ -523,7 +547,8 @@ function renderOverview() {
   const totals = monthTotals(month);
   const pending = state.shopping.filter((item) => !item.checked).length;
   const due = billsDue(state.bills || [], today);
-  return `<section class="hero-panel home-hero"><div class="hero-copy"><p class="eyebrow">ΜΙΚΡΕΣ ΣΥΝΗΘΕΙΕΣ, ΠΙΟ ΗΡΕΜΟ ΣΠΙΤΙ</p><h1>Η Σπιτοθήκη σου<br>με μια ματιά</h1><p>Τι έχεις στο σπίτι, τι λήγει, τι χρειάζεται η λίστα και πόσα ξοδεύεις κάθε μήνα.</p></div><div class="hero-illustration" aria-hidden="true"><span>🫒</span></div></section>
+  return `<section class="hero-panel home-hero"><div class="hero-copy"><p class="eyebrow">ΜΙΚΡΕΣ ΣΥΝΗΘΕΙΕΣ, ΠΙΟ ΗΡΕΜΟ ΣΠΙΤΙ</p><h1>Η Σπιτοθήκη σου <br>με μια ματιά</h1><p>${escapeHtml(t('Τι θέλεις να κάνεις τώρα;'))}</p></div><div class="hero-illustration" aria-hidden="true"><span>🫒</span></div></section>
+    ${renderHomePrimary()}
     ${summary.expired ? `<div class="alert-banner" role="status">${t(summary.expired === 1 ? '⚠️ Έχεις {count} προϊόν που έχει λήξει. Έλεγξέ τα πριν τα χρησιμοποιήσεις.' : '⚠️ Έχεις {count} προϊόντα που έχουν λήξει. Έλεγξέ τα πριν τα χρησιμοποιήσεις.', { count: summary.expired })}</div>` : ''}
     ${renderStarterCard()}${renderProtectCard()}${renderTesterCard()}
     <section class="stats-grid home-stats" aria-label="Σύνοψη αποθέματος">
@@ -535,9 +560,9 @@ function renderOverview() {
       <section class="panel" id="home-month"><div class="panel-heading"><div><h2>${escapeHtml(t('Τα έξοδα του μήνα'))}</h2><p data-no-i18n>${escapeHtml(monthLabel(month))}</p></div><button class="panel-link" type="button" data-view="insights">${escapeHtml(t('Αναλυτικά →'))}</button></div>
         <p class="big-number" id="home-month-total">${escapeHtml(money(totals.total))}</p>${renderHomeMonthRows(totals.rows)}
         ${due.length ? `<button class="alert-banner home-bills-due" type="button" data-view="bills">📄 ${escapeHtml((due.length === 1 ? t('1 λογαριασμός λήγει σύντομα ή έχει λήξει') : t('{count} λογαριασμοί λήγουν σύντομα ή έχουν λήξει', { count: due.length })))} ›</button>` : ''}</section>
-      <section class="panel quick-panel" id="home-quick"><div class="panel-heading"><div><h2>Γρήγορες κινήσεις</h2><p>Τα βασικά, χωρίς ψάξιμο</p></div></div><div class="quick-actions quick-grid">${renderQuickActions(['scan', 'manual', 'list', 'extra', 'transport', 'product'])}</div></section>
       <section class="panel" id="home-expiry"><div class="panel-heading"><div><h2>Έλεγξε τις ημερομηνίες</h2><p>Ό,τι λήγει μέσα στις επόμενες 7 ημέρες</p></div><button class="panel-link" type="button" data-action="home-card" data-card="expiring">${escapeHtml(t('Όλα όσα λήγουν →'))}</button></div><div class="product-list">${upcoming.length ? upcoming.map(renderMiniProduct).join('') : renderEmpty('Όλα καλά εδώ', 'Δεν έχεις προϊόντα που λήγουν σύντομα.', 'add-item', 'Πρόσθεσε προϊόν', '🌿')}</div></section>
-    </div>`;
+    </div>
+    ${renderHomeMore()}`;
 }
 
 function renderPantryList() {
