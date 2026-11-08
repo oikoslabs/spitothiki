@@ -40,7 +40,7 @@ test('v1.9.19 edit form: shows the error inline instead of saving', () => {
 });
 test('v1.9.19 manual expense: on the home quick actions and available for the bottom bar; saved bars untouched', () => {
   const app = readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');
-  assert.match(app, /renderQuickActions\(\['scan', 'manual',/);
+  assert.match(app, /renderQuickActions\(\['scan', 'manual',|manual: \['Έξοδο με το χέρι', 'Χωρίς απόδειξη'\]/); // friendly home: primary action
   assert.ok(BAR_OPTIONS.some((o) => o.id === 'manual'));
   assert.ok(dictionaries.en['Με το χέρι']);
   assert.deepEqual(DEFAULT_BAR, ['scan', 'list', 'extra', 'transport', 'all']);
