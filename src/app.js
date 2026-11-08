@@ -26,6 +26,7 @@ import { extractShelfPrice, lastReceiptPrice } from './shelf-price.js';
 import { addCartItem, budgetState, createTrip, finishTrip, lastPrice, lineTotal, remainingShopping, removeCartItem, tripForReceipt, updateCartItem } from './cart.js';
 import { VM_MODES, interpretCode } from './gs1.js';
 import { initBackToTop } from './back-to-top.js';
+import { HOME_KEY, HOME_OPTIONS, DEFAULT_HOME, isDefaultHome, parseHome, toggleHome } from './home-actions.js';
 import { BAR_KEY, BAR_MAX, BAR_OPTIONS, DEFAULT_BAR, barOption, moveBar, parseBar, toggleBar } from './bar.js';
 import { CHORE_SUGGESTIONS, choreDates, choreMembers, choreStatus, choreNotice, choresDueToday, choresSummary, createChore, historyCounts, lastDone, markDone, nextDue, sortChores, undoDone } from './chores.js';
 import { decryptBackup, decryptWithKey, deriveDeviceKey, encryptBackup, encryptWithKey, readBackup } from './backup-crypto.js';
@@ -519,23 +520,36 @@ function renderHomeMonthRows(rows) {
 
 // Friendly home (preview): three big primary actions first, everything else grouped and quieter below.
 // Same data-quick ids as before, so every action, the bottom bar and the ⚡ sheet keep working unchanged.
-const HOME_PRIMARY = [
-  { id: 'scan', icon: '📷', label: 'Σκάναρε απόδειξη', hint: 'ή λογαριασμό, διόδια, προϊόν' },
-  { id: 'manual', icon: '✍️', label: 'Έξοδο με το χέρι', hint: 'Χωρίς απόδειξη' },
-  { id: 'list', icon: '✓', label: 'Λίστα αγορών', hint: 'Πρόσθεσε κάτι που χρειάζεσαι' }
-];
+// v1.9.19 friendly home: the user's chosen shortcuts (Settings → «Αρχική οθόνη»; default scan, manual, list) first,
+// everything not chosen grouped and quieter below. Same data-quick ids as the bottom bar and the ⚡ sheet.
+const HOME_HINTS = { scan: ['Σκάναρε απόδειξη', 'ή λογαριασμό, διόδια, προϊόν'], manual: ['Έξοδο με το χέρι', 'Χωρίς απόδειξη'], list: ['Λίστα αγορών', 'Πρόσθεσε κάτι που χρειάζεσαι'] };
+const homeAction = (id) => { const a = QUICK_ACTIONS.find((x) => x.id === id); if (!a) return null; const h = HOME_HINTS[id]; return h ? { ...a, label: h[0], hint: h[1] } : a; };
 const HOME_GROUPS = [
-  { title: 'Έξοδα', ids: ['extra', 'transport', 'bill', 'rent'] },
-  { title: 'Σπίτι & ψώνια', ids: ['product', 'cart', 'cook'] }
+  { title: 'Έξοδα', ids: ['scan', 'manual', 'receipt', 'extra', 'transport', 'bill', 'rent'] },
+  { title: 'Σπίτι & ψώνια', ids: ['list', 'product', 'cart', 'cook'] }
 ];
+const homeIds = () => { try { return parseHome(localStorage.getItem(HOME_KEY)); } catch { return [...DEFAULT_HOME]; } };
+function saveHome(ids) { try { if (isDefaultHome(ids)) localStorage.removeItem(HOME_KEY); else localStorage.setItem(HOME_KEY, JSON.stringify(ids)); } catch {} }
 function renderHomePrimary() {
+  const ids = homeIds();
+  if (!ids.length) return `<section class="home-primary home-primary-empty" id="home-quick" aria-labelledby="home-primary-title"><h2 class="visually-hidden" id="home-primary-title">${escapeHtml(t('Βασικές κινήσεις'))}</h2><p class="field-hint">${escapeHtml(t('Δεν έχεις διαλέξει συντομεύσεις για την αρχική. Όλες οι λειτουργίες είναι στα «Περισσότερα» και στο μενού.'))} <button class="text-button" type="button" data-view="settings" data-focus="home-card">${escapeHtml(t('Διάλεξε στις Ρυθμίσεις'))}</button></p></section>`;
   return `<section class="home-primary" id="home-quick" aria-labelledby="home-primary-title"><h2 class="visually-hidden" id="home-primary-title">${escapeHtml(t('Βασικές κινήσεις'))}</h2>
-    <div class="home-primary-grid">${HOME_PRIMARY.map((a) => `<button class="quick-action home-primary-action" type="button" data-action="quick" data-quick="${a.id}" id="home-primary-${a.id}"><span class="quick-action-icon" aria-hidden="true">${a.icon}</span><span class="home-primary-text"><strong>${escapeHtml(t(a.label))}</strong><small>${escapeHtml(t(a.hint))}</small></span></button>`).join('')}</div></section>`;
+    <div class="home-primary-grid${ids.length > 3 ? ' is-many' : ''}">${ids.map(homeAction).filter(Boolean).map((a) => `<button class="quick-action home-primary-action" type="button" data-action="quick" data-quick="${a.id}" id="home-primary-${a.id}"><span class="quick-action-icon" aria-hidden="true">${a.icon}</span><span class="home-primary-text"><strong>${escapeHtml(t(a.label))}</strong><small>${escapeHtml(t(a.hint))}</small></span></button>`).join('')}</div></section>`;
 }
 function renderHomeMore() {
+  const chosen = new Set(homeIds());
   const chip = (id) => { const a = QUICK_ACTIONS.find((x) => x.id === id); return a ? `<button class="home-more-chip" type="button" data-action="quick" data-quick="${a.id}"><span aria-hidden="true">${a.icon}</span> ${escapeHtml(t(a.label))}</button>` : ''; };
+  const groups = HOME_GROUPS.map((g) => ({ ...g, ids: g.ids.filter((id) => !chosen.has(id)) })).filter((g) => g.ids.length);
   return `<section class="panel home-more" id="home-more" aria-labelledby="home-more-title"><div class="panel-heading"><div><h2 id="home-more-title">${escapeHtml(t('Περισσότερα'))}</h2></div><button class="panel-link" type="button" data-action="quick" data-quick="all" aria-haspopup="dialog">${escapeHtml(t('Όλες οι κινήσεις →'))}</button></div>
-    ${HOME_GROUPS.map((g, i) => `<div class="home-more-group" role="group" aria-labelledby="home-more-g${i}"><h3 id="home-more-g${i}">${escapeHtml(t(g.title))}</h3><div class="home-more-chips">${g.ids.map(chip).join('')}</div></div>`).join('')}</section>`;
+    ${groups.map((g, i) => `<div class="home-more-group" role="group" aria-labelledby="home-more-g${i}"><h3 id="home-more-g${i}">${escapeHtml(t(g.title))}</h3><div class="home-more-chips">${g.ids.map(chip).join('')}</div></div>`).join('')}
+    <p class="field-hint home-more-hint"><button class="text-button" type="button" data-view="settings" data-focus="home-card">${escapeHtml(t('Άλλαξε τι φαίνεται στην αρχική'))}</button></p></section>`;
+}
+function renderHomeCard() {
+  const ids = new Set(homeIds());
+  return `<section class="panel settings-card" id="home-card" aria-labelledby="home-card-title"><span class="stat-icon">⌂</span><h2 id="home-card-title">${escapeHtml(t('Αρχική οθόνη'))}</h2><p>${escapeHtml(t('Διάλεξε ποιες λειτουργίες φαίνονται ως μεγάλα κουμπιά στην αρχική. Αλλάζει μόνο τις συντομεύσεις: τίποτα δεν διαγράφεται και όλα μένουν στο μενού και στις «Όλες οι κινήσεις».'))}</p>
+    <fieldset class="home-choices"><legend class="visually-hidden">${escapeHtml(t('Λειτουργίες στην αρχική'))}</legend>${HOME_OPTIONS.map((id) => { const a = QUICK_ACTIONS.find((x) => x.id === id); return a ? `<label class="home-choice"><input type="checkbox" data-home-id="${id}"${ids.has(id) ? ' checked' : ''}><span aria-hidden="true">${a.icon}</span> <span>${escapeHtml(t(a.label))}</span></label>` : ''; }).join('')}</fieldset>
+    <p class="field-hint">${escapeHtml(t('Η κάτω μπάρα του κινητού ρυθμίζεται χωριστά, στην «Κάτω μπάρα».'))}</p>
+    <div class="settings-actions"><button class="button button-quiet" type="button" data-action="home-reset" id="home-reset">↺ ${escapeHtml(t('Επαναφορά'))}</button></div></section>`;
 }
 
 function renderOverview() {
@@ -653,7 +667,7 @@ function renderSettings() {
     <section class="panel settings-card"><span class="stat-icon">◐</span><h2>Εμφάνιση</h2><p>Θέμα, μέγεθος γραμμάτων και αντίθεση. Ισχύουν σε όλη την εφαρμογή, σε αυτή τη συσκευή.</p><div class="theme-options" role="group" aria-label="Θέμα">${[['auto', 'Αυτόματο'], ['light', 'Φωτεινό'], ['dark', 'Σκούρο']].map(([value, label]) => `<button type="button" class="filter-chip ${currentTheme() === value ? 'is-active' : ''}" data-action="set-theme" data-theme="${value}" aria-pressed="${currentTheme() === value}">${label}</button>`).join('')}</div>
       <h3 class="settings-sub" id="text-size-label">Μέγεθος γραμμάτων</h3><div class="theme-options size-options" role="group" aria-labelledby="text-size-label">${[['normal', 'Κανονικά'], ['large', 'Μεγάλα'], ['xlarge', 'Πολύ μεγάλα']].map(([value, label]) => `<button type="button" class="filter-chip ${textSize() === value ? 'is-active' : ''}" data-action="set-text-size" data-size="${value}" aria-pressed="${textSize() === value}">${label}</button>`).join('')}</div>
       <label class="check-row"><input type="checkbox" id="high-contrast" ${highContrast() ? 'checked' : ''}> <span>Υψηλή αντίθεση (πιο έντονα γράμματα και περιγράμματα)</span></label></section>
-    ${renderBarCard()}${renderLanguageCard()}
+    ${renderHomeCard()}${renderBarCard()}${renderLanguageCard()}
     <section class="panel settings-card"><span class="stat-icon amber">👋</span><h2>Αρχικές ερωτήσεις</h2><p>Γλώσσα, οι λογαριασμοί που έχεις και μέγεθος γραμμάτων, σε ένα λεπτό.</p><div class="settings-actions"><button class="button button-quiet" type="button" data-action="onboard-again">Κάνε τις ερωτήσεις ξανά</button></div></section>
     ${renderSyncCard()}
     ${renderNotificationCard()}
@@ -3210,6 +3224,7 @@ function handleAction(button) {
   else if (action === 'close-dialog') itemDialog.close();
   else if (action === 'edit-item') openItemDialog(id);
   else if (action === 'navigate') navigate(button.dataset.view);
+  else if (action === 'home-reset') { saveHome([...DEFAULT_HOME]); const card = document.querySelector('#home-card'); if (card) { card.outerHTML = renderHomeCard(); translateDom(document.querySelector('#home-card')); } document.querySelector('#home-reset')?.focus(); showToast('Η αρχική επανήλθε.'); }
   else if (action === 'bar-move' || action === 'bar-toggle' || action === 'bar-reset') {
     const ids = barIds();
     saveBar(action === 'bar-reset' ? [...DEFAULT_BAR] : action === 'bar-move' ? moveBar(ids, Number(button.dataset.index), Number(button.dataset.delta)) : toggleBar(ids, button.dataset.id));
@@ -3488,7 +3503,8 @@ document.addEventListener('click', (event) => {
     event.preventDefault(); const view = viewButton.dataset.view;
     // Fast feedback first (close the menu, highlight the target), heavy render after the next paint (INP).
     if (viewButton.closest('#menu-sheet')) document.querySelector('#menu-sheet').close();
-    pressFeedback(viewButton); afterPaint(() => navigate(view)); return;
+    const focusId = viewButton.dataset.focus; // e.g. «Άλλαξε τι φαίνεται στην αρχική» → Settings → «Αρχική οθόνη»
+    pressFeedback(viewButton); afterPaint(() => { navigate(view); if (focusId) requestAnimationFrame(() => { const el = document.getElementById(focusId); el?.scrollIntoView({ block: 'start' }); el?.querySelector('input, button')?.focus({ preventScroll: true }); }); }); return;
   }
   if (event.target.id === 'menu-sheet' || event.target.id === 'quick-sheet') { event.target.close(); return; }
   const button = event.target.closest('[data-action]');
@@ -3509,6 +3525,7 @@ document.addEventListener('input', (event) => {
 });
 
 document.addEventListener('change', (event) => {
+  if (event.target.dataset?.homeId) { saveHome(toggleHome(homeIds(), event.target.dataset.homeId, event.target.checked)); showToast('Η αρχική ενημερώθηκε.'); return; }
   if (event.target.id === 'drive-auto') { try { localStorage.setItem(DRIVE_AUTO_KEY, event.target.checked ? '1' : '0'); } catch {} showToast(event.target.checked ? 'Το αυτόματο αντίγραφο ενεργοποιήθηκε.' : 'Το αυτόματο αντίγραφο σταμάτησε.'); return; }
   if (event.target.dataset?.whopaidKey !== undefined) { state.payers = setPayer(state.payers || [], event.target.dataset.whopaidKey, event.target.value); if (persist()) { openPanels.add('whopaid-list'); renderApp(); } return; }
   if (event.target.id === 'bill-autopay') event.target.form.dataset.autoPayTouched = '1';

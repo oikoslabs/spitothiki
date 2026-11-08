@@ -7,7 +7,7 @@ const css = readFileSync(new URL('../styles.css', import.meta.url), 'utf8');
 const home = app.slice(app.indexOf('function renderOverview()'), app.indexOf('function renderPantryList'));
 
 test('friendly home: three primary actions (scan, manual, list) come right after the header, before cards and totals', () => {
-  assert.match(app, /const HOME_PRIMARY = \[\n  \{ id: 'scan'[^\n]*\n  \{ id: 'manual'[^\n]*\n  \{ id: 'list'/);
+  assert.match(app, /const HOME_HINTS = \{ scan: [^\n]*manual: [^\n]*list: /);
   const order = ['home-hero', 'renderHomePrimary()', 'renderStarterCard()', 'renderProtectCard()', 'renderTesterCard()', 'home-stats', 'id="home-month"', 'renderHomeMore()'];
   const pos = order.map((k) => home.indexOf(k));
   pos.forEach((p, i) => assert.ok(p > -1, order[i]));

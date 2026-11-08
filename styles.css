@@ -1040,3 +1040,13 @@ a.menu-item { color: inherit; }
 }
 :root[data-theme="dark"] .quick-action.home-primary-action { border-color: var(--line); }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .quick-action.home-primary-action { border-color: var(--line); } }
+/* Settings → Αρχική οθόνη */
+.home-choices { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; margin: 12px 0 4px; padding: 0; border: 0; }
+.home-choice { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 12px; cursor: pointer; font-size: calc(13.5px * var(--text-scale)); }
+.home-choice input { width: 20px; height: 20px; flex: 0 0 20px; accent-color: #2d6b4c; }
+.home-choice:has(input:checked) { border-color: #2d6b4c; background: var(--green-soft); }
+.home-choice:has(input:focus-visible) { outline: 3px solid #2d6b4c; outline-offset: 2px; }
+.home-more-hint { margin: 14px 0 0; }
+.home-primary-empty { padding: 4px 2px; }
+@media (min-width: 701px) { .home-primary-grid.is-many { grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); } }
+@media (max-width: 700px) { .home-choices { grid-template-columns: 1fr; } }
