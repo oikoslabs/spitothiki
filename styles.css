@@ -579,6 +579,14 @@ body[data-screen="pantry"] .topbar .button-add { display: none; }
 .extras-cat-form { display: grid; grid-template-columns: 64px minmax(0,1fr) auto auto; gap: 8px; width: 100%; margin-top: 8px; }
 #extras-cat-form { grid-template-columns: 64px minmax(0,1fr) auto; }
 .extras-emoji-input { text-align: center; }
+/* v1.9.20: own product types (Settings → Είδη προϊόντων) */
+.ptype-form { display: grid; grid-template-columns: 64px minmax(0,1fr) auto auto; gap: 8px; width: 100%; margin-top: 8px; }
+#ptype-form { grid-template-columns: 64px minmax(0,1fr) auto; }
+.ptype-form .form-error, .ptype-emojis { grid-column: 1 / -1; }
+.ptype-emojis { display: flex; flex-wrap: wrap; gap: 4px; }
+.ptype-emoji { min-width: 40px; min-height: 40px; border: 1px solid var(--line, #ddd); border-radius: 10px; background: transparent; font-size: calc(20px * var(--text-scale)); cursor: pointer; }
+.ptype-emoji:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+#ptype-list li { flex-wrap: wrap; }
 @media (max-width: 480px) {
   .extras-quick { grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; }
   .extras-quick-button { min-height: 92px; padding: 10px 4px; }
@@ -590,6 +598,9 @@ body[data-screen="pantry"] .topbar .button-add { display: none; }
   .extras-ask-row [data-action="extras-ask-cancel"] { grid-column: 1 / -1; }
   .extras-cat-form { grid-template-columns: 52px minmax(0,1fr); }
   .extras-cat-form button { grid-column: span 1; }
+  .ptype-form, #ptype-form { grid-template-columns: 52px minmax(0,1fr); }
+  #ptype-add { grid-column: 1 / -1; }
+  .ptype-emoji { min-width: 36px; min-height: 36px; }
 }
 
 /* ---------- Navigation tidy-up: one menu (☰ / sidebar), a quick-actions bar on phones ---------- */
