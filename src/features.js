@@ -1,5 +1,6 @@
 // Pure helpers for the newer features (recurring items, voice add, expiry snapshot, ...).
 import { createShoppingItem, normalizeSearch, normalizeUnit } from './domain.js';
+import { BUILTIN_TYPES, OTHER_TYPE, allProductTypes, currentCustomTypes, isProductType } from './product-types.js';
 
 function makeId(prefix) {
   if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
@@ -87,7 +88,8 @@ export function dueFromSnapshot(snapshot, today) {
 }
 
 // ---------- Stores & aisles ----------
-export const CATEGORIES = ['Φρούτα & λαχανικά', 'Κρέας & ψάρι', 'Γαλακτοκομικά', 'Ξηρά τρόφιμα', 'Κατεψυγμένα', 'Ροφήματα', 'Καθαριότητα', 'Άλλο'];
+// Built-in product types (v1.9.20: plus the user's own, see product-types.js).
+export const CATEGORIES = BUILTIN_TYPES;
 
 export function createStore(input = {}, now = new Date().toISOString()) {
   const name = String(input.name ?? '').trim();
@@ -97,13 +99,19 @@ export function createStore(input = {}, now = new Date().toISOString()) {
 }
 
 // Full walking order: saved order first (known categories only), then any missing categories.
-export function storeOrder(order = []) {
-  const known = (Array.isArray(order) ? order : []).filter((c, i, a) => CATEGORIES.includes(c) && a.indexOf(c) === i);
-  return [...known, ...CATEGORIES.filter((c) => !known.includes(c))];
+// v1.9.20: own product types count too; a new own type goes just before «Άλλο» (deleted ones drop out).
+export function storeOrder(order = [], custom = currentCustomTypes()) {
+  const all = allProductTypes(custom);
+  const known = (Array.isArray(order) ? order : []).filter((c, i, a) => all.includes(c) && a.indexOf(c) === i);
+  const missing = all.filter((c) => !known.includes(c));
+  const other = known.indexOf(OTHER_TYPE);
+  if (other < 0) return [...known, ...missing];
+  const before = missing.filter((c) => c !== OTHER_TYPE);
+  return [...known.slice(0, other), ...before, ...known.slice(other)];
 }
 
-export function moveCategory(store, category, direction, now = new Date().toISOString()) {
-  const order = storeOrder(store.order);
+export function moveCategory(store, category, direction, now = new Date().toISOString(), custom = currentCustomTypes()) {
+  const order = storeOrder(store.order, custom);
   const from = order.indexOf(category);
   const to = from + (direction < 0 ? -1 : 1);
   if (from < 0 || to < 0 || to >= order.length) return store;
@@ -112,18 +120,18 @@ export function moveCategory(store, category, direction, now = new Date().toISOS
 }
 
 // Category of a shopping row: its own, the linked pantry item's, a same-name pantry item's, else 'Άλλο'.
-export function rowCategory(row, items = []) {
-  if (row.category && CATEGORIES.includes(row.category)) return row.category;
+export function rowCategory(row, items = [], custom = currentCustomTypes()) {
+  if (row.category && isProductType(row.category, custom)) return row.category;
   const linked = row.itemId && items.find((item) => item.id === row.itemId);
   const same = linked || items.find((item) => normalizeSearch(item.name).trim() === normalizeSearch(row.name).trim());
-  return same?.category && CATEGORIES.includes(same.category) ? same.category : 'Άλλο';
+  return same?.category && isProductType(same.category, custom) ? same.category : 'Άλλο';
 }
 
 // Groups rows in the store's walking order: [{ category, aisle, rows }].
-export function groupByStore(rows, store, items = []) {
-  const order = storeOrder(store?.order);
+export function groupByStore(rows, store, items = [], custom = currentCustomTypes()) {
+  const order = storeOrder(store?.order, custom);
   const groups = new Map(order.map((category) => [category, []]));
-  for (const row of rows) groups.get(rowCategory(row, items)).push(row);
+  for (const row of rows) groups.get(rowCategory(row, items, custom)).push(row);
   return order.map((category, index) => ({ category, aisle: index + 1, rows: groups.get(category) })).filter((group) => group.rows.length);
 }
 

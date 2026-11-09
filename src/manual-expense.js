@@ -7,11 +7,12 @@
 // can be edited (✎) and deleted there, and older app versions in the same household read, edit and delete it the same way.
 // v1.8.4: the product group of a hand-typed expense («Τι αγόρασες;»), same groups as a scanned receipt's items,
 // so butcher / λαϊκή / cheese show in the right bar of «Έξοδα». Old entries without it stay 'Άλλο'.
-import { CATEGORIES } from './features.js';
+import { validType } from './product-types.js';
 import { normalizeSearch } from './domain.js';
 const r2 = (n) => Math.round(n * 100) / 100;
 
-export const manualCategory = (value) => (CATEGORIES.includes(value) ? value : 'Άλλο');
+// v1.9.20: built-in or the user's own product type; anything else → «Άλλο».
+export const manualCategory = (value) => validType(value);
 
 // Light guess from the shop text (accent- and case-insensitive). '' when nothing matches.
 const GUESS = [
