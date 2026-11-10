@@ -3,6 +3,7 @@
 // Stored data (categories, units, locations) stays Greek; it is translated only when displayed.
 
 import { DIET_EN } from './diet-i18n.js';
+import { GUIDE_EN } from './guide.js';
 
 export const LANG_KEY = 'spitothiki:lang';
 export const LANGS = ['el', 'en'];
@@ -20,6 +21,7 @@ const EN = {
   "Αν αλλάξεις κινητό ή σβηστούν τα δεδομένα του browser, χωρίς σύνδεση ή Drive χάνονται. Η σύνδεση κρατά τα πάντα και σε άλλες συσκευές· το Google Drive κρατά κρυπτογραφημένο αντίγραφο στο δικό σου Drive.": "If you change phone or the browser data is cleared, without sign-in or Drive it is lost. Signing in keeps everything on your other devices too; Google Drive keeps an encrypted copy in your own Drive.",
   "Τα παραδείγματα φορτώθηκαν. Τα δεδομένα σου είναι μόνο σε αυτό το κινητό: συνδέσου ή σύνδεσε Google Drive για να μη χαθούν.": "Examples loaded. Your data is only on this phone: sign in or connect Google Drive so it isn’t lost.",
   ...DIET_EN,
+  ...GUIDE_EN,
   "Κράτα ένα αντίγραφο των δεδομένων σου": "Keep a backup of your data",
   "Το τελευταίο αντίγραφο έγινε {date}.": "Your last backup was on {date}.",
   "Δεν έχεις κάνει ακόμα αντίγραφο. Αν αλλάξεις κινητό, θα το χρειαστείς.": "You have no backup yet. You will need one if you change phone.",
@@ -343,7 +345,11 @@ const EN = {
   "1. Ομάδα δοκιμαστών": "1. Testers group",
   "Μετά άνοιξε τη σελίδα δοκιμής του Google Play, πάτα «Become a tester» και εγκατάστησε την εφαρμογή από το Play Store.": "Then open the Google Play testing page, tap “Become a tester” and install the app from the Play Store.",
   "2. Δοκιμή στο Google Play": "2. Google Play testing",
-  "Η Σπιτοθήκη δεν μπορεί να δει αν ολοκλήρωσες τα βήματα. Αν σε ρωτήσει για λογαριασμό, διάλεξε αυτόν που έχεις στο Play Store. Κλείσε την κάρτα με το × όταν τελειώσεις.": "Spitothiki can’t see whether you finished these steps. If asked for an account, pick the one you use on the Play Store. Close this card with × when you’re done.",
+  "Η Σπιτοθήκη δεν μπορεί να δει αν ολοκλήρωσες τα βήματα. Αν σε ρωτήσει για λογαριασμό, διάλεξε αυτόν που έχεις στο Play Store. Πάτα το × για να μαζέψεις την κάρτα σε μία γραμμή· μένει στην αρχική μέχρι να βγει η εφαρμογή.": "Spitothiki can’t see whether you finished these steps. If asked for an account, pick the one you use on the Play Store. Tap × to collapse the card to one line; it stays on the home screen until the app launches.",
+  "Σύμπτυξη πρόσκλησης δοκιμής": "Collapse the tester invite",
+  "Άνοιξε την πρόσκληση δοκιμής": "Open the tester invite",
+  "Οδηγός χρήσης": "User guide",
+  "Φαίνεται ως μικρός σύνδεσμος στην κορυφή της αρχικής, όχι ως μεγάλο κουμπί.": "It appears as a small link at the top of the home screen, not as a large button.",
   "Σκανάρεις το QR της απόδειξης.": "Scan the receipt’s QR code.",
   "Σκανάρεις το QR της απόδειξης. Από τις υποστηριζόμενες ηλεκτρονικές αποδείξεις η Σπιτοθήκη παίρνει τα προϊόντα και το ποσό. Σε άλλες (π.χ. QR της ΑΑΔΕ) μπορεί να σου ζητήσει το ποσό, μια φωτογραφία ή να το γράψεις με το χέρι.": "Scan the receipt’s QR code. From supported e-receipts Spitothiki gets the products and the amount. For others (e.g. an AADE QR) it may ask you for the amount, a photo, or to type it in by hand.",
   "Με το χέρι": "By hand",

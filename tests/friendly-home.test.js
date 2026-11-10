@@ -8,7 +8,7 @@ const home = app.slice(app.indexOf('function renderOverview()'), app.indexOf('fu
 
 test('friendly home: three primary actions (scan, manual, list) come right after the header, before cards and totals', () => {
   assert.match(app, /const HOME_HINTS = \{ scan: [^\n]*manual: [^\n]*list: /);
-  const order = ['home-hero', 'renderHomePrimary()', 'renderStarterCard()', 'renderProtectCard()', 'renderTesterCard()', 'home-stats', 'id="home-month"', 'renderHomeMore()'];
+  const order = ['home-hero', 'renderHomeGuide()', 'renderHomePrimary()', 'renderStarterCard()', 'renderProtectCard()', 'renderTesterCard()', 'home-stats', 'id="home-month"', 'renderHomeMore()'];
   const pos = order.map((k) => home.indexOf(k));
   pos.forEach((p, i) => assert.ok(p > -1, order[i]));
   assert.deepEqual([...pos].sort((a, b) => a - b), pos);
@@ -34,4 +34,6 @@ test('friendly home: Greek/English strings and touch-size/responsive CSS', () =>
   assert.match(css, /\.home-more-chip \{ min-height: 44px/);
   assert.match(css, /\.quick-action\.home-primary-action \{ flex-direction: column;[^}]*min-height: 96px/);
   assert.match(css, /\.home-primary-action:focus-visible/);
+  assert.match(css, /\.home-guide-link \{[^}]*min-height: 44px/);
+  assert.match(css, /\.tester-banner \{[^}]*min-height: 44px/);
 });

@@ -1,15 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { isPlayApp, showTesterCard, TESTER_GROUP_URL, TESTER_PLAY_URL } from '../src/tester-card.js';
+import { isPlayApp, showTesterCard, TESTER_GROUP_URL, TESTER_INVITE_UNTIL_LAUNCH, TESTER_COLLAPSE_KEY, TESTER_PLAY_URL } from '../src/tester-card.js';
 import { dictionaries } from '../src/i18n.js';
 const A = 'Mozilla/5.0 (Linux; Android 14) Chrome/130 Mobile';
-test('v1.9.5 tester card: Android browser only, not Play app, not after dismiss', () => {
-  assert.ok(showTesterCard({ userAgent: A }));
-  assert.ok(!showTesterCard({ userAgent: 'Mozilla/5.0 (iPhone)' }));
-  assert.ok(!showTesterCard({ userAgent: 'Mozilla/5.0 (Windows NT 10.0)' }));
-  assert.ok(!showTesterCard({ userAgent: A, playApp: true }));
-  assert.ok(!showTesterCard({ userAgent: A, done: true }));
+test('tester invite stays on the home screen until launch, even after an old dismiss', () => {
+  assert.equal(TESTER_INVITE_UNTIL_LAUNCH, true);
+  assert.ok(showTesterCard());
+  assert.ok(showTesterCard({ userAgent: 'Mozilla/5.0 (iPhone)' }));
+  assert.ok(showTesterCard({ userAgent: 'Mozilla/5.0 (Windows NT 10.0)', done: true }));
+  assert.ok(showTesterCard({ userAgent: A, done: true }));
+  assert.ok(!showTesterCard({ playApp: true }));
+  assert.ok(!showTesterCard({ userAgent: A, untilLaunch: false }));
+  assert.ok(!showTesterCard({ untilLaunch: false, done: false }));
 });
 test('v1.9.5 Play app detection', () => {
   assert.ok(isPlayApp({ search: '?src=play' }));
@@ -17,7 +20,7 @@ test('v1.9.5 Play app detection', () => {
   assert.ok(isPlayApp({ session: { getItem: () => '1' } }));
   assert.ok(!isPlayApp({ search: '?src=reddit', referrer: 'https://www.reddit.com/' }));
 });
-test('v1.9.19 tester card: two steps (Group, then Play opt-in), no email, only × hides it', () => {
+test('v1.9.19 tester card: two steps (Group, then Play opt-in); × collapses, never dismisses', () => {
   assert.equal(TESTER_GROUP_URL, 'https://groups.google.com/g/spitothiki-testers/about');
   assert.equal(TESTER_PLAY_URL, 'https://play.google.com/apps/testing/com.oikoslabs.spitothiki');
   const app = readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');
@@ -26,8 +29,15 @@ test('v1.9.19 tester card: two steps (Group, then Play opt-in), no email, only �
   assert.ok(card.indexOf('TESTER_GROUP_URL') < card.indexOf('TESTER_PLAY_URL'));
   assert.match(card, /ίδιο λογαριασμό Google/);
   assert.match(card, /δεν μπορεί να δει αν ολοκλήρωσες/);
-  assert.equal((card.match(/data-action="tester-done"/g) || []).length, 1); // only the × button
+  assert.match(card, /TESTER_COLLAPSE_KEY/);
+  assert.equal((card.match(/data-action="tester-collapse"/g) || []).length, 1);
+  assert.match(card, /data-action="tester-expand"/);
+  assert.doesNotMatch(card, /tester-done|Απόκρυψη'/);
   assert.doesNotMatch(card, /<a [^>]*data-action/);
-  const keys = [...card.matchAll(/t\('([^']+)'\)/g)].map((m) => m[1]).concat(['1. Ομάδα δοκιμαστών', '2. Δοκιμή στο Google Play']);
+  assert.match(app, /action === 'tester-collapse'/);
+  assert.match(app, /action === 'tester-expand'/);
+  assert.match(app, /writeKey\(TESTER_COLLAPSE_KEY, null\)/);
+  const keys = [...card.matchAll(/t\('([^']+)'\)/g)].map((m) => m[1]).concat(['1. Ομάδα δοκιμαστών', '2. Δοκιμή στο Google Play', 'Σύμπτυξη πρόσκλησης δοκιμής']);
   for (const k of keys) assert.ok(dictionaries.en[k], `EN missing: ${k}`);
+  assert.equal(TESTER_COLLAPSE_KEY, 'spitothiki:tester-card-collapsed');
 });
