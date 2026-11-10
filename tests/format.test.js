@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { daysUntil, escapeHtml, expiryLabel, formatDate, localDateKey } from '../src/format.js';
+import { setLang } from '../src/i18n.js';
 
 const plus = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return localDateKey(d); };
 
@@ -23,6 +24,7 @@ test('formatDate: empty/invalid → empty string, valid → non-empty', () => {
   assert.ok(formatDate(plus(1)).length > 2);
 });
 test('expiryLabel wording (Greek default) is unchanged by the split', () => {
+  setLang('el');
   assert.equal(expiryLabel(plus(0)), 'Λήγει σήμερα');
   assert.equal(expiryLabel(plus(1)), 'Λήγει αύριο');
   assert.equal(expiryLabel(''), '');

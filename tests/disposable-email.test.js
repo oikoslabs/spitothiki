@@ -55,8 +55,8 @@ test('v1.9.16 disposable: wired into signup (app + firebase) and English string'
   // Google path unchanged (no disposable check on signInWithGoogle).
   assert.doesNotMatch(sync.slice(sync.indexOf('signInWithGoogle'), sync.indexOf('signInWithEmail')), /disposable/i);
   const sw = read('sw.js');
-  assert.match(sw, /CACHE_VERSION = 'v120'/);
+  assert.match(sw, /CACHE_VERSION = 'v121'/);
   assert.ok(sw.includes("'./src/disposable-email.js'"));
-  assert.match(read('package.json'), /"version": "1\.9\.20"/);
-  assert.match(read('index.html'), /data-no-i18n>1\.9\.20</);
+  assert.match(read('package.json'), /"version": "1\.9\.21"/);
+  assert.match(read('index.html'), /data-no-i18n>1\.9\.21</);
 });
