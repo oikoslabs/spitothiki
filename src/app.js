@@ -27,6 +27,7 @@ import { addCartItem, budgetState, createTrip, finishTrip, lastPrice, lineTotal,
 import { VM_MODES, interpretCode } from './gs1.js';
 import { initBackToTop } from './back-to-top.js';
 import { HOME_KEY, HOME_OPTIONS, DEFAULT_HOME, isDefaultHome, parseHome, toggleHome } from './home-actions.js';
+import { GUIDE_SECTIONS, guideHeading, searchGuide, sectionForView } from './guide.js';
 import { PRODUCT_TYPE_DEFAULT_EMOJI, PRODUCT_TYPE_EMOJIS, allProductTypes, createProductType, customProductTypes, deleteProductType, effectiveType, isCustomTypeId, isProductType, mergeTypeRows, setProductTypes, suggestTypeEmoji, typeEmoji, typeLabel, typeName, upsertProductType, validType } from './product-types.js';
 import { BAR_KEY, BAR_MAX, BAR_OPTIONS, DEFAULT_BAR, barOption, moveBar, parseBar, toggleBar } from './bar.js';
 import { CHORE_SUGGESTIONS, choreDates, choreMembers, choreStatus, choreNotice, choresDueToday, choresSummary, createChore, historyCounts, lastDone, markDone, nextDue, sortChores, undoDone } from './chores.js';
@@ -63,7 +64,7 @@ const testerCtx = (() => { let session = null; try { session = sessionStorage; }
 initSource({ hasData: sourceHasData });
 let state = loadState();
 setProductTypes(state.productTypes); // v1.9.20: own product types («Είδος προϊόντος»)
-const VIEWS = ['overview', 'pantry', 'shopping', 'cart', 'cook', 'bills', 'transport', 'extras', 'chores', 'insights', 'receipts', 'settings'];
+const VIEWS = ['overview', 'pantry', 'shopping', 'cart', 'cook', 'bills', 'transport', 'extras', 'chores', 'insights', 'receipts', 'settings', 'guide'];
 let activeView = VIEWS.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'overview';
 let pantryQuery = '';
 let pantryCategory = 'Όλα';
@@ -168,7 +169,7 @@ function pendingLabel(count) {
   return t(count === 1 ? '{count} εκκρεμές προϊόν' : '{count} εκκρεμή προϊόντα', { count });
 }
 
-const SECTION_LABELS = { overview: 'Σπιτοθήκη', pantry: 'Το απόθεμά μου', shopping: 'Λίστα αγορών', cart: 'Καλάθι στο κατάστημα', cook: 'Μαγείρεμα & γεύματα', bills: 'Λογαριασμοί', transport: 'Μετακινήσεις', extras: 'Μικροέξοδα', chores: 'Δουλειές σπιτιού', insights: 'Σύνολο εξόδων', receipts: 'Αποδείξεις', settings: 'Ρυθμίσεις' };
+const SECTION_LABELS = { overview: 'Σπιτοθήκη', pantry: 'Το απόθεμά μου', shopping: 'Λίστα αγορών', cart: 'Καλάθι στο κατάστημα', cook: 'Μαγείρεμα & γεύματα', bills: 'Λογαριασμοί', transport: 'Μετακινήσεις', extras: 'Μικροέξοδα', chores: 'Δουλειές σπιτιού', insights: 'Σύνολο εξόδων', receipts: 'Αποδείξεις', settings: 'Ρυθμίσεις', guide: 'Οδηγός' };
 function setActiveNavigation() {
   document.body.dataset.screen = activeView;
   const current = document.querySelector('#current-section');
@@ -189,7 +190,7 @@ const openAttr = (id) => (openPanels.has(id) ? 'open' : '');
 document.addEventListener('toggle', (event) => { const d = event.target; if (d.matches?.('details.collapsible[id]')) { if (d.open) openPanels.add(d.id); else openPanels.delete(d.id); } }, true);
 
 // Which menu group each section belongs to (shown as a breadcrumb under the top bar: ⌂ Αρχική › ΕΞΟΔΑ).
-const SECTION_GROUPS = { pantry: 'ΣΠΙΤΙ', shopping: 'ΣΠΙΤΙ', cart: 'ΣΠΙΤΙ', cook: 'ΣΠΙΤΙ', chores: 'ΣΠΙΤΙ', bills: 'ΕΞΟΔΑ', transport: 'ΕΞΟΔΑ', extras: 'ΕΞΟΔΑ', insights: 'ΕΞΟΔΑ', receipts: 'ΕΞΟΔΑ', settings: 'ΕΦΑΡΜΟΓΗ' };
+const SECTION_GROUPS = { pantry: 'ΣΠΙΤΙ', shopping: 'ΣΠΙΤΙ', cart: 'ΣΠΙΤΙ', cook: 'ΣΠΙΤΙ', chores: 'ΣΠΙΤΙ', bills: 'ΕΞΟΔΑ', transport: 'ΕΞΟΔΑ', extras: 'ΕΞΟΔΑ', insights: 'ΕΞΟΔΑ', receipts: 'ΕΞΟΔΑ', settings: 'ΕΦΑΡΜΟΓΗ', guide: 'ΕΦΑΡΜΟΓΗ' };
 function renderCrumbs() {
   const group = SECTION_GROUPS[activeView];
   return `<nav class="eyebrow crumbs" aria-label="${escapeHtml(t('Πού βρίσκομαι'))}"><button class="crumb-home" type="button" data-view="overview">⌂ ${escapeHtml(t('Αρχική'))}</button>${group ? `<span aria-hidden="true">›</span><span>${escapeHtml(t(group))}</span>` : ''}</nav>`;
@@ -251,8 +252,58 @@ function runQuickAction(id) {
   else if (id === 'cart' || id === 'cook') navigate(id);
 }
 
+function helpButton(view = activeView) {
+  if (view === 'guide') return '';
+  const id = sectionForView(view, { cookTab });
+  const section = GUIDE_SECTIONS.find((entry) => entry.id === id);
+  const label = section ? t('Οδηγός: {title}', { title: t(section.title) }) : t('Οδηγός');
+  return `<button class="icon-button help-button" type="button" data-action="open-guide" data-section="${id}" aria-label="${escapeHtml(label)}" title="${escapeHtml(label)}">;</button>`;
+}
+
 function renderHeader(title, description, actionLabel = '') {
-  return `<header class="page-heading"><div>${renderCrumbs()}<h1>${title}</h1><p>${description}</p></div>${actionLabel ? `<button class="button button-primary" type="button" data-action="add-item"><span aria-hidden="true">＋</span>${actionLabel}</button>` : ''}</header>`;
+  const actions = `${helpButton()}${actionLabel ? `<button class="button button-primary" type="button" data-action="add-item"><span aria-hidden="true">＋</span>${actionLabel}</button>` : ''}`;
+  return `<header class="page-heading"><div>${renderCrumbs()}<h1>${title}</h1><p>${description}</p></div>${actions ? `<div class="page-actions heading-actions">${actions}</div>` : ''}</header>`;
+}
+
+let guideQuery = '';
+let guideFocus = '';
+
+function displayGuideHeading(section) {
+  const heading = guideHeading(section, GUIDE_SECTIONS.indexOf(section));
+  return section.numbered === false ? t(section.title) : `${heading.split('. ')[0]}. ${t(section.title)}`;
+}
+
+function renderGuide() {
+  const sections = searchGuide(guideQuery, { translate: t });
+  const tocItems = sections.map((section) => `<li><button class="guide-toc-link" type="button" data-action="guide-jump" data-section="${section.id}">${escapeHtml(displayGuideHeading(section))}</button></li>`).join('');
+  const body = sections.map((section) => `<section class="guide-section${guideFocus === section.id ? ' is-target' : ''}" id="guide-section-${section.id}">
+      <h2>${escapeHtml(section.icon)} ${escapeHtml(displayGuideHeading(section))}</h2>
+      <p class="guide-intro">${escapeHtml(t(section.intro))}</p>
+      <ul class="guide-bullets">${section.bullets.map((bullet) => `<li>${escapeHtml(t(bullet))}</li>`).join('')}</ul>
+    </section>`).join('');
+  const empty = `<p class="subtle-empty" id="guide-empty">${escapeHtml(t('Δεν βρήκα ενότητες για «{query}».', { query: guideQuery.trim() }))}</p>`;
+  return `${renderHeader(t('Οδηγός'), t('Πώς δουλεύει η Σπιτοθήκη'))}
+    <section class="panel" id="guide-panel"><label class="search-wrap guide-search-wrap"><span aria-hidden="true">⌕</span><input id="guide-search" class="search-input" type="search" value="${escapeHtml(guideQuery)}" placeholder="${escapeHtml(t('Βρες μια λειτουργία ή μια λέξη, π.χ. απόδειξη, λήξη, λίστα.'))}" aria-label="${escapeHtml(t('Αναζήτηση στον οδηγό'))}"></label>
+    ${sections.length ? `<nav class="guide-toc" aria-label="${escapeHtml(t('Περιεχόμενα'))}"><h2>${escapeHtml(t('Περιεχόμενα'))}</h2><ol>${tocItems}</ol></nav><div class="guide-manual">${body}</div>` : empty}</section>`;
+}
+
+function openGuide(sectionId = '') {
+  guideQuery = '';
+  guideFocus = sectionId || '';
+  const sheet = document.querySelector('#menu-sheet');
+  if (sheet?.open) sheet.close();
+  if (activeView !== 'guide') navigate('guide');
+  else renderApp();
+  const el = sectionId && document.querySelector(`#guide-section-${sectionId}`);
+  if (el) requestAnimationFrame(() => el.scrollIntoView({ block: 'start', behavior: 'smooth' }));
+}
+
+function jumpGuideSection(sectionId) {
+  if (!sectionId) return;
+  guideFocus = sectionId;
+  document.querySelectorAll('.guide-section.is-target').forEach((node) => node.classList.remove('is-target'));
+  const el = document.querySelector(`#guide-section-${sectionId}`);
+  if (el) { el.classList.add('is-target'); el.scrollIntoView({ block: 'start', behavior: 'smooth' }); }
 }
 
 function renderEmpty(title, description, action = 'add-item', label = 'Προσθήκη προϊόντος', emoji = '🧺') {
@@ -348,7 +399,7 @@ function renderStarterCard() {
   return `<section class="signin-card starter-card" id="home-starter-card" aria-labelledby="home-starter-title">
     <div class="starter-body"><h2 id="home-starter-title">${escapeHtml(t('Πέτα τις αποδείξεις στο συρτάρι. Σκάναρέ τες εδώ.'))}</h2>
     <p>${escapeHtml(t('Κάθε απόδειξη που σκανάρεις μπαίνει στα έξοδα του μήνα.'))}</p>
-    <div class="starter-actions"><button class="button button-primary" type="button" data-action="quick" data-quick="scan" id="starter-scan">📷 ${escapeHtml(t('Σκάναρε την πρώτη σου απόδειξη'))}</button><button class="text-button" type="button" data-action="load-demo" id="starter-demo">${escapeHtml(t('ή δες με παραδείγματα'))}</button></div>
+    <div class="starter-actions"><button class="button button-primary" type="button" data-action="quick" data-quick="scan" id="starter-scan">📷 ${escapeHtml(t('Σκάναρε την πρώτη σου απόδειξη'))}</button><button class="text-button" type="button" data-action="open-guide" data-section="start" id="starter-guide">${escapeHtml(t('Διάβασε τον οδηγό'))}</button><button class="text-button" type="button" data-action="load-demo" id="starter-demo">${escapeHtml(t('ή δες με παραδείγματα'))}</button></div>
     <details class="starter-more" id="starter-more"><summary>${escapeHtml(t('Πώς δουλεύει;'))}</summary>
     <p>${escapeHtml(t('Σκανάρεις το QR της απόδειξης. Από τις υποστηριζόμενες ηλεκτρονικές αποδείξεις η Σπιτοθήκη παίρνει τα προϊόντα και το ποσό. Σε άλλες (π.χ. QR της ΑΑΔΕ) μπορεί να σου ζητήσει το ποσό, μια φωτογραφία ή να το γράψεις με το χέρι.'))}</p>
     <p class="starter-example">${escapeHtml(t('Π.χ. σκάναρες την απόδειξη από τον Σκλαβενίτη: 14 προϊόντα, 38,40 €. Μπήκαν στα έξοδα του μήνα και στο ντουλάπι σου.'))}</p>
@@ -559,7 +610,7 @@ function renderOverview() {
   const totals = monthTotals(month);
   const pending = state.shopping.filter((item) => !item.checked).length;
   const due = billsDue(state.bills || [], today);
-  return `<section class="hero-panel home-hero"><div class="hero-copy"><p class="eyebrow">ΜΙΚΡΕΣ ΣΥΝΗΘΕΙΕΣ, ΠΙΟ ΗΡΕΜΟ ΣΠΙΤΙ</p><h1>Η Σπιτοθήκη σου <br>με μια ματιά</h1><p>${escapeHtml(t('Τι θέλεις να κάνεις τώρα;'))}</p></div><div class="hero-illustration" aria-hidden="true"><span>🫒</span></div></section>
+  return `<section class="hero-panel home-hero">${helpButton('overview')}<div class="hero-copy"><p class="eyebrow">ΜΙΚΡΕΣ ΣΥΝΗΘΕΙΕΣ, ΠΙΟ ΗΡΕΜΟ ΣΠΙΤΙ</p><h1>Η Σπιτοθήκη σου <br>με μια ματιά</h1><p>${escapeHtml(t('Τι θέλεις να κάνεις τώρα;'))}</p></div><div class="hero-illustration" aria-hidden="true"><span>🫒</span></div></section>
     ${renderHomePrimary()}
     ${summary.expired ? `<div class="alert-banner" role="status">${t(summary.expired === 1 ? '⚠️ Έχεις {count} προϊόν που έχει λήξει. Έλεγξέ τα πριν τα χρησιμοποιήσεις.' : '⚠️ Έχεις {count} προϊόντα που έχουν λήξει. Έλεγξέ τα πριν τα χρησιμοποιήσεις.', { count: summary.expired })}</div>` : ''}
     ${renderStarterCard()}${renderProtectCard()}${renderTesterCard()}
@@ -674,6 +725,7 @@ function renderSettings() {
       <h3 class="settings-sub" id="text-size-label">Μέγεθος γραμμάτων</h3><div class="theme-options size-options" role="group" aria-labelledby="text-size-label">${[['normal', 'Κανονικά'], ['large', 'Μεγάλα'], ['xlarge', 'Πολύ μεγάλα']].map(([value, label]) => `<button type="button" class="filter-chip ${textSize() === value ? 'is-active' : ''}" data-action="set-text-size" data-size="${value}" aria-pressed="${textSize() === value}">${label}</button>`).join('')}</div>
       <label class="check-row"><input type="checkbox" id="high-contrast" ${highContrast() ? 'checked' : ''}> <span>Υψηλή αντίθεση (πιο έντονα γράμματα και περιγράμματα)</span></label></section>
     ${renderHomeCard()}${renderBarCard()}${renderLanguageCard()}
+    <section class="panel settings-card" id="guide-card"><span class="stat-icon">📖</span><h2>${escapeHtml(t('Οδηγός'))}</h2><p>${escapeHtml(t('Πώς δουλεύει κάθε λειτουργία, με απλά βήματα.'))}</p><div class="settings-actions"><button class="button button-primary" type="button" data-view="guide" id="open-guide-settings">📖 ${escapeHtml(t('Άνοιξε τον οδηγό'))}</button></div></section>
     <section class="panel settings-card"><span class="stat-icon amber">👋</span><h2>Αρχικές ερωτήσεις</h2><p>Γλώσσα, οι λογαριασμοί που έχεις και μέγεθος γραμμάτων, σε ένα λεπτό.</p><div class="settings-actions"><button class="button button-quiet" type="button" data-action="onboard-again">Κάνε τις ερωτήσεις ξανά</button></div></section>
     ${renderProductTypesCard()}
     ${renderSyncCard()}
@@ -707,6 +759,7 @@ function renderApp() {
   else if (activeView === 'chores') viewRoot.innerHTML = renderChores();
   else if (activeView === 'cart') viewRoot.innerHTML = renderCart();
   else if (activeView === 'cook') { viewRoot.innerHTML = renderCook(); loadOnlineRecipes(); }
+  else if (activeView === 'guide') viewRoot.innerHTML = renderGuide();
   else viewRoot.innerHTML = renderSettings();
   if (activeView === 'pantry') renderPantryList();
   translateDom(viewRoot);
@@ -1051,7 +1104,7 @@ function renderOnboard() {
     <h3 class="settings-sub" id="ob-theme">${escapeHtml(t('Θέμα'))}</h3><div class="theme-options" role="group" aria-labelledby="ob-theme">${[['auto', 'Αυτόματο'], ['light', 'Φωτεινό'], ['dark', 'Σκούρο']].map(([v, l]) => `<button type="button" class="filter-chip ${currentTheme() === v ? 'is-active' : ''}" data-action="onboard-theme" data-theme="${v}" aria-pressed="${currentTheme() === v}">${escapeHtml(t(l))}</button>`).join('')}</div>
     <p class="field-hint">${escapeHtml(t('Όλα αλλάζουν αργότερα από τις Ρυθμίσεις.'))}</p></details>
     <!-- v1.9.1: examples are offered on the starter card right after this, so a new user sees it -->
-    <div class="choice-actions onboard-actions"><button class="button button-primary" type="button" data-action="onboard-done" id="onboard-done">${escapeHtml(t('Ξεκίνα'))}</button></div>`;
+    <div class="choice-actions onboard-actions"><button class="button button-primary" type="button" data-action="onboard-done" id="onboard-done">${escapeHtml(t('Ξεκίνα'))}</button><button class="text-button" type="button" data-action="onboard-guide" id="onboard-guide">${escapeHtml(t('Διάβασε τον οδηγό'))}</button></div>`;
   document.querySelector('#onboard-more')?.addEventListener('toggle', (e) => { onboardMoreOpen = e.target.open; });
 }
 function openOnboard() {
@@ -1061,7 +1114,7 @@ function openOnboard() {
   if (!dialog.open) dialog.showModal();
   dialog.querySelector('#onboard-done')?.focus();
 }
-function finishOnboard(save, { demo = false } = {}) {
+function finishOnboard(save, { demo = false, guide = false } = {}) {
   if (save) writeKey(PRESETS_KEY, JSON.stringify([...onboardPicks]));
   writeKey(ONBOARD_KEY, '1');
   document.querySelector('#onboard-dialog').close();
@@ -1069,6 +1122,7 @@ function finishOnboard(save, { demo = false } = {}) {
   afterPaint(() => {
     renderApp();
     if (demo) { loadDemoData(); return; }
+    if (guide) { openGuide('start'); return; }
     if (save) showToast(onboardPicks.size ? t('Έτοιμο! Οι λογαριασμοί σου είναι στους Λογαριασμούς, για να τους προσθέσεις με ένα πάτημα.') : t('Έτοιμο!'));
     setTimeout(maybeProtectSheet, 300);
   });
@@ -1876,7 +1930,7 @@ function renderCart() {
   const remaining = remainingShopping(state.shopping, trip);
   const budget = budgetState(trip);
   const left = trip.budget ? trip.budget - trip.total : 0;
-  return `<header class="page-heading"><div><p class="eyebrow">ΚΑΛΑΘΙ</p><h1 data-no-i18n>${escapeHtml(trip.storeName || t('Καλάθι'))}</h1><p>${escapeHtml(t('{count} προϊόντα στο καλάθι', { count: trip.items.length }))}</p></div></header>
+  return `<header class="page-heading"><div><p class="eyebrow">ΚΑΛΑΘΙ</p><h1 data-no-i18n>${escapeHtml(trip.storeName || t('Καλάθι'))}</h1><p>${escapeHtml(t('{count} προϊόντα στο καλάθι', { count: trip.items.length }))}</p></div><div class="page-actions heading-actions">${helpButton('cart')}</div></header>
     <section class="panel cart-total-panel is-${budget}"><p class="eyebrow">Σύνολο</p><p class="cart-total" id="cart-total">${escapeHtml(money(trip.total))}</p>
       ${trip.budget ? `<div class="budget-track"><span style="width:${Math.min(100, Math.round((trip.total / trip.budget) * 100))}%"></span></div><p class="field-hint" id="cart-budget-state">${escapeHtml(budget === 'over' ? t('Ξεπέρασες τον προϋπολογισμό κατά {amount}!', { amount: money(-left) }) : t('Απομένουν {amount} από {budget}', { amount: money(left), budget: money(trip.budget) }))}</p>` : ''}
       ${budget === 'over' ? `<p class="alert-banner is-danger" id="cart-budget-warning" role="alert">${escapeHtml(t('Πάνω από τον προϋπολογισμό'))}</p>` : ''}
@@ -2706,7 +2760,7 @@ function renderBills() {
   const due = billsDue(bills, today);
   const overdue = due.filter((bill) => bill.overdue);
   const toPay = unpaid.reduce((sum, bill) => sum + bill.amount, 0);
-  return `<header class="page-heading"><div>${renderCrumbs()}<h1>Λογαριασμοί</h1><p>Λογαριασμοί και σταθερά μηνιαία έξοδα: ΔΕΗ, νερό, ενοίκιο, γυμναστήριο, φροντιστήριο, συνδρομές. Τι πληρώνεις και πότε.</p></div><div class="page-actions"><label class="button button-quiet file-button" id="bill-import"><span>📥 Εισαγωγή PDF</span><input type="file" accept="application/pdf,.pdf,image/*" class="visually-hidden" data-bill-file id="bill-file"></label><button class="button button-primary" type="button" data-action="add-bill"><span aria-hidden="true">＋</span>Προσθήκη λογαριασμού</button></div></header>
+  return `<header class="page-heading"><div>${renderCrumbs()}<h1>Λογαριασμοί</h1><p>Λογαριασμοί και σταθερά μηνιαία έξοδα: ΔΕΗ, νερό, ενοίκιο, γυμναστήριο, φροντιστήριο, συνδρομές. Τι πληρώνεις και πότε.</p></div><div class="page-actions heading-actions">${helpButton('bills')}<label class="button button-quiet file-button" id="bill-import"><span>📥 Εισαγωγή PDF</span><input type="file" accept="application/pdf,.pdf,image/*" class="visually-hidden" data-bill-file id="bill-file"></label><button class="button button-primary" type="button" data-action="add-bill"><span aria-hidden="true">＋</span>Προσθήκη λογαριασμού</button></div></header>
     ${renderBillPresets()}
     ${due.length ? `<div class="alert-banner${overdue.length ? ' is-danger' : ''}" role="status" id="bills-alert">${escapeHtml(overdue.length ? t(overdue.length === 1 ? '1 ληξιπρόθεσμος λογαριασμός · σύνολο {sum}' : '{count} ληξιπρόθεσμοι λογαριασμοί · σύνολο {sum}', { count: overdue.length, sum: money(overdue.reduce((s, b) => s + b.amount, 0)) }) : t(due.length === 1 ? '1 λογαριασμός λήγει σύντομα · σύνολο {sum}' : '{count} λογαριασμοί λήγουν σύντομα · σύνολο {sum}', { count: due.length, sum: money(due.reduce((s, b) => s + b.amount, 0)) }))}</div>` : ''}
     ${bills.length ? `<section class="panel"><div class="panel-heading"><div><h2>Προς πληρωμή</h2><p>${escapeHtml(t(unpaid.length === 1 ? '1 απλήρωτος · {sum}' : '{count} απλήρωτοι · {sum}', { count: unpaid.length, sum: money(toPay) }))}</p></div></div><div class="product-list" id="bills-unpaid">${unpaid.length ? unpaid.map(renderBillRow).join('') : `<p class="subtle-empty">${escapeHtml(t(debits.length ? 'Τίποτα να πληρώσεις με το χέρι. 🎉' : 'Όλα πληρωμένα! 🎉'))}</p>`}</div></section>
@@ -3438,6 +3492,9 @@ function handleAction(button) {
   else if (action === 'onboard-skip') finishOnboard(false);
   else if (action === 'onboard-demo') { finishOnboard(true, { demo: true }); }
   else if (action === 'onboard-again') openOnboard();
+  else if (action === 'onboard-guide') finishOnboard(true, { guide: true });
+  else if (action === 'open-guide') openGuide(button.dataset.section || '');
+  else if (action === 'guide-jump') jumpGuideSection(button.dataset.section || '');
   else if (action === 'bill-preset') openBillPreset(button.dataset.id);
   else if (action === 'choice') { const run = choiceHandlers[Number(button.dataset.index)]; document.querySelector('#choice-dialog').close(); run?.(); }
   else if (action === 'close-choice') document.querySelector('#choice-dialog').close();
@@ -3641,6 +3698,14 @@ document.addEventListener('input', (event) => {
     pantryQuery = event.target.value;
     renderPantryList();
     const input = document.querySelector('#pantry-search');
+    input?.focus(); input?.setSelectionRange(caret, caret);
+  }
+  if (event.target.id === 'guide-search') {
+    const caret = event.target.selectionStart;
+    guideQuery = event.target.value;
+    guideFocus = '';
+    renderApp();
+    const input = document.querySelector('#guide-search');
     input?.focus(); input?.setSelectionRange(caret, caret);
   }
 });

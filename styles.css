@@ -1061,3 +1061,30 @@ a.menu-item { color: inherit; }
 .home-primary-empty { padding: 4px 2px; }
 @media (min-width: 701px) { .home-primary-grid.is-many { grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); } }
 @media (max-width: 700px) { .home-choices { grid-template-columns: 1fr; } }
+
+/* In-app guide («Οδηγός») */
+.help-button { width: 44px; height: 44px; flex: 0 0 44px; font-weight: 800; font-size: calc(22px * var(--text-scale)); color: var(--green); line-height: 1; }
+.help-button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
+.home-hero { position: relative; }
+.home-hero .help-button { position: absolute; top: 14px; right: 14px; z-index: 2; }
+.guide-search-wrap { max-width: none; margin-bottom: 18px; }
+.guide-toc { margin: 0 0 22px; padding: 0; }
+.guide-toc h2 { margin: 0 0 10px; font: 800 calc(16px * var(--text-scale)) var(--display); }
+.guide-toc ol { margin: 0; padding: 0 0 0 1.3em; }
+.guide-toc li { margin: 0 0 4px; }
+.guide-toc-link { display: inline; padding: 4px 0; border: 0; background: none; color: var(--green); font-size: calc(14px * var(--text-scale)); font-weight: 700; text-align: left; cursor: pointer; }
+.guide-toc-link:hover, .guide-toc-link:focus-visible { text-decoration: underline; }
+.guide-toc-link:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; border-radius: 4px; }
+.guide-manual { display: grid; gap: 22px; }
+.guide-section { scroll-margin-top: 84px; padding: 4px 2px 8px; border-bottom: 1px solid var(--line); }
+.guide-section:last-child { border-bottom: 0; }
+.guide-section h2 { margin: 0 0 8px; font: 800 calc(20px * var(--text-scale)) var(--display); }
+.guide-intro { margin: 0 0 10px; color: var(--ink); font-size: calc(15px * var(--text-scale)); font-weight: 650; }
+.guide-bullets { margin: 0; padding-left: 1.2em; }
+.guide-bullets li { margin: 0 0 8px; font-size: calc(14px * var(--text-scale)); line-height: 1.45; }
+.guide-section.is-target { border-radius: 12px; background: var(--green-soft); padding: 12px 14px 14px; border-bottom-color: transparent; }
+@media (max-width: 700px) {
+  .heading-actions { width: 100%; flex-wrap: wrap; }
+  .guide-section { scroll-margin-top: 72px; }
+  .home-hero .help-button { top: 10px; right: 10px; }
+}
