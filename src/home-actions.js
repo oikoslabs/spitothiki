@@ -11,9 +11,28 @@ export function normalizeHome(ids) {
   const set = new Set(ids.filter((id) => typeof id === 'string' && VALID.has(id)));
   return HOME_OPTIONS.filter((id) => set.has(id));
 }
+// { ids, guide }. «guide» is the compact home-screen user-guide link: on by default, even for
+// older saved custom layouts (plain arrays). Hidden only when the saved object has guide: false.
+export function parseHomeState(raw) {
+  if (raw == null || raw === '') return { ids: [...DEFAULT_HOME], guide: true };
+  try {
+    const v = JSON.parse(raw);
+    if (Array.isArray(v)) return { ids: normalizeHome(v), guide: true };
+    if (v && typeof v === 'object') {
+      const ids = Array.isArray(v.ids) ? normalizeHome(v.ids) : [...DEFAULT_HOME];
+      return { ids, guide: v.guide !== false };
+    }
+  } catch {}
+  return { ids: [...DEFAULT_HOME], guide: true };
+}
 export function parseHome(raw) {
-  if (raw == null || raw === '') return [...DEFAULT_HOME];
-  try { const v = JSON.parse(raw); return Array.isArray(v) ? normalizeHome(v) : [...DEFAULT_HOME]; } catch { return [...DEFAULT_HOME]; }
+  return parseHomeState(raw).ids;
+}
+export function serializeHome({ ids, guide }) {
+  const list = normalizeHome(ids);
+  const show = guide !== false;
+  if (JSON.stringify(list) === JSON.stringify(DEFAULT_HOME) && show) return null;
+  return JSON.stringify({ ids: list, guide: show });
 }
 export function toggleHome(ids, id, on) {
   if (!VALID.has(id)) return normalizeHome(ids);
@@ -21,3 +40,4 @@ export function toggleHome(ids, id, on) {
   return normalizeHome(on ? [...rest, id] : rest);
 }
 export const isDefaultHome = (ids) => JSON.stringify(normalizeHome(ids)) === JSON.stringify(DEFAULT_HOME);
+export const isDefaultHomeState = ({ ids, guide }) => isDefaultHome(ids) && guide !== false;

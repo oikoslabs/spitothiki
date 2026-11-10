@@ -66,7 +66,7 @@ test('header screens map to the matching guide section', () => {
   for (const id of Object.values(VIEW_TO_SECTION)) assert.ok(GUIDE_SECTIONS.some((section) => section.id === id), id);
 });
 
-test('guide is in the menu, settings, starter, welcome and SW cache v119', () => {
+test('guide is in the menu, settings, starter, welcome and SW cache v120', () => {
   const html = read('index.html');
   const block = (start, end) => html.slice(html.indexOf(start), html.indexOf(end, html.indexOf(start)));
   for (const nav of [block('<nav class="primary-nav"', '</nav>'), block('<nav class="menu-list" id="menu-list"', '</nav>')]) {
@@ -82,6 +82,35 @@ test('guide is in the menu, settings, starter, welcome and SW cache v119', () =>
   assert.match(app, /onboard-guide/);
   assert.match(app, /function helpButton/);
   const sw = read('sw.js');
-  assert.match(sw, /CACHE_VERSION = 'v119'/);
+  assert.match(sw, /CACHE_VERSION = 'v120'/);
   assert.ok(sw.includes("./src/guide.js"));
+});
+
+test('shopping voice text matches the hidden-mic behaviour and names Chrome', () => {
+  const shopping = GUIDE_SECTIONS.find((section) => section.id === 'shopping');
+  const voice = shopping.bullets.find((bullet) => bullet.includes('🎤'));
+  assert.ok(voice);
+  assert.match(voice, /Πάτα το 🎤 και πες π\.χ\. «δύο γάλατα»/);
+  assert.match(voice, /Αν δεν βλέπεις το μικρόφωνο, άνοιξε την εφαρμογή με Chrome/);
+  assert.doesNotMatch(voice, /σε κάποιους browser|Σε πολλούς browsers/i);
+  const app = read('src/app.js');
+  const form = app.slice(app.indexOf('function renderItemAddForm'), app.indexOf('const SpeechRecognitionApi'));
+  assert.match(form, /voice \? '<button class="button button-quiet voice-button"/);
+  assert.match(app, /SpeechRecognitionApi = window\.SpeechRecognition \|\| window\.webkitSpeechRecognition/);
+  assert.match(app, /renderItemAddForm\(\{ id: 'shopping-form'[\s\S]*voice: Boolean\(SpeechRecognitionApi\)/);
+  assert.equal(dictionaries.en[voice], 'Type a product or tap «To the list» from the pantry. Tap the 🎤 and say e.g. “two milks”. If you don’t see the microphone, open the app in Chrome.');
+});
+
+test('home screen has a permanent user-guide entry, default on, hideable in Settings', () => {
+  const app = read('src/app.js');
+  assert.match(app, /function renderHomeGuide/);
+  assert.match(app, /id="home-guide"/);
+  assert.match(app, /id="home-choice-guide"/);
+  assert.match(app, /Οδηγός χρήσης/);
+  const home = app.slice(app.indexOf('function renderOverview()'), app.indexOf('function renderPantryList'));
+  assert.ok(home.indexOf('renderHomeGuide()') < home.indexOf('renderHomePrimary()'));
+  assert.ok(home.includes('renderHomeGuide()'));
+  // still shown after first data: it is not behind hasAnyData / starter
+  const guideFn = app.slice(app.indexOf('function renderHomeGuide'), app.indexOf('function renderHomePrimary'));
+  assert.doesNotMatch(guideFn, /hasAnyData|renderStarterCard/);
 });

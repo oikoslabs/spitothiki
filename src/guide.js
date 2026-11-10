@@ -34,7 +34,7 @@ export const GUIDE_SECTIONS = [
     title: 'Λίστα αγορών',
     intro: 'Σημείωσε όσα χρειάζεσαι και πάρε τη λίστα μαζί σου.',
     bullets: [
-      'Γράψε ένα προϊόν ή πάτα «Στη λίστα» από το απόθεμα. Σε πολλούς browsers μπορείς να προσθέσεις και με φωνή (🎤).',
+      'Γράψε ένα προϊόν ή πάτα «Στη λίστα» από το απόθεμα. Πάτα το 🎤 και πες π.χ. «δύο γάλατα». Αν δεν βλέπεις το μικρόφωνο, άνοιξε την εφαρμογή με Chrome.',
       'Όταν τσεκάρεις κάτι ως αγορασμένο, η ποσότητα μπαίνει στο απόθεμα. Γράψε την τιμή αν θέλεις να μετρήσει στα έξοδα.',
       'Η αυτόματη λίστα (Ρυθμίσεις) βάζει μόνη της ένα προϊόν μόνο όταν η ποσότητα γίνει 0 ή όταν έχει ήδη λήξει — όχι όταν απλώς πέσει κάτω από το ελάχιστο.',
       'Στα «Επαναλαμβανόμενα» ορίζεις εσύ κάθε πότε να μπαίνει κάτι (π.χ. γάλα κάθε εβδομάδα). Η εφαρμογή δεν το μαντεύει από τις αγορές σου.'
@@ -247,7 +247,7 @@ export const GUIDE_EN = {
   'Όταν πετάς κάτι, πάτα το κάδο στο απόθεμα και σημείωσέ το ως «πετάχτηκε».': 'When you throw something away, tap the bin on the pantry item and mark it as thrown away.',
   'Στο πεδίο «Υπενθύμιση κάτω από» εμφανίζεται ετικέτα «Χαμηλό απόθεμα». Αυτό δεν βάζει μόνο του το προϊόν στη λίστα αγορών.': 'The «Remind me below» field shows a «Low stock» tag. That does not add the product to the shopping list by itself.',
   'Σημείωσε όσα χρειάζεσαι και πάρε τη λίστα μαζί σου.': 'Note what you need and take the list with you.',
-  'Γράψε ένα προϊόν ή πάτα «Στη λίστα» από το απόθεμα. Σε πολλούς browsers μπορείς να προσθέσεις και με φωνή (🎤).': 'Type a product or tap «To the list» from the pantry. In many browsers you can also add items by voice (🎤).',
+  'Γράψε ένα προϊόν ή πάτα «Στη λίστα» από το απόθεμα. Πάτα το 🎤 και πες π.χ. «δύο γάλατα». Αν δεν βλέπεις το μικρόφωνο, άνοιξε την εφαρμογή με Chrome.': 'Type a product or tap «To the list» from the pantry. Tap the 🎤 and say e.g. “two milks”. If you don’t see the microphone, open the app in Chrome.',
   'Όταν τσεκάρεις κάτι ως αγορασμένο, η ποσότητα μπαίνει στο απόθεμα. Γράψε την τιμή αν θέλεις να μετρήσει στα έξοδα.': 'When you tick something as bought, its quantity is added to the pantry. Type the price if you want it to count in spending.',
   'Η αυτόματη λίστα (Ρυθμίσεις) βάζει μόνη της ένα προϊόν μόνο όταν η ποσότητα γίνει 0 ή όταν έχει ήδη λήξει — όχι όταν απλώς πέσει κάτω από το ελάχιστο.': 'The automatic list (Settings) adds a product by itself only when the quantity reaches 0 or it has already expired — not when it merely drops below the minimum.',
   'Στα «Επαναλαμβανόμενα» ορίζεις εσύ κάθε πότε να μπαίνει κάτι (π.χ. γάλα κάθε εβδομάδα). Η εφαρμογή δεν το μαντεύει από τις αγορές σου.': 'In «Repeating items» you choose how often something is added (e.g. milk every week). The app does not guess this from your purchases.',
