@@ -6,6 +6,7 @@ import { createFakeBackend, fakeApp, fakeAuth, fakeFirestore } from './fake-fire
 
 const url = process.argv[2] || 'http://127.0.0.1:8080/';
 const quick = process.argv.includes('--quick');
+const IDLE = /^http:\/\/(127\.0\.0\.1|localhost)/.test(url) ? 'networkidle0' : 'networkidle2';
 const only = process.argv.includes('--solo');
 const browser = await puppeteer.launch({ executablePath: process.env.CHROME_PATH || '/usr/bin/google-chrome', args: ['--no-sandbox'], headless: true });
 const backend = createFakeBackend();
@@ -45,9 +46,9 @@ async function device(name, { firebase = true, lang = 'el' } = {}) {
       return request.continue();
     });
   }
-  await page.goto(`${url}#settings`, { waitUntil: 'networkidle0' });
+  await page.goto(`${url}#settings`, { waitUntil: IDLE });
   await page.evaluate(() => { localStorage.clear(); localStorage.setItem('spitothiki:onboarded', '1'); });
-  await page.reload({ waitUntil: 'networkidle0' });
+  await page.reload({ waitUntil: IDLE });
   await page.evaluate(() => { document.querySelectorAll('dialog[open]').forEach((d) => d.close()); });
   return page;
 }
