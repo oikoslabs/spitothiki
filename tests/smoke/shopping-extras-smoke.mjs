@@ -175,6 +175,20 @@ await check('Maria adds milk → Giannis gets «Μαρία πρόσθεσε Γά
   console.log('  notice:', notice);
   return !early && got && /(Μαρία|Μέλος 2) πρόσθεσε Γάλα, Ψωμί/.test(notice) && list.filter((x) => /πρόσθεσε/.test(x)).length === 1 && !own && note === 'ΔΕΛΤΑ 1,5%';
 });
+await check('a note being typed is kept when the other member changes the list', async () => {
+  await go(phone, 'shopping');
+  const id = (await shopping(phone)).find((r) => r.name === 'Ψωμί').id;
+  await tap(phone, `[data-action="note-edit"][data-id="${id}"]`); await wait();
+  await phone.type('#row-note-input', 'ολικής άλεσης');
+  await addToList(laptop, 'Ρύζι'); await wait(1500);
+  const synced = (await shopping(phone)).some((r) => r.name === 'Ρύζι');
+  const kept = await phone.$eval('#row-note-input', (el) => el.value).catch(() => '');
+  const focused = await phone.evaluate(() => document.activeElement?.id);
+  await phone.type('#row-note-input', ' 500γρ');
+  await phone.$eval('#row-note-form', (f) => f.requestSubmit()); await wait();
+  const saved = (await shopping(phone)).find((r) => r.id === id)?.note;
+  return synced && kept === 'ολικής άλεσης' && focused === 'row-note-input' && saved === 'ολικής άλεσης 500γρ';
+});
 if (!quick) {
   await check('app in background: system notification with the shopping tag (after the 2-minute gap)', async () => {
     await phone.evaluate(() => { const k = 'spitothiki:notifications'; const s = JSON.parse(localStorage.getItem(k) || '{}'); localStorage.setItem(k, JSON.stringify({ ...s, enabled: true })); window.__hidden = true; });

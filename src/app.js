@@ -686,8 +686,9 @@ function renderShoppingRow(item) {
 
 // v1.9.22: note per row (brand/size), visible to whoever shops; ✎ opens a small inline editor.
 let noteEditId = '';
+let noteDraft = null; // v1.9.22: what is typed in the note editor, kept across re-renders (e.g. a sync update)
 function renderRowNote(item) {
-  if (noteEditId === item.id) return `<form class="row-note-form" id="row-note-form" data-id="${escapeHtml(item.id)}" novalidate><input class="field-input" name="note" id="row-note-input" maxlength="${NOTE_MAX}" value="${escapeHtml(item.note || '')}" placeholder="π.χ. Barilla 500 γρ., χωρίς λακτόζη" aria-label="${escapeHtml(t('Σημείωση για {name}', { name: item.name }))}" autocomplete="off"><button class="button button-primary small-action" type="submit">Αποθήκευση</button><button class="button button-quiet small-action" type="button" data-action="note-cancel">Άκυρο</button></form>`;
+  if (noteEditId === item.id) return `<form class="row-note-form" id="row-note-form" data-id="${escapeHtml(item.id)}" novalidate><input class="field-input" name="note" id="row-note-input" maxlength="${NOTE_MAX}" value="${escapeHtml(noteDraft ?? item.note ?? '')}" placeholder="π.χ. Barilla 500 γρ., χωρίς λακτόζη" aria-label="${escapeHtml(t('Σημείωση για {name}', { name: item.name }))}" autocomplete="off"><button class="button button-primary small-action" type="submit">Αποθήκευση</button><button class="button button-quiet small-action" type="button" data-action="note-cancel">Άκυρο</button></form>`;
   const label = escapeHtml(t(item.note ? 'Αλλαγή σημείωσης για {name}' : 'Σημείωση για {name}', { name: item.name }));
   const note = item.note ? `<div class="shopping-row-note"><span aria-hidden="true">📝</span> <span class="row-note-text" data-no-i18n>${escapeHtml(item.note)}</span></div>` : '';
   if (item.checked) return note;
@@ -897,7 +898,13 @@ async function startSync() {
     sync = await createFirebaseSync({
       config: firebaseConfig,
       getState: () => state,
-      setState: (next) => { state = next; try { saveState(state); } catch {} renderApp(); },
+      setState: (next) => {
+        state = next; try { saveState(state); } catch {}
+        // v1.9.22: a sync update must not take the note being typed (text is in noteDraft; keep focus and caret).
+        const typing = document.activeElement?.id === 'row-note-input' ? document.activeElement.selectionStart : null;
+        renderApp();
+        if (typing !== null) { const input = document.querySelector('#row-note-input'); if (input) { input.focus(); input.setSelectionRange(typing, typing); } }
+      },
       onNewHousehold: () => { sourceSignup(); },
       onRemote: (docs, before, me) => { if (notifySettings().listNotify) listNotices.push(shoppingChanges(before?.shopping || [], docs, me)); },
       onStatus: (status) => { noteSignin(status); syncStatus = status; if (status.user) requestPersistentStorage(); ensureMyName(); if (activeView === 'settings' || activeView === 'overview' || activeView === 'insights') renderApp(); maybeProtectSheet(); }
@@ -3647,10 +3654,10 @@ function handleAction(button) {
     } catch (error) { showToast(error.message); return; }
     if (persist()) { renderApp(); showToast(t('Προστέθηκε: {name}', { name: pick.name })); document.querySelector('#shopping-form input[name="name"]')?.focus(); }
   } else if (action === 'note-edit') {
-    noteEditId = id; renderApp();
+    noteEditId = id; noteDraft = null; renderApp();
     const input = document.querySelector('#row-note-input');
     if (input) { input.focus(); input.setSelectionRange(input.value.length, input.value.length); }
-  } else if (action === 'note-cancel') { noteEditId = ''; renderApp();
+  } else if (action === 'note-cancel') { noteEditId = ''; noteDraft = null; renderApp();
   } else if (action === 'filter-category') {
     pantryCategory = button.dataset.category || 'Όλα';
     renderApp();
@@ -3721,6 +3728,7 @@ document.addEventListener('input', (event) => {
   if ((event.target.id === 'bill-name' || event.target.name === 'type') && event.target.form?.id === 'bill-form' && !event.target.form.elements.billId.value && event.target.form.elements.type.value === 'rent') event.target.form.elements.period.value = '1';
   if (event.target.id === 'bill-name') rememberAutoPay(event.target.form);
   if (event.target.name === 'name' && event.target.form?.id === 'shopping-form') refreshSuggestChips();
+  if (event.target.id === 'row-note-input') noteDraft = event.target.value;
 });
 
 document.addEventListener('change', (event) => {
@@ -4011,7 +4019,7 @@ document.addEventListener('submit', (event) => {
     event.preventDefault();
     const rowId = event.target.dataset.id;
     const value = cleanNote(event.target.elements.note.value);
-    noteEditId = '';
+    noteEditId = ''; noteDraft = null;
     if (state.shopping.some((row) => row.id === rowId)) { state.shopping = setRowNote(state.shopping, rowId, value); if (persist()) showToast(value ? 'Η σημείωση αποθηκεύτηκε.' : 'Η σημείωση αφαιρέθηκε.'); }
     renderApp();
     return;

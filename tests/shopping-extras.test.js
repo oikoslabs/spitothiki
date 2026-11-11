@@ -172,3 +172,19 @@ test('wiring: synced pastLists kind, SW precache + cache bump + notification cli
   // No new network calls in the feature module.
   assert.doesNotMatch(read('src/shopping-extras.js'), /fetch\(|XMLHttpRequest|sendBeacon/);
 });
+
+test('guide: shopping chapter documents all four features (EL/EN), incl. the toggle and the closed-app limit', async () => {
+  const { GUIDE_SECTIONS } = await import('../src/guide.js');
+  const text = GUIDE_SECTIONS.find((s) => s.id === 'shopping').bullets.join(' ');
+  for (const re of [/«Συχνά:»/, /✎ Πρόσθεσε σημείωση/, /🔁 Ξαναψώνισε τα ίδια/, /Μαρία πρόσθεσε γάλα/, /εντελώς κλειστή εφαρμογή δεν έρχεται/, /Ρυθμίσεις → Ειδοποιήσεις → «Ειδοποίηση όταν άλλο μέλος αλλάζει την κοινή λίστα αγορών»/]) assert.match(text, re);
+  setLang('en');
+  try { const en = GUIDE_SECTIONS.find((s) => s.id === 'shopping').bullets.map((b) => t(b)).join(' '); for (const re of [/«Often:»/, /Add a note/, /Buy the same again/, /fully closed/, /Notify me when another member changes the shared shopping list/]) assert.match(en, re); }
+  finally { setLang('el'); }
+});
+
+test('note being typed survives a sync re-render (draft + focus kept)', () => {
+  const app = read('src/app.js');
+  assert.match(app, /noteDraft \?\? item\.note/);
+  assert.match(app, /event\.target\.id === 'row-note-input'\) noteDraft = event\.target\.value/);
+  assert.match(app, /activeElement\?\.id === 'row-note-input'/);
+});
