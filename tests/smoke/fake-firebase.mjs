@@ -23,6 +23,8 @@ export async function signInWithPopup() { return login('google@example.com'); }
 export async function signInWithRedirect() {}
 export async function sendPasswordResetEmail() {}
 export async function signOut() { current = null; emit(); }
+export async function getRedirectResult() { return null; }
+export async function deleteUser() {}
 `;
 
 export const fakeFirestore = `
@@ -30,6 +32,8 @@ const UNION = Symbol('union'), REMOVE = Symbol('remove');
 export function initializeFirestore() { return {}; }
 export function getFirestore() { return {}; }
 export function persistentLocalCache() { return {}; }
+export async function terminate() {}
+export async function clearIndexedDbPersistence() {}
 export function persistentMultipleTabManager() { return {}; }
 export function serverTimestamp() { return Date.now(); }
 export function arrayUnion(...values) { return { [UNION]: values }; }

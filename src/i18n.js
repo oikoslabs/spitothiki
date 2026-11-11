@@ -4,6 +4,7 @@
 
 import { DIET_EN } from './diet-i18n.js';
 import { GUIDE_EN } from './guide.js';
+import { SHOPPING_EXTRAS_EN } from './shopping-extras.js';
 
 export const LANG_KEY = 'spitothiki:lang';
 export const LANGS = ['el', 'en'];
@@ -22,6 +23,7 @@ const EN = {
   "Τα παραδείγματα φορτώθηκαν. Τα δεδομένα σου είναι μόνο σε αυτό το κινητό: συνδέσου ή σύνδεσε Google Drive για να μη χαθούν.": "Examples loaded. Your data is only on this phone: sign in or connect Google Drive so it isn’t lost.",
   ...DIET_EN,
   ...GUIDE_EN,
+  ...SHOPPING_EXTRAS_EN,
   "Κράτα ένα αντίγραφο των δεδομένων σου": "Keep a backup of your data",
   "Το τελευταίο αντίγραφο έγινε {date}.": "Your last backup was on {date}.",
   "Δεν έχεις κάνει ακόμα αντίγραφο. Αν αλλάξεις κινητό, θα το χρειαστείς.": "You have no backup yet. You will need one if you change phone.",

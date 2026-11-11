@@ -9,7 +9,7 @@ const SDK = new URL('../vendor/firebase-13.0.0', import.meta.url).href;
 const META_KEY = 'spitothiki:sync';
 const PENDING_MARKETING_KEY = 'spitothiki:pending-marketing';
 
-export async function createFirebaseSync({ config, getState, setState, onStatus, onNewHousehold }) {
+export async function createFirebaseSync({ config, getState, setState, onStatus, onNewHousehold, onRemote }) {
   const [{ initializeApp }, auth, fs] = await Promise.all([
     import(`${SDK}/firebase-app.js`), import(`${SDK}/firebase-auth.js`), import(`${SDK}/firebase-firestore.js`)
   ]);
@@ -157,7 +157,8 @@ export async function createFirebaseSync({ config, getState, setState, onStatus,
   function connect(hid) {
     engine?.stop();
     householdId = hid;
-    engine = new SyncEngine({ backend: backendFor(hid), getState, setState, store: metaStore(hid), uid: () => user?.uid || '' });
+    engine = new SyncEngine({ backend: backendFor(hid), getState, setState, store: metaStore(hid), uid: () => user?.uid || '',
+      onRemote: onRemote ? (docs, before) => onRemote(docs, before, user?.uid || '') : null });
     engine.start();
     // v1.7.0: household members (read only; a failure just hides «Ποιος πλήρωσε τι»).
     stopMembers?.(); members = [];

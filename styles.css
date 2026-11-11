@@ -1096,3 +1096,17 @@ a.menu-item { color: inherit; }
 .tester-banner { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; margin: 0 0 14px; padding: 8px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--ink); font: inherit; font-size: calc(14px * var(--text-scale)); font-weight: 700; text-align: left; cursor: pointer; }
 .tester-banner:hover { border-color: #bfd4c1; }
 .tester-banner:focus-visible { outline: 3px solid #2d6b4c; outline-offset: 2px; }
+
+/* v1.9.22: shopping-list extras (quick suggestions, row notes) */
+.suggest-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: -4px 0 12px; }
+.suggest-chips:empty { display: none; }
+.suggest-label { color: var(--muted); font-size: calc(12px * var(--text-scale)); font-weight: 700; margin-right: 2px; }
+.suggest-chip { min-height: 36px; padding: 0 12px; border-style: solid; color: inherit; background: #f6f9f4; }
+.shopping-row-note { margin-top: 2px; color: #3d5a45; font-size: calc(12px * var(--text-scale)); font-weight: 600; overflow-wrap: anywhere; }
+.row-note-edit { margin-top: 2px; padding: 2px 0; font-size: calc(11px * var(--text-scale)); }
+.row-note-form { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.row-note-form .field-input { flex: 1 1 160px; min-width: 0; }
+:root[data-theme="dark"] .suggest-chip { background: #24312a; color: #e3ece6; }
+:root[data-theme="dark"] .shopping-row-note { color: #b3c2b8; }
+@media (min-width: 761px) { #shopping-form.has-extra { grid-template-columns: minmax(0,1fr) 80px 110px 170px; } }
+.item-add-form .note-input { grid-column: 1 / -1; }
