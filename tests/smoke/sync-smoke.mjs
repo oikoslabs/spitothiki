@@ -38,6 +38,8 @@ async function check(name, fn) {
   try { const ok = await fn(); results.push(ok); console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}`); if (!ok) errors.push(`assert: ${name}`); }
   catch (error) { console.log(`FAIL ${name}: ${error.message}`); errors.push(`assert: ${name}: ${error.message}`); }
 }
+// Scrolls to the middle first, so the fixed bottom bar never takes the click.
+const tap = async (page, sel) => { await page.$eval(sel, (el) => el.scrollIntoView({ block: 'center' })); await page.click(sel); };
 const items = (page) => page.evaluate(() => JSON.parse(localStorage.getItem('spitothiki:v1') || '{"items":[]}').items.map((i) => `${i.name}:${i.quantity}`).sort());
 async function addItem(page, name) {
   await page.evaluate((n) => { location.hash = '#pantry'; }, name); await wait();
@@ -104,11 +106,11 @@ await check('changes and deletions propagate', async () => {
 await check('stores created in ⚙ and at cart start persist after reload and reach the other device', async () => {
   await phone.setViewport({ width: 375, height: 800, isMobile: true, hasTouch: true });
   await phone.evaluate(() => { location.hash = '#shopping'; }); await wait();
-  await phone.click('[data-action="toggle-stores"]'); await wait();
-  await phone.type('#store-form input[name=name]', 'Σκλαβενίτης'); await phone.click('#store-form button[type=submit]'); await wait(900);
-  await phone.click('#open-cart'); await wait();
+  await tap(phone, '[data-action="toggle-stores"]'); await wait();
+  await phone.type('#store-form input[name=name]', 'Σκλαβενίτης'); await tap(phone, '#store-form button[type=submit]'); await wait(900);
+  await tap(phone, '#open-cart'); await wait();
   await phone.select('#cart-store', '__new'); await wait();
-  await phone.type('#cart-new-store', 'Μασούτης'); await phone.click('#cart-start-form button[type=submit]'); await wait(900);
+  await phone.type('#cart-new-store', 'Μασούτης'); await tap(phone, '#cart-start-form button[type=submit]'); await wait(900);
   await phone.reload({ waitUntil: 'networkidle0' }); await wait(1500);
   const names = (p) => p.evaluate(() => (JSON.parse(localStorage.getItem('spitothiki:v1')).stores || []).map((s) => s.name).sort().join(','));
   const local = await names(phone), other = await names(laptop);

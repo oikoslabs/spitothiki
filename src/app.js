@@ -23,6 +23,7 @@ import { lastScanDate, pushDates, scanNudgeDates, pushSupported, pushSubscriptio
 import { autoListAdds } from './auto-list.js';
 import { comparePrices, listComparison } from './price-compare.js';
 import { extractShelfPrice, lastReceiptPrice } from './shelf-price.js';
+import { NOTE_MAX, archiveChecked, cleanNote, createNoticeBatcher, listNoticeText, quickSuggestions, reshop, reshopSource, setRowNote, shoppingChanges } from './shopping-extras.js';
 import { addCartItem, budgetState, createTrip, finishTrip, lastPrice, lineTotal, remainingShopping, removeCartItem, tripForReceipt, updateCartItem } from './cart.js';
 import { VM_MODES, interpretCode } from './gs1.js';
 import { initBackToTop } from './back-to-top.js';
@@ -680,7 +681,30 @@ function renderPantry() {
 }
 
 function renderShoppingRow(item) {
-  return `<div class="shopping-row ${item.checked ? 'checked has-price' : ''}"><input class="shopping-check" type="checkbox" data-action="toggle-shopping" data-id="${escapeHtml(item.id)}" ${item.checked ? 'checked' : ''} aria-label="${escapeHtml(t(item.checked ? 'Ολοκληρώθηκε: {name}' : 'Σημείωση ως αγορασμένο: {name}', { name: item.name }))}"><div><strong class="shopping-row-name">${escapeHtml(item.name)}</strong>${item.auto && !item.checked ? ` <span class="auto-tag">${escapeHtml(t('αυτόματα'))}</span>` : ''}<div class="shopping-row-detail">${escapeHtml(item.quantity)} ${escapeHtml(t(item.unit))}</div></div><span class="shopping-state">${item.checked ? (item.pantryAdded ? 'Μπήκε στο απόθεμα' : 'Μπήκε στο καλάθι') : ''}</span>${item.checked ? renderPriceField(item) : ''}<button class="icon-button danger" type="button" data-action="remove-shopping" data-id="${escapeHtml(item.id)}" aria-label="${escapeHtml(t('Αφαίρεση {name} από τη λίστα', { name: item.name }))}">×</button></div>`;
+  return `<div class="shopping-row ${item.checked ? 'checked has-price' : ''}"><input class="shopping-check" type="checkbox" data-action="toggle-shopping" data-id="${escapeHtml(item.id)}" ${item.checked ? 'checked' : ''} aria-label="${escapeHtml(t(item.checked ? 'Ολοκληρώθηκε: {name}' : 'Σημείωση ως αγορασμένο: {name}', { name: item.name }))}"><div><strong class="shopping-row-name">${escapeHtml(item.name)}</strong>${item.auto && !item.checked ? ` <span class="auto-tag">${escapeHtml(t('αυτόματα'))}</span>` : ''}<div class="shopping-row-detail">${escapeHtml(item.quantity)} ${escapeHtml(t(item.unit))}</div>${renderRowNote(item)}</div><span class="shopping-state">${item.checked ? (item.pantryAdded ? 'Μπήκε στο απόθεμα' : 'Μπήκε στο καλάθι') : ''}</span>${item.checked ? renderPriceField(item) : ''}<button class="icon-button danger" type="button" data-action="remove-shopping" data-id="${escapeHtml(item.id)}" aria-label="${escapeHtml(t('Αφαίρεση {name} από τη λίστα', { name: item.name }))}">×</button></div>`;
+}
+
+// v1.9.22: note per row (brand/size), visible to whoever shops; ✎ opens a small inline editor.
+let noteEditId = '';
+function renderRowNote(item) {
+  if (noteEditId === item.id) return `<form class="row-note-form" id="row-note-form" data-id="${escapeHtml(item.id)}" novalidate><input class="field-input" name="note" id="row-note-input" maxlength="${NOTE_MAX}" value="${escapeHtml(item.note || '')}" placeholder="π.χ. Barilla 500 γρ., χωρίς λακτόζη" aria-label="${escapeHtml(t('Σημείωση για {name}', { name: item.name }))}" autocomplete="off"><button class="button button-primary small-action" type="submit">Αποθήκευση</button><button class="button button-quiet small-action" type="button" data-action="note-cancel">Άκυρο</button></form>`;
+  const label = escapeHtml(t(item.note ? 'Αλλαγή σημείωσης για {name}' : 'Σημείωση για {name}', { name: item.name }));
+  const note = item.note ? `<div class="shopping-row-note"><span aria-hidden="true">📝</span> <span class="row-note-text" data-no-i18n>${escapeHtml(item.note)}</span></div>` : '';
+  if (item.checked) return note;
+  return `${note}<button class="panel-link row-note-edit" type="button" data-action="note-edit" data-id="${escapeHtml(item.id)}" aria-label="${label}" title="${label}">✎ ${escapeHtml(t(item.note ? 'Σημείωση' : 'Πρόσθεσε σημείωση'))}</button>`;
+}
+
+// v1.9.22: one-tap chips of what this household buys often; filtered while typing in «Προϊόν για αγορά».
+function renderSuggestChips(query = '') {
+  const list = quickSuggestions(state, { query, limit: 8 });
+  if (!list.length) return '';
+  return `<span class="suggest-label">${escapeHtml(t(query ? 'Ταιριάζουν:' : 'Συχνά:'))}</span>${list.map((s, i) => `<button class="extras-chip suggest-chip" type="button" data-action="suggest-add" data-index="${i}" data-name="${escapeHtml(s.name)}" aria-label="${escapeHtml(t('Πρόσθεσε {name} στη λίστα', { name: s.name }))}"><span data-no-i18n>＋ ${escapeHtml(s.name)}</span></button>`).join('')}`;
+}
+function refreshSuggestChips() {
+  const box = document.querySelector('#shopping-suggest');
+  if (!box) return;
+  box.innerHTML = renderSuggestChips(document.querySelector('#shopping-form input[name="name"]')?.value || '');
+  translateDom(box);
 }
 
 function renderPriceField(row) {
@@ -728,8 +752,9 @@ function renderShopping() {
   const trip = activeTrip();
   return `${renderHeader('Λίστα αγορών', 'Σημείωσε όσα χρειάζεσαι και πάρε τη λίστα μαζί σου.')}
     <div class="page-actions cart-entry"><button class="button ${trip ? 'button-primary' : 'button-quiet'}" type="button" data-view="cart" id="open-cart">🛒 ${escapeHtml(trip ? t('Συνέχεια καλαθιού · {total}', { total: money(trip.total) }) : t('Καλάθι στο κατάστημα'))}</button></div>
-    <div class="shopping-layout"><section class="panel"><div class="panel-heading"><div><h2>Τι χρειάζεται το σπίτι;</h2><p>${pending.length ? pendingLabel(pending.length) : 'Κανένα εκκρεμές προϊόν'}</p></div><div class="panel-links">${pending.length ? '<button class="panel-link" type="button" data-action="compare-list">💶 Σύγκριση τιμών</button><button class="panel-link" type="button" data-action="share-shopping">↗ Κοινοποίηση</button>' : ''}${checked.length ? '<button class="panel-link" type="button" data-action="clear-completed">Καθάρισε τα αγορασμένα</button>' : ''}</div></div>
-    ${renderItemAddForm({ id: 'shopping-form', label: 'Προϊόν για αγορά', placeholder: 'π.χ. Φέτα', voice: Boolean(SpeechRecognitionApi) })}
+    <div class="shopping-layout"><section class="panel"><div class="panel-heading"><div><h2>Τι χρειάζεται το σπίτι;</h2><p>${pending.length ? pendingLabel(pending.length) : 'Κανένα εκκρεμές προϊόν'}</p></div><div class="panel-links">${pending.length ? '<button class="panel-link" type="button" data-action="compare-list">💶 Σύγκριση τιμών</button><button class="panel-link" type="button" data-action="share-shopping">↗ Κοινοποίηση</button>' : ''}${checked.length ? '<button class="panel-link" type="button" data-action="clear-completed">Καθάρισε τα αγορασμένα</button>' : ''}${reshopSource(state.shopping, state.pastLists || []).source ? '<button class="panel-link" type="button" data-action="reshop" id="reshop">🔁 Ξαναψώνισε τα ίδια</button>' : ''}</div></div>
+    ${renderItemAddForm({ id: 'shopping-form', label: 'Προϊόν για αγορά', placeholder: 'π.χ. Φέτα', voice: Boolean(SpeechRecognitionApi), extra: `<input class="field-input note-input" name="note" maxlength="${NOTE_MAX}" placeholder="Σημείωση: μάρκα, μέγεθος (προαιρετικά)" aria-label="Σημείωση: μάρκα, μέγεθος (προαιρετικά)" autocomplete="off">` })}
+    <div class="suggest-chips" id="shopping-suggest" aria-label="Γρήγορες προτάσεις">${renderSuggestChips()}</div>
     <p class="form-error" id="shopping-error" role="alert" hidden></p>
     ${renderStoreBar()}
     <div class="shopping-list">${state.shopping.length ? renderShoppingRows(pending, checked) : renderEmpty('Η λίστα είναι άδεια', 'Πρόσθεσε όσα χρειάζεσαι πριν πας για ψώνια.', 'focus-shopping', 'Γράψε το πρώτο προϊόν', '🛒')}</div></section>
@@ -828,7 +853,7 @@ function updateExpiryWarning() {
 }
 
 async function shareShoppingList() {
-  const text = shoppingListText(state.shopping).split('\n').map((line, i) => i === 0 ? t(line) : line.replace(/ (\S+)$/, (m, unit) => ` ${t(unit)}`)).join('\n');
+  const text = shoppingListText(state.shopping).split('\n').map((line, i) => i === 0 ? t(line) : line.replace(/( — [\d.,]+ )(\S+)/, (m, pre, unit) => `${pre}${t(unit)}`)).join('\n');
   if (!text) { showToast('Η λίστα δεν έχει εκκρεμή προϊόντα.'); return; }
   if (navigator.share) {
     try { await navigator.share({ title: t('Λίστα αγορών'), text }); return; }
@@ -874,6 +899,7 @@ async function startSync() {
       getState: () => state,
       setState: (next) => { state = next; try { saveState(state); } catch {} renderApp(); },
       onNewHousehold: () => { sourceSignup(); },
+      onRemote: (docs, before, me) => { if (notifySettings().listNotify) listNotices.push(shoppingChanges(before?.shopping || [], docs, me)); },
       onStatus: (status) => { noteSignin(status); syncStatus = status; if (status.user) requestPersistentStorage(); ensureMyName(); if (activeView === 'settings' || activeView === 'overview' || activeView === 'insights') renderApp(); maybeProtectSheet(); }
     });
   } catch {
@@ -1287,13 +1313,38 @@ async function testPush() {
 function notifySettings() {
   try {
     const saved = JSON.parse(localStorage.getItem(NOTIFY_KEY) || '{}');
-    return { enabled: Boolean(saved.enabled), days: Number.isInteger(saved.days) && saved.days >= 0 && saved.days <= 30 ? saved.days : 3, lastNotified: String(saved.lastNotified || ''), lastBillNotified: String(saved.lastBillNotified || ''), scanNudge: Boolean(saved.scanNudge) };
-  } catch { return { enabled: false, days: 3, lastNotified: '', lastBillNotified: '', scanNudge: false }; }
+    return { enabled: Boolean(saved.enabled), days: Number.isInteger(saved.days) && saved.days >= 0 && saved.days <= 30 ? saved.days : 3, lastNotified: String(saved.lastNotified || ''), lastBillNotified: String(saved.lastBillNotified || ''), scanNudge: Boolean(saved.scanNudge), listNotify: saved.listNotify !== false };
+  } catch { return { enabled: false, days: 3, lastNotified: '', lastBillNotified: '', scanNudge: false, listNotify: true }; }
 }
 
 function saveNotifySettings(changes) {
   try { localStorage.setItem(NOTIFY_KEY, JSON.stringify({ ...notifySettings(), ...changes })); } catch {}
 }
+
+// ---------- v1.9.22: «Η Μαρία πρόσθεσε γάλα» — changes by another member to the shared shopping list ----------
+// Built on this phone from the synced rows (no server, no new data). Batched: one notice per burst of changes and at
+// most one every 2 minutes. App on screen → a short message; app in the background (still running) → a system
+// notification (needs notifications on). Fully closed app: nothing arrives, the changes show on the next open.
+const LIST_TAG = 'spitothiki-list';
+let missedListNotice = null;
+const listNotices = createNoticeBatcher({ quiet: 10_000, maxWait: 45_000, gap: 120_000, onFlush: (events) => deliverListNotice(events) });
+async function deliverListNotice(events) {
+  if (!syncStatus?.user || !notifySettings().listNotify) return;
+  const names = memberNames(householdMembers(), state.people || [], (n) => t('Μέλος {n}', { n }));
+  const notice = listNoticeText(events, names, t);
+  if (!notice) return;
+  if (document.visibilityState === 'visible') { missedListNotice = null; showToast(`🛒 ${notice.title}${notice.body && notice.body !== t('Λίστα αγορών') ? ` · ${notice.body}` : ''}`); return; }
+  const settings = notifySettings();
+  if (settings.enabled && notificationsSupported() && Notification.permission === 'granted') {
+    try { await showNotification(notice.title, notice.body, LIST_TAG); missedListNotice = null; return; } catch {}
+  }
+  missedListNotice = notice;
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible' || !missedListNotice) return;
+  const notice = missedListNotice; missedListNotice = null;
+  showToast(`🛒 ${notice.title}${notice.body && notice.body !== t('Λίστα αγορών') ? ` · ${notice.body}` : ''}`);
+});
 
 function notificationsSupported() {
   return 'Notification' in window;
@@ -1368,6 +1419,8 @@ function renderNotificationCard() {
     <label class="field-label" for="notify-days">Ειδοποίηση για λήξη μέσα σε (ημέρες)</label><input class="field-input notify-days" id="notify-days" type="number" min="0" max="30" step="1" value="${settings.days}" inputmode="numeric">
     <div class="settings-actions">${active ? '<button class="button button-quiet" type="button" data-action="disable-notifications">Απενεργοποίηση</button>' : `<button class="button button-primary" type="button" data-action="enable-notifications" ${permission === 'unsupported' || permission === 'denied' ? 'disabled' : ''}>Ενεργοποίηση ειδοποιήσεων</button>`}</div>
     ${active ? `<label class="check-row" for="notify-scan"><input type="checkbox" id="notify-scan" ${settings.scanNudge ? 'checked' : ''}> <span>${escapeHtml(t('Υπενθύμιση σκαναρίσματος, αν δεν σκανάρεις 7 μέρες (το πολύ μία την εβδομάδα)'))}</span></label>` : ''}
+    <label class="check-row" for="notify-list"><input type="checkbox" id="notify-list" ${settings.listNotify ? 'checked' : ''}> <span>${escapeHtml(t('Ειδοποίηση όταν άλλο μέλος αλλάζει την κοινή λίστα αγορών'))}</span></label>
+    <p class="field-hint" id="notify-list-hint">${escapeHtml(t('Μόνο σε κοινό σπίτι. Έρχεται όσο η εφαρμογή είναι ανοιχτή ή στο παρασκήνιο, μαζεμένα (το πολύ μία κάθε 2 λεπτά). Ποτέ για δικές σου αλλαγές.'))}</p>
     <p class="field-hint" id="notify-background">${backgroundSyncSupported() ? 'Έλεγχος στο παρασκήνιο: διαθέσιμος. Με την εφαρμογή εγκατεστημένη, ο browser ελέγχει περίπου μία φορά τη μέρα, όποτε κρίνει.' : 'Έλεγχος στο παρασκήνιο: δεν υποστηρίζεται από αυτόν τον browser. Ο έλεγχος γίνεται όταν ανοίγεις την εφαρμογή.'}</p>
     <p class="field-hint" id="notify-push">${escapeHtml(t(!pushSupported() ? 'Με κλειστή εφαρμογή: δεν υποστηρίζεται από αυτόν τον browser.' : permission === 'denied' ? 'Με κλειστή εφαρμογή: μπλοκαρισμένες. Άνοιξε Ρυθμίσεις Android → Εφαρμογές → Σπιτοθήκη (ή Chrome) → Ειδοποιήσεις → Να επιτρέπονται.' : !active ? 'Με κλειστή εφαρμογή: ενεργοποίησε τις ειδοποιήσεις για να έρχονται και με κλειστή εφαρμογή (κάθε πρωί στις 9:00).' : pushState === 'error' ? 'Με κλειστή εφαρμογή: πρόβλημα.' : pushState === 'on' ? 'Με κλειστή εφαρμογή: ενεργές. Κάθε πρωί στις 9:00 για λογαριασμούς και λήξεις.' : 'Με κλειστή εφαρμογή: έλεγχος…'))}${pushState === 'error' && pushError ? ` <strong class="form-error" id="notify-push-error">${escapeHtml(pushError)}</strong>` : ''}</p>
     ${active && pushSupported() ? `<div class="settings-actions"><button class="button button-primary" type="button" data-action="push-test">🔔 Δοκιμαστική ειδοποίηση</button></div><p class="field-hint">${escapeHtml(t('Αν δεν έρθει: Ρυθμίσεις Android → Εφαρμογές → Σπιτοθήκη (ή Chrome) → Ειδοποιήσεις → ενεργές, και απενεργοποίησε την «Εξοικονόμηση μπαταρίας» για την εφαρμογή.'))}</p>` : ''}</section>`;
@@ -3574,8 +3627,30 @@ function handleAction(button) {
   else if (action === 'copy-share') copyShareText();
   else if (action === 'close-share') document.querySelector('#share-dialog').close();
   else if (action === 'clear-completed') {
+    // v1.9.22: the ticked rows are kept as the last completed list, for «Ξαναψώνισε τα ίδια».
+    state.pastLists = archiveChecked(state.pastLists || [], state.shopping);
     state.shopping = state.shopping.filter((entry) => !entry.checked);
     persist(); renderApp(); showToast('Η λίστα καθαρίστηκε.');
+  } else if (action === 'reshop') {
+    const before = reshopSource(state.shopping, state.pastLists || []);
+    if (!before.source) return;
+    const result = reshop(state);
+    if (!result.added && before.source === 'last') { showToast('Όλα είναι ήδη στη λίστα.'); return; }
+    undoable(t('Ξαναμπήκαν στη λίστα: {count}', { count: result.added }), () => { state.shopping = result.shopping; state.pastLists = result.pastLists; if (persist()) renderApp(); });
+  } else if (action === 'suggest-add') {
+    const query = document.querySelector('#shopping-form input[name="name"]')?.value || '';
+    const pick = quickSuggestions(state, { query, limit: 8 })[Number(button.dataset.index)];
+    if (!pick || pick.name !== button.dataset.name) { refreshSuggestChips(); return; }
+    try {
+      const row = createShoppingItem({ name: pick.name, quantity: pick.quantity, unit: pick.unit, itemId: pick.itemId });
+      state.shopping.push({ ...row, ...(isProductType(pick.category) ? { category: pick.category } : {}), ...(pick.note ? { note: pick.note } : {}) });
+    } catch (error) { showToast(error.message); return; }
+    if (persist()) { renderApp(); showToast(t('Προστέθηκε: {name}', { name: pick.name })); document.querySelector('#shopping-form input[name="name"]')?.focus(); }
+  } else if (action === 'note-edit') {
+    noteEditId = id; renderApp();
+    const input = document.querySelector('#row-note-input');
+    if (input) { input.focus(); input.setSelectionRange(input.value.length, input.value.length); }
+  } else if (action === 'note-cancel') { noteEditId = ''; renderApp();
   } else if (action === 'filter-category') {
     pantryCategory = button.dataset.category || 'Όλα';
     renderApp();
@@ -3612,7 +3687,7 @@ function handleAction(button) {
     else loadDemo();
   } else if (action === 'clear-data') {
     showConfirm(`${t('Θα διαγραφούν όλα τα δεδομένα (απόθεμα, λίστες και έξοδα) από αυτή τη συσκευή.')}${syncStatus.user ? t(' Επειδή είσαι συνδεδεμένος, θα διαγραφούν και από τις συγχρονισμένες συσκευές.') : ''}${t(' Φρόντισε να έχεις αντίγραφο αν τα χρειάζεσαι.')}`, () => {
-      state = { items: [], shopping: [], recurring: [], stores: [], purchases: [], waste: [], receipts: [], meals: [], bills: [], trips: [], prices: [], transport: [], transportRecurring: [], vehicles: [], extras: [], extraCategories: [], expenseCategories: [], productTypes: [] }; persist(); renderApp(); showToast('Τα δεδομένα διαγράφηκαν.');
+      state = { items: [], shopping: [], recurring: [], stores: [], purchases: [], waste: [], receipts: [], meals: [], bills: [], trips: [], prices: [], transport: [], transportRecurring: [], vehicles: [], extras: [], extraCategories: [], expenseCategories: [], productTypes: [], pastLists: [] }; persist(); renderApp(); showToast('Τα δεδομένα διαγράφηκαν.');
     }, 'Διαγραφή όλων των δεδομένων;');
   }
 }
@@ -3645,6 +3720,7 @@ document.addEventListener('input', (event) => {
   if (event.target.id === 'manual-store' && !event.target.form.dataset.groupTouched) event.target.form.elements.category.value = guessManualCategory(event.target.value) || 'Άλλο';
   if ((event.target.id === 'bill-name' || event.target.name === 'type') && event.target.form?.id === 'bill-form' && !event.target.form.elements.billId.value && event.target.form.elements.type.value === 'rent') event.target.form.elements.period.value = '1';
   if (event.target.id === 'bill-name') rememberAutoPay(event.target.form);
+  if (event.target.name === 'name' && event.target.form?.id === 'shopping-form') refreshSuggestChips();
 });
 
 document.addEventListener('change', (event) => {
@@ -3706,6 +3782,7 @@ document.addEventListener('change', (event) => {
 });
 
 document.addEventListener('input', (event) => {
+  if (event.target.id === 'notify-list') { saveNotifySettings({ listNotify: event.target.checked }); if (!event.target.checked) listNotices.cancel(); showToast(event.target.checked ? t('Οι ειδοποιήσεις κοινής λίστας ενεργοποιήθηκαν.') : t('Οι ειδοποιήσεις κοινής λίστας απενεργοποιήθηκαν.')); }
   if (event.target.id === 'notify-scan') { saveNotifySettings({ scanNudge: event.target.checked }); scheduleBackgroundSnapshot(); showToast(event.target.checked ? t('Η υπενθύμιση σκαναρίσματος ενεργοποιήθηκε.') : t('Η υπενθύμιση σκαναρίσματος απενεργοποιήθηκε.')); }
   if (event.target.id === 'notify-days') {
     const days = Math.round(Number(event.target.value));
@@ -3930,12 +4007,22 @@ document.addEventListener('submit', (event) => {
     return;
   }
 
+  if (event.target.id === 'row-note-form') {
+    event.preventDefault();
+    const rowId = event.target.dataset.id;
+    const value = cleanNote(event.target.elements.note.value);
+    noteEditId = '';
+    if (state.shopping.some((row) => row.id === rowId)) { state.shopping = setRowNote(state.shopping, rowId, value); if (persist()) showToast(value ? 'Η σημείωση αποθηκεύτηκε.' : 'Η σημείωση αφαιρέθηκε.'); }
+    renderApp();
+    return;
+  }
   if (event.target.id === 'shopping-form') {
     event.preventDefault();
     const formData = new FormData(event.target);
     try {
       const category = String(formData.get('category') || '');
-      state.shopping.push({ ...createShoppingItem({ name: formData.get('name'), quantity: formData.get('quantity'), unit: formData.get('unit') }), ...(isProductType(category) ? { category } : {}) });
+      const note = cleanNote(formData.get('note'));
+      state.shopping.push({ ...createShoppingItem({ name: formData.get('name'), quantity: formData.get('quantity'), unit: formData.get('unit') }), ...(isProductType(category) ? { category } : {}), ...(note ? { note } : {}) });
       if (persist()) { renderApp(); showToast('Προστέθηκε στη λίστα αγορών.'); document.querySelector('#shopping-form input[name="name"]')?.focus(); }
       return;
     } catch (error) {

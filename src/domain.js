@@ -168,7 +168,7 @@ export function returnShoppingItem(items = [], row, now = new Date().toISOString
 export function shoppingListText(shopping = []) {
   const pending = shopping.filter((row) => !row.checked);
   if (!pending.length) return '';
-  return ['🛒 Λίστα αγορών (Σπιτοθήκη)', ...pending.map((row) => `• ${row.name} — ${row.quantity} ${normalizeUnit(row.unit)}`)].join('\n');
+  return ['🛒 Λίστα αγορών (Σπιτοθήκη)', ...pending.map((row) => `• ${row.name} — ${row.quantity} ${normalizeUnit(row.unit)}${row.note ? ` (${row.note})` : ''}`)].join('\n');
 }
 
 // Items whose expiry is between today and `days` days from now (inclusive), soonest first.

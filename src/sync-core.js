@@ -66,8 +66,8 @@ export function applyRemote(state, times, docs) {
 // backend: { subscribe(onDocs) -> unsubscribe, write(docs) -> Promise }
 // store: { load() -> { snapshot, times } | null, save({ snapshot, times }) }
 export class SyncEngine {
-  constructor({ backend, getState, setState, store, now = () => Date.now(), uid = () => '' }) {
-    Object.assign(this, { backend, getState, setState, store, now, uid });
+  constructor({ backend, getState, setState, store, now = () => Date.now(), uid = () => '', onRemote = null }) {
+    Object.assign(this, { backend, getState, setState, store, now, uid, onRemote });
     const saved = store.load() || {};
     this.times = saved.times || {};
     // v1.7.0: who last saved each record ('kind:id' → uid), from the sync rows' `by`; local meta only, never sent.
@@ -94,7 +94,8 @@ export class SyncEngine {
       const key = recordKey(doc.kind, doc.id);
       if (doc.deleted) delete this.writers[key]; else if (doc.by && (Number(doc.ts) >= Number(this.times[key] || 0))) this.writers[key] = String(doc.by);
     }
-    const result = applyRemote(this.getState(), this.times, docs);
+    const before = this.getState();
+    const result = applyRemote(before, this.times, docs);
     this.times = result.times;
     if (firstSync) {
       // First contact with this household: records only on this device get uploaded,
@@ -119,6 +120,8 @@ export class SyncEngine {
       this.snapshot = merged.state;
     }
     if (result.changed) this.setState(result.state);
+    // v1.9.22: live changes (never the first load) go to the app, with the state from before, for notices.
+    if (!firstSync && result.changed && this.onRemote) { try { this.onRemote(docs, before); } catch {} }
     this.persistMeta();
     if (firstSync) return this.push();
     return Promise.resolve();

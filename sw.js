@@ -4,11 +4,12 @@
 // on every open). A new deploy still shows up: the browser re-checks sw.js on every open, a new CACHE_VERSION
 // installs a fresh copy of the shell, and the page reloads once on «controllerchange».
 // Bump CACHE_VERSION on EVERY deploy that changes any app file; old caches are deleted on activate.
-const CACHE_VERSION = 'v121';
+const CACHE_VERSION = 'v122';
 const CACHE = `spitothiki-${CACHE_VERSION}`;
 const OCR_CACHE = 'spitothiki-vendor'; // v1.9.4: was spitothiki-ocr (CDN copies), deleted on activate
 const SHARE_CACHE = 'spitothiki-share'; // a file shared to the app (Web Share Target), picked up by the page // Tesseract.js script/worker/core/language files, kept across versions
 const DATA_CACHE = 'spitothiki-data'; // written by the app: expiry snapshot for background checks
+// v122: shopping-list extras: shared-list notices, quick suggestions, «Ξαναψώνισε τα ίδια», row notes (cache bumped, app version stays 1.9.21 until release).
 // v121: v1.9.21 in-app user guide (Οδηγός), home guide link, tester invite until launch (cache bumped).
 // v120: home «Οδηγός χρήσης» shortcut + tester invite until launch (cache bumped, app version stays 1.9.20 until release).
 // v119: in-app user guide («Οδηγός») (cache bumped, app version stays 1.9.20 until release).
@@ -33,7 +34,7 @@ const DATA_CACHE = 'spitothiki-data'; // written by the app: expiry snapshot for
 const SHORT_PATH = /^\/(tiktok|facebook|instagram|telegram|viber|reddit|pinterest|sofisstore|play)\/?$/i;
 const SHELL = [
   './', './index.html', './privacy.html', './styles.css', './manifest.webmanifest',
-  './src/app.js', './src/format.js', './src/theme.js', './src/i18n.js', './src/features.js', './src/recipes.js', './src/receipt.js', './src/receipt-photo.js', './src/mealplan.js', './src/diet-plan.js', './src/receipts.js', './src/diet-ui.js', './src/diet-i18n.js', './src/bills.js', './src/transport.js', './src/extras.js', './src/chores.js', './src/bar.js', './src/bill-pdf.js', './src/prefs.js', './src/scan-router.js', './src/onboarding.js', './src/cart.js', './src/shelf-price.js', './src/push.js', './src/auto-list.js', './src/price-compare.js', './src/recipe-data.js', './src/gs1.js', './src/back-to-top.js', './src/backup-crypto.js', './src/gdrive.js', './src/gdrive-auth.js', './src/drive-key.js', './src/receipt-edit.js', './src/manual-expense.js', './src/receipt-domains.js', './src/expense-cats.js', './src/whopaid.js', './src/offline.js', './src/protect.js', './src/domain.js', './src/storage.js', './src/barcode.js', './src/toll-barcode.js', './src/firebase-config.js', './src/sync-core.js', './src/sync-firebase.js', './src/disposable-email.js', './src/marketing-consent.js', './src/source.js', './src/account-delete.js', './src/tester-card.js', './src/home-actions.js', './src/product-types.js', './src/guide.js',
+  './src/app.js', './src/format.js', './src/theme.js', './src/i18n.js', './src/features.js', './src/recipes.js', './src/receipt.js', './src/receipt-photo.js', './src/mealplan.js', './src/diet-plan.js', './src/receipts.js', './src/diet-ui.js', './src/diet-i18n.js', './src/bills.js', './src/transport.js', './src/extras.js', './src/chores.js', './src/bar.js', './src/bill-pdf.js', './src/prefs.js', './src/scan-router.js', './src/onboarding.js', './src/cart.js', './src/shelf-price.js', './src/push.js', './src/auto-list.js', './src/price-compare.js', './src/recipe-data.js', './src/gs1.js', './src/back-to-top.js', './src/backup-crypto.js', './src/gdrive.js', './src/gdrive-auth.js', './src/drive-key.js', './src/receipt-edit.js', './src/manual-expense.js', './src/receipt-domains.js', './src/expense-cats.js', './src/whopaid.js', './src/offline.js', './src/protect.js', './src/domain.js', './src/storage.js', './src/barcode.js', './src/toll-barcode.js', './src/firebase-config.js', './src/sync-core.js', './src/sync-firebase.js', './src/disposable-email.js', './src/marketing-consent.js', './src/source.js', './src/account-delete.js', './src/tester-card.js', './src/home-actions.js', './src/product-types.js', './src/guide.js', './src/shopping-extras.js',
   './fonts/commissioner-greek.woff2', './fonts/commissioner-latin.woff2', './icons/icon-192.png', './icons/icon.svg'
 ];
 
@@ -112,7 +113,7 @@ self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   event.waitUntil((async () => {
     const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-    const view = event.notification.tag === 'spitothiki-bills' ? 'bills' : event.notification.tag === 'spitothiki-chores' ? 'chores' : ['spitothiki-push', 'spitothiki-scan'].includes(event.notification.tag) ? 'overview' : 'pantry';
+    const view = event.notification.tag === 'spitothiki-list' ? 'shopping' : event.notification.tag === 'spitothiki-bills' ? 'bills' : event.notification.tag === 'spitothiki-chores' ? 'chores' : ['spitothiki-push', 'spitothiki-scan'].includes(event.notification.tag) ? 'overview' : 'pantry';
     const existing = windows.find((client) => client.url.startsWith(self.registration.scope));
     if (existing) { await existing.focus(); return existing.navigate(`${self.registration.scope}#${view}`).catch(() => {}); }
     return self.clients.openWindow(`${self.registration.scope}#${view}`);
