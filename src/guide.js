@@ -11,7 +11,7 @@ export const GUIDE_SECTIONS = [
     intro: 'Ξεκίνα από εδώ: κάνε πρώτα αυτά τα 3.',
     bullets: [
       'Πάτα «Σάρωση» και σκάναρε το QR μιας απόδειξης. Τα έξοδα γράφονται μόνα τους· αν θέλεις, τα προϊόντα μπαίνουν και στο απόθεμα.',
-      'Στην αρχική οθόνη δες πόσα ξόδεψες αυτόν τον μήνα και τι λήγει στις επόμενες 7 ημέρες.',
+      'Στην αρχική οθόνη δες πόσα ξόδεψες αυτόν τον μήνα, τι άλλαξε σε σχέση με τον προηγούμενο, και τι λήγει στις επόμενες 7 ημέρες.',
       'Γράψε στη λίστα αγορών ό,τι χρειάζεται το σπίτι, πριν βγεις για ψώνια.',
       'Η σύνδεση είναι προαιρετική. Χρειάζεται μόνο αν θέλεις τα ίδια δεδομένα σε άλλο κινητό ή να τα βλέπει η οικογένεια.'
     ]
@@ -64,7 +64,8 @@ export const GUIDE_SECTIONS = [
       'Σκάναρε το QR της ηλεκτρονικής απόδειξης, όχι την κάρτα πόντων και όχι το barcode του ταμείου. Βλέπεις τα είδη πριν μπουν οπουδήποτε.',
       'Αν το QR είναι της ΑΑΔΕ και δεν έχει τα είδη, βγάλε φωτογραφία την απόδειξη ή γράψε το ποσό με το χέρι.',
       'Η σάρωση απόδειξης δεν τσεκάρει τη λίστα αγορών. Η ημερομηνία λήξης δεν έρχεται από την απόδειξη — μόνο από τον κωδικό στο ίδιο το προϊόν.',
-      'Αν είναι βενζίνη ή διόδια, μπορείς να τη μεταφέρεις στις Μετακινήσεις.'
+      'Αν είναι βενζίνη ή διόδια, μπορείς να τη μεταφέρεις στις Μετακινήσεις.',
+      'Μπορείς να εξάγεις τις αποδείξεις ενός μήνα ή μιας περιόδου σε ένα PDF. Φτιάχνεται στο κινητό σου, με λίστα, σύνολα και τα είδη όπου υπάρχουν, και δουλεύει και χωρίς σύνδεση. Οι φωτογραφίες αποδείξεων δεν φυλάγονται, οπότε δεν μπαίνουν στο PDF.'
     ]
   },
   {
@@ -107,7 +108,8 @@ export const GUIDE_SECTIONS = [
     bullets: [
       'Πάτα «Σύνολο εξόδων» για αγορές, ενοίκιο, λογαριασμούς, μετακινήσεις και μικροέξοδα του μήνα.',
       'Μπορείς να φτιάξεις δικές σου κατηγορίες εξόδων (π.χ. Ρούχα). Στο κοινό σπίτι με δύο μέλη βλέπεις και «Ποιος πλήρωσε τι».',
-      'Δεν υπάρχει ακόμη εβδομαδιαίο σύνολο για όλα τα έξοδα, ούτε μηνιαίο όριο προϋπολογισμού για το νοικοκυριό. Προϋπολογισμός υπάρχει μόνο στο καλάθι, για μία επίσκεψη στο κατάστημα.'
+      'Δεν υπάρχει ακόμη εβδομαδιαίο σύνολο για όλα τα έξοδα, ούτε μηνιαίο όριο προϋπολογισμού για το νοικοκυριό. Προϋπολογισμός υπάρχει μόνο στο καλάθι, για μία επίσκεψη στο κατάστημα.',
+      'Στην αρχική, η κάρτα «Τι άλλαξε αυτόν τον μήνα» συγκρίνει τα έξοδα μέχρι σήμερα με το ίδιο διάστημα του προηγούμενου μήνα. Εμφανίζεται μόνο όταν υπάρχουν αρκετά στοιχεία και υπολογίζεται στη συσκευή σου. Την κρύβεις από Ρυθμίσεις → Αρχική οθόνη.'
     ]
   },
   {
@@ -171,7 +173,8 @@ export const GUIDE_SECTIONS = [
     bullets: [
       'Εξαγωγή ή εισαγωγή αντιγράφου σε αρχείο (και με κωδικό). Προαιρετικά, κρυπτογραφημένο αντίγραφο στο δικό σου Google Drive, μία φορά τη μέρα (κρατάει τα 5 τελευταία).',
       'Ρύθμισε θέμα, μέγεθος γραμμάτων, τι φαίνεται στην αρχική και στην κάτω μπάρα, και δικά σου είδη προϊόντων.',
-      'Αν δεν συνδεθείς και αλλάξεις κινητό ή καθαρίσεις τα δεδομένα του browser, χρειάζεσαι αντίγραφο για να τα πάρεις μαζί σου.'
+      'Αν δεν συνδεθείς και αλλάξεις κινητό ή καθαρίσεις τα δεδομένα του browser, χρειάζεσαι αντίγραφο για να τα πάρεις μαζί σου.',
+      'Η κάρτα «Τι άλλαξε αυτόν τον μήνα» στην αρχική κρύβεται από την ίδια ρύθμιση «Αρχική οθόνη», όπως ο οδηγός.'
     ]
   },
   {
@@ -242,7 +245,7 @@ export const GUIDE_EN = {
   'Ξεκίνημα': 'Getting started',
   'Ξεκίνα από εδώ: κάνε πρώτα αυτά τα 3.': 'Start here: do these 3 things first.',
   'Πάτα «Σάρωση» και σκάναρε το QR μιας απόδειξης. Τα έξοδα γράφονται μόνα τους· αν θέλεις, τα προϊόντα μπαίνουν και στο απόθεμα.': 'Tap «Scan» and scan the QR code on a receipt. Spending is recorded by itself; if you want, the products go into the pantry too.',
-  'Στην αρχική οθόνη δες πόσα ξόδεψες αυτόν τον μήνα και τι λήγει στις επόμενες 7 ημέρες.': 'On the home screen, see how much you spent this month and what expires in the next 7 days.',
+  'Στην αρχική οθόνη δες πόσα ξόδεψες αυτόν τον μήνα, τι άλλαξε σε σχέση με τον προηγούμενο, και τι λήγει στις επόμενες 7 ημέρες.': 'On the home screen, see how much you spent this month, what changed compared with last month, and what expires in the next 7 days.',
   'Γράψε στη λίστα αγορών ό,τι χρειάζεται το σπίτι, πριν βγεις για ψώνια.': 'Write on the shopping list what the house needs, before you go out shopping.',
   'Η σύνδεση είναι προαιρετική. Χρειάζεται μόνο αν θέλεις τα ίδια δεδομένα σε άλλο κινητό ή να τα βλέπει η οικογένεια.': 'Signing in is optional. You only need it if you want the same data on another phone, or for the family to see it.',
   'Αποθήκη (τι έχεις στο σπίτι)': 'Pantry (what you have at home)',
@@ -266,6 +269,7 @@ export const GUIDE_EN = {
   'Αν το QR είναι της ΑΑΔΕ και δεν έχει τα είδη, βγάλε φωτογραφία την απόδειξη ή γράψε το ποσό με το χέρι.': 'If the QR code is from AADE and has no items, take a photo of the receipt or type the amount by hand.',
   'Η σάρωση απόδειξης δεν τσεκάρει τη λίστα αγορών. Η ημερομηνία λήξης δεν έρχεται από την απόδειξη — μόνο από τον κωδικό στο ίδιο το προϊόν.': 'Scanning a receipt does not tick off the shopping list. The expiry date does not come from the receipt — only from the code on the product itself.',
   'Αν είναι βενζίνη ή διόδια, μπορείς να τη μεταφέρεις στις Μετακινήσεις.': 'If it is fuel or a toll, you can move it to Transport.',
+  'Μπορείς να εξάγεις τις αποδείξεις ενός μήνα ή μιας περιόδου σε ένα PDF. Φτιάχνεται στο κινητό σου, με λίστα, σύνολα και τα είδη όπου υπάρχουν, και δουλεύει και χωρίς σύνδεση. Οι φωτογραφίες αποδείξεων δεν φυλάγονται, οπότε δεν μπαίνουν στο PDF.': 'You can export the receipts of a month or a date range as one PDF. It is made on your phone, with a list, totals and the items where they exist, and it also works offline. Receipt photos are not stored, so they are not included in the PDF.',
   'Τι να μαγειρέψω': 'What should I cook',
   'Πάτα «Μαγείρεμα & γεύματα» και δες συνταγές που ταιριάζουν με το απόθεμά σου.': 'Tap «Cooking & meals» and see recipes that match your pantry.',
   'Ό,τι λείπει μπορείς να το βάλεις στη λίστα με ένα πάτημα, ή τη συνταγή στο πρόγραμμα της εβδομάδας.': 'You can add what’s missing to the list in one tap, or put the recipe on the week’s plan.',
@@ -282,6 +286,7 @@ export const GUIDE_EN = {
   'Πάτα «Σύνολο εξόδων» για αγορές, ενοίκιο, λογαριασμούς, μετακινήσεις και μικροέξοδα του μήνα.': 'Tap «Spending overview» for this month’s shopping, rent, bills, transport and small expenses.',
   'Μπορείς να φτιάξεις δικές σου κατηγορίες εξόδων (π.χ. Ρούχα). Στο κοινό σπίτι με δύο μέλη βλέπεις και «Ποιος πλήρωσε τι».': 'You can create your own expense categories (e.g. Clothes). In a shared home with two members you also see «Who paid what».',
   'Δεν υπάρχει ακόμη εβδομαδιαίο σύνολο για όλα τα έξοδα, ούτε μηνιαίο όριο προϋπολογισμού για το νοικοκυριό. Προϋπολογισμός υπάρχει μόνο στο καλάθι, για μία επίσκεψη στο κατάστημα.': 'There is not yet a weekly total for all spending, nor a monthly budget limit for the household. A budget exists only in the cart, for one store visit.',
+  'Στην αρχική, η κάρτα «Τι άλλαξε αυτόν τον μήνα» συγκρίνει τα έξοδα μέχρι σήμερα με το ίδιο διάστημα του προηγούμενου μήνα. Εμφανίζεται μόνο όταν υπάρχουν αρκετά στοιχεία και υπολογίζεται στη συσκευή σου. Την κρύβεις από Ρυθμίσεις → Αρχική οθόνη.': 'On the home screen, the «What changed this month» card compares spending so far with the same period last month. It appears only when there is enough data and is calculated on your device. You can hide it from Settings → Home screen.',
   'Βενζίνη, διόδια, ΜΜΜ, ταξί και στάθμευση, κάθε μήνα.': 'Fuel, tolls, public transport, taxis and parking, each month.',
   'Καταχώρισε ένα έξοδο μετακίνησης, ή μετάφερε μια απόδειξη καυσίμων ή διοδίων από τις Αποδείξεις.': 'Record a transport expense, or move a fuel or toll receipt from Receipts.',
   'Στα καύσιμα μπορείς να βάλεις λίτρα και χιλιόμετρα για την κατανάλωση. Τα μηνιαία πάγια (π.χ. κάρτα απεριορίστων) καταχωρούνται μόνα τους κάθε μήνα.': 'For fuel you can enter litres and kilometres for consumption. Monthly standing costs (e.g. an unlimited travel card) are recorded by themselves each month.',
@@ -310,6 +315,7 @@ export const GUIDE_EN = {
   'Εξαγωγή ή εισαγωγή αντιγράφου σε αρχείο (και με κωδικό). Προαιρετικά, κρυπτογραφημένο αντίγραφο στο δικό σου Google Drive, μία φορά τη μέρα (κρατάει τα 5 τελευταία).': 'Export or import a backup file (with a password if you want). Optionally, an encrypted copy in your own Google Drive, once a day (keeps the last 5).',
   'Ρύθμισε θέμα, μέγεθος γραμμάτων, τι φαίνεται στην αρχική και στην κάτω μπάρα, και δικά σου είδη προϊόντων.': 'Set the theme, text size, what appears on the home screen and the bottom bar, and your own product types.',
   'Αν δεν συνδεθείς και αλλάξεις κινητό ή καθαρίσεις τα δεδομένα του browser, χρειάζεσαι αντίγραφο για να τα πάρεις μαζί σου.': 'If you are not signed in and you change phone or clear the browser data, you need a backup to take your data with you.',
+  'Η κάρτα «Τι άλλαξε αυτόν τον μήνα» στην αρχική κρύβεται από την ίδια ρύθμιση «Αρχική οθόνη», όπως ο οδηγός.': 'The «What changed this month» card on the home screen is hidden from the same «Home screen» setting, like the guide.',
   'Χρήσιμα tips': 'Useful tips',
   'Μικρές λεπτομέρειες που γλιτώνουν λάθη.': 'Small details that help you avoid mistakes.',
   'Άνοιξε τη Σπιτοθήκη στο spitothiki.web.app. Από το μενού του browser (Chrome ή Safari) μπορείς να την προσθέσεις στην αρχική οθόνη του κινητού σου. Δεν χρειάζεται λογαριασμός.': 'Open Spitothiki at spitothiki.web.app. From the browser menu (Chrome or Safari) you can add it to your phone’s home screen. No account is needed.',

@@ -1110,3 +1110,17 @@ a.menu-item { color: inherit; }
 :root[data-theme="dark"] .shopping-row-note { color: #b3c2b8; }
 @media (min-width: 761px) { #shopping-form.has-extra { grid-template-columns: minmax(0,1fr) 80px 110px 170px; } }
 .item-add-form .note-input { grid-column: 1 / -1; }
+
+
+/* Home card: «Τι άλλαξε αυτόν τον μήνα» */
+#home-changed { margin-bottom: 16px; }
+.home-changed-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.home-changed-item { font-size: calc(15px * var(--text-scale)); line-height: 1.45; font-weight: 600; }
+.home-changed-item.up { color: var(--danger, #b3261e); }
+.home-changed-item.down { color: var(--accent, #2f7d4f); }
+.receipt-export-dates { display: grid; gap: 12px; grid-template-columns: 1fr 1fr; }
+@media (max-width: 520px) { .receipt-export-dates { grid-template-columns: 1fr; } }
+#receipt-export-dialog .segmented { margin: 8px 0 14px; display: flex; flex-wrap: wrap; gap: 8px; }
+#receipt-export-dialog .field { margin-bottom: 12px; }
+#receipt-export-dialog .field label { display: block; font-weight: 600; margin-bottom: 4px; }
+#receipt-export-dialog select, #receipt-export-dialog input[type="date"] { width: 100%; min-height: 44px; padding: 8px 10px; font: inherit; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--ink); }

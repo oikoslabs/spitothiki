@@ -5,6 +5,8 @@
 import { DIET_EN } from './diet-i18n.js';
 import { GUIDE_EN } from './guide.js';
 import { SHOPPING_EXTRAS_EN } from './shopping-extras.js';
+import { MONTH_INSIGHTS_EN } from './month-insights.js';
+import { RECEIPT_PDF_EN } from './receipt-pdf.js';
 
 export const LANG_KEY = 'spitothiki:lang';
 export const LANGS = ['el', 'en'];
@@ -24,6 +26,8 @@ const EN = {
   ...DIET_EN,
   ...GUIDE_EN,
   ...SHOPPING_EXTRAS_EN,
+  ...MONTH_INSIGHTS_EN,
+  ...RECEIPT_PDF_EN,
   "Κράτα ένα αντίγραφο των δεδομένων σου": "Keep a backup of your data",
   "Το τελευταίο αντίγραφο έγινε {date}.": "Your last backup was on {date}.",
   "Δεν έχεις κάνει ακόμα αντίγραφο. Αν αλλάξεις κινητό, θα το χρειαστείς.": "You have no backup yet. You will need one if you change phone.",
