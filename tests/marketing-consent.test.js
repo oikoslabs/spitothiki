@@ -85,6 +85,6 @@ test('v1.9.18 bilingual strings + SW precache + version bump', () => {
   assert.equal(dictionaries.en[MARKETING_HINT].includes('Necessary service messages'), true);
   assert.match(read('sw.js'), /marketing-consent\.js/);
   assert.match(read('sw.js'), /CACHE_VERSION = 'v124'/);
-  assert.match(read('package.json'), /"version": "1\.9\.22"/);
-  assert.match(read('index.html'), /1\.9\.22/);
+  assert.match(read('package.json'), /"version": "1\.9\.23"/);
+  assert.match(read('index.html'), /1\.9\.23/);
 });
