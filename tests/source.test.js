@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { SOURCES, SOURCE_KEY, cleanUrl, initSource, isStatsOrigin, parseSource, sendEvent, sourceSignup, validEvent } from '../src/source.js';
+import { SOURCES, SOURCE_KEY, SCAN_KEY, cleanUrl, initSource, isStatsOrigin, parseSource, sendEvent, sendScanEvent, reportScan, flushScans, sourceSignup, validEvent } from '../src/source.js';
 
 const memory = (init = {}) => { const m = new Map(Object.entries(init)); return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), m }; };
 
@@ -97,4 +97,33 @@ test('v1.8.3 short links: hosting redirect (302) and service worker use the same
   const sw = readFileSync(new URL('../sw.js', import.meta.url), 'utf8');
   assert.ok(sw.includes(`/^\\/(${SOURCES.join('|')})\\/?$/i`));
   for (const f of SOURCES) assert.throws(() => readFileSync(new URL(`../${f}`, import.meta.url)), 'no file or folder clashes with a short link');
+});
+
+test('reportScan sends one anonymous {type, store, success, via}; queues offline; skips proxy reads', async () => {
+  const storage = memory(); const calls = [];
+  const fetchImpl = async (url, opts) => { calls.push(JSON.parse(opts.body)); return { ok: true }; };
+  const opts = { storage, sendScan: (e) => sendScanEvent(e, { fetchImpl, online: true, origin: 'https://spitothiki.web.app' }) };
+  assert.equal(await reportScan({ receipt: { issuerName: 'ΣΚΛΑΒΕΝΙΤΗΣ' }, success: true, via: 'photo', proxied: false }, opts), true);
+  assert.deepEqual(calls, [{ type: 'supermarket', store: 'Sklavenitis', success: true, via: 'photo' }]);
+  assert.ok(!('url' in calls[0]) && !('amount' in calls[0]));
+  assert.equal(await reportScan({ receipt: { issuerName: 'Lidl' }, success: true, via: 'proxy', proxied: true }, opts), false);
+  assert.equal(calls.length, 1);
+  const offline = { storage, sendScan: async () => false };
+  assert.equal(await reportScan({ receipt: { issuerName: 'Lidl' }, success: false, via: 'direct', proxied: false }, offline), false);
+  assert.equal(JSON.parse(storage.getItem(SCAN_KEY)).length, 1);
+  const later = [];
+  assert.equal(await flushScans({ storage, sendScan: async (e) => { later.push(e); return true; } }), 1);
+  assert.equal(later[0].via, 'direct');
+  assert.equal(later[0].success, false);
+  assert.equal(JSON.parse(storage.getItem(SCAN_KEY)).length, 0);
+});
+
+test('sendScanEvent never throws and stays on live origins', async () => {
+  const calls = [];
+  const fetchImpl = async (url, opts) => { calls.push([url, opts]); return { ok: true }; };
+  assert.equal(await sendScanEvent({ type: 'supermarket', store: 'Lidl', success: true, via: 'direct' }, { fetchImpl, online: true, origin: 'https://spitothiki.web.app' }), true);
+  assert.equal(JSON.parse(calls[0][1].body).store, 'Lidl');
+  assert.equal(await sendScanEvent({ type: 'supermarket', store: 'Lidl', success: true, via: 'direct' }, { fetchImpl, online: false, origin: 'https://spitothiki.web.app' }), false);
+  assert.equal(await sendScanEvent({ type: 'supermarket', store: 'Lidl', success: true, via: 'direct' }, { fetchImpl, online: true, origin: 'http://localhost:8080' }), false);
+  assert.equal(await sendScanEvent({ type: 'supermarket', store: 'Lidl', success: true, via: 'direct' }, { fetchImpl: async () => { throw new Error('net'); }, online: true, origin: 'https://spitothiki.web.app' }), false);
 });

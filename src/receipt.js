@@ -217,7 +217,7 @@ export function receiptFailure(error) {
   return 'unsupported';
 }
 
-async function getText(url, { fetchImpl, proxy, known = true }) {
+async function getText(url, { fetchImpl, proxy, known = true, used }) {
   const attempt = async (target) => {
     let res;
     const signal = typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(FETCH_TIMEOUT_MS) : undefined;
@@ -231,6 +231,7 @@ async function getText(url, { fetchImpl, proxy, known = true }) {
     // A CORS block or network error surfaces as TypeError; retry through the proxy if one is configured.
     // Only for known providers: the proxy refuses every other domain anyway.
     if (!proxy || error.status || !known) throw error;
+    if (used) { used.proxied = true; used.via = 'proxy'; }
     return attempt(`${proxy.replace(/\/+$/, '')}/?url=${encodeURIComponent(url)}`);
   }
 }
@@ -239,17 +240,18 @@ export async function fetchReceipt(input, { fetchImpl = fetch, proxy = '' } = {}
   const target = classifyReceiptUrl(input);
   if (target.kind === 'invalid') throw new Error('Ο σύνδεσμος δεν είναι έγκυρος.');
   if (target.kind === 'insecure') throw new Error('Ο σύνδεσμος πρέπει να ξεκινά με https://');
-  if (target.kind === 'aade') return { ...parseAadeSummary(target.url), sourceUrl: target.url };
-  if (globalThis.navigator?.onLine === false) throw Object.assign(new Error(RECEIPT_MESSAGES.network), { kind: 'network', cors: true });
+  if (target.kind === 'aade') return { ...parseAadeSummary(target.url), sourceUrl: target.url, via: 'aade', proxied: false };
+  if (globalThis.navigator?.onLine === false) throw Object.assign(new Error(RECEIPT_MESSAGES.network), { kind: 'network', cors: true, via: 'direct', proxied: false });
   // v1.8.0: a provider that isn't in our list is «not supported yet» whatever happens next (never «no internet»).
   // One quiet direct read is still tried, in case such a provider happens to allow it; no proxy, no retry.
   const known = allowedHost(target.host);
+  const used = { via: 'direct', proxied: false };
   let receipt = null;
   let lastError = null;
-  try { receipt = parseMyData(await getText(`${target.url}/myDATA`, { fetchImpl, proxy, known })); } catch (error) { lastError = error; }
+  try { receipt = parseMyData(await getText(`${target.url}/myDATA`, { fetchImpl, proxy, known, used })); } catch (error) { lastError = error; }
   let ubl = null;
   if (known && (!receipt?.lines.length || !receipt.issuerName)) {
-    try { ubl = parseUbl(await getText(`${target.url}/EN16931`, { fetchImpl, proxy, known })); } catch (error) { lastError = lastError || error; }
+    try { ubl = parseUbl(await getText(`${target.url}/EN16931`, { fetchImpl, proxy, known, used })); } catch (error) { lastError = lastError || error; }
   }
   if (!receipt?.lines.length && ubl?.lines.length) receipt = ubl;
   else if (receipt && ubl?.issuerName) receipt.issuerName = ubl.issuerName;
@@ -258,7 +260,7 @@ export async function fetchReceipt(input, { fetchImpl = fetch, proxy = '' } = {}
     // Body arrived but isn't receipt data (e.g. an HTML page) → unsupported layout; otherwise judge by the error.
     const kind = receipt || !known ? 'unsupported'
       : [400, 404].includes(lastError?.status) && NOT_YET.test(lastError.body || '') ? 'pending' : receiptFailure(lastError);
-    throw Object.assign(new Error(RECEIPT_MESSAGES[kind]), { kind, unsupported: kind === 'unsupported', cors: kind !== 'unsupported', ...(kind === 'network' ? {} : { status: lastError?.status || 0 }) });
+    throw Object.assign(new Error(RECEIPT_MESSAGES[kind]), { kind, unsupported: kind === 'unsupported', cors: kind !== 'unsupported', via: used.via, proxied: used.proxied, ...(kind === 'network' ? {} : { status: lastError?.status || 0 }) });
   }
-  return { ...receipt, sourceUrl: target.url };
+  return { ...receipt, sourceUrl: target.url, via: used.via, proxied: used.proxied };
 }
