@@ -6,6 +6,6 @@ test('v1.9.20 release: version, cache bump and product-types module precached', 
   assert.match(read('package.json'), /"version": "1\.9\.23"/);
   assert.equal((read('index.html').match(/data-no-i18n>1\.9\.23</g) || []).length, 2);
   const sw = read('sw.js');
-  assert.match(sw, /CACHE_VERSION = 'v126';/);
+  assert.match(sw, /CACHE_VERSION = 'v127';/);
   for (const f of ['product-types', 'home-actions', 'storage', 'app']) assert.match(sw, new RegExp(`'\\./src/${f}\\.js'`));
 });

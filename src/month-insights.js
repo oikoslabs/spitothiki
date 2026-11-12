@@ -152,31 +152,59 @@ export function monthInsights(state, today, { limit = 3 } = {}) {
 export const MONTH_INSIGHTS_EN = {
   'Τι άλλαξε αυτόν τον μήνα': 'What changed this month',
   'Σύγκριση με το ίδιο διάστημα του προηγούμενου μήνα': 'Compared with the same period last month',
-  'Ξόδεψες {percent}% περισσότερα από τον προηγούμενο μήνα στο ίδιο διάστημα ({current} αντί για {previous}).': 'You spent {percent}% more than last month over the same period ({current} vs {previous}).',
-  'Ξόδεψες {percent}% λιγότερα από τον προηγούμενο μήνα στο ίδιο διάστημα ({current} αντί για {previous}).': 'You spent {percent}% less than last month over the same period ({current} vs {previous}).',
+  'Ξόδεψες {change} περισσότερα από τον προηγούμενο μήνα στο ίδιο διάστημα ({current} αντί για {previous}).': 'You spent {change} more than last month over the same period ({current} vs {previous}).',
+  'Ξόδεψες {change} λιγότερα από τον προηγούμενο μήνα στο ίδιο διάστημα ({current} αντί για {previous}).': 'You spent {change} less than last month over the same period ({current} vs {previous}).',
+  'Ξόδεψες περίπου το {change} από τον προηγούμενο μήνα στο ίδιο διάστημα ({current} αντί για {previous}).': 'You spent about {change} of last month’s amount over the same period ({current} vs {previous}).',
   'Ξόδεψες περίπου τα ίδια με τον προηγούμενο μήνα στο ίδιο διάστημα ({current}).': 'You spent about the same as last month over the same period ({current}).',
-  'Ξόδεψες {percent}% περισσότερα στα «{category}» από τον προηγούμενο μήνα στο ίδιο διάστημα ({current} αντί για {previous}).': 'You spent {percent}% more on “{category}” than last month over the same period ({current} vs {previous}).',
-  'Ξόδεψες {percent}% λιγότερα στα «{category}» από τον προηγούμενο μήνα στο ίδιο διάστημα ({current} αντί για {previous}).': 'You spent {percent}% less on “{category}” than last month over the same period ({current} vs {previous}).',
+  'Ξόδεψες {change} περισσότερα στα «{category}» από τον προηγούμενο μήνα στο ίδιο διάστημα ({current} αντί για {previous}).': 'You spent {change} more on “{category}” than last month over the same period ({current} vs {previous}).',
+  'Ξόδεψες {change} λιγότερα στα «{category}» από τον προηγούμενο μήνα στο ίδιο διάστημα ({current} αντί για {previous}).': 'You spent {change} less on “{category}” than last month over the same period ({current} vs {previous}).',
+  'Ξόδεψες περίπου το {change} στα «{category}» από τον προηγούμενο μήνα στο ίδιο διάστημα ({current} αντί για {previous}).': 'You spent about {change} on “{category}” compared with last month over the same period ({current} vs {previous}).',
   'Κάρτα «Τι άλλαξε αυτόν τον μήνα»': '“What changed this month” card',
   'Φαίνεται στην αρχική όταν υπάρχουν αρκετά έξοδα για σύγκριση με τον προηγούμενο μήνα. Υπολογίζεται μόνο στη συσκευή σου.': 'Shown on the home screen when there is enough spending to compare with last month. It is calculated only on your device.'
 };
 
 const fill = (s, p) => String(s).replace(/\{(\w+)\}/g, (_, k) => (p && k in p ? p[k] : `{${k}}`));
-export function insightText(insight, { t = fill, money = (n) => String(n), categoryLabel = (s) => s } = {}) {
+
+function formatTimes(ratio, locale) {
+  const n = ratio >= 10 ? Math.round(ratio) : Math.round(ratio * 10) / 10;
+  if (Number.isInteger(n) || Math.abs(n - Math.round(n)) < 0.05) return String(Math.round(n));
+  return n.toLocaleString(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+}
+
+// How to say the change: ordinary percentages, or «12×» / «1/12» when the previous period is tiny (or huge).
+export function insightChange(insight, { locale = 'el-GR' } = {}) {
+  const cur = Number(insight.current);
+  const prev = Number(insight.previous);
+  if (insight.dir === 'same' || !(prev > 0) || !Number.isFinite(cur)) return { kind: 'same', dir: 'same', label: '' };
+  const ratio = cur / prev;
+  if (ratio >= 2.5) {
+    const times = formatTimes(ratio, locale);
+    return { kind: 'times', dir: 'up', times, label: `${times}×` };
+  }
+  if (ratio > 0 && ratio <= 1 / 2.5) {
+    const times = formatTimes(1 / ratio, locale);
+    return { kind: 'fraction', dir: 'down', times, label: `1/${times}` };
+  }
+  const percent = Math.abs(Number.isFinite(Number(insight.percent)) ? Number(insight.percent) : Math.round((ratio - 1) * 100));
+  return { kind: 'percent', dir: ratio >= 1 ? 'up' : 'down', percent, label: `${percent}%` };
+}
+
+export function insightText(insight, { t = fill, money = (n) => String(n), categoryLabel = (s) => s, locale = 'el-GR' } = {}) {
   const current = money(insight.current);
   const previous = money(insight.previous);
-  if (insight.kind === 'total' && insight.dir === 'up') {
-    return t('Ξόδεψες {percent}% περισσότερα από τον προηγούμενο μήνα στο ίδιο διάστημα ({current} αντί για {previous}).', { percent: insight.percent, current, previous });
-  }
-  if (insight.kind === 'total' && insight.dir === 'down') {
-    return t('Ξόδεψες {percent}% λιγότερα από τον προηγούμενο μήνα στο ίδιο διάστημα ({current} αντί για {previous}).', { percent: insight.percent, current, previous });
-  }
-  if (insight.kind === 'total') {
+  const ch = insightChange(insight, { locale });
+  const change = ch.label;
+  if (insight.kind === 'total' && insight.dir === 'same') {
     return t('Ξόδεψες περίπου τα ίδια με τον προηγούμενο μήνα στο ίδιο διάστημα ({current}).', { current });
   }
-  const category = categoryLabel(insight.label);
-  if (insight.dir === 'up') {
-    return t('Ξόδεψες {percent}% περισσότερα στα «{category}» από τον προηγούμενο μήνα στο ίδιο διάστημα ({current} αντί για {previous}).', { percent: insight.percent, category, current, previous });
+  const fraction = ch.kind === 'fraction';
+  if (insight.kind === 'category') {
+    const category = categoryLabel(insight.label);
+    if (fraction) return t('Ξόδεψες περίπου το {change} στα «{category}» από τον προηγούμενο μήνα στο ίδιο διάστημα ({current} αντί για {previous}).', { change, category, current, previous });
+    if (insight.dir === 'up') return t('Ξόδεψες {change} περισσότερα στα «{category}» από τον προηγούμενο μήνα στο ίδιο διάστημα ({current} αντί για {previous}).', { change, category, current, previous });
+    return t('Ξόδεψες {change} λιγότερα στα «{category}» από τον προηγούμενο μήνα στο ίδιο διάστημα ({current} αντί για {previous}).', { change, category, current, previous });
   }
-  return t('Ξόδεψες {percent}% λιγότερα στα «{category}» από τον προηγούμενο μήνα στο ίδιο διάστημα ({current} αντί για {previous}).', { percent: insight.percent, category, current, previous });
+  if (fraction) return t('Ξόδεψες περίπου το {change} από τον προηγούμενο μήνα στο ίδιο διάστημα ({current} αντί για {previous}).', { change, current, previous });
+  if (insight.dir === 'up') return t('Ξόδεψες {change} περισσότερα από τον προηγούμενο μήνα στο ίδιο διάστημα ({current} αντί για {previous}).', { change, current, previous });
+  return t('Ξόδεψες {change} λιγότερα από τον προηγούμενο μήνα στο ίδιο διάστημα ({current} αντί για {previous}).', { change, current, previous });
 }

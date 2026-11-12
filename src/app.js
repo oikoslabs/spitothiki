@@ -28,7 +28,7 @@ import { addCartItem, budgetState, createTrip, finishTrip, lastPrice, lineTotal,
 import { VM_MODES, interpretCode } from './gs1.js';
 import { initBackToTop } from './back-to-top.js';
 import { HOME_KEY, HOME_OPTIONS, DEFAULT_HOME, parseHomeState, serializeHome, toggleHome } from './home-actions.js';
-import { insightText, monthInsights } from './month-insights.js';
+import { insightChange, insightText, monthInsights } from './month-insights.js';
 import { createReceiptPdf, periodBoundsForMonth } from './receipt-pdf.js';
 import { GUIDE_SECTIONS, guideHeading, searchGuide, sectionForView } from './guide.js';
 import { PRODUCT_TYPE_DEFAULT_EMOJI, PRODUCT_TYPE_EMOJIS, allProductTypes, createProductType, customProductTypes, deleteProductType, effectiveType, isCustomTypeId, isProductType, mergeTypeRows, setProductTypes, suggestTypeEmoji, typeEmoji, typeLabel, typeName, upsertProductType, validType } from './product-types.js';
@@ -630,10 +630,19 @@ function renderHomeChanged() {
   const items = monthInsights(state, localDateKey());
   if (!items.length) return '';
   const catLabel = (name) => t(name);
+  const loc = locale();
   const list = items.map((ins) => {
-    const text = insightText(ins, { t, money, categoryLabel: catLabel });
-    const mark = ins.dir === 'up' ? '▲ ' : ins.dir === 'down' ? '▼ ' : '';
-    return `<li class="home-changed-item ${ins.dir}">${escapeHtml(mark + text)}</li>`;
+    const text = insightText(ins, { t, money, categoryLabel: catLabel, locale: loc });
+    const change = insightChange(ins, { locale: loc });
+    let body = escapeHtml(text);
+    if (change.label) {
+      const needle = escapeHtml(change.label);
+      const at = body.indexOf(needle);
+      if (at >= 0) body = `${body.slice(0, at)}<span class="home-changed-pct">${needle}</span>${body.slice(at + needle.length)}`;
+    }
+    const mark = ins.dir === 'up' ? '▲' : ins.dir === 'down' ? '▼' : '';
+    const markHtml = mark ? `<span class="home-changed-mark" aria-hidden="true">${mark}</span>` : '';
+    return `<li class="home-changed-item ${ins.dir}">${markHtml}${body}</li>`;
   }).join('');
   return `<section class="panel" id="home-changed"><div class="panel-heading"><div><h2>${escapeHtml(t('Τι άλλαξε αυτόν τον μήνα'))}</h2><p>${escapeHtml(t('Σύγκριση με το ίδιο διάστημα του προηγούμενου μήνα'))}</p></div><button class="panel-link" type="button" data-view="insights">${escapeHtml(t('Αναλυτικά →'))}</button></div><ul class="home-changed-list" id="home-changed-list">${list}</ul></section>`;
 }

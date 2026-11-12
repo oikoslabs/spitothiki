@@ -1115,9 +1115,12 @@ a.menu-item { color: inherit; }
 /* Home card: «Τι άλλαξε αυτόν τον μήνα» */
 #home-changed { margin-bottom: 16px; }
 .home-changed-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
-.home-changed-item { font-size: calc(15px * var(--text-scale)); line-height: 1.45; font-weight: 600; }
-.home-changed-item.up { color: var(--danger, #b3261e); }
-.home-changed-item.down { color: var(--accent, #2f7d4f); }
+.home-changed-item { color: var(--ink); font-size: calc(15px * var(--text-scale)); line-height: 1.45; font-weight: 600; }
+.home-changed-mark { margin-right: .35em; font-weight: 800; }
+.home-changed-item.up .home-changed-mark,
+.home-changed-item.up .home-changed-pct { color: var(--red); }
+.home-changed-item.down .home-changed-mark,
+.home-changed-item.down .home-changed-pct { color: var(--green); }
 .receipt-export-dates { display: grid; gap: 12px; grid-template-columns: 1fr 1fr; }
 @media (max-width: 520px) { .receipt-export-dates { grid-template-columns: 1fr; } }
 #receipt-export-dialog .segmented { margin: 8px 0 14px; display: flex; flex-wrap: wrap; gap: 8px; }

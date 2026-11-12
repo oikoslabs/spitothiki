@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { daysInMonth, insightText, monthInsights, monthToDateWindows, periodTotals, MONTH_INSIGHTS_EN } from '../src/month-insights.js';
+import { daysInMonth, insightChange, insightText, monthInsights, monthToDateWindows, periodTotals, MONTH_INSIGHTS_EN } from '../src/month-insights.js';
 import { dictionaries } from '../src/i18n.js';
 
 const money = (n) => `${n.toFixed(2)} €`;
@@ -98,6 +98,67 @@ test('insight wording and English strings', () => {
   }
 });
 
+test('huge changes use a simple × (or 1/n) instead of a four-digit percent', () => {
+  const jump = { kind: 'total', dir: 'up', percent: 1138, current: 978, previous: 79 };
+  assert.deepEqual(insightChange(jump).label, '12×');
+  const text = insightText(jump, { money });
+  assert.match(text, /12× περισσότερα/);
+  assert.doesNotMatch(text, /1138%|1132%/);
+  const drop = { kind: 'total', dir: 'down', percent: 92, current: 79, previous: 978 };
+  assert.deepEqual(insightChange(drop).label, '1/12');
+  assert.match(insightText(drop, { money }), /περίπου το 1\/12/);
+  assert.equal(insightChange({ kind: 'total', dir: 'up', percent: 150, current: 250, previous: 100 }).label, '2,5×');
+  assert.equal(insightChange({ kind: 'total', dir: 'up', percent: 150, current: 250, previous: 100 }, { locale: 'en-GB' }).label, '2.5×');
+  assert.equal(insightChange({ kind: 'total', dir: 'up', percent: 18, current: 118, previous: 100 }).label, '18%');
+});
+
+test('home insight body uses the theme text colour; only the arrow and change are tinted, with AA contrast', () => {
+  const app = readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');
+  const css = readFileSync(new URL('../styles.css', import.meta.url), 'utf8');
+  const block = app.slice(app.indexOf('function renderHomeChanged'), app.indexOf('function renderOverview'));
+  assert.match(block, /home-changed-mark/);
+  assert.match(block, /home-changed-pct/);
+  assert.match(block, /insightChange/);
+  assert.match(css, /\.home-changed-item \{ color: var\(--ink\)/);
+  assert.doesNotMatch(css, /\.home-changed-item\.up \{ color:/);
+  assert.doesNotMatch(css, /\.home-changed-item\.down \{ color:/);
+  assert.match(css, /\.home-changed-item\.up \.home-changed-mark,/);
+  assert.match(css, /color: var\(--red\)/);
+  assert.match(css, /color: var\(--green\)/);
+
+  const rel = (hex) => {
+    const n = hex.replace('#', '');
+    const rgb = [0, 2, 4].map((i) => parseInt(n.slice(i, i + 2), 16) / 255);
+    const f = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+    const [r, g, b] = rgb.map(f);
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const contrast = (a, b) => {
+    const [l1, l2] = [rel(a), rel(b)].sort((x, y) => y - x);
+    return (l1 + 0.05) / (l2 + 0.05);
+  };
+  const varsOf = (selector) => {
+    const start = css.indexOf(selector);
+    assert.ok(start >= 0, selector);
+    const body = css.slice(css.indexOf('{', start) + 1, css.indexOf('}', start));
+    const expand = (hex) => hex.length === 4 ? '#' + [...hex.slice(1)].map((c) => c + c).join('') : hex;
+    return Object.fromEntries([...body.matchAll(/--([a-z-]+):\s*(#[0-9a-fA-F]{3,8})/g)].map((m) => [m[1], expand(m[2].toLowerCase())]));
+  };
+  const themes = [
+    { name: 'light', vars: varsOf(':root {') },
+    { name: 'dark', vars: { ...varsOf(':root {'), ...varsOf(':root[data-theme="dark"] {') } },
+    { name: 'high-contrast light', vars: { ...varsOf(':root {'), ...varsOf(':root[data-contrast="high"] {') } },
+    { name: 'high-contrast dark', vars: { ...varsOf(':root {'), ...varsOf(':root[data-contrast="high"] {'), ...varsOf(':root[data-contrast="high"][data-dark="1"] {') } }
+  ];
+  for (const { name, vars } of themes) {
+    const bg = vars.surface;
+    for (const token of ['ink', 'red', 'green']) {
+      const ratio = contrast(vars[token], bg);
+      assert.ok(ratio >= 4.5, `${name} --${token} ${vars[token]} on ${bg} is ${ratio.toFixed(2)}:1`);
+    }
+  }
+});
+
 test('home card is hideable in Αρχική οθόνη settings and hidden without data', () => {
   const app = readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');
   assert.match(app, /function renderHomeChanged/);
@@ -108,4 +169,6 @@ test('home card is hideable in Αρχική οθόνη settings and hidden witho
   assert.match(app, /if \(!homeState\(\)\.insights\) return ''/);
   assert.match(app, /monthInsights\(state, localDateKey\(\)\)/);
   assert.match(app, /saveHome\(\[\.\.\.DEFAULT_HOME\], true, true\)/);
+  assert.match(app, /home-changed-mark/);
+  assert.match(app, /home-changed-pct/);
 });

@@ -6,6 +6,6 @@ test('v1.9.21 release: version, cache bump and guide module precached', () => {
   assert.match(read('package.json'), /"version": "1\.9\.23"/);
   assert.equal((read('index.html').match(/data-no-i18n>1\.9\.23</g) || []).length, 2);
   const sw = read('sw.js');
-  assert.match(sw, /CACHE_VERSION = 'v126';/);
+  assert.match(sw, /CACHE_VERSION = 'v127';/);
   for (const f of ['guide', 'home-actions', 'tester-card', 'app']) assert.match(sw, new RegExp(`'\\./src/${f}\\.js'`));
 });
