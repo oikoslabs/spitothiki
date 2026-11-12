@@ -65,11 +65,22 @@ test('fetchReceipt: myDATA first, issuer name from EN16931, proxy only on networ
   assert.deepEqual(calls, ['https://a.epsilonnet.gr/fd/abc:1/myDATA', 'https://a.epsilonnet.gr/fd/abc:1/EN16931']);
   assert.equal(r.format, 'myDATA');
   assert.equal(r.issuerName, 'ΔΟΚΙΜΑΣΤΙΚΟ ΣΟΥΠΕΡΜΑΡΚΕΤ ΑΕ');
+  assert.equal(r.via, 'direct');
+  assert.equal(r.proxied, false);
   const via = [];
   const cors = async (url) => { via.push(url); if (!url.startsWith('https://proxy.test')) throw new TypeError('Failed to fetch'); return ok(url.includes('myDATA') ? myData : ubl); };
   const p = await fetchReceipt('https://b.epsilonnet.gr/fd/x', { fetchImpl: cors, proxy: 'https://proxy.test/' });
   assert.equal(p.lines.length, 8);
+  assert.equal(p.via, 'proxy');
+  assert.equal(p.proxied, true);
   assert.ok(via.includes(`https://proxy.test/?url=${encodeURIComponent('https://b.epsilonnet.gr/fd/x/myDATA')}`));
   await assert.rejects(fetchReceipt('https://b.epsilonnet.gr/fd/x', { fetchImpl: cors }), (e) => e.cors === true);
   await assert.rejects(fetchReceipt('http://b.gr/x'), /https/);
+});
+
+test('fetchReceipt: AADE summary is on-device (no proxy) and is marked via=aade', async () => {
+  const r = await fetchReceipt('https://www1.aade.gr/tameiakes/timologioqr?issuerVat=094379707&issueDate=2026-11-12&totalGrossValue=10');
+  assert.equal(r.format, 'AADE');
+  assert.equal(r.via, 'aade');
+  assert.equal(r.proxied, false);
 });
