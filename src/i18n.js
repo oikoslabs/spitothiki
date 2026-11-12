@@ -1149,7 +1149,7 @@ const EN = {
   "Η υπηρεσία αποδείξεων δεν απαντά αυτή τη στιγμή. Δοκίμασε ξανά σε λίγα λεπτά.": "The receipt service is not responding right now. Try again in a few minutes.",
   // v1.8.1
   "Νέα & tips στο Telegram": "News & tips on Telegram",
-  // About (Settings → Σχετικά): official Facebook page and Telegram channel
+  // About (Settings → Σχετικά): official Facebook page, Telegram channel and TikTok account
   "Σχετικά": "About",
   "Ακολούθησε τη Σπιτοθήκη για νέα και tips.": "Follow Spitothiki for news and tips.",
   // v1.8.2

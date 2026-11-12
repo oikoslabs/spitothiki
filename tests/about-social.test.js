@@ -6,8 +6,11 @@ import { dictionaries } from '../src/i18n.js';
 
 const read = (file) => readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
 
-const FACEBOOK = 'https://www.facebook.com/people/SpitoThiki/61596458362898/';
-const TELEGRAM = 'https://t.me/spitothiki';
+const LINKS = {
+  facebook: 'https://www.facebook.com/people/SpitoThiki/61596458362898/',
+  telegram: 'https://t.me/spitothiki',
+  tiktok: 'https://www.tiktok.com/@spitothikiapp',
+};
 
 function settingsFn() {
   const app = read('src/app.js');
@@ -16,21 +19,21 @@ function settingsFn() {
   return app.slice(start, end);
 }
 
-test('Settings has a Σχετικά card with Facebook and Telegram links in a new tab', () => {
+test('Settings has a Σχετικά card with Facebook, Telegram and TikTok links in a new tab', () => {
   const settings = settingsFn();
   assert.match(settings, /id="about"/);
   assert.match(settings, /t\('Σχετικά'\)/);
   assert.match(settings, /t\('Ακολούθησε τη Σπιτοθήκη για νέα και tips\.'\)/);
-  const facebook = settings.match(/<a class="button button-quiet" data-link="facebook-about"[^>]*>/);
-  const telegram = settings.match(/<a class="button button-quiet" data-link="telegram-about"[^>]*>/);
-  assert.ok(facebook, 'Facebook link is missing');
-  assert.ok(telegram, 'Telegram link is missing');
-  assert.match(facebook[0], new RegExp(`href="${FACEBOOK.replace(/[./]/g, '\\$&')}"`));
-  assert.match(telegram[0], new RegExp(`href="${TELEGRAM.replace(/[./]/g, '\\$&')}"`));
-  for (const tag of [facebook[0], telegram[0]]) {
-    assert.match(tag, /target="_blank"/);
-    assert.match(tag, /rel="noopener"/);
+  const tags = {};
+  for (const name of Object.keys(LINKS)) {
+    const match = settings.match(new RegExp(`<a class="button button-quiet" data-link="${name}-about"[^>]*>`));
+    assert.ok(match, `${name} link is missing`);
+    tags[name] = match[0];
+    assert.ok(tags[name].includes(`href="${LINKS[name]}"`), `${name} href`);
+    assert.match(tags[name], /target="_blank"/);
+    assert.match(tags[name], /rel="noopener"/);
   }
+  assert.ok(!LINKS.tiktok.includes('?'), 'TikTok URL must have no tracking params');
 });
 
 test('About strings have English translations', () => {
@@ -44,15 +47,16 @@ test('the in-app guide points to About in Settings for the official channels', (
   assert.ok(bullet);
   assert.match(bullet, /Facebook/);
   assert.match(bullet, /Telegram/);
+  assert.match(bullet, /TikTok/);
   assert.equal(
     dictionaries.en[bullet],
-    'In Settings, under «About», you will find our Facebook page and Telegram channel for news and tips.'
+    'In Settings, under «About», you will find our Facebook page, Telegram channel and TikTok account for news and tips.'
   );
 });
 
-test('About card ships in SW cache v124, app version stays 1.9.22', () => {
+test('About card ships in SW cache v125, app version stays 1.9.22', () => {
   const sw = read('sw.js');
-  assert.match(sw, /CACHE_VERSION = 'v124'/);
-  assert.match(sw, /About card in Settings with Facebook and Telegram links/);
+  assert.match(sw, /CACHE_VERSION = 'v125'/);
+  assert.match(sw, /About card also links the official TikTok account/);
   assert.match(read('package.json'), /"version": "1\.9\.22"/);
 });

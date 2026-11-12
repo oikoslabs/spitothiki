@@ -66,7 +66,7 @@ test('header screens map to the matching guide section', () => {
   for (const id of Object.values(VIEW_TO_SECTION)) assert.ok(GUIDE_SECTIONS.some((section) => section.id === id), id);
 });
 
-test('guide is in the menu, settings, starter, welcome and SW cache v124', () => {
+test('guide is in the menu, settings, starter, welcome and SW cache v125', () => {
   const html = read('index.html');
   const block = (start, end) => html.slice(html.indexOf(start), html.indexOf(end, html.indexOf(start)));
   for (const nav of [block('<nav class="primary-nav"', '</nav>'), block('<nav class="menu-list" id="menu-list"', '</nav>')]) {
@@ -82,7 +82,7 @@ test('guide is in the menu, settings, starter, welcome and SW cache v124', () =>
   assert.match(app, /onboard-guide/);
   assert.match(app, /function helpButton/);
   const sw = read('sw.js');
-  assert.match(sw, /CACHE_VERSION = 'v124'/);
+  assert.match(sw, /CACHE_VERSION = 'v125'/);
   assert.ok(sw.includes("./src/guide.js"));
 });
 
