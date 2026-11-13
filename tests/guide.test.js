@@ -17,7 +17,7 @@ test('guide has a numbered manual ending with useful tips, 2–4 bullets each', 
   assert.equal(numbered.length, 15);
   for (const section of GUIDE_SECTIONS) {
     assert.ok(section.intro.trim());
-    assert.ok(section.bullets.length >= 2 && section.bullets.length <= (section.id === 'shopping' ? 8 : section.id === 'receipts' ? 5 : 4), section.id);
+    assert.ok(section.bullets.length >= 2 && section.bullets.length <= (section.id === 'shopping' ? 8 : (section.id === 'receipts' || section.id === 'settings') ? 5 : 4), section.id);
   }
 });
 
@@ -66,7 +66,7 @@ test('header screens map to the matching guide section', () => {
   for (const id of Object.values(VIEW_TO_SECTION)) assert.ok(GUIDE_SECTIONS.some((section) => section.id === id), id);
 });
 
-test('guide is in the menu, settings, starter, welcome and SW cache v123', () => {
+test('guide is in the menu, settings, starter, welcome and SW cache v125', () => {
   const html = read('index.html');
   const block = (start, end) => html.slice(html.indexOf(start), html.indexOf(end, html.indexOf(start)));
   for (const nav of [block('<nav class="primary-nav"', '</nav>'), block('<nav class="menu-list" id="menu-list"', '</nav>')]) {

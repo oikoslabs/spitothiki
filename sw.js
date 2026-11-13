@@ -13,7 +13,7 @@ const DATA_CACHE = 'spitothiki-data'; // written by the app: expiry snapshot for
 // v128: reserved.
 // v127: readable insight colours in dark theme + calmer wording for huge % changes (cache bumped, app version stays 1.9.23 until release).
 // v126: month-to-date spending insights on the home screen + on-device receipt PDF export (cache bumped, app version stays 1.9.23 until release).
-// v125: reserved (about-social preview).
+// v125: About card in Settings with Facebook, Telegram and the official TikTok account (cache bumped, app version stayed 1.9.22 until later release).
 // v124: v1.9.23 release: anonymous on-device receipt counts (AADE / photo / direct) + privacy wording (cache bumped).
 // v123: v1.9.22 release: shopping-list extras (shared-list notices, «Συχνά:» suggestions, «Ξαναψώνισε τα ίδια», row notes) (cache bumped).
 // v122: shopping-list extras: shared-list notices, quick suggestions, «Ξαναψώνισε τα ίδια», row notes (cache bumped, app version stays 1.9.21 until release).

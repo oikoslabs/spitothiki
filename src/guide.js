@@ -173,6 +173,7 @@ export const GUIDE_SECTIONS = [
     bullets: [
       'Εξαγωγή ή εισαγωγή αντιγράφου σε αρχείο (και με κωδικό). Προαιρετικά, κρυπτογραφημένο αντίγραφο στο δικό σου Google Drive, μία φορά τη μέρα (κρατάει τα 5 τελευταία).',
       'Ρύθμισε θέμα, μέγεθος γραμμάτων, τι φαίνεται στην αρχική και στην κάτω μπάρα, και δικά σου είδη προϊόντων.',
+      'Στις Ρυθμίσεις, στο «Σχετικά», βρίσκεις τη σελίδα μας στο Facebook, το κανάλι στο Telegram και τον λογαριασμό στο TikTok για νέα και tips.',
       'Αν δεν συνδεθείς και αλλάξεις κινητό ή καθαρίσεις τα δεδομένα του browser, χρειάζεσαι αντίγραφο για να τα πάρεις μαζί σου.',
       'Η κάρτα «Τι άλλαξε αυτόν τον μήνα» στην αρχική κρύβεται από την ίδια ρύθμιση «Αρχική οθόνη», όπως ο οδηγός.'
     ]
@@ -314,6 +315,7 @@ export const GUIDE_EN = {
   'Εμφάνιση, αντίγραφο ασφαλείας και προσαρμογή της αρχικής.': 'Appearance, backup and home-screen layout.',
   'Εξαγωγή ή εισαγωγή αντιγράφου σε αρχείο (και με κωδικό). Προαιρετικά, κρυπτογραφημένο αντίγραφο στο δικό σου Google Drive, μία φορά τη μέρα (κρατάει τα 5 τελευταία).': 'Export or import a backup file (with a password if you want). Optionally, an encrypted copy in your own Google Drive, once a day (keeps the last 5).',
   'Ρύθμισε θέμα, μέγεθος γραμμάτων, τι φαίνεται στην αρχική και στην κάτω μπάρα, και δικά σου είδη προϊόντων.': 'Set the theme, text size, what appears on the home screen and the bottom bar, and your own product types.',
+  'Στις Ρυθμίσεις, στο «Σχετικά», βρίσκεις τη σελίδα μας στο Facebook, το κανάλι στο Telegram και τον λογαριασμό στο TikTok για νέα και tips.': 'In Settings, under «About», you will find our Facebook page, Telegram channel and TikTok account for news and tips.',
   'Αν δεν συνδεθείς και αλλάξεις κινητό ή καθαρίσεις τα δεδομένα του browser, χρειάζεσαι αντίγραφο για να τα πάρεις μαζί σου.': 'If you are not signed in and you change phone or clear the browser data, you need a backup to take your data with you.',
   'Η κάρτα «Τι άλλαξε αυτόν τον μήνα» στην αρχική κρύβεται από την ίδια ρύθμιση «Αρχική οθόνη», όπως ο οδηγός.': 'The «What changed this month» card on the home screen is hidden from the same «Home screen» setting, like the guide.',
   'Χρήσιμα tips': 'Useful tips',
