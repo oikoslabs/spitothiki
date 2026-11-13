@@ -1,5 +1,5 @@
 import { MAX_QUANTITY, expiringItems, createPantryItem, createShoppingItem, expiringWithin, expiryStatus, expiryWarning, normalizeSearch, normalizeUnit, pantrySummary, receiveShoppingItem, returnShoppingItem, shoppingListText, syncShoppingWithItem, toggleShoppingItem } from './domain.js';
-import { decodeImageCodes, lookupBarcode, normalizeBarcode, startScanner } from './barcode.js';
+import { adoptCamera, decodeImageCodes, lookupBarcode, normalizeBarcode, requestCamera, startScanner, warmScanner } from './barcode.js';
 import { isUrlCode, lastTollAmount, parseTollBarcode, parseTollText, tollAmountFromText } from './toll-barcode.js';
 import { authProviders, firebaseConfig } from './firebase-config.js';
 import { loadState, parseBackup, saveState } from './storage.js';
@@ -815,7 +815,15 @@ function renderSettings() {
 }
 
 // Let the browser paint the tap's feedback before running heavy work (keeps INP low on slow phones).
-function afterPaint(fn) { return new Promise((resolve) => requestAnimationFrame(() => setTimeout(() => resolve(fn?.()), 0))); }
+function afterPaint(fn) {
+  // scheduler.yield when available, then a double rAF + timeout: a single rAF+timeout can run before the paint on mobile Chrome (INP).
+  const paint = () => new Promise((resolve) => {
+    const run = () => setTimeout(() => resolve(fn?.()), 0);
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => requestAnimationFrame(run));
+    else run();
+  });
+  return globalThis.scheduler?.yield ? scheduler.yield().then(paint) : paint();
+}
 function pressFeedback(el) { el.classList.add('is-pressed'); setTimeout(() => el.classList.remove('is-pressed'), 400); }
 
 function renderApp() {
@@ -904,6 +912,7 @@ async function copyShareText() {
 }
 
 let stopScanner = null;
+let scanAbort = null;
 let sync = null;
 let syncStatus = { state: firebaseConfig ? 'loading' : 'disabled' };
 
@@ -1060,30 +1069,39 @@ const TILL_SKIP_HINT = 'Αυτός είναι ο barcode του ταμείου �
 async function openScanner({ onCode = fillFromBarcode, qr = false, confident = null } = {}) {
   const dialog = document.querySelector('#scan-dialog');
   const status = document.querySelector('#scan-status');
-  status.textContent = t('Άνοιγμα κάμερας…');
+  status.textContent = t('Ανοίγει η κάμερα…');
   document.querySelector('#scan-file-row').hidden = qr !== 'all';
   document.querySelector('#scan-title').textContent = t(qr === 'all' ? 'Σκάναρε οτιδήποτε' : qr === 'any' ? 'Σάρωση κωδικού λογαριασμού' : qr ? 'Σάρωση QR απόδειξης' : 'Σάρωση προϊόντος');
   const torch = document.querySelector('#scan-torch');
   torch.hidden = true; torch.setAttribute('aria-pressed', 'false'); torch.textContent = t('🔦 Φακός');
+  scanAbort?.abort();
+  const ac = new AbortController();
+  scanAbort = ac;
+  // Start getUserMedia in the same turn as the tap (keeps the user gesture) and as showModal, so the dialog can paint while the camera opens.
+  let streamPromise;
+  try { streamPromise = adoptCamera(requestCamera(), ac.signal); }
+  catch (error) { streamPromise = Promise.reject(error); }
   dialog.showModal();
-  await afterPaint(); // let the dialog paint before the heavy camera/detector setup (INP)
-  if (!dialog.open) return;
+  await afterPaint(); // let the dialog paint before detector setup (INP)
+  if (!dialog.open) ac.abort();
   try {
     stopScanner = await startScanner(document.querySelector('#scan-video'), (code) => {
       stopScanner = null;
       dialog.close();
       onCode(code);
-    }, { qr, confident,
+    }, { qr, confident, signal: ac.signal, streamPromise,
       // Receipt/«all» scans: a receipt's till barcode (date + till + transaction) is skipped so the QR can be read.
       skip: qr === true || qr === 'all' ? (v) => Boolean(parseStoreReceiptBarcode(v)) : null,
       onSkip: () => { if (dialog.open) status.textContent = t(TILL_SKIP_HINT); },
       onIdle: () => { if (dialog.open) status.textContent = t(qr === 'all' ? 'Δεν το πιάνει; Κράτα το κινητό λίγο πιο μακριά (15–20 εκ.), με καλό φως, ή πάτα «📎 Από φωτογραφία ή PDF».' : 'Δεν το πιάνει; Κράτα το κινητό λίγο πιο μακριά (15–20 εκ.) και με καλό φως.'); } });
+    if (ac.signal.aborted || !dialog.open) { closeScanner(); return; }
     if (stopScanner?.hasTorch) torch.hidden = false;
     // Some phones report the flashlight only a moment after the camera starts.
     else setTimeout(() => { if (dialog.open && stopScanner?.checkTorch?.()) torch.hidden = false; }, 800);
     if (dialog.open) status.textContent = t(qr === 'all' ? 'Στόχευσε QR ή barcode: απόδειξη, λογαριασμό, διόδια ή προϊόν.' : qr === 'any' ? 'Στόχευσε το QR ή τον barcode του λογαριασμού.' : qr ? 'Στόχευσε το QR της απόδειξης μέσα στο πλαίσιο, όχι την κάρτα πόντων ή το barcode του ταμείου.' : 'Στόχευσε τον barcode με την κάμερα.');
     else closeScanner();
   } catch (error) {
+    if (error?.name === 'AbortError' || ac.signal.aborted) return;
     status.textContent = t(error?.name === 'NotAllowedError' ? 'Δεν δόθηκε άδεια για την κάμερα. Μπορείς να γράψεις τον barcode με το χέρι.'
       : error?.name === 'NotFoundError' ? 'Δεν βρέθηκε κάμερα. Μπορείς να γράψεις τον barcode με το χέρι.'
       : (error.message || 'Η σάρωση δεν είναι διαθέσιμη.'));
@@ -1244,6 +1262,8 @@ function applyIncomeTaxPlan(form) {
 }
 
 function closeScanner() {
+  scanAbort?.abort();
+  scanAbort = null;
   stopScanner?.();
   stopScanner = null;
   const dialog = document.querySelector('#scan-dialog');
@@ -3822,6 +3842,11 @@ function handleAction(button) {
 
 initDietUi({ getState: () => state, persist, rerender: () => renderApp(), toast: showToast, createShoppingItem, getWeek: () => planWeek });
 
+document.addEventListener('pointerdown', (event) => {
+  const el = event.target.closest?.('[data-action="quick"][data-quick="scan"], [data-action="scan-barcode"], [data-action="receipt-scan"], [data-action="bill-scan"], [data-quick="scan"]');
+  if (el) warmScanner();
+}, { passive: true });
+
 document.addEventListener('click', (event) => {
   const viewButton = event.target.closest('[data-view]');
   if (viewButton) {
@@ -4178,7 +4203,7 @@ transportHistoryDialog().addEventListener('close', () => { if (history.state?.tr
 window.addEventListener('popstate', () => { if (transportHistoryDialog().open && !history.state?.transportHistory) transportHistoryDialog().close(); });
 extrasHistoryDialog().addEventListener('close', () => { if (history.state?.extrasHistory) history.back(); });
 window.addEventListener('popstate', () => { if (extrasHistoryDialog().open && !history.state?.extrasHistory) extrasHistoryDialog().close(); });
-document.querySelector('#scan-dialog').addEventListener('close', () => { stopScanner?.(); stopScanner = null; });
+document.querySelector('#scan-dialog').addEventListener('close', () => { scanAbort?.abort(); scanAbort = null; stopScanner?.(); stopScanner = null; });
 itemForm.elements.barcode.addEventListener('keydown', (event) => {
   if (event.key === 'Enter') { event.preventDefault(); fillFromBarcode(event.target.value); }
 });

@@ -291,7 +291,7 @@ const EN = {
   'Βρέθηκε: {name}. Έλεγξε τα στοιχεία πριν την αποθήκευση.': 'Found: {name}. Check the details before saving.',
   'Χωρίς σύνδεση: η αναζήτηση δεν είναι διαθέσιμη.': 'Offline: lookup is not available.', 'Η αναζήτηση απέτυχε.': 'The lookup failed.',
   'Η αναζήτηση στο Open Food Facts απέτυχε.': 'The Open Food Facts lookup failed.', 'Δεν φόρτωσε ο σαρωτής. Έλεγξε τη σύνδεση.': 'The scanner did not load. Check your connection.',
-  'Η κάμερα δεν είναι διαθέσιμη σε αυτόν τον browser.': 'The camera is not available in this browser.', 'Άνοιγμα κάμερας…': 'Opening camera…',
+  'Η κάμερα δεν είναι διαθέσιμη σε αυτόν τον browser.': 'The camera is not available in this browser.', 'Άνοιγμα κάμερας…': 'Opening camera…', 'Ανοίγει η κάμερα…': 'Opening camera…',
   'Δεν δόθηκε άδεια για την κάμερα. Μπορείς να γράψεις τον barcode με το χέρι.': 'Camera permission was not granted. You can type the barcode by hand.',
   'Δεν βρέθηκε κάμερα. Μπορείς να γράψεις τον barcode με το χέρι.': 'No camera found. You can type the barcode by hand.', 'Η σάρωση δεν είναι διαθέσιμη.': 'Scanning is not available.',
   // Notifications
