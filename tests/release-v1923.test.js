@@ -6,7 +6,7 @@ test('v1.9.23 release: version, cache bump and on-device scan counts', () => {
   assert.match(read('package.json'), /"version": "1\.9\.23"/);
   assert.equal((read('index.html').match(/data-no-i18n>1\.9\.23</g) || []).length, 2);
   const sw = read('sw.js');
-  assert.match(sw, /CACHE_VERSION = 'v124';/);
+  assert.match(sw, /CACHE_VERSION = 'v129';/);
   assert.match(read('src/source.js'), /reportScan/);
   assert.match(read('src/receipt-store.js'), /classifyStore/);
   for (const f of ['shopping-extras', 'guide', 'sync-core', 'app', 'source', 'receipt-store']) assert.match(sw, new RegExp(`'\\./src/${f}\\.js'`));
