@@ -113,12 +113,52 @@ const rememberEngine = (name) => { try { name === 'zxing' ? localStorage.setItem
 // Scans ~8 times/s over SCAN_REGIONS. onIdle() fires once if nothing was read for 8 s.
 // Returns stop(); stop.torch(on) toggles the flashlight when supported (stop.hasTorch).
 // skip(value) → true: a code that is read but not wanted (e.g. a receipt's till barcode); onSkip(value) is told once per value and scanning goes on.
-export async function startScanner(video, onCode, { qr = false, confident = null, onIdle = null, skip = null, onSkip = null } = {}) {
+export const CAMERA_CONSTRAINTS = { video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false };
+
+export function requestCamera(constraints = CAMERA_CONSTRAINTS) {
   if (!navigator.mediaDevices?.getUserMedia) throw new Error('Η κάμερα δεν είναι διαθέσιμη σε αυτόν τον browser.');
+  return navigator.mediaDevices.getUserMedia(constraints);
+}
+
+// If the dialog is closed (signal aborted) before getUserMedia resolves, stop the tracks so the stream is not leaked.
+export function adoptCamera(streamPromise, signal) {
+  return Promise.resolve(streamPromise).then((stream) => {
+    if (signal?.aborted) {
+      stream.getTracks().forEach((t) => t.stop());
+      throw new DOMException('The operation was aborted.', 'AbortError');
+    }
+    return stream;
+  });
+}
+
+// Warm BarcodeDetector on pointerdown so the first scan does not pay ML Kit / format-list init on the tap itself.
+export function warmScanner() {
+  if ('BarcodeDetector' in globalThis) globalThis.BarcodeDetector.getSupportedFormats().catch(() => {});
+}
+
+const abortError = () => new DOMException('The operation was aborted.', 'AbortError');
+
+export async function startScanner(video, onCode, { qr = false, confident = null, onIdle = null, skip = null, onSkip = null, signal = null, stream: givenStream = null, streamPromise = null } = {}) {
+  if (signal?.aborted) throw abortError();
+  // Start (or adopt) the camera first and show the preview, then set up BarcodeDetector / ZXing.
+  // Detector init on Android can take a long time and used to run before getUserMedia, blocking the dialog paint (INP).
+  let stream;
+  try {
+    stream = givenStream || await (streamPromise || adoptCamera(requestCamera(), signal));
+  } catch (error) {
+    if (!givenStream && !streamPromise && !navigator.mediaDevices?.getUserMedia) throw new Error('Η κάμερα δεν είναι διαθέσιμη σε αυτόν τον browser.');
+    throw error;
+  }
+  const abandon = () => { stream.getTracks().forEach((t) => t.stop()); if (video.srcObject === stream) video.srcObject = null; };
+  if (signal?.aborted) { abandon(); throw abortError(); }
+  video.srcObject = stream;
+  try { await video.play(); } catch (error) { abandon(); throw error; }
+  if (signal?.aborted) { abandon(); throw abortError(); }
   const mode = scanMode(qr);
   const wanted = scanFormats(mode);
   let native = [];
   if ('BarcodeDetector' in globalThis) native = await globalThis.BarcodeDetector.getSupportedFormats().catch(() => []);
+  if (signal?.aborted) { abandon(); throw abortError(); }
   const nativeFormats = wanted.filter((f) => native.includes(f));
   // Product mode accepts retail barcodes and GS1 DataMatrix / GS1 QR / Digital Link; other QR codes are ignored.
   const accept = (value) => mode !== 'product' || interpretCode(value).barcode;
@@ -142,10 +182,8 @@ export async function startScanner(video, onCode, { qr = false, confident = null
     return zxingReady;
   };
   if (!decoders.length) await addZxing(); // no usable native detector: ZXing is the only decoder (throws if it can't load)
-  const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false });
+  if (signal?.aborted) { abandon(); throw abortError(); }
   const track = stream.getVideoTracks()[0];
-  video.srcObject = stream;
-  await video.play();
   const hasTorch = track ? await tuneCamera(track) : false;
   let stopped = false, frame = 0, idleTimer = 0;
   const last = new Map(); // decoder index → previous value
@@ -154,7 +192,9 @@ export async function startScanner(video, onCode, { qr = false, confident = null
   if (onIdle) idleTimer = setTimeout(() => { if (!stopped) onIdle(); }, 8000);
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
-  const stop = () => { stopped = true; clearTimeout(zxingTimer); clearTimeout(idleTimer); stream.getTracks().forEach((t) => t.stop()); video.srcObject = null; };
+  const stop = () => { if (stopped) return; stopped = true; clearTimeout(zxingTimer); clearTimeout(idleTimer); abandon(); signal?.removeEventListener?.('abort', stop); };
+  signal?.addEventListener?.('abort', stop, { once: true });
+  if (signal?.aborted) { stop(); throw abortError(); }
   stop.hasTorch = hasTorch;
   stop.checkTorch = () => { try { stop.hasTorch = Boolean(track?.getCapabilities?.().torch); } catch {} return stop.hasTorch; };
   stop.torch = async (on) => { try { await track.applyConstraints({ advanced: [{ torch: Boolean(on) }] }); return true; } catch { return false; } };
