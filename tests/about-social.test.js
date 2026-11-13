@@ -54,9 +54,9 @@ test('the in-app guide points to About in Settings for the official channels', (
   );
 });
 
-test('About card ships in SW cache v125, app version stays 1.9.22', () => {
+test('About card ships in the service worker cache notes', () => {
   const sw = read('sw.js');
-  assert.match(sw, /CACHE_VERSION = 'v125'/);
-  assert.match(sw, /About card also links the official TikTok account/);
-  assert.match(read('package.json'), /"version": "1\.9\.22"/);
+  assert.match(sw, /CACHE_VERSION = 'v129'/);
+  assert.match(sw, /About card in Settings with Facebook, Telegram and the official TikTok account/);
+  assert.match(read('package.json'), /"version": "1\.9\.23"/);
 });

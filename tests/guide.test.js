@@ -17,7 +17,7 @@ test('guide has a numbered manual ending with useful tips, 2–4 bullets each', 
   assert.equal(numbered.length, 15);
   for (const section of GUIDE_SECTIONS) {
     assert.ok(section.intro.trim());
-    assert.ok(section.bullets.length >= 2 && section.bullets.length <= (section.id === 'shopping' ? 8 : 4), section.id);
+    assert.ok(section.bullets.length >= 2 && section.bullets.length <= (section.id === 'shopping' ? 8 : (section.id === 'receipts' || section.id === 'settings') ? 5 : 4), section.id);
   }
 });
 
@@ -82,7 +82,7 @@ test('guide is in the menu, settings, starter, welcome and SW cache v125', () =>
   assert.match(app, /onboard-guide/);
   assert.match(app, /function helpButton/);
   const sw = read('sw.js');
-  assert.match(sw, /CACHE_VERSION = 'v125'/);
+  assert.match(sw, /CACHE_VERSION = 'v129'/);
   assert.ok(sw.includes("./src/guide.js"));
 });
 

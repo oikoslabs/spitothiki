@@ -21,7 +21,7 @@ test('v1.8.7 privacy.html: deployed (not in firebase.json ignore), cached by the
   for (const pattern of hosting.ignore) assert.ok(!['*.html', '**/*.html', 'privacy.html'].includes(pattern), pattern);
   const sw = read('sw.js');
   assert.match(sw, /'\.\/privacy\.html'/);
-  assert.match(sw, /CACHE_VERSION = 'v125'/);
+  assert.match(sw, /CACHE_VERSION = 'v129'/);
   assert.match(read('src/app.js'), /href="\.\/privacy\.html"/);
   assert.equal(dictionaries.en['Πλήρης πολιτική απορρήτου'], 'Full privacy policy');
 });
@@ -41,14 +41,14 @@ test('v1.9.18 privacy: email-contact section separates service mail from marketi
   const el = html.slice(html.indexOf('id="el"'), html.indexOf('id="en"'));
   const en = html.slice(html.indexOf('id="en"'));
   assert.match(el, /Επικοινωνία με email/);
-  assert.match(el, /6 Νοεμβρίου 2026/);
+  assert.match(el, /12 Νοεμβρίου 2026/);
   assert.match(el, /μηνύματα απαραίτητα για τη λειτουργία/);
   assert.match(el, /σημαντική ενημέρωση έκδοσης/);
   assert.match(el, /ασφάλεια/);
   assert.match(el, /Δεν στέλνουμε διαφημίσεις, προσφορές ή newsletter χωρίς ρητή συγκατάθεσή σου/);
   assert.ok(!/πιστοποίηση|certified|GDPR compliant/i.test(html), 'no legal-certification claims');
   assert.match(en, /Email contact/);
-  assert.match(en, /6 November 2026/);
+  assert.match(en, /12 November 2026/);
   assert.match(en, /without your explicit consent/i);
   assert.match(en, /important version updates for security/i);
 });

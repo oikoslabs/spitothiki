@@ -23,7 +23,7 @@
 <a class="back" href="./">← Σπιτοθήκη</a>
 <article class="card" lang="el" id="el">
 <h1>Πολιτική απορρήτου</h1>
-<p class="muted">Σπιτοθήκη · https://spitothiki.web.app · Τελευταία ενημέρωση: 6 Νοεμβρίου 2026</p>
+<p class="muted">Σπιτοθήκη · https://spitothiki.web.app · Τελευταία ενημέρωση: 12 Νοεμβρίου 2026</p>
 <p>Η Σπιτοθήκη είναι μια δωρεάν εφαρμογή για το απόθεμα, τις αγορές και τα έξοδα του σπιτιού. Δεν έχει διαφημίσεις, δεν πουλάμε δεδομένα και δεν χρησιμοποιούμε cookies παρακολούθησης. Παρακάτω περιγράφουμε απλά τι γίνεται με τα δεδομένα σου.</p>
 
 <h2>Στη συσκευή σου</h2>
@@ -33,7 +33,7 @@
 <p>Η σύνδεση γίνεται μέσω Firebase Authentication (Google), που κρατά το email σου και, αν συνδεθείς με Google, το όνομά σου. Τα δεδομένα της εφαρμογής συγχρονίζονται στο Firebase Firestore (Google) και έχουν πρόσβαση σε αυτά μόνο τα μέλη του νοικοκυριού σου, δηλαδή όσοι μπήκαν με κωδικό πρόσκλησης που έδωσες.</p>
 
 <h2>Αποδείξεις με QR</h2>
-<p>Ο σύνδεσμος της απόδειξης περνά από έναν μικρό διακομιστή μας (Cloudflare Worker) μόνο για να διαβαστεί η απόδειξη. Δεν κρατάμε τα είδη, τα ποσά ή τη διεύθυνση IP σου. Κρατάμε μόνο ανώνυμη μέτρηση, π.χ. «σούπερ μάρκετ, επιτυχία», για να ξέρουμε ποια καταστήματα διαβάζονται σωστά.</p>
+<p>Ο σύνδεσμος της απόδειξης περνά από έναν μικρό διακομιστή μας (Cloudflare Worker) μόνο για να διαβαστεί η απόδειξη, όταν ο πάροχος δεν επιτρέπει απευθείας ανάγνωση. Δεν κρατάμε τα είδη, τα ποσά ή τη διεύθυνση IP σου. Κρατάμε μόνο ανώνυμη μέτρηση, π.χ. «σούπερ μάρκετ, επιτυχία», και όταν η απόδειξη διαβάζεται στη συσκευή σου (QR της ΑΑΔΕ, φωτογραφία ή απευθείας σύνδεση), για να ξέρουμε ποια καταστήματα διαβάζονται σωστά.</p>
 
 <h2>Barcode</h2>
 <p>Όταν σκανάρεις barcode, στέλνεται μόνο ο αριθμός του barcode στο <a href="https://world.openfoodfacts.org/" rel="noopener">Open Food Facts</a> για να βρεθεί το όνομα του προϊόντος.</p>
@@ -79,12 +79,12 @@
 
 <article class="card" lang="en" id="en">
 <h1>Privacy policy (English)</h1>
-<p class="muted">Spitothiki · https://spitothiki.web.app · Last updated: 6 November 2026</p>
+<p class="muted">Spitothiki · https://spitothiki.web.app · Last updated: 12 November 2026</p>
 <p>Spitothiki is a free household app for pantry, shopping and expenses. No ads, no selling of data, no tracking cookies.</p>
 <ul>
 <li><strong>On your device:</strong> your data stays on your device unless you sign in. Photos and PDFs are read on the device and are not uploaded.</li>
 <li><strong>If you sign in:</strong> Firebase Authentication (Google) keeps your email (and name with Google sign-in); your data syncs to Firebase Firestore and only members of your household can access it.</li>
-<li><strong>Receipt QR codes:</strong> the receipt link passes through our small Cloudflare Worker only to be read. We do not keep items, amounts or your IP address, only an anonymous count (e.g. “supermarket, success”).</li>
+<li><strong>Receipt QR codes:</strong> the receipt link passes through our small Cloudflare Worker only to be read when the provider blocks a direct request. We do not keep items, amounts or your IP address, only an anonymous count (e.g. “supermarket, success”), including when the receipt is read on your device (AADE QR, photo, or a direct fetch).</li>
 <li><strong>Barcodes:</strong> only the barcode number is sent to Open Food Facts.</li>
 <li><strong>Recipes:</strong> the basic recipes are built in; if you search for a new recipe, only the search word is sent to <a href="https://www.themealdb.com/" rel="noopener">TheMealDB</a>, and recipe photos load from there.</li>
 <li><strong>Other services:</strong> all app files, including the scanning, PDF and OCR libraries, load from our own hosting (Firebase Hosting, Google). Google sign-in and the Drive backup use Google's pages (accounts.google.com, apis.google.com).</li>

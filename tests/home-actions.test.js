@@ -32,9 +32,11 @@ test('home shortcuts: every option is a real quick action with EN label; catalog
 test('home shortcuts: Settings card, persistence, reset, no duplicates in «Περισσότερα», never stranded', () => {
   assert.match(app, /\$\{renderHomeCard\(\)\}\$\{renderBarCard\(\)\}/);
   assert.match(app, /saveHome\(toggleHome\(homeIds\(\), event\.target\.dataset\.homeId, event\.target\.checked\)\)/);
-  assert.match(app, /serializeHome\(\{ ids, guide: guide !== false \}\)/);
-  assert.match(app, /action === 'home-reset'\) \{ saveHome\(\[\.\.\.DEFAULT_HOME\], true\)/);
+  assert.match(app, /serializeHome\(\{ ids, guide: guide !== false, insights: insights !== false \}\)/);
+  assert.match(app, /action === 'home-reset'\) \{ saveHome\(\[\.\.\.DEFAULT_HOME\], true, true\)/);
   assert.match(app, /dataset\?\.homeGuide/);
+  assert.match(app, /dataset\?\.homeInsights/);
+  assert.match(app, /id="home-choice-insights"/);
   assert.match(app, /id="home-guide"/);
   assert.match(app, /data-home-guide="1"/);
   assert.match(app, /function renderHomeGuide/);
@@ -55,13 +57,16 @@ test('home shortcuts: Greek/English strings', () => {
 });
 
 test('home guide link: on by default, even with a saved custom layout; hidden only when explicitly turned off', () => {
-  assert.deepEqual(parseHomeState(null), { ids: DEFAULT_HOME, guide: true });
-  assert.deepEqual(parseHomeState(JSON.stringify(['scan', 'transport'])), { ids: ['scan', 'transport'], guide: true });
-  assert.deepEqual(parseHomeState('[]'), { ids: [], guide: true });
-  assert.deepEqual(parseHomeState(JSON.stringify({ ids: ['list'], guide: false })), { ids: ['list'], guide: false });
-  assert.equal(serializeHome({ ids: DEFAULT_HOME, guide: true }), null);
-  assert.equal(serializeHome({ ids: ['scan', 'transport'], guide: true }), JSON.stringify({ ids: ['scan', 'transport'], guide: true }));
-  assert.equal(serializeHome({ ids: DEFAULT_HOME, guide: false }), JSON.stringify({ ids: DEFAULT_HOME, guide: false }));
-  assert.ok(isDefaultHomeState({ ids: ['list', 'scan', 'manual'], guide: true }));
+  assert.deepEqual(parseHomeState(null), { ids: DEFAULT_HOME, guide: true, insights: true });
+  assert.deepEqual(parseHomeState(JSON.stringify(['scan', 'transport'])), { ids: ['scan', 'transport'], guide: true, insights: true });
+  assert.deepEqual(parseHomeState('[]'), { ids: [], guide: true, insights: true });
+  assert.deepEqual(parseHomeState(JSON.stringify({ ids: ['list'], guide: false })), { ids: ['list'], guide: false, insights: true });
+  assert.deepEqual(parseHomeState(JSON.stringify({ ids: ['list'], guide: true, insights: false })), { ids: ['list'], guide: true, insights: false });
+  assert.equal(serializeHome({ ids: DEFAULT_HOME, guide: true, insights: true }), null);
+  assert.equal(serializeHome({ ids: ['scan', 'transport'], guide: true }), JSON.stringify({ ids: ['scan', 'transport'], guide: true, insights: true }));
+  assert.equal(serializeHome({ ids: DEFAULT_HOME, guide: false }), JSON.stringify({ ids: DEFAULT_HOME, guide: false, insights: true }));
+  assert.equal(serializeHome({ ids: DEFAULT_HOME, guide: true, insights: false }), JSON.stringify({ ids: DEFAULT_HOME, guide: true, insights: false }));
+  assert.ok(isDefaultHomeState({ ids: ['list', 'scan', 'manual'], guide: true, insights: true }));
   assert.ok(!isDefaultHomeState({ ids: DEFAULT_HOME, guide: false }));
+  assert.ok(!isDefaultHomeState({ ids: DEFAULT_HOME, guide: true, insights: false }));
 });

@@ -5,6 +5,8 @@
 import { DIET_EN } from './diet-i18n.js';
 import { GUIDE_EN } from './guide.js';
 import { SHOPPING_EXTRAS_EN } from './shopping-extras.js';
+import { MONTH_INSIGHTS_EN } from './month-insights.js';
+import { RECEIPT_PDF_EN } from './receipt-pdf.js';
 
 export const LANG_KEY = 'spitothiki:lang';
 export const LANGS = ['el', 'en'];
@@ -24,6 +26,8 @@ const EN = {
   ...DIET_EN,
   ...GUIDE_EN,
   ...SHOPPING_EXTRAS_EN,
+  ...MONTH_INSIGHTS_EN,
+  ...RECEIPT_PDF_EN,
   "Κράτα ένα αντίγραφο των δεδομένων σου": "Keep a backup of your data",
   "Το τελευταίο αντίγραφο έγινε {date}.": "Your last backup was on {date}.",
   "Δεν έχεις κάνει ακόμα αντίγραφο. Αν αλλάξεις κινητό, θα το χρειαστείς.": "You have no backup yet. You will need one if you change phone.",
@@ -87,7 +91,7 @@ const EN = {
   "Η απόδειξη διαγράφηκε μαζί με τα έξοδά της.": "Receipt deleted together with its expenses.",
   "Στη συσκευή σου: απόθεμα, λίστες, έξοδα, λογαριασμοί, μετακινήσεις, πρόγραμμα διατροφής και ρυθμίσεις. Δεν φεύγουν από εκεί αν δεν συνδεθείς.": "On your device: pantry, lists, expenses, bills, trips, diet plan and settings. They stay there unless you sign in.",
   "Αν συνδεθείς: τα ίδια δεδομένα συγχρονίζονται στο Firebase (Google) και τα βλέπουν μόνο τα μέλη του νοικοκυριού σου. Μπορείς να αποσυνδεθείς ή να τα διαγράψεις όποτε θες.": "If you sign in: the same data syncs to Firebase (Google) and only members of your household can see it. You can sign out or delete it any time.",
-  "Αποδείξεις με QR: ο σύνδεσμος της απόδειξης περνά από έναν μικρό διακομιστή μας (Cloudflare) μόνο για να διαβαστεί. Δεν κρατάμε τα είδη, τα ποσά ή τη διεύθυνση IP σου, μόνο ανώνυμη μέτρηση (π.χ. «σούπερ μάρκετ, επιτυχία»).": "QR receipts: the receipt link passes through our small server (Cloudflare) only to be read. We do not keep the items, amounts or your IP address, only an anonymous count (e.g. “supermarket, success”).",
+  "Αποδείξεις με QR: ο σύνδεσμος της απόδειξης περνά από έναν μικρό διακομιστή μας (Cloudflare) μόνο για να διαβαστεί, όταν ο πάροχος δεν επιτρέπει απευθείας ανάγνωση. Δεν κρατάμε τα είδη, τα ποσά ή τη διεύθυνση IP σου, μόνο ανώνυμη μέτρηση (π.χ. «σούπερ μάρκετ, επιτυχία»), και όταν η απόδειξη διαβάζεται στη συσκευή σου (QR της ΑΑΔΕ, φωτογραφία ή απευθείας σύνδεση).": "QR receipts: the receipt link passes through our small server (Cloudflare) only to be read when the provider blocks a direct request. We do not keep the items, amounts or your IP address, only an anonymous count (e.g. “supermarket, success”), including when the receipt is read on your device (AADE QR, photo, or a direct fetch).",
   "Φωτογραφίες και PDF (αποδείξεις, λογαριασμοί, πρόγραμμα διατροφής) διαβάζονται μέσα στο κινητό σου και δεν ανεβαίνουν πουθενά.": "Photos and PDFs (receipts, bills, diet plan) are read on your phone and are not uploaded anywhere.",
   "Barcode: στέλνεται μόνο ο αριθμός στο Open Food Facts. Οι βασικές συνταγές είναι μέσα στην εφαρμογή. Αν ψάξεις νέα συνταγή, στέλνεται μόνο η λέξη αναζήτησης στο TheMealDB. Ειδοποιήσεις με κλειστή εφαρμογή: ο διακομιστής μας (Cloudflare) κρατά μόνο τις ημερομηνίες υπενθύμισης, όχι ονόματα, ποσά ή προϊόντα.": "Barcodes: only the number is sent to Open Food Facts. The basic recipes are built into the app; if you search for a new recipe, only the search word is sent to TheMealDB. Notifications with the app closed: our server (Cloudflare) keeps only the reminder dates, not names, amounts or products.",
   "Η εφαρμογή φτιάχνεται από έναν άνθρωπο με τη βοήθεια AI. Εγώ αποφασίζω τι κάνει, τη δοκιμάζω καθημερινά και διορθώνω ό,τι βρεθεί. Η πρόσβαση στα δεδομένα ελέγχεται από κανόνες ασφαλείας και ο καθένας βλέπει μόνο τα δικά του.": "This app is made by one person with the help of AI. I decide what it does, test it every day and fix whatever comes up. Access to data is protected by security rules and everyone sees only their own.",
