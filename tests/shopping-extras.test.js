@@ -159,7 +159,7 @@ test('row note: cleaned, capped, cleared, kept in the shared text', () => {
 test('wiring: synced pastLists kind, SW precache + cache bump + notification click, settings toggle, English', () => {
   assert.ok(DATA_KINDS.includes('pastLists'));
   const sw = read('sw.js');
-  assert.match(sw, /CACHE_VERSION = 'v124';/);
+  assert.match(sw, /CACHE_VERSION = 'v129';/);
   assert.match(sw, /'\.\/src\/shopping-extras\.js'/);
   assert.match(sw, /'spitothiki-list' \? 'shopping'/);
   const app = read('src/app.js');
@@ -187,4 +187,33 @@ test('note being typed survives a sync re-render (draft + focus kept)', () => {
   assert.match(app, /noteDraft \?\? item\.note/);
   assert.match(app, /event\.target\.id === 'row-note-input'\) noteDraft = event\.target\.value/);
   assert.match(app, /activeElement\?\.id === 'row-note-input'/);
+});
+
+test('suggest chips and row notes use theme tokens (readable in light, explicit dark, and auto dark)', () => {
+  const css = read('styles.css');
+  const chip = css.match(/\.suggest-chip\s*\{[^}]+\}/)?.[0] || '';
+  const note = css.match(/\.shopping-row-note\s*\{[^}]+\}/)?.[0] || '';
+  assert.match(chip, /background:\s*var\(--surface\)/);
+  assert.match(chip, /color:\s*var\(--ink\)/);
+  assert.match(chip, /border-color:\s*var\(--line\)/);
+  assert.doesNotMatch(chip, /#f6f9f4|color:\s*inherit/);
+  assert.match(note, /color:\s*var\(--green-dark\)/);
+  assert.doesNotMatch(note, /#3d5a45/);
+  // Hard-coded light colours with only a :root[data-theme="dark"] override miss auto + system dark.
+  assert.doesNotMatch(css, /:root\[data-theme="dark"\] \.suggest-chip/);
+  assert.doesNotMatch(css, /:root\[data-theme="dark"\] \.shopping-row-note/);
+
+  const vars = (block) => Object.fromEntries([...block.matchAll(/--([a-z-]+):\s*(#[0-9a-fA-F]{3,8})/g)].map((m) => [m[1], m[2]]));
+  const light = vars(css.match(/:root\s*\{[^}]+\}/)[0]);
+  const dark = vars(css.match(/:root\[data-theme="dark"\]\s*\{[^}]+\}/)[0]);
+  const lum = (hex) => {
+    const n = parseInt(hex.slice(1), 16);
+    const to = (c) => { const s = c / 255; return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4; };
+    return 0.2126 * to((n >> 16) & 255) + 0.7152 * to((n >> 8) & 255) + 0.0722 * to(n & 255);
+  };
+  const contrast = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+  for (const theme of [light, dark]) {
+    assert.ok(contrast(theme.ink, theme.surface) >= 4.5, `${theme.ink} on ${theme.surface}`);
+    assert.ok(contrast(theme['green-dark'], theme.surface) >= 4.5, `green-dark ${theme['green-dark']} on ${theme.surface}`);
+  }
 });
