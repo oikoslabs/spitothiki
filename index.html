@@ -307,6 +307,24 @@
       <div class="dialog-actions"><button class="button button-quiet" value="cancel">Άκυρο</button></div></form>
   </dialog>
   <input id="backup-file" type="file" aria-label="Αρχείο αντιγράφου ασφαλείας" accept="application/json,.json,.spitobak" hidden>
+
+  <dialog id="receipt-export-dialog" class="confirm-dialog" aria-labelledby="receipt-export-title">
+    <form id="receipt-export-form" data-mode="month">
+      <div class="dialog-heading"><div><p class="eyebrow">PDF</p><h2 id="receipt-export-title">Εξαγωγή αποδείξεων σε PDF</h2></div><button class="icon-button" type="button" data-action="receipts-export-close" aria-label="Κλείσιμο">×</button></div>
+      <p class="field-hint">Διάλεξε έναν μήνα ή δικές σου ημερομηνίες. Το PDF φτιάχνεται στο κινητό σου και δεν στέλνεται πουθενά.</p>
+      <div class="segmented" role="group" aria-label="Μήνας">
+        <button type="button" class="filter-chip is-active" data-action="receipts-export-mode" data-mode="month" aria-pressed="true">Μήνας</button>
+        <button type="button" class="filter-chip" data-action="receipts-export-mode" data-mode="custom" aria-pressed="false">Δικές μου ημερομηνίες</button>
+      </div>
+      <div id="receipt-export-month-wrap" class="field"><label for="receipt-export-month">Μήνας</label><select id="receipt-export-month" name="month"></select></div>
+      <div id="receipt-export-custom-wrap" class="receipt-export-dates" hidden>
+        <div class="field"><label for="receipt-export-from">Από</label><input id="receipt-export-from" name="from" type="date" required></div>
+        <div class="field"><label for="receipt-export-to">Έως</label><input id="receipt-export-to" name="to" type="date" required></div>
+      </div>
+      <p class="field-hint">Οι φωτογραφίες αποδείξεων δεν φυλάγονται στην εφαρμογή, οπότε το PDF έχει τα στοιχεία και τα είδη, όχι φωτογραφίες.</p>
+      <div class="dialog-actions"><button class="button button-quiet" type="button" data-action="receipts-export-close">Άκυρο</button><button class="button button-primary" type="submit" id="receipt-export-go">Λήψη PDF</button></div>
+    </form>
+  </dialog>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script type="module" src="src/app.js"></script>
 <!-- Cloudflare Web Analytics (cookieless) -->

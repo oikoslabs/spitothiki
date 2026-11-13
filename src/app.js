@@ -28,6 +28,8 @@ import { addCartItem, budgetState, createTrip, finishTrip, lastPrice, lineTotal,
 import { VM_MODES, interpretCode } from './gs1.js';
 import { initBackToTop } from './back-to-top.js';
 import { HOME_KEY, HOME_OPTIONS, DEFAULT_HOME, parseHomeState, serializeHome, toggleHome } from './home-actions.js';
+import { insightChange, insightText, monthInsights } from './month-insights.js';
+import { createReceiptPdf, periodBoundsForMonth } from './receipt-pdf.js';
 import { GUIDE_SECTIONS, guideHeading, searchGuide, sectionForView } from './guide.js';
 import { PRODUCT_TYPE_DEFAULT_EMOJI, PRODUCT_TYPE_EMOJIS, allProductTypes, createProductType, customProductTypes, deleteProductType, effectiveType, isCustomTypeId, isProductType, mergeTypeRows, setProductTypes, suggestTypeEmoji, typeEmoji, typeLabel, typeName, upsertProductType, validType } from './product-types.js';
 import { BAR_KEY, BAR_MAX, BAR_OPTIONS, DEFAULT_BAR, barOption, moveBar, parseBar, toggleBar } from './bar.js';
@@ -583,11 +585,11 @@ const HOME_GROUPS = [
   { title: 'Έξοδα', ids: ['scan', 'manual', 'receipt', 'extra', 'transport', 'bill', 'rent'] },
   { title: 'Σπίτι & ψώνια', ids: ['list', 'product', 'cart', 'cook'] }
 ];
-const homeState = () => { try { return parseHomeState(localStorage.getItem(HOME_KEY)); } catch { return { ids: [...DEFAULT_HOME], guide: true }; } };
+const homeState = () => { try { return parseHomeState(localStorage.getItem(HOME_KEY)); } catch { return { ids: [...DEFAULT_HOME], guide: true, insights: true }; } };
 const homeIds = () => homeState().ids;
-function saveHome(ids, guide = homeState().guide) {
+function saveHome(ids, guide = homeState().guide, insights = homeState().insights) {
   try {
-    const raw = serializeHome({ ids, guide: guide !== false });
+    const raw = serializeHome({ ids, guide: guide !== false, insights: insights !== false });
     if (raw == null) localStorage.removeItem(HOME_KEY); else localStorage.setItem(HOME_KEY, raw);
   } catch {}
 }
@@ -610,14 +612,39 @@ function renderHomeMore() {
     <p class="field-hint home-more-hint"><button class="text-button" type="button" data-view="settings" data-focus="home-card">${escapeHtml(t('Άλλαξε τι φαίνεται στην αρχική'))}</button></p></section>`;
 }
 function renderHomeCard() {
-  const { ids, guide } = homeState();
+  const { ids, guide, insights } = homeState();
   const chosen = new Set(ids);
   return `<section class="panel settings-card" id="home-card" aria-labelledby="home-card-title"><span class="stat-icon">⌂</span><h2 id="home-card-title">${escapeHtml(t('Αρχική οθόνη'))}</h2><p>${escapeHtml(t('Διάλεξε ποιες λειτουργίες φαίνονται ως μεγάλα κουμπιά στην αρχική. Αλλάζει μόνο τις συντομεύσεις: τίποτα δεν διαγράφεται και όλα μένουν στο μενού και στις «Όλες οι κινήσεις».'))}</p>
     <label class="home-choice" id="home-choice-guide"><input type="checkbox" data-home-guide="1"${guide ? ' checked' : ''}><span aria-hidden="true">📖</span> <span>${escapeHtml(t('Οδηγός χρήσης'))}</span></label>
     <p class="field-hint">${escapeHtml(t('Φαίνεται ως μικρός σύνδεσμος στην κορυφή της αρχικής, όχι ως μεγάλο κουμπί.'))}</p>
+    <label class="home-choice" id="home-choice-insights"><input type="checkbox" data-home-insights="1"${insights ? ' checked' : ''}><span aria-hidden="true">∑</span> <span>${escapeHtml(t('Κάρτα «Τι άλλαξε αυτόν τον μήνα»'))}</span></label>
+    <p class="field-hint">${escapeHtml(t('Φαίνεται στην αρχική όταν υπάρχουν αρκετά έξοδα για σύγκριση με τον προηγούμενο μήνα. Υπολογίζεται μόνο στη συσκευή σου.'))}</p>
     <fieldset class="home-choices"><legend class="visually-hidden">${escapeHtml(t('Λειτουργίες στην αρχική'))}</legend>${HOME_OPTIONS.map((id) => { const a = QUICK_ACTIONS.find((x) => x.id === id); return a ? `<label class="home-choice"><input type="checkbox" data-home-id="${id}"${chosen.has(id) ? ' checked' : ''}><span aria-hidden="true">${a.icon}</span> <span>${escapeHtml(t(a.label))}</span></label>` : ''; }).join('')}</fieldset>
     <p class="field-hint">${escapeHtml(t('Η κάτω μπάρα του κινητού ρυθμίζεται χωριστά, στην «Κάτω μπάρα».'))}</p>
     <div class="settings-actions"><button class="button button-quiet" type="button" data-action="home-reset" id="home-reset">↺ ${escapeHtml(t('Επαναφορά'))}</button></div></section>`;
+}
+
+
+function renderHomeChanged() {
+  if (!homeState().insights) return '';
+  const items = monthInsights(state, localDateKey());
+  if (!items.length) return '';
+  const catLabel = (name) => t(name);
+  const loc = locale();
+  const list = items.map((ins) => {
+    const text = insightText(ins, { t, money, categoryLabel: catLabel, locale: loc });
+    const change = insightChange(ins, { locale: loc });
+    let body = escapeHtml(text);
+    if (change.label) {
+      const needle = escapeHtml(change.label);
+      const at = body.indexOf(needle);
+      if (at >= 0) body = `${body.slice(0, at)}<span class="home-changed-pct">${needle}</span>${body.slice(at + needle.length)}`;
+    }
+    const mark = ins.dir === 'up' ? '▲' : ins.dir === 'down' ? '▼' : '';
+    const markHtml = mark ? `<span class="home-changed-mark" aria-hidden="true">${mark}</span>` : '';
+    return `<li class="home-changed-item ${ins.dir}">${markHtml}${body}</li>`;
+  }).join('');
+  return `<section class="panel" id="home-changed"><div class="panel-heading"><div><h2>${escapeHtml(t('Τι άλλαξε αυτόν τον μήνα'))}</h2><p>${escapeHtml(t('Σύγκριση με το ίδιο διάστημα του προηγούμενου μήνα'))}</p></div><button class="panel-link" type="button" data-view="insights">${escapeHtml(t('Αναλυτικά →'))}</button></div><ul class="home-changed-list" id="home-changed-list">${list}</ul></section>`;
 }
 
 function renderOverview() {
@@ -639,6 +666,7 @@ function renderOverview() {
       <button class="stat-card" type="button" data-action="home-card" data-card="expiring" id="home-card-expiring"><span class="stat-icon amber">◷</span><div><strong>${summary.expiringSoon + summary.expired}</strong><span>λήγουν ή έληξαν</span></div></button>
       <button class="stat-card" type="button" data-action="home-card" data-card="shopping" id="home-card-shopping"><span class="stat-icon blue">✓</span><div><strong>${pending}</strong><span>${escapeHtml(t('στη λίστα αγορών'))}</span></div></button>
     </section>
+    ${renderHomeChanged()}
     <div class="dashboard-grid">
       <section class="panel" id="home-month"><div class="panel-heading"><div><h2>${escapeHtml(t('Τα έξοδα του μήνα'))}</h2><p data-no-i18n>${escapeHtml(monthLabel(month))}</p></div><button class="panel-link" type="button" data-view="insights">${escapeHtml(t('Αναλυτικά →'))}</button></div>
         <p class="big-number" id="home-month-total">${escapeHtml(money(totals.total))}</p>${renderHomeMonthRows(totals.rows)}
@@ -3065,7 +3093,7 @@ function renderReceipts() {
   const list = rows.length ? `<ul class="receipts-list" id="receipts-list">${rows.map((r) => `<li><button type="button" class="receipt-row" data-action="receipt-open" data-id="${escapeHtml(r.id)}"><span class="receipt-main"><strong data-no-i18n>${escapeHtml(r.store || t('Απόδειξη'))}</strong><small>${escapeHtml(formatDate(r.date))} · ${escapeHtml(receiptCatText(r))}</small></span><span class="receipt-total" data-no-i18n>${escapeHtml(money(r.total))}</span><span class="arrow" aria-hidden="true">›</span></button></li>`).join('')}</ul>`
     : `<p class="subtle-empty">${escapeHtml(t(all.length ? 'Καμία απόδειξη αυτόν τον μήνα.' : 'Δεν έχεις σκανάρει αποδείξεις ακόμα. Πάτα «📷 Σάρωση» και στόχευσε το QR της απόδειξης.'))}</p>`;
   return `${renderHeader('Αποδείξεις', 'Όσες αποδείξεις έχεις σκανάρει, οι πιο πρόσφατες πρώτα.')}
-    <div class="settings-actions"><button class="button button-primary" type="button" data-action="menu-receipt">📷 ${escapeHtml(t('Σάρωση απόδειξης'))}</button><button class="button button-quiet" type="button" data-action="receipt-manual" id="receipts-manual">＋ ${escapeHtml(t('Έξοδο με το χέρι'))}</button></div>
+    <div class="settings-actions"><button class="button button-primary" type="button" data-action="menu-receipt">📷 ${escapeHtml(t('Σάρωση απόδειξης'))}</button><button class="button button-quiet" type="button" data-action="receipt-manual" id="receipts-manual">＋ ${escapeHtml(t('Έξοδο με το χέρι'))}</button><button class="button button-quiet" type="button" data-action="receipts-export" id="receipts-export">📄 ${escapeHtml(t('Εξαγωγή PDF'))}</button></div>
     <section class="panel" id="receipts-panel">${filter}${rows.length ? `<p class="field-hint" id="receipts-summary">${escapeHtml(t('{count} αποδείξεις · σύνολο {total}', { count: rows.length, total: money(total) }))}</p>` : ''}${list}</section>`;
 }
 
@@ -3396,13 +3424,98 @@ function renderQueueNote() {
   return `<div class="alert-banner" id="receipt-queue" role="status"><p>${escapeHtml(t('⏳ {count} αποδείξεις περιμένουν σύνδεση.', { count: queue.length }))}</p>${navigator.onLine === false ? '' : `<div class="settings-actions"><button class="button button-quiet" type="button" data-action="receipt-queue-open" data-link="${escapeHtml(queue[0].link)}">${escapeHtml(t('Άνοιγμα της επόμενης'))}</button></div>`}<button class="button button-quiet small-action" type="button" data-action="receipt-queue-clear">${escapeHtml(t('Διαγραφή αναμονής'))}</button></div>`;
 }
 
+
+function receiptExportTodayBounds() {
+  const today = localDateKey();
+  const month = receiptsMonth || monthKey(today);
+  return periodBoundsForMonth(month) || { from: `${monthKey(today)}-01`, to: today };
+}
+function setReceiptExportMode(mode) {
+  const form = document.querySelector('#receipt-export-form');
+  if (!form) return;
+  const isCustom = mode === 'custom';
+  form.dataset.mode = isCustom ? 'custom' : 'month';
+  const monthWrap = document.querySelector('#receipt-export-month-wrap');
+  const customWrap = document.querySelector('#receipt-export-custom-wrap');
+  if (monthWrap) monthWrap.hidden = isCustom;
+  if (customWrap) customWrap.hidden = !isCustom;
+  form.querySelectorAll('[data-action="receipts-export-mode"]').forEach((btn) => {
+    btn.classList.toggle('is-active', btn.dataset.mode === form.dataset.mode);
+    btn.setAttribute('aria-pressed', btn.dataset.mode === form.dataset.mode ? 'true' : 'false');
+  });
+}
+function openReceiptExport() {
+  const dialog = document.querySelector('#receipt-export-dialog');
+  const form = document.querySelector('#receipt-export-form');
+  if (!dialog || !form) return;
+  const today = localDateKey();
+  const months = receiptMonths(state.receipts || []);
+  const selected = receiptsMonth && months.includes(receiptsMonth) ? receiptsMonth : (months.includes(monthKey(today)) ? monthKey(today) : (months[0] || monthKey(today)));
+  const sel = form.elements.month;
+  if (sel) {
+    const opts = (months.length ? months : [monthKey(today)]).map((m) => `<option value="${m}"${m === selected ? ' selected' : ''} data-no-i18n>${escapeHtml(monthLabel(m))}</option>`).join('');
+    sel.innerHTML = opts;
+  }
+  const bounds = periodBoundsForMonth(selected) || { from: `${monthKey(today)}-01`, to: today };
+  if (form.elements.from) form.elements.from.value = bounds.from;
+  if (form.elements.to) form.elements.to.value = bounds.to > today ? today : bounds.to;
+  form.dataset.busy = '';
+  const go = document.querySelector('#receipt-export-go');
+  if (go) { go.disabled = false; go.textContent = t('Λήψη PDF'); }
+  setReceiptExportMode('month');
+  translateDom(dialog);
+  dialog.showModal();
+}
+async function submitReceiptExport(event) {
+  event.preventDefault();
+  const form = event.target;
+  if (form.dataset.busy) return;
+  let from, to;
+  if (form.dataset.mode === 'custom') {
+    from = form.elements.from.value;
+    to = form.elements.to.value;
+  } else {
+    const bounds = periodBoundsForMonth(form.elements.month.value);
+    from = bounds?.from;
+    to = bounds?.to;
+  }
+  if (!from || !to || from > to) { showToast('Διάλεξε ημερομηνία.'); return; }
+  form.dataset.busy = '1';
+  const go = document.querySelector('#receipt-export-go');
+  if (go) { go.disabled = true; go.textContent = t('Δημιουργία PDF…'); }
+  try {
+    const { summary, filename, bytes } = await createReceiptPdf(state, from, to, {
+      t, money, locale: locale(), categoryLabel: (name) => receiptCatText({ category: name })
+    });
+    if (!summary.count) { showToast('Δεν υπάρχουν αποδείξεις σε αυτή την περίοδο.'); return; }
+    const blob = new Blob([bytes], { type: 'application/pdf' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    document.querySelector('#receipt-export-dialog')?.close();
+    showToast('Το PDF αποθηκεύτηκε.');
+  } catch (err) {
+    console.warn('receipt pdf', err);
+    showToast('Δεν μπόρεσα να φτιάξω το PDF. Δοκίμασε ξανά.');
+  } finally {
+    form.dataset.busy = '';
+    if (go) { go.disabled = false; go.textContent = t('Λήψη PDF'); }
+  }
+}
+
 function handleAction(button) {
   const { action, id } = button.dataset;
   if (action === 'add-item') openItemDialog();
   else if (action === 'close-dialog') itemDialog.close();
   else if (action === 'edit-item') openItemDialog(id);
   else if (action === 'navigate') navigate(button.dataset.view);
-  else if (action === 'home-reset') { saveHome([...DEFAULT_HOME], true); const card = document.querySelector('#home-card'); if (card) { card.outerHTML = renderHomeCard(); translateDom(document.querySelector('#home-card')); } document.querySelector('#home-reset')?.focus(); showToast('Η αρχική επανήλθε.'); }
+  else if (action === 'home-reset') { saveHome([...DEFAULT_HOME], true, true); const card = document.querySelector('#home-card'); if (card) { card.outerHTML = renderHomeCard(); translateDom(document.querySelector('#home-card')); } document.querySelector('#home-reset')?.focus(); showToast('Η αρχική επανήλθε.'); }
   else if (action === 'bar-move' || action === 'bar-toggle' || action === 'bar-reset') {
     const ids = barIds();
     saveBar(action === 'bar-reset' ? [...DEFAULT_BAR] : action === 'bar-move' ? moveBar(ids, Number(button.dataset.index), Number(button.dataset.delta)) : toggleBar(ids, button.dataset.id));
@@ -3608,6 +3721,9 @@ function handleAction(button) {
   else if (action === 'waste-item') openWasteDialog(id);
   else if (action === 'close-waste') document.querySelector('#waste-dialog').close();
   else if (action === 'receipts-month') { receiptsMonth = button.dataset.month || ''; renderApp(); }
+  else if (action === 'receipts-export') openReceiptExport();
+  else if (action === 'receipts-export-close') document.querySelector('#receipt-export-dialog')?.close();
+  else if (action === 'receipts-export-mode') setReceiptExportMode(button.dataset.mode);
   else if (action === 'receipt-open') openReceiptDetails(button.dataset.id);
   else if (action === 'receipt-detail-close') document.querySelector('#receipt-detail-dialog').close();
   else if (action === 'receipt-edit') openReceiptEdit(button.dataset.id);
@@ -3737,6 +3853,17 @@ document.addEventListener('input', (event) => {
 
 document.addEventListener('change', (event) => {
   if (event.target.dataset?.homeGuide) { saveHome(homeIds(), event.target.checked); showToast('Η αρχική ενημερώθηκε.'); return; }
+  if (event.target.dataset?.homeInsights) { saveHome(homeIds(), homeState().guide, event.target.checked); showToast('Η αρχική ενημερώθηκε.'); return; }
+  if (event.target.id === 'receipt-export-month') {
+    const b = periodBoundsForMonth(event.target.value);
+    const form = event.target.form;
+    if (b && form) {
+      const today = localDateKey();
+      form.elements.from.value = b.from;
+      form.elements.to.value = b.to > today ? today : b.to;
+    }
+    return;
+  }
   if (event.target.dataset?.homeId) { saveHome(toggleHome(homeIds(), event.target.dataset.homeId, event.target.checked)); showToast('Η αρχική ενημερώθηκε.'); return; }
   if (event.target.id === 'drive-auto') { try { localStorage.setItem(DRIVE_AUTO_KEY, event.target.checked ? '1' : '0'); } catch {} showToast(event.target.checked ? 'Το αυτόματο αντίγραφο ενεργοποιήθηκε.' : 'Το αυτόματο αντίγραφο σταμάτησε.'); return; }
   if (event.target.dataset?.whopaidKey !== undefined) { state.payers = setPayer(state.payers || [], event.target.dataset.whopaidKey, event.target.value); if (persist()) { openPanels.add('whopaid-list'); renderApp(); } return; }
@@ -3821,6 +3948,7 @@ document.addEventListener('input', (event) => {
 });
 
 document.addEventListener('submit', (event) => {
+  if (event.target.id === 'receipt-export-form') { submitReceiptExport(event); return; }
   if (event.target.id === 'receipt-edit-form') { event.preventDefault(); saveReceiptEdit(event.target); return; }
   if (event.target.id === 'ptype-form' || event.target.id === 'ptype-edit-form') { event.preventDefault(); savePtypeForm(event.target); return; }
   if (event.target.id === 'expcat-form' || event.target.id === 'expcat-edit-form') { event.preventDefault(); saveExpCatForm(event.target); return; }

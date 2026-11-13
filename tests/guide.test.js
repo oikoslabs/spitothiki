@@ -17,7 +17,7 @@ test('guide has a numbered manual ending with useful tips, 2–4 bullets each', 
   assert.equal(numbered.length, 15);
   for (const section of GUIDE_SECTIONS) {
     assert.ok(section.intro.trim());
-    assert.ok(section.bullets.length >= 2 && section.bullets.length <= (section.id === 'shopping' ? 8 : 4), section.id);
+    assert.ok(section.bullets.length >= 2 && section.bullets.length <= (section.id === 'shopping' ? 8 : section.id === 'receipts' ? 5 : 4), section.id);
   }
 });
 

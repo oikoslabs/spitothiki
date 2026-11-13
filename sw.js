@@ -11,8 +11,8 @@ const SHARE_CACHE = 'spitothiki-share'; // a file shared to the app (Web Share T
 const DATA_CACHE = 'spitothiki-data'; // written by the app: expiry snapshot for background checks
 // v129: readable «Συχνά:» suggestion chips and row notes in dark / auto theme (cache bumped, app version stays 1.9.23 until release).
 // v128: reserved.
-// v127: reserved (month-insights preview).
-// v126: reserved (month-insights preview).
+// v127: readable insight colours in dark theme + calmer wording for huge % changes (cache bumped, app version stays 1.9.23 until release).
+// v126: month-to-date spending insights on the home screen + on-device receipt PDF export (cache bumped, app version stays 1.9.23 until release).
 // v125: reserved (about-social preview).
 // v124: v1.9.23 release: anonymous on-device receipt counts (AADE / photo / direct) + privacy wording (cache bumped).
 // v123: v1.9.22 release: shopping-list extras (shared-list notices, «Συχνά:» suggestions, «Ξαναψώνισε τα ίδια», row notes) (cache bumped).
@@ -41,8 +41,8 @@ const DATA_CACHE = 'spitothiki-data'; // written by the app: expiry snapshot for
 const SHORT_PATH = /^\/(tiktok|facebook|instagram|telegram|viber|reddit|pinterest|sofisstore|play)\/?$/i;
 const SHELL = [
   './', './index.html', './privacy.html', './styles.css', './manifest.webmanifest',
-  './src/app.js', './src/format.js', './src/theme.js', './src/i18n.js', './src/features.js', './src/recipes.js', './src/receipt.js', './src/receipt-photo.js', './src/mealplan.js', './src/diet-plan.js', './src/receipts.js', './src/diet-ui.js', './src/diet-i18n.js', './src/bills.js', './src/transport.js', './src/extras.js', './src/chores.js', './src/bar.js', './src/bill-pdf.js', './src/prefs.js', './src/scan-router.js', './src/onboarding.js', './src/cart.js', './src/shelf-price.js', './src/push.js', './src/auto-list.js', './src/price-compare.js', './src/recipe-data.js', './src/gs1.js', './src/back-to-top.js', './src/backup-crypto.js', './src/gdrive.js', './src/gdrive-auth.js', './src/drive-key.js', './src/receipt-edit.js', './src/manual-expense.js', './src/receipt-domains.js', './src/expense-cats.js', './src/whopaid.js', './src/offline.js', './src/protect.js', './src/domain.js', './src/storage.js', './src/barcode.js', './src/toll-barcode.js', './src/firebase-config.js', './src/sync-core.js', './src/sync-firebase.js', './src/disposable-email.js', './src/marketing-consent.js', './src/source.js', './src/receipt-store.js', './src/account-delete.js', './src/tester-card.js', './src/home-actions.js', './src/product-types.js', './src/guide.js', './src/shopping-extras.js',
-  './fonts/commissioner-greek.woff2', './fonts/commissioner-latin.woff2', './icons/icon-192.png', './icons/icon.svg'
+  './src/app.js', './src/format.js', './src/theme.js', './src/i18n.js', './src/features.js', './src/recipes.js', './src/receipt.js', './src/receipt-photo.js', './src/mealplan.js', './src/diet-plan.js', './src/receipts.js', './src/diet-ui.js', './src/diet-i18n.js', './src/bills.js', './src/transport.js', './src/extras.js', './src/chores.js', './src/bar.js', './src/bill-pdf.js', './src/prefs.js', './src/scan-router.js', './src/onboarding.js', './src/cart.js', './src/shelf-price.js', './src/push.js', './src/auto-list.js', './src/price-compare.js', './src/recipe-data.js', './src/gs1.js', './src/back-to-top.js', './src/backup-crypto.js', './src/gdrive.js', './src/gdrive-auth.js', './src/drive-key.js', './src/receipt-edit.js', './src/manual-expense.js', './src/receipt-domains.js', './src/expense-cats.js', './src/whopaid.js', './src/offline.js', './src/protect.js', './src/domain.js', './src/storage.js', './src/barcode.js', './src/toll-barcode.js', './src/firebase-config.js', './src/sync-core.js', './src/sync-firebase.js', './src/disposable-email.js', './src/marketing-consent.js', './src/source.js', './src/receipt-store.js', './src/account-delete.js', './src/tester-card.js', './src/home-actions.js', './src/product-types.js', './src/guide.js', './src/shopping-extras.js', './src/month-insights.js', './src/receipt-pdf.js', './src/pdf-doc.js',
+  './fonts/commissioner-greek.woff2', './fonts/commissioner-latin.woff2', './fonts/pdf-sans-el.ttf', './icons/icon-192.png', './icons/icon.svg'
 ];
 
 // v1.9.12: first install takes the files the page just downloaded from the browser cache (short max-age in
