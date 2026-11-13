@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 const read = (f) => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
 test('v1.9.24 release: version, cache bump, About links, insights and PDF export', () => {
-  assert.match(read('package.json'), /"version": "1\.9\.24"/);
-  assert.equal((read('index.html').match(/data-no-i18n>1\.9\.24</g) || []).length, 2);
+  assert.match(read('package.json'), /"version": "1\.9\.25"/);
+  assert.equal((read('index.html').match(/data-no-i18n>1\.9\.25</g) || []).length, 2);
   const sw = read('sw.js');
-  assert.match(sw, /CACHE_VERSION = 'v130';/);
+  assert.match(sw, /CACHE_VERSION = 'v131';/);
   assert.match(read('src/app.js'), /id="about"/);
   assert.match(read('src/app.js'), /https:\/\/www\.facebook\.com\/people\/SpitoThiki\/61596458362898\//);
   assert.match(read('src/app.js'), /https:\/\/t\.me\/spitothiki/);
