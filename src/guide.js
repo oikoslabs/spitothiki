@@ -179,6 +179,65 @@ export const GUIDE_SECTIONS = [
     ]
   },
   {
+    id: 'meds',
+    icon: '💊',
+    title: 'Φάρμακα',
+    intro: 'Δόσεις στις ώρες σου, ανά άτομο, με υπενθύμιση όταν τελειώνουν τα χάπια. Λειτουργία Pro.',
+    bullets: [
+      'Άνοιξε «Φάρμακα» από το μενού και πρόσθεσε όνομα, ώρες δόσης και, αν θέλεις, για ποιον είναι.',
+      'Όταν έρθει η ώρα, πάτα «✓ Το πήρα». Η εφαρμογή μετρά πόσα χάπια μένουν και σε ειδοποιεί όταν τελειώνουν.',
+      'Οι υπενθυμίσεις φαίνονται μέσα στην εφαρμογή. Δεν στέλνονται με κλειστή εφαρμογή (για να μην αλλάξουμε τον διακομιστή ειδοποιήσεων).',
+      'Τα φάρμακα μένουν στη συσκευή σου και, αν συνδεθείς, συγχρονίζονται μόνο με το νοικοκυριό σου, όπως τα υπόλοιπα δεδομένα.'
+    ]
+  },
+  {
+    id: 'trades',
+    icon: '🛠️',
+    title: 'Τεχνίτες',
+    intro: 'Το δικό σου βιβλίο τεχνιτών του σπιτιού. Λειτουργία Pro — χωρίς δημόσιο κατάλογο.',
+    bullets: [
+      'Κράτα όνομα, ειδικότητα (π.χ. υδραυλικός, ηλεκτρολόγος) και τηλέφωνο. Πάτα «Κλήση» για να καλέσεις.',
+      'Γράψε το ιστορικό εργασιών: ημερομηνία, τι έγινε και κόστος.',
+      'Βάλε υπενθυμίσεις συντήρησης, π.χ. ετήσιο σέρβις λέβητα. Θα τις δεις στην αρχική όταν πλησιάζει η ημερομηνία.',
+      'Τα στοιχεία μένουν στο νοικοκυριό σου. Δεν υπάρχει δημόσιος κατάλογος ούτε σύνδεση με υπηρεσίες τρίτων.'
+    ]
+  },
+  {
+    id: 'bank',
+    icon: '🏦',
+    title: 'Εισαγωγή κίνησης',
+    intro: 'Φέρε ένα αρχείο CSV κίνησης λογαριασμού. Όλα διαβάζονται στη συσκευή σου. Λειτουργία Pro.',
+    bullets: [
+      'Κατέβασε την κίνηση από την τράπεζά σου ως CSV (όχι σύνδεση στην τράπεζα μέσα στην εφαρμογή). Το Excel δεν διαβάζεται ακόμη.',
+      'Η εφαρμογή ταιριάζει κινήσεις με αποδείξεις: ίδιο ποσό, ημερομηνία ±2 ημέρες και παρόμοιο όνομα καταστήματος.',
+      'Ό,τι ταιριάζει σημειώνεται «πληρώθηκε με κάρτα». Αν δεν είναι σίγουρο, διαλέγεις Ίδιο έξοδο, Νέο έξοδο ή Παράβλεψη.',
+      'Η τελευταία εισαγωγή αναιρείται. Δεν κρατάμε το αρχείο και δεν στέλνεται πουθενά.'
+    ]
+  },
+  {
+    id: 'reports',
+    icon: '📊',
+    title: 'Αναφορές',
+    intro: 'Πλήρεις αναφορές και γραφήματα του μήνα. Λειτουργία Pro.',
+    bullets: [
+      'Δες σύνολο μήνα, σύγκριση με τον προηγούμενο, έξοδα ανά κατηγορία και ανά εβδομάδα, με γραφήματα.',
+      'Η κάρτα «Σύνολο εξόδων» στην αρχική και στη σελίδα εξόδων, και το PDF απόδειξης, μένουν δωρεάν.',
+      'Οι αριθμοί είναι οι ίδιοι λογαριασμοί με το δωρεάν σύνολο εξόδων — απλώς με περισσότερη ανάλυση.'
+    ]
+  },
+  {
+    id: 'pro',
+    icon: '✦',
+    title: 'Σπιτοθήκη Pro',
+    intro: 'Πρόσθετες λειτουργίες. Προς το παρόν ανοίγουν μόνο για τον κάτοχο της εφαρμογής.',
+    bullets: [
+      'Pro είναι η σάρωση εγγράφου στις φωτογραφίες αποδείξεων (γωνίες, προοπτική, βελτίωση στη συσκευή σου), τα φάρμακα, οι τεχνίτες, η εισαγωγή κίνησης και οι πλήρεις αναφορές.',
+      'Ό,τι είναι ήδη δωρεάν μένει δωρεάν: λίστα, απόθεμα, αποδείξεις, φωνή, barcode προϊόντων, κάρτα εξόδων μήνα και PDF απόδειξης.',
+      'Δεν υπάρχει πληρωμή ακόμη. Αργότερα το Pro θα μπορεί να ξεκλειδωθεί με αγορά.',
+      'Στο preview μπορείς να το ανοίξεις προσωρινά από τις Ρυθμίσεις, μόνο σε αυτή τη διεύθυνση, για δοκιμή.'
+    ]
+  },
+  {
     id: 'tips',
     icon: '💡',
     title: 'Χρήσιμα tips',
@@ -205,7 +264,11 @@ export const VIEW_TO_SECTION = {
   transport: 'transport',
   extras: 'extras',
   chores: 'chores',
-  settings: 'settings'
+  settings: 'settings',
+  meds: 'meds',
+  trades: 'trades',
+  bank: 'bank',
+  reports: 'reports'
 };
 
 export function sectionForView(view, { cookTab } = {}) {
@@ -323,5 +386,30 @@ export const GUIDE_EN = {
   'Άνοιξε τη Σπιτοθήκη στο spitothiki.web.app. Από το μενού του browser (Chrome ή Safari) μπορείς να την προσθέσεις στην αρχική οθόνη του κινητού σου. Δεν χρειάζεται λογαριασμός.': 'Open Spitothiki at spitothiki.web.app. From the browser menu (Chrome or Safari) you can add it to your phone’s home screen. No account is needed.',
   'Η εφαρμογή είναι δωρεάν, χωρίς διαφημίσεις, και δουλεύει και χωρίς internet. Τα δεδομένα μένουν στο κινητό ώσπου να συνδεθείς.': 'The app is free, with no ads, and works offline too. Your data stays on the phone until you sign in.',
   'Μοίρασε τη λίστα αγορών με το κουμπί κοινοποίησης και, αν ψωνίζεις συχνά στο ίδιο κατάστημα, όρισε τη σειρά των διαδρόμων.': 'Share the shopping list with the share button and, if you often shop at the same store, set the aisle order.',
-  'Για απορίες ή προβλήματα, γράψε στο oikoslabs.apps@gmail.com.': 'For questions or problems, write to oikoslabs.apps@gmail.com.'
+  'Για απορίες ή προβλήματα, γράψε στο oikoslabs.apps@gmail.com.': 'For questions or problems, write to oikoslabs.apps@gmail.com.',
+  'Δόσεις στις ώρες σου, ανά άτομο, με υπενθύμιση όταν τελειώνουν τα χάπια. Λειτουργία Pro.': 'Doses at your times, per person, with an alert when pills run low. A Pro feature.',
+  'Άνοιξε «Φάρμακα» από το μενού και πρόσθεσε όνομα, ώρες δόσης και, αν θέλεις, για ποιον είναι.': 'Open «Medications» from the menu and add a name, dose times and, if you want, who it is for.',
+  'Όταν έρθει η ώρα, πάτα «✓ Το πήρα». Η εφαρμογή μετρά πόσα χάπια μένουν και σε ειδοποιεί όταν τελειώνουν.': 'When the time comes, tap «✓ I took it». The app counts how many pills are left and alerts you when they run low.',
+  'Οι υπενθυμίσεις φαίνονται μέσα στην εφαρμογή. Δεν στέλνονται με κλειστή εφαρμογή (για να μην αλλάξουμε τον διακομιστή ειδοποιήσεων).': 'Reminders appear inside the app. They are not sent with the app closed (so we do not change the notification server).',
+  'Τα φάρμακα μένουν στη συσκευή σου και, αν συνδεθείς, συγχρονίζονται μόνο με το νοικοκυριό σου, όπως τα υπόλοιπα δεδομένα.': 'Medications stay on your device and, if you sign in, sync only with your household, like the rest of your data.',
+  'Το δικό σου βιβλίο τεχνιτών του σπιτιού. Λειτουργία Pro — χωρίς δημόσιο κατάλογο.': 'Your own home tradespeople book. A Pro feature — no public directory.',
+  'Κράτα όνομα, ειδικότητα (π.χ. υδραυλικός, ηλεκτρολόγος) και τηλέφωνο. Πάτα «Κλήση» για να καλέσεις.': 'Keep a name, specialty (e.g. plumber, electrician) and phone number. Tap «Call» to ring them.',
+  'Γράψε το ιστορικό εργασιών: ημερομηνία, τι έγινε και κόστος.': 'Write the job history: date, what was done and cost.',
+  'Βάλε υπενθυμίσεις συντήρησης, π.χ. ετήσιο σέρβις λέβητα. Θα τις δεις στην αρχική όταν πλησιάζει η ημερομηνία.': 'Add maintenance reminders, e.g. annual boiler service. You will see them on the home screen when the date is near.',
+  'Τα στοιχεία μένουν στο νοικοκυριό σου. Δεν υπάρχει δημόσιος κατάλογος ούτε σύνδεση με υπηρεσίες τρίτων.': 'The details stay in your household. There is no public directory and no connection to third-party services.',
+  'Φέρε ένα αρχείο CSV κίνησης λογαριασμού. Όλα διαβάζονται στη συσκευή σου. Λειτουργία Pro.': 'Bring a bank statement CSV. Everything is read on your device. A Pro feature.',
+  'Κατέβασε την κίνηση από την τράπεζά σου ως CSV (όχι σύνδεση στην τράπεζα μέσα στην εφαρμογή). Το Excel δεν διαβάζεται ακόμη.': 'Download the statement from your bank as CSV (no bank login inside the app). Excel is not read yet.',
+  'Η εφαρμογή ταιριάζει κινήσεις με αποδείξεις: ίδιο ποσό, ημερομηνία ±2 ημέρες και παρόμοιο όνομα καταστήματος.': 'The app matches transactions to receipts: same amount, date ±2 days and a similar store name.',
+  'Ό,τι ταιριάζει σημειώνεται «πληρώθηκε με κάρτα». Αν δεν είναι σίγουρο, διαλέγεις Ίδιο έξοδο, Νέο έξοδο ή Παράβλεψη.': 'Matches are marked “paid by card”. If it is unsure, you choose Same expense, New expense or Skip.',
+  'Η τελευταία εισαγωγή αναιρείται. Δεν κρατάμε το αρχείο και δεν στέλνεται πουθενά.': 'The last import can be undone. We do not keep the file and it is not sent anywhere.',
+  'Πλήρεις αναφορές και γραφήματα του μήνα. Λειτουργία Pro.': 'Full monthly reports and charts. A Pro feature.',
+  'Δες σύνολο μήνα, σύγκριση με τον προηγούμενο, έξοδα ανά κατηγορία και ανά εβδομάδα, με γραφήματα.': 'See the month total, a comparison with the previous month, spending by category and by week, with charts.',
+  'Η κάρτα «Σύνολο εξόδων» στην αρχική και στη σελίδα εξόδων, και το PDF απόδειξης, μένουν δωρεάν.': 'The spending totals card on the home screen and the expenses page, and the receipt PDF, stay free.',
+  'Οι αριθμοί είναι οι ίδιοι λογαριασμοί με το δωρεάν σύνολο εξόδων — απλώς με περισσότερη ανάλυση.': 'The figures use the same accounts as the free spending totals — just with more detail.',
+  'Πρόσθετες λειτουργίες. Προς το παρόν ανοίγουν μόνο για τον κάτοχο της εφαρμογής.': 'Extra features. For now they open only for the app owner.',
+  'Pro είναι η σάρωση εγγράφου στις φωτογραφίες αποδείξεων (γωνίες, προοπτική, βελτίωση στη συσκευή σου), τα φάρμακα, οι τεχνίτες, η εισαγωγή κίνησης και οι πλήρεις αναφορές.': 'Pro is document scanning on receipt photos (corners, perspective, on-device enhancement), medications, tradespeople, statement import and full reports.',
+  'Ό,τι είναι ήδη δωρεάν μένει δωρεάν: λίστα, απόθεμα, αποδείξεις, φωνή, barcode προϊόντων, κάρτα εξόδων μήνα και PDF απόδειξης.': 'Everything already free stays free: list, pantry, receipts, voice, product barcodes, the monthly spending card and the receipt PDF.',
+  'Δεν υπάρχει πληρωμή ακόμη. Αργότερα το Pro θα μπορεί να ξεκλειδωθεί με αγορά.': 'There is no payment yet. Later, Pro will be unlockable with a purchase.',
+  'Στο preview μπορείς να το ανοίξεις προσωρινά από τις Ρυθμίσεις, μόνο σε αυτή τη διεύθυνση, για δοκιμή.': 'On the preview you can turn it on temporarily from Settings, only on this address, for testing.'
 };
+

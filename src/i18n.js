@@ -7,6 +7,13 @@ import { GUIDE_EN } from './guide.js';
 import { SHOPPING_EXTRAS_EN } from './shopping-extras.js';
 import { MONTH_INSIGHTS_EN } from './month-insights.js';
 import { RECEIPT_PDF_EN } from './receipt-pdf.js';
+import { PRO_EN } from './pro.js';
+import { MEDS_EN } from './meds.js';
+import { TRADES_EN } from './trades.js';
+import { BANK_EN } from './bank-import.js';
+import { REPORTS_EN } from './reports.js';
+import { DOC_SCAN_EN } from './doc-scan.js';
+import { PRO_PAGES_EN } from './pro-pages.js';
 
 export const LANG_KEY = 'spitothiki:lang';
 export const LANGS = ['el', 'en'];
@@ -28,6 +35,13 @@ const EN = {
   ...SHOPPING_EXTRAS_EN,
   ...MONTH_INSIGHTS_EN,
   ...RECEIPT_PDF_EN,
+  ...PRO_EN,
+  ...MEDS_EN,
+  ...TRADES_EN,
+  ...BANK_EN,
+  ...REPORTS_EN,
+  ...DOC_SCAN_EN,
+  ...PRO_PAGES_EN,
   "Κράτα ένα αντίγραφο των δεδομένων σου": "Keep a backup of your data",
   "Το τελευταίο αντίγραφο έγινε {date}.": "Your last backup was on {date}.",
   "Δεν έχεις κάνει ακόμα αντίγραφο. Αν αλλάξεις κινητό, θα το χρειαστείς.": "You have no backup yet. You will need one if you change phone.",
