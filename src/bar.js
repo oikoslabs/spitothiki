@@ -5,7 +5,7 @@ export const DEFAULT_BAR = ['scan', 'list', 'extra', 'transport', 'all'];
 // quick actions (data-quick) and pages (view:<name>, data-view)
 export const BAR_OPTIONS = [
   { id: 'scan', icon: '📷', label: 'Σάρωση' }, { id: 'list', icon: '✓', label: 'Στη λίστα' }, { id: 'extra', icon: '☕', label: 'Μικροέξοδο' },
-  { id: 'transport', icon: '⛽', label: 'Μετακίνηση' }, { id: 'all', icon: '⚡', label: 'Κινήσεις' }, { id: 'view:chores', icon: '🧹', label: 'Δουλειές' },
+  { id: 'transport', icon: '⛽', label: 'Μετακίνηση' }, { id: 'all', icon: '⚡', label: 'Κινήσεις' }, { id: 'view:chores', icon: '🧹', label: 'Δουλειές' }, { id: 'view:calendar', icon: '📅', label: 'Ημερολόγιο' },
   { id: 'view:pantry', icon: '▦', label: 'Απόθεμα' }, { id: 'view:shopping', icon: '📝', label: 'Λίστα' }, { id: 'view:bills', icon: '📄', label: 'Λογαριασμοί' },
   { id: 'view:transport', icon: '🚗', label: 'Μετακινήσεις' }, { id: 'view:extras', icon: '🧾', label: 'Μικροέξοδα' }, { id: 'view:insights', icon: '∑', label: 'Σύνολο' },
   { id: 'cart', icon: '🛒', label: 'Καλάθι' }, { id: 'cook', icon: '🍳', label: 'Μαγείρεμα' }, { id: 'receipt', icon: '🧾', label: 'Απόδειξη' }, { id: 'manual', icon: '✍️', label: 'Με το χέρι' },
