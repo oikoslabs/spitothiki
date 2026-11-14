@@ -61,7 +61,10 @@ test('signed-out home includes the sign-in card and Settings leads with sync', (
   assert.match(app, /signin-nudge/);
   assert.match(app, /signin-head/);
   assert.match(app, /signin-actions/);
-  assert.match(app, /Με σύνδεση, όλα συγχρονίζονται σε κάθε κινητό ή υπολογιστή σου\./);
+  assert.match(app, /signin-benefits/);
+  assert.match(app, /Μένουν ασφαλή αν αλλάξεις ή χάσεις κινητό\./);
+  assert.match(app, /Μοιράζεσαι λίστα, λογαριασμούς και ημερολόγιο με το σπίτι\./);
+  assert.match(app, /Δωρεάν, χωρίς κάρτα\./);
   assert.doesNotMatch(app, /χωρίς λογαριασμό· σύνδεση χρειάζεται/);
   const syncAt = app.indexOf('${renderSyncCard()}');
   const themeAt = app.indexOf('<h2>Εμφάνιση</h2>');
