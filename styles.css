@@ -1173,6 +1173,11 @@ a.menu-item { color: inherit; }
 .cal-entry-kind { font-size: 0.78rem; color: var(--ink-soft, #58616b); }
 .cal-entry strong { display: block; }
 .cal-entry small { display: block; color: var(--ink-soft, #58616b); }
+.cal-entry.is-overdue { border-left-color: #c62a2f; }
+.cal-entry.is-overdue .cal-entry-kind, .cal-entry.is-overdue strong { color: #c62a2f; }
+.cal-entry.is-overdue:hover, .cal-entry.is-overdue:focus-visible { background: color-mix(in srgb, #c62a2f 8%, var(--surface, #fff)); }
+:root[data-theme="dark"] .cal-entry.is-overdue .cal-entry-kind,
+:root[data-theme="dark"] .cal-entry.is-overdue strong { color: #f0a0a0; }
 .cal-toolbar { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.8rem 0 1rem; }
 .cal-form { margin-top: 0.8rem; }
 .cal-form .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.7rem; }

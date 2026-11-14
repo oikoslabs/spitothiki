@@ -83,6 +83,25 @@ export function eventOccurrences(event, from, to) {
   return out;
 }
 
+// Compact day/month for «✓ Πληρώθηκε 12/11». Include the year when it differs from `today`.
+export function shortDayMonth(date, today = '') {
+  if (!DATE.test(date)) return '';
+  const [y, m, d] = date.split('-').map(Number);
+  const core = `${d}/${m}`;
+  if (DATE.test(today) && today.slice(0, 4) !== String(y)) return `${core}/${y}`;
+  return core;
+}
+
+export function billCalendarStatus(bill = {}, today = '') {
+  const due = String(bill.due || '');
+  const paid = Boolean(bill.paid);
+  const paidAt = paid && DATE.test(String(bill.paidAt || '').slice(0, 10)) ? String(bill.paidAt).slice(0, 10) : (paid ? '' : '');
+  const debit = Boolean(bill.autoPay);
+  const overdue = Boolean(!paid && !debit && DATE.test(due) && DATE.test(today) && due < today);
+  const pending = Boolean(!paid && !debit);
+  return { paid, paidAt, debit, overdue, pending };
+}
+
 export function monthBounds(month) {
   const days = daysInMonth(month);
   if (!days) return null;
@@ -110,7 +129,7 @@ export function monthGrid(month) {
   return cells;
 }
 
-export function autoEntries(state = {}, from, to) {
+export function autoEntries(state = {}, from, to, { today } = {}) {
   const out = [];
   for (const item of state.items || []) {
     const expiry = String(item.expiry || '');
@@ -130,10 +149,10 @@ export function autoEntries(state = {}, from, to) {
   for (const bill of state.bills || []) {
     const due = String(bill.due || '');
     if (!DATE.test(due) || due < from || due > to) continue;
-    const debit = Boolean(bill.autoPay);
+    const status = billCalendarStatus(bill, today);
     out.push({
-      id: `${debit ? 'debit' : 'bill'}:${bill.id}:${due}`,
-      source: debit ? 'debit' : 'bill',
+      id: `${status.debit ? 'debit' : 'bill'}:${bill.id}:${due}`,
+      source: status.debit ? 'debit' : 'bill',
       sourceId: bill.id,
       date: due,
       time: '',
@@ -141,7 +160,11 @@ export function autoEntries(state = {}, from, to) {
       notes: '',
       person: '',
       readOnly: true,
-      amount: bill.amount
+      amount: bill.amount,
+      paid: status.paid,
+      paidAt: status.paidAt,
+      pending: status.pending,
+      overdue: status.overdue
     });
   }
   for (const chore of state.chores || []) {
@@ -210,7 +233,7 @@ export function userEntries(events = [], from, to, { pro = calendarProEnabled() 
 }
 
 export function calendarEntries(state = {}, from, to, opts) {
-  const rows = [...autoEntries(state, from, to), ...userEntries(state.events || [], from, to, opts)];
+  const rows = [...autoEntries(state, from, to, opts), ...userEntries(state.events || [], from, to, opts)];
   return rows.sort((a, b) => a.date.localeCompare(b.date) || String(a.time).localeCompare(String(b.time)) || a.title.localeCompare(b.title, 'el'));
 }
 
@@ -343,6 +366,8 @@ export const CALENDAR_EN = {
   'Κυρ': 'Sun',
   'Λήξεις, λογαριασμοί και γεγονότα': 'Expiries, bills and events',
   'Προηγούμενος μήνας': 'Previous month',
-  'Επόμενος μήνας': 'Next month'
+  'Επόμενος μήνας': 'Next month',
+  '✓ Πληρώθηκε {date}': '✓ Paid {date}',
+  '✓ Πληρώθηκε': '✓ Paid'
 };
 
