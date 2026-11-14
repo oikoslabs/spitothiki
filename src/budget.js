@@ -174,6 +174,7 @@ export const BUDGET_EN = {
   'Αν συνεχίσεις έτσι: {amount} στο τέλος του μήνα': 'At this pace: {amount} by the end of the month',
   'Πλησιάζεις το όριο του προϋπολογισμού (80%).': 'You are approaching the budget limit (80%).',
   'Ξεπέρασες τον προϋπολογισμό του μήνα.': 'You have exceeded this month’s budget.',
+  'Ξεπέρασες το όριο μιας κατηγορίας.': 'You have exceeded a category limit.',
   'Βάλε προϋπολογισμό μήνα': 'Set a monthly budget',
   'Αποθήκευση προϋπολογισμού': 'Save budget',
   'Αφαίρεση ορίων': 'Remove limits',

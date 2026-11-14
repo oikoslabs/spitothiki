@@ -2623,8 +2623,10 @@ function renderBudgetBars(report, { compact = false } = {}) {
   const projText = report.total.projection != null && report.total.limit
     ? t('Αν συνεχίσεις έτσι: {amount} στο τέλος του μήνα', { amount: money(report.total.projection) })
     : '';
-  const banner = report.status === 'over'
+  const banner = report.total.status === 'over'
     ? `<p class="alert-banner is-danger budget-banner" role="alert">${escapeHtml(t('Ξεπέρασες τον προϋπολογισμό του μήνα.'))}</p>`
+    : report.categories.some((c) => c.status === 'over')
+    ? `<p class="alert-banner is-danger budget-banner" role="alert">${escapeHtml(t('Ξεπέρασες το όριο μιας κατηγορίας.'))}</p>`
     : report.status === 'warn'
     ? `<p class="alert-banner budget-banner" role="status">${escapeHtml(t('Πλησιάζεις το όριο του προϋπολογισμού (80%).'))}</p>`
     : '';
