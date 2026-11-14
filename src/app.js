@@ -29,6 +29,7 @@ import { VM_MODES, interpretCode } from './gs1.js';
 import { initBackToTop } from './back-to-top.js';
 import { HOME_KEY, HOME_OPTIONS, DEFAULT_HOME, parseHomeState, serializeHome, toggleHome } from './home-actions.js';
 import { insightChange, insightText, monthInsights } from './month-insights.js';
+import { NOTICE_KEY, activeBudget, budgetReport, createBudget, hasBudget, monthSpend, shouldNotify } from './budget.js';
 import { createReceiptPdf, periodBoundsForMonth } from './receipt-pdf.js';
 import { GUIDE_SECTIONS, guideHeading, searchGuide, sectionForView } from './guide.js';
 import { PRODUCT_TYPE_DEFAULT_EMOJI, PRODUCT_TYPE_EMOJIS, allProductTypes, createProductType, customProductTypes, deleteProductType, effectiveType, isCustomTypeId, isProductType, mergeTypeRows, setProductTypes, suggestTypeEmoji, typeEmoji, typeLabel, typeName, upsertProductType, validType } from './product-types.js';
@@ -154,6 +155,7 @@ function persist() {
     scheduleBackgroundSnapshot();
     requestPersistentStorage();
     if (!demoLoading) setTimeout(maybeProtectSheet, 600); // v1.9.0: asked only once something is saved
+    setTimeout(checkBudgetNotifications, 0);
     return true;
   } catch {
     showToast('Δεν ήταν δυνατή η αποθήκευση στη συσκευή.');
@@ -585,11 +587,11 @@ const HOME_GROUPS = [
   { title: 'Έξοδα', ids: ['scan', 'manual', 'receipt', 'extra', 'transport', 'bill', 'rent'] },
   { title: 'Σπίτι & ψώνια', ids: ['list', 'product', 'cart', 'cook'] }
 ];
-const homeState = () => { try { return parseHomeState(localStorage.getItem(HOME_KEY)); } catch { return { ids: [...DEFAULT_HOME], guide: true, insights: true }; } };
+const homeState = () => { try { return parseHomeState(localStorage.getItem(HOME_KEY)); } catch { return { ids: [...DEFAULT_HOME], guide: true, insights: true, budget: true }; } };
 const homeIds = () => homeState().ids;
-function saveHome(ids, guide = homeState().guide, insights = homeState().insights) {
+function saveHome(ids, guide = homeState().guide, insights = homeState().insights, budget = homeState().budget) {
   try {
-    const raw = serializeHome({ ids, guide: guide !== false, insights: insights !== false });
+    const raw = serializeHome({ ids, guide: guide !== false, insights: insights !== false, budget: budget !== false });
     if (raw == null) localStorage.removeItem(HOME_KEY); else localStorage.setItem(HOME_KEY, raw);
   } catch {}
 }
@@ -612,13 +614,15 @@ function renderHomeMore() {
     <p class="field-hint home-more-hint"><button class="text-button" type="button" data-view="settings" data-focus="home-card">${escapeHtml(t('Άλλαξε τι φαίνεται στην αρχική'))}</button></p></section>`;
 }
 function renderHomeCard() {
-  const { ids, guide, insights } = homeState();
+  const { ids, guide, insights, budget } = homeState();
   const chosen = new Set(ids);
   return `<section class="panel settings-card" id="home-card" aria-labelledby="home-card-title"><span class="stat-icon">⌂</span><h2 id="home-card-title">${escapeHtml(t('Αρχική οθόνη'))}</h2><p>${escapeHtml(t('Διάλεξε ποιες λειτουργίες φαίνονται ως μεγάλα κουμπιά στην αρχική. Αλλάζει μόνο τις συντομεύσεις: τίποτα δεν διαγράφεται και όλα μένουν στο μενού και στις «Όλες οι κινήσεις».'))}</p>
     <label class="home-choice" id="home-choice-guide"><input type="checkbox" data-home-guide="1"${guide ? ' checked' : ''}><span aria-hidden="true">📖</span> <span>${escapeHtml(t('Οδηγός χρήσης'))}</span></label>
     <p class="field-hint">${escapeHtml(t('Φαίνεται ως μικρός σύνδεσμος στην κορυφή της αρχικής, όχι ως μεγάλο κουμπί.'))}</p>
     <label class="home-choice" id="home-choice-insights"><input type="checkbox" data-home-insights="1"${insights ? ' checked' : ''}><span aria-hidden="true">∑</span> <span>${escapeHtml(t('Κάρτα «Τι άλλαξε αυτόν τον μήνα»'))}</span></label>
     <p class="field-hint">${escapeHtml(t('Φαίνεται στην αρχική όταν υπάρχουν αρκετά έξοδα για σύγκριση με τον προηγούμενο μήνα. Υπολογίζεται μόνο στη συσκευή σου.'))}</p>
+    <label class="home-choice" id="home-choice-budget"><input type="checkbox" data-home-budget="1"${budget ? ' checked' : ''}><span aria-hidden="true">🎯</span> <span>${escapeHtml(t('Κάρτα προϋπολογισμού μήνα'))}</span></label>
+    <p class="field-hint">${escapeHtml(t('Φαίνεται στην αρχική όταν έχεις βάλει όριο. Μετράει τα ίδια έξοδα με το «Σύνολο εξόδων».'))}</p>
     <fieldset class="home-choices"><legend class="visually-hidden">${escapeHtml(t('Λειτουργίες στην αρχική'))}</legend>${HOME_OPTIONS.map((id) => { const a = QUICK_ACTIONS.find((x) => x.id === id); return a ? `<label class="home-choice"><input type="checkbox" data-home-id="${id}"${chosen.has(id) ? ' checked' : ''}><span aria-hidden="true">${a.icon}</span> <span>${escapeHtml(t(a.label))}</span></label>` : ''; }).join('')}</fieldset>
     <p class="field-hint">${escapeHtml(t('Η κάτω μπάρα του κινητού ρυθμίζεται χωριστά, στην «Κάτω μπάρα».'))}</p>
     <div class="settings-actions"><button class="button button-quiet" type="button" data-action="home-reset" id="home-reset">↺ ${escapeHtml(t('Επαναφορά'))}</button></div></section>`;
@@ -666,7 +670,7 @@ function renderOverview() {
       <button class="stat-card" type="button" data-action="home-card" data-card="expiring" id="home-card-expiring"><span class="stat-icon amber">◷</span><div><strong>${summary.expiringSoon + summary.expired}</strong><span>λήγουν ή έληξαν</span></div></button>
       <button class="stat-card" type="button" data-action="home-card" data-card="shopping" id="home-card-shopping"><span class="stat-icon blue">✓</span><div><strong>${pending}</strong><span>${escapeHtml(t('στη λίστα αγορών'))}</span></div></button>
     </section>
-    ${renderHomeChanged()}
+    ${renderHomeChanged()}${renderHomeBudget()}
     <div class="dashboard-grid">
       <section class="panel" id="home-month"><div class="panel-heading"><div><h2>${escapeHtml(t('Τα έξοδα του μήνα'))}</h2><p data-no-i18n>${escapeHtml(monthLabel(month))}</p></div><button class="panel-link" type="button" data-view="insights">${escapeHtml(t('Αναλυτικά →'))}</button></div>
         <p class="big-number" id="home-month-total">${escapeHtml(money(totals.total))}</p>${renderHomeMonthRows(totals.rows)}
@@ -1418,6 +1422,25 @@ async function showNotification(title, body, tag = 'spitothiki-expiry') {
 }
 
 // Checks expiries when the app opens or comes back to the foreground; notifies at most once per day.
+async function checkBudgetNotifications() {
+  if (!notificationsSupported() || typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+  const today = localDateKey();
+  const month = monthKey(today);
+  const budget = activeBudget(state.budgets || []);
+  if (!hasBudget(budget)) return;
+  const report = budgetReport(budget, monthSpend(state, month), { today });
+  if (!report || (report.status !== 'warn' && report.status !== 'over')) return;
+  let prev = null;
+  try { prev = JSON.parse(localStorage.getItem(NOTICE_KEY) || ''); } catch {}
+  if (!shouldNotify(prev, { month: report.month, level: report.status })) return;
+  const title = report.status === 'over' ? t('Ξεπέρασες τον προϋπολογισμό του μήνα.') : t('Πλησιάζεις το όριο του προϋπολογισμού (80%).');
+  const body = report.total.limit ? t('Ξόδεψες {spent} από {limit}', { spent: money(report.total.spent), limit: money(report.total.limit) }) : '';
+  try {
+    await showNotification(title, body, 'spitothiki-budget');
+    localStorage.setItem(NOTICE_KEY, JSON.stringify({ month: report.month, level: report.status }));
+  } catch {}
+}
+
 async function checkExpiryNotifications() {
   const settings = notifySettings();
   if (!settings.enabled || !notificationsSupported() || Notification.permission !== 'granted') return;
@@ -1465,6 +1488,7 @@ async function enableNotifications() {
   showToast('Οι ειδοποιήσεις ενεργοποιήθηκαν.');
   enablePush().then((push) => { if (activeView === 'settings') renderApp(); if (push) showToast('Οι ειδοποιήσεις ενεργοποιήθηκαν, και με κλειστή εφαρμογή.'); });
   checkExpiryNotifications();
+  checkBudgetNotifications();
 }
 
 function renderNotificationCard() {
@@ -2580,6 +2604,79 @@ function renderTransportCard() {
     ${month.count ? renderBars(month.byType.map((row) => ({ label: `${TRANSPORT_ICONS[row.type]} ${t(TRANSPORT_LABELS[row.type])}`, value: row.total })), money) : '<p class="subtle-empty">Κανένα έξοδο μετακίνησης αυτόν τον μήνα.</p>'}</section>`;
 }
 
+function renderBudgetBars(report, { compact = false } = {}) {
+  if (!report) return '';
+  const line = (row, title) => {
+    const width = Math.min(100, row.pct || 0);
+    const remainingText = row.remaining == null ? ''
+      : row.remaining >= 0 ? t('Απομένουν {amount}', { amount: money(row.remaining) })
+      : t('Ξεπέρασες το όριο κατά {amount}', { amount: money(-row.remaining) });
+    return `<div class="budget-line is-${row.status}">
+      <div class="budget-line-head"><strong>${title}</strong><span>${escapeHtml(t('Ξόδεψες {spent} από {limit}', { spent: money(row.spent), limit: money(row.limit) }))}</span></div>
+      <div class="budget-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.min(100, row.pct || 0)}"><span style="width:${width}%"></span></div>
+      <p class="field-hint">${escapeHtml(remainingText)}</p>
+    </div>`;
+  };
+  const daysText = report.total.limit
+    ? (report.total.daysLeft === 1 ? t('Απομένει 1 ημέρα αυτόν τον μήνα') : t('Απομένουν {count} ημέρες αυτόν τον μήνα', { count: report.total.daysLeft }))
+    : '';
+  const projText = report.total.projection != null && report.total.limit
+    ? t('Αν συνεχίσεις έτσι: {amount} στο τέλος του μήνα', { amount: money(report.total.projection) })
+    : '';
+  const banner = report.status === 'over'
+    ? `<p class="alert-banner is-danger budget-banner" role="alert">${escapeHtml(t('Ξεπέρασες τον προϋπολογισμό του μήνα.'))}</p>`
+    : report.status === 'warn'
+    ? `<p class="alert-banner budget-banner" role="status">${escapeHtml(t('Πλησιάζεις το όριο του προϋπολογισμού (80%).'))}</p>`
+    : '';
+  const cats = (compact ? report.categories.slice(0, 3) : report.categories).map((c) => line(c, `${escapeHtml(c.emoji)} ${escapeHtml(t(c.label))}`)).join('');
+  return `${banner}${report.total.limit ? line(report.total, escapeHtml(t('Προϋπολογισμός μήνα'))) : ''}${daysText || projText ? `<p class="field-hint" id="budget-forecast">${escapeHtml([daysText, projText].filter(Boolean).join(' · '))}</p>` : ''}${cats}`;
+}
+
+function renderHomeBudget() {
+  if (!homeState().budget) return '';
+  const today = localDateKey();
+  const month = monthKey(today);
+  const budget = activeBudget(state.budgets || []);
+  if (!hasBudget(budget)) {
+    return `<section class="panel" id="home-budget"><div class="panel-heading"><div><h2>${escapeHtml(t('Προϋπολογισμός μήνα'))}</h2><p>${escapeHtml(t('Βάλε ένα συνολικό όριο και, αν θέλεις, όρια ανά κατηγορία. Μετράνε τα ίδια έξοδα με το «Σύνολο εξόδων μήνα».'))}</p></div><button class="panel-link" type="button" data-view="insights">${escapeHtml(t('Βάλε προϋπολογισμό μήνα'))} →</button></div></section>`;
+  }
+  const report = budgetReport(budget, monthSpend(state, month), { today });
+  return `<section class="panel" id="home-budget"><div class="panel-heading"><div><h2>${escapeHtml(t('Προϋπολογισμός μήνα'))}</h2><p data-no-i18n>${escapeHtml(monthLabel(month))}</p></div><button class="panel-link" type="button" data-view="insights">${escapeHtml(t('Αναλυτικά →'))}</button></div>
+    ${renderBudgetBars(report, { compact: true })}</section>`;
+}
+
+function renderBudgetCard(month = insightsMonth) {
+  const today = localDateKey();
+  const budget = activeBudget(state.budgets || []);
+  const spend = monthSpend(state, month);
+  const report = hasBudget(budget) ? budgetReport(budget, spend, { today }) : null;
+  const limits = new Map((budget?.categories || []).map((c) => [c.id, c.amount]));
+  const fields = (spend.rows || []).map((row) => `<label class="field budget-cat-field"><span class="field-label">${escapeHtml(row.emoji)} ${escapeHtml(t(row.label))}</span><input class="field-input" name="cat-${escapeHtml(row.id)}" inputmode="decimal" value="${escapeHtml(limits.has(row.id) ? String(limits.get(row.id)) : '')}"></label>`).join('');
+  return `<section class="panel settings-card" id="budget-card"><span class="stat-icon">🎯</span><h2>${escapeHtml(t('Προϋπολογισμός μήνα'))}</h2>
+    <p>${escapeHtml(t('Βάλε ένα συνολικό όριο και, αν θέλεις, όρια ανά κατηγορία. Μετράνε τα ίδια έξοδα με το «Σύνολο εξόδων μήνα».'))}</p>
+    ${report ? renderBudgetBars(report) : `<p class="subtle-empty">${escapeHtml(t('Βάλε προϋπολογισμό μήνα'))}</p>`}
+    <form id="budget-form" class="budget-form">
+      <label class="field"><span class="field-label">${escapeHtml(t('Συνολικό όριο μήνα (€)'))}</span><input class="field-input" name="total" inputmode="decimal" value="${escapeHtml(budget?.total != null ? String(budget.total) : '')}" placeholder="${escapeHtml(t('π.χ. 1.200'))}"></label>
+      <h3 class="settings-sub">${escapeHtml(t('Όρια ανά κατηγορία (προαιρετικά)'))}</h3>
+      <div class="budget-cat-fields">${fields}</div>
+      <div class="dialog-actions"><button class="button button-primary" type="submit">${escapeHtml(t('Αποθήκευση προϋπολογισμού'))}</button>
+      ${hasBudget(budget) ? `<button class="button button-quiet" type="button" data-action="budget-clear">${escapeHtml(t('Αφαίρεση ορίων'))}</button>` : ''}</div>
+    </form></section>`;
+}
+
+function saveBudgetForm(form) {
+  try {
+    const existing = activeBudget(state.budgets || []);
+    const categories = [...form.querySelectorAll('input[name^="cat-"]')].map((el) => ({ id: el.name.slice(4), amount: el.value }));
+    const rec = createBudget({ ...(existing || {}), id: 'month', total: form.elements.total.value, categories, createdAt: existing?.createdAt });
+    const rest = (state.budgets || []).filter((b) => b.id !== rec.id);
+    state.budgets = [...rest, rec];
+    if (persist()) { showToast(t('Ο προϋπολογισμός αποθηκεύτηκε.')); renderApp(); }
+  } catch (err) {
+    showToast(t(err.message || 'Σφάλμα'));
+  }
+}
+
 // Everything spent in a month: purchases + bills due + transport + small expenses (separate data, no overlap).
 function monthTotals(month) {
   const shopping = monthlySpending(state.purchases || [], month).total;
@@ -3216,7 +3313,7 @@ function renderInsights() {
   return `${renderHeader('Σύνολο εξόδων', 'Πόσα ξοδεύεις και τι πετιέται, ανά μήνα.')}
     <div class="settings-actions"><button class="button button-quiet" type="button" data-view="receipts" id="insights-receipts">🧾 ${escapeHtml(t('Αποδείξεις'))} (${(state.receipts || []).length})</button></div>
     <div class="month-switch" role="group" aria-label="Μήνας"><button class="icon-button" type="button" data-action="insights-month" data-delta="-1" aria-label="Προηγούμενος μήνας">‹</button><strong id="insights-month" data-no-i18n>${escapeHtml(monthLabel(insightsMonth))}</strong><button class="icon-button" type="button" data-action="insights-month" data-delta="1" aria-label="Επόμενος μήνας" ${isCurrent ? 'disabled' : ''}>›</button></div>
-    <div class="settings-grid insights-grid">${renderMonthTotals(spending)}${renderWhoPaid()}
+    <div class="settings-grid insights-grid">${renderMonthTotals(spending)}${renderBudgetCard()}${renderWhoPaid()}
     <section class="panel settings-card" id="spending-card"><span class="stat-icon blue">€</span><h2>${escapeHtml(t('Αγορές ανά είδος προϊόντος'))}</h2>
       <p class="big-number" id="spending-total">${escapeHtml(money(spending.total))}</p>
       <p class="field-hint">${escapeHtml(t('{count} αγορές με τιμή · προηγούμενος μήνας: {prev}', { count: spending.count, prev: money(previous.total) }))}</p>${renderOwnCatNote(spending)}
@@ -3595,7 +3692,11 @@ function handleAction(button) {
   else if (action === 'close-dialog') itemDialog.close();
   else if (action === 'edit-item') openItemDialog(id);
   else if (action === 'navigate') navigate(button.dataset.view);
-  else if (action === 'home-reset') { saveHome([...DEFAULT_HOME], true, true); const card = document.querySelector('#home-card'); if (card) { card.outerHTML = renderHomeCard(); translateDom(document.querySelector('#home-card')); } document.querySelector('#home-reset')?.focus(); showToast('Η αρχική επανήλθε.'); }
+  else if (action === 'budget-clear') {
+    state.budgets = (state.budgets || []).filter((b) => b.id !== 'month');
+    if (persist()) { showToast(t('Ο προϋπολογισμός αφαιρέθηκε.')); renderApp(); }
+  }
+  else if (action === 'home-reset') { saveHome([...DEFAULT_HOME], true, true, true); const card = document.querySelector('#home-card'); if (card) { card.outerHTML = renderHomeCard(); translateDom(document.querySelector('#home-card')); } document.querySelector('#home-reset')?.focus(); showToast('Η αρχική επανήλθε.'); }
   else if (action === 'bar-move' || action === 'bar-toggle' || action === 'bar-reset') {
     const ids = barIds();
     saveBar(action === 'bar-reset' ? [...DEFAULT_BAR] : action === 'bar-move' ? moveBar(ids, Number(button.dataset.index), Number(button.dataset.delta)) : toggleBar(ids, button.dataset.id));
@@ -3970,7 +4071,8 @@ document.addEventListener('input', (event) => {
 
 document.addEventListener('change', (event) => {
   if (event.target.dataset?.homeGuide) { saveHome(homeIds(), event.target.checked); showToast('Η αρχική ενημερώθηκε.'); return; }
-  if (event.target.dataset?.homeInsights) { saveHome(homeIds(), homeState().guide, event.target.checked); showToast('Η αρχική ενημερώθηκε.'); return; }
+  if (event.target.dataset?.homeInsights) { saveHome(homeIds(), homeState().guide, event.target.checked, homeState().budget); showToast('Η αρχική ενημερώθηκε.'); return; }
+  if (event.target.dataset?.homeBudget) { saveHome(homeIds(), homeState().guide, homeState().insights, event.target.checked); showToast('Η αρχική ενημερώθηκε.'); return; }
   if (event.target.id === 'receipt-export-month') {
     const b = periodBoundsForMonth(event.target.value);
     const form = event.target.form;
@@ -4071,6 +4173,7 @@ document.addEventListener('submit', (event) => {
   if (event.target.id === 'expcat-form' || event.target.id === 'expcat-edit-form') { event.preventDefault(); saveExpCatForm(event.target); return; }
   if (event.target.id === 'whopaid-form') { event.preventDefault(); openPanels.add('whopaid-settings'); saveWhoPaidForm(event.target); return; }
   if (event.target.id === 'bill-form') { event.preventDefault(); saveBillForm(event.target); return; }
+  if (event.target.id === 'budget-form') { event.preventDefault(); saveBudgetForm(event.target); return; }
   if (event.target.id === 'chore-form') { event.preventDefault(); saveChoreForm(event.target); return; }
   if (event.target.id === 'transport-form') { event.preventDefault(); saveTransportForm(event.target); return; }
   if (event.target.id === 'extras-form') { event.preventDefault(); saveExtrasForm(event.target); return; }
@@ -4332,6 +4435,7 @@ function runDailyChecks() {
   runAutoPay();
   runTransportRecurring();
   checkExpiryNotifications();
+  checkBudgetNotifications();
 }
 runDailyChecks();
 updateBackgroundCheck();
