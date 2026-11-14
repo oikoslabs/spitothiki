@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { SOURCES, SOURCE_KEY, SCAN_KEY, cleanUrl, initSource, isStatsOrigin, isPreviewOrigin, isStatsTest, setOwnerTestFlag, parseSource, sendEvent, sendScanEvent, reportScan, flushScans, sourceSignup, validEvent } from '../src/source.js';
+import { SOURCES, SOURCE_KEY, SCAN_KEY, cleanUrl, initSource, isStatsOrigin, isPreviewOrigin, isStatsTest, setOwnerTestFlag, applyOwnerTestStatus, receiptScanHost, parseSource, sendEvent, sendScanEvent, reportScan, flushScans, sourceSignup, validEvent } from '../src/source.js';
 
 const memory = (init = {}) => { const m = new Map(Object.entries(init)); return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), m }; };
 
@@ -36,8 +36,8 @@ test('source: first open sends one visit with only the word, then strips ?src', 
   const loc = { href: 'https://spitothiki.web.app/?src=tiktok#pantry', search: '?src=tiktok' };
   const hist = { state: null, replaceState: (_s, _t, url) => replaced.push(url) };
   const send = async (type, src) => { sent.push([type, src]); return true; };
-  await initSource({ storage, loc, hist, send });
-  await initSource({ storage, loc: { href: 'https://spitothiki.web.app/?src=facebook', search: '?src=facebook' }, hist, send });
+  await initSource({ waitTest: false,  storage, loc, hist, send });
+  await initSource({ waitTest: false,  storage, loc: { href: 'https://spitothiki.web.app/?src=facebook', search: '?src=facebook' }, hist, send });
   assert.deepEqual(sent, [['visit', 'tiktok']]);
   assert.deepEqual(replaced, ['/#pantry', '/']);
   assert.deepEqual(JSON.parse(storage.getItem(SOURCE_KEY)), { src: 'tiktok', visit: true });
@@ -49,11 +49,11 @@ test('source: offline -> retried on a later open; devices used before are "exist
   const storage = memory(); const sent = []; let up = false;
   const send = async (type, src) => { if (!up) return false; sent.push([type, src]); return true; };
   const loc = { href: 'https://spitothiki.web.app/', search: '' };
-  await initSource({ storage, loc, send });
-  up = true; await initSource({ storage, loc, send });
+  await initSource({ waitTest: false,  storage, loc, send });
+  up = true; await initSource({ waitTest: false,  storage, loc, send });
   assert.deepEqual(sent, [['visit', 'direct']]);
   const old = memory(); const sent2 = [];
-  await initSource({ storage: old, loc, hasData: true, send: async (...a) => { sent2.push(a); return true; } });
+  await initSource({ waitTest: false,  storage: old, loc, hasData: true, send: async (...a) => { sent2.push(a); return true; } });
   await sourceSignup({ storage: old, send: async (...a) => { sent2.push(a); return true; } });
   assert.deepEqual(sent2, [['signup', 'existing']]);
 });
@@ -106,7 +106,7 @@ test('v1.8.3 short links: /tiktok, /TikTok/, /TIKTOK count like ?src and the add
   assert.equal(cleanUrl('https://spitothiki.web.app/viber#bills'), '/#bills');
   assert.ok(!SHORT_PATH.test('/tiktok/x') && !SHORT_PATH.test('/index.html'));
   const storage = memory(); const sent = []; const replaced = [];
-  await initSource({ storage, loc: { href: 'https://spitothiki.web.app/TIKTOK', search: '', pathname: '/TIKTOK' }, hist: { replaceState: (_s, _t, u) => replaced.push(u) }, send: async (...a) => { sent.push(a); return true; } });
+  await initSource({ waitTest: false,  storage, loc: { href: 'https://spitothiki.web.app/TIKTOK', search: '', pathname: '/TIKTOK' }, hist: { replaceState: (_s, _t, u) => replaced.push(u) }, send: async (...a) => { sent.push(a); return true; } });
   assert.deepEqual(sent, [['visit', 'tiktok']]); assert.deepEqual(replaced, ['/']);
 });
 
@@ -148,4 +148,39 @@ test('sendScanEvent never throws and stays on live origins', async () => {
   assert.equal(await sendScanEvent({ type: 'supermarket', store: 'Lidl', success: true, via: 'direct' }, { fetchImpl, online: false, origin: 'https://spitothiki.web.app' }), false);
   assert.equal(await sendScanEvent({ type: 'supermarket', store: 'Lidl', success: true, via: 'direct' }, { fetchImpl, online: true, origin: 'http://localhost:8080' }), false);
   assert.equal(await sendScanEvent({ type: 'supermarket', store: 'Lidl', success: true, via: 'direct' }, { fetchImpl: async () => { throw new Error('net'); }, online: true, origin: 'https://spitothiki.web.app' }), false);
+});
+
+
+test('applyOwnerTestStatus keeps the flag unless the owner signs out; never puts email in the payload', async () => {
+  const memory = () => { const m = new Map(); return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k) }; };
+  const storage = memory();
+  const isOwner = async (email) => email === 'fixture-owner@example.test';
+  setOwnerTestFlag(false, { storage });
+  assert.equal(await applyOwnerTestStatus({ state: 'connecting', user: { email: 'fixture-owner@example.test' } }, isOwner, { storage }), true);
+  assert.equal(isStatsTest({ origin: 'https://spitothiki.web.app', storage }), true);
+  // A later status without email must not clear a confirmed owner flag.
+  assert.equal(await applyOwnerTestStatus({ state: 'error' }, isOwner, { storage }), true);
+  assert.equal(isStatsTest({ origin: 'https://spitothiki.web.app', storage }), true);
+  assert.equal(await applyOwnerTestStatus({ state: 'signed-out' }, isOwner, { storage }), false);
+  assert.equal(isStatsTest({ origin: 'https://spitothiki.web.app', storage }), false);
+});
+
+test('reportScan classifies the store from the receipt host; still never sends the URL', async () => {
+  assert.equal(receiptScanHost({ sourceUrl: 'https://epsilondigital-sklavenitis.epsilonnet.gr/fd/abc' }), 'epsilondigital-sklavenitis.epsilonnet.gr');
+  const calls = [];
+  const fetchImpl = async (_url, opts) => { calls.push(JSON.parse(opts.body)); return { ok: true }; };
+  setOwnerTestFlag(true);
+  try {
+    await reportScan(
+      { receipt: { sourceUrl: 'https://epsilondigital-sklavenitis.epsilonnet.gr/fd/abc' }, success: true, via: 'direct', proxied: false },
+      { sendScan: (e) => sendScanEvent(e, { fetchImpl, online: true, origin: 'https://spitothiki.web.app' }) }
+    );
+  } finally {
+    setOwnerTestFlag(false);
+  }
+  assert.equal(calls[0].store, 'Sklavenitis');
+  assert.equal(calls[0].type, 'supermarket');
+  assert.equal(calls[0].t, 1);
+  assert.equal(JSON.stringify(calls).includes('epsilonnet'), false);
+  assert.equal(JSON.stringify(calls).includes('http'), false);
 });

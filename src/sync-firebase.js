@@ -173,7 +173,8 @@ export async function createFirebaseSync({ config, getState, setState, onStatus,
   }
 
   auth.onAuthStateChanged(authApi, async (current) => {
-    user = current ? { uid: current.uid, email: current.email, name: current.displayName } : null;
+    const email = current?.email || current?.providerData?.map((p) => p.email).find(Boolean) || '';
+    user = current ? { uid: current.uid, email, name: current.displayName } : null;
     if (!current) {
       engine?.stop(); engine = null; householdId = ''; stopMembers?.(); stopMembers = null; members = [];
       stopUser?.(); stopUser = null; marketingOptIn = false; marketingCommitDone = false;

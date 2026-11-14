@@ -52,7 +52,7 @@ import { EXTRA_DEFAULT_EMOJI, EXTRA_SUGGESTIONS, LEGACY_EXTRA_CATEGORIES, create
 import { getLang, locale, setLang, t, translateDom, untranslatedGreek } from './i18n.js';
 import { daysUntil, escapeHtml, expiryLabel, formatDate, localDateKey, readKey, writeKey } from './format.js';
 import { THEME_KEY, applyTheme, currentTheme } from './theme.js';
-import { initSource, sourceSignup, reportScan, setOwnerTestFlag } from './source.js';
+import { initSource, sourceSignup, reportScan, applyOwnerTestStatus } from './source.js';
 import { isOwnerEmail } from './owner.js';
 import { TESTER_COLLAPSE_KEY, TWA_SESSION_KEY, isPlayApp, showTesterCard, TESTER_GROUP_URL, TESTER_PLAY_URL } from './tester-card.js';
 
@@ -437,9 +437,7 @@ function renderProtectSheet() {
 const SIGNIN_WATCH_KEY = 'spitothiki:signin-watch';
 // Tag later anonymous stats as test when the signed-in user is the owner. Never send or store the email.
 async function refreshOwnerTestFlag(status) {
-  try {
-    setOwnerTestFlag(Boolean(status?.user?.email) && await isOwnerEmail(status.user.email));
-  } catch { setOwnerTestFlag(false); }
+  await applyOwnerTestStatus(status, isOwnerEmail);
 }
 function noteSignin(status) {
   try {
@@ -4670,9 +4668,19 @@ maybeArmAutoBackup();
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
   // updateViaCache 'none' + update() on load/return: a new version reaches the phone without reinstalling.
   window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then((reg) => { reg.update().catch(() => {}); document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') reg.update().catch(() => {}); }); }).catch(() => {}));
-  // New worker took over: reload once so the new code runs, unless a dialog with unsaved work is open.
+  // New worker took over: reload once so the new code runs. If a dialog with unsaved work is open,
+  // wait until it closes — otherwise the phone keeps running the old script and stats stay untagged.
   let swReloaded = false; const hadController = Boolean(navigator.serviceWorker.controller);
-  navigator.serviceWorker.addEventListener('controllerchange', () => { if (!hadController || swReloaded || document.querySelector('dialog[open]')) return; swReloaded = true; location.reload(); });
+  const reloadWhenIdle = () => {
+    if (swReloaded) return;
+    if (document.querySelector('dialog[open]')) {
+      document.addEventListener('close', () => reloadWhenIdle(), { once: true, capture: true });
+      return;
+    }
+    swReloaded = true;
+    location.reload();
+  };
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (!hadController) return; reloadWhenIdle(); });
 }
 
 takeSharedFile();
