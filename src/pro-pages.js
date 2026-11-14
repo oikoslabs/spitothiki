@@ -234,22 +234,17 @@ export function proHomeBanners({ t, escapeHtml, state, today, nowTime }) {
 }
 
 function page(ctx, title, intro, body, action, actionLabel) {
-  const { renderHeader, t, escapeHtml, pro = true } = ctx;
-  const heading = `${t(title)} ${proBadge()}`;
-  const actions = actionLabel ? '' : '';
-  if (typeof renderHeader === 'function') {
-    // Header helper in app.js does not include the badge; prepend it in the title string (HTML is allowed in current renderHeader).
-    const extra = action && isPro() ? `<button class="button button-primary" type="button" data-action="${action}"><span aria-hidden="true">＋</span>${escapeHtml(t(actionLabel))}</button>` : '';
-    const head = renderHeader(heading, t(intro), '');
-    if (extra) return head.replace('</div></header>', `</div><div class="page-actions heading-actions">${extra}</div></header>`.replace('</div><div class="page-actions', '</div>'));
-    // Safer append: if heading-actions exists, leave as is; otherwise inject before close.
-    if (extra && !head.includes('heading-actions')) {
-      return head.replace('</header>', `<div class="page-actions heading-actions">${extra}</div></header>`) + body;
-    }
-    if (extra) return head.replace('</div></header>', `${extra}</div></header>`) + body;
-    return head + body;
+  const { renderHeader, t, escapeHtml } = ctx;
+  const heading = `${escapeHtml(t(title))} ${proBadge()}`;
+  let head = typeof renderHeader === 'function'
+    ? renderHeader(heading, t(intro), '')
+    : `<header class="page-heading"><h1>${heading}</h1><p>${escapeHtml(t(intro))}</p></header>`;
+  if (action && isPro()) {
+    const extra = `<button class="button button-primary" type="button" data-action="${action}"><span aria-hidden="true">＋</span>${escapeHtml(t(actionLabel))}</button>`;
+    if (head.includes('heading-actions')) head = head.replace('</div></header>', `${extra}</div></header>`);
+    else head = head.replace('</header>', `<div class="page-actions heading-actions">${extra}</div></header>`);
   }
-  return `<header class="page-heading"><h1>${heading}</h1><p>${escapeHtml(t(intro))}</p></header>${body}`;
+  return head + body;
 }
 
 export function handleProAction(action, ctx) {
