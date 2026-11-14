@@ -19,12 +19,13 @@ export const GUIDE_SECTIONS = [
   {
     id: 'whats-new',
     icon: '✨',
-    title: 'Τι νέο στην 1.9.30',
+    title: 'Τι νέο στην 1.9.33',
     numbered: false,
-    intro: 'Στο ημερολόγιο φαίνεται αν ένας λογαριασμός πληρώθηκε ή εκκρεμεί.',
+    intro: 'Στην αρχική εμφανίζεται ξανά κάρτα σύνδεσης, ώστε να μη χάσεις τα δεδομένα σου αν αλλάξεις κινητό.',
     bullets: [
-      'Στο ημερολόγιο, οι απλήρωτοι λογαριασμοί έχουν σήμα ⏳ και γίνονται κόκκινοι αν έχει περάσει η ημερομηνία. Οι πληρωμένοι μένουν στη λήξη τους με «✓ Πληρώθηκε» και την ημερομηνία πληρωμής. Πάτα έναν λογαριασμό για να τον ανοίξεις στα «Λογαριασμοί» και να τον σημάνεις πληρωμένο. Οι πάγιες εντολές δουλεύουν όπως πριν και μπορούν να δείχνουν ✓ αν πληρώθηκαν.',
-      'Ο μηνιαίος προϋπολογισμός και το ημερολόγιο νοικοκυριού (λήξεις, λογαριασμοί, δουλειές, γεγονότα, κάρτα «Σήμερα», αρχείο .ics για υπενθυμίσεις με κλειστή εφαρμογή) προστέθηκαν στην 1.9.29.'
+      'Αν δεν έχεις συνδεθεί, στην αρχική βλέπεις την κάρτα «Συνδέσου για να μη χάσεις τα δεδομένα σου», με «Σύνδεση με Google» και «Email / νέος λογαριασμός». Με σύνδεση, τα δεδομένα συγχρονίζονται σε κάθε κινητό ή υπολογιστή σου. Μπορείς να κρύψεις την κάρτα για 14 ημέρες.',
+      'Στις Ρυθμίσεις, η κάρτα συγχρονισμού είναι αμέσως μετά το Απόρρητο.',
+      'Στο ημερολόγιο φαίνεται αν ένας λογαριασμός πληρώθηκε ή εκκρεμεί (1.9.30): οι απλήρωτοι έχουν σήμα ⏳ και γίνονται κόκκινοι αν έχει περάσει η ημερομηνία, οι πληρωμένοι μένουν στη λήξη με «✓ Πληρώθηκε». Ο μηνιαίος προϋπολογισμός και το ημερολόγιο νοικοκυριού προστέθηκαν στην 1.9.29.'
     ]
   },
   {
@@ -366,6 +367,11 @@ export const GUIDE_EN = {
   'Πρόσθεσε γεγονός με τίτλο, ημερομηνία, προαιρετικά ώρα, ποιος το αφορά και σημειώσεις. Μπορεί να επαναλαμβάνεται κάθε εβδομάδα, μήνα ή χρόνο.': 'Add an event with a title, a date, optional time, who it concerns and notes. It can repeat weekly, monthly or yearly.',
   'Η κάρτα «Σήμερα» στην αρχική δείχνει ό,τι πέφτει σήμερα και κρύβεται από Ρυθμίσεις → Αρχική οθόνη.': 'The «Today» card on the home screen shows whatever falls today and is hidden from Settings → Home screen.',
   '«Πρόσθεσε στο ημερολόγιο του κινητού» κατεβάζει αρχείο .ics ώστε να χτυπήσουν υπενθυμίσεις και με κλειστή εφαρμογή. Μέσα στην εφαρμογή, υπενθύμιση εμφανίζεται μόνο όσο είναι ανοιχτή (όχι push).': '«Add to the phone calendar» downloads an .ics file so reminders can ring with the app closed. In the app, a reminder appears only while it is open (no push).',
+  'Τι νέο στην 1.9.33': 'What’s new in 1.9.33',
+  'Στην αρχική εμφανίζεται ξανά κάρτα σύνδεσης, ώστε να μη χάσεις τα δεδομένα σου αν αλλάξεις κινητό.': 'The home screen shows a sign-in card again, so you don’t lose your data if you change phones.',
+  'Αν δεν έχεις συνδεθεί, στην αρχική βλέπεις την κάρτα «Συνδέσου για να μη χάσεις τα δεδομένα σου», με «Σύνδεση με Google» και «Email / νέος λογαριασμός». Με σύνδεση, τα δεδομένα συγχρονίζονται σε κάθε κινητό ή υπολογιστή σου. Μπορείς να κρύψεις την κάρτα για 14 ημέρες.': 'When you are signed out, the home screen shows the «Sign in so you never lose your data» card, with «Sign in with Google» and «Email / new account». Once signed in, your data syncs to every phone or computer you use. You can hide the card for 14 days.',
+  'Στις Ρυθμίσεις, η κάρτα συγχρονισμού είναι αμέσως μετά το Απόρρητο.': 'In Settings, the sync card is now right under Privacy.',
+  'Στο ημερολόγιο φαίνεται αν ένας λογαριασμός πληρώθηκε ή εκκρεμεί (1.9.30): οι απλήρωτοι έχουν σήμα ⏳ και γίνονται κόκκινοι αν έχει περάσει η ημερομηνία, οι πληρωμένοι μένουν στη λήξη με «✓ Πληρώθηκε». Ο μηνιαίος προϋπολογισμός και το ημερολόγιο νοικοκυριού προστέθηκαν στην 1.9.29.': 'The calendar shows whether a bill was paid or is still outstanding (1.9.30): unpaid bills have a ⏳ marker and turn red if the due date has passed; paid bills stay on the due date with «✓ Paid». The monthly budget and the household calendar were added in 1.9.29.',
   'Τι νέο στην 1.9.30': 'What’s new in 1.9.30',
   'Στο ημερολόγιο φαίνεται αν ένας λογαριασμός πληρώθηκε ή εκκρεμεί.': 'The calendar shows whether a bill was paid or is still outstanding.',
   'Στο ημερολόγιο, οι απλήρωτοι λογαριασμοί έχουν σήμα ⏳ και γίνονται κόκκινοι αν έχει περάσει η ημερομηνία. Οι πληρωμένοι μένουν στη λήξη τους με «✓ Πληρώθηκε» και την ημερομηνία πληρωμής. Πάτα έναν λογαριασμό για να τον ανοίξεις στα «Λογαριασμοί» και να τον σημάνεις πληρωμένο. Οι πάγιες εντολές δουλεύουν όπως πριν και μπορούν να δείχνουν ✓ αν πληρώθηκαν.': 'On the calendar, unpaid bills have a ⏳ marker and turn red if the due date has passed. Paid bills stay on their due date with «✓ Paid» and the payment date. Tap a bill to open it in «Bills» and mark it paid. Standing orders work as before and can show ✓ if they were paid.',
