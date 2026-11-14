@@ -13,19 +13,19 @@ export const GUIDE_SECTIONS = [
       'Πάτα «Σάρωση» και σκάναρε το QR μιας απόδειξης. Τα έξοδα γράφονται μόνα τους· αν θέλεις, τα προϊόντα μπαίνουν και στο απόθεμα.',
       'Στην αρχική οθόνη δες τα έξοδα του μήνα, τον προϋπολογισμό, την κάρτα «Σήμερα» του ημερολογίου, τι άλλαξε σε σχέση με τον προηγούμενο μήνα, και τι λήγει στις επόμενες 7 ημέρες.',
       'Γράψε στη λίστα αγορών ό,τι χρειάζεται το σπίτι, πριν βγεις για ψώνια.',
-      'Η σύνδεση είναι προαιρετική. Χρειάζεται μόνο αν θέλεις τα ίδια δεδομένα σε άλλο κινητό ή να τα βλέπει η οικογένεια.'
+      'Η σύνδεση είναι προαιρετική και δωρεάν, χωρίς κάρτα. Κρατά τα δεδομένα σου αν αλλάξεις ή χάσεις κινητό, και μοιράζεσαι λίστα, λογαριασμούς και ημερολόγιο με το σπίτι.'
     ]
   },
   {
     id: 'whats-new',
     icon: '✨',
-    title: 'Τι νέο στην 1.9.34',
+    title: 'Τι νέο στην 1.9.35',
     numbered: false,
-    intro: 'Πάτα μια ημέρα στο ημερολόγιο για να δεις όλα όσα πέφτουν εκεί, σε ένα φύλλο.',
+    intro: 'Η σύνδεση εξηγείται καλύτερα στην αρχική, και εμφανίζεται μια ήπια υπενθύμιση τη στιγμή που ωφελεί.',
     bullets: [
-      'Στην προβολή μήνα, πάτα μια ημέρα και ανοίγει φύλλο με λήξεις, λογαριασμούς (⏳ ή ✓), πάγιες εντολές, δουλειές και γεγονότα. Από εκεί ανοίγεις το στοιχείο ή πατάς «➕ Πρόσθεσε γεγονός» με την ημερομηνία συμπληρωμένη. Κλείνεις με το ×, σύροντας προς τα κάτω, πατώντας έξω ή με Esc.',
-      'Κάτω από κάθε ημέρα φαίνονται μέχρι τρεις χρωματιστές τελείες: κόκκινο για απλήρωτο λογαριασμό, πορτοκαλί για λήξη, μπλε για γεγονός, και ουδέτερο χρώμα για τα υπόλοιπα (δουλειές, πάγιες εντολές).',
-      'Στην αρχική προστέθηκε κάρτα σύνδεσης στην 1.9.33. Στο ημερολόγιο φαίνεται αν ένας λογαριασμός πληρώθηκε ή εκκρεμεί από την 1.9.30. Ο μηνιαίος προϋπολογισμός και το ημερολόγιο νοικοκυριού προστέθηκαν στην 1.9.29.'
+      'Στην κάρτα σύνδεσης της αρχικής φαίνονται τρία σύντομα οφέλη: τα δεδομένα μένουν ασφαλή αν αλλάξεις ή χάσεις κινητό, μοιράζεσαι λίστα, λογαριασμούς και ημερολόγιο με το σπίτι, και είναι δωρεάν χωρίς κάρτα.',
+      'Αν δεν έχεις συνδεθεί, μπορεί να εμφανιστεί μία φορά (μόνο σε αυτή τη συσκευή) μια μικρή ερώτηση μετά την 3η αποθηκευμένη απόδειξη, όταν πατάς «Κοινοποίηση» ή «Πρόσκληση μέλους», ή όταν έχεις ήδη 10 ή περισσότερες καταχωρήσεις. Επιλέγεις «Σύνδεση» ή «Όχι τώρα». Δεν στέλνεται τίποτα και δεν επαναλαμβάνεται.',
+      'Στην προβολή μήνα, πάτα μια ημέρα για το φύλλο της ημέρας (1.9.34). Στην αρχική προστέθηκε κάρτα σύνδεσης στην 1.9.33. Στο ημερολόγιο φαίνεται αν ένας λογαριασμός πληρώθηκε ή εκκρεμεί από την 1.9.30. Ο μηνιαίος προϋπολογισμός και το ημερολόγιο νοικοκυριού προστέθηκαν στην 1.9.29.'
     ]
   },
   {
@@ -285,7 +285,7 @@ export const GUIDE_EN = {
   'Πάτα «Σάρωση» και σκάναρε το QR μιας απόδειξης. Τα έξοδα γράφονται μόνα τους· αν θέλεις, τα προϊόντα μπαίνουν και στο απόθεμα.': 'Tap «Scan» and scan the QR code on a receipt. Spending is recorded by itself; if you want, the products go into the pantry too.',
   'Στην αρχική οθόνη δες τα έξοδα του μήνα, τον προϋπολογισμό, την κάρτα «Σήμερα» του ημερολογίου, τι άλλαξε σε σχέση με τον προηγούμενο μήνα, και τι λήγει στις επόμενες 7 ημέρες.': 'On the home screen, see this month’s expenses, the budget, the calendar «Today» card, what changed compared with last month, and what expires in the next 7 days.',
   'Γράψε στη λίστα αγορών ό,τι χρειάζεται το σπίτι, πριν βγεις για ψώνια.': 'Write on the shopping list what the house needs, before you go out shopping.',
-  'Η σύνδεση είναι προαιρετική. Χρειάζεται μόνο αν θέλεις τα ίδια δεδομένα σε άλλο κινητό ή να τα βλέπει η οικογένεια.': 'Signing in is optional. You only need it if you want the same data on another phone, or for the family to see it.',
+  'Η σύνδεση είναι προαιρετική και δωρεάν, χωρίς κάρτα. Κρατά τα δεδομένα σου αν αλλάξεις ή χάσεις κινητό, και μοιράζεσαι λίστα, λογαριασμούς και ημερολόγιο με το σπίτι.': 'Signing in is optional and free, with no card. It keeps your data safe if you change or lose your phone, and lets you share the list, bills and calendar with the household.',
   'Αποθήκη (τι έχεις στο σπίτι)': 'Pantry (what you have at home)',
   'Όσα έχεις στο σπίτι, με ποσότητα και λήξη, σε ένα σημείο.': 'Everything you have at home, with quantity and expiry, in one place.',
   'Πάτα «Προσθήκη προϊόντος» και γράψε όνομα, ποσότητα και, αν θέλεις, πού βρίσκεται. Μπορείς να σκανάρεις το barcode για να συμπληρωθεί το όνομα.': 'Tap «Add product» and type a name, quantity and, if you want, where it is. You can scan the barcode to fill in the name.',
@@ -367,7 +367,13 @@ export const GUIDE_EN = {
   'Πρόσθεσε γεγονός με τίτλο, ημερομηνία, προαιρετικά ώρα, ποιος το αφορά και σημειώσεις. Μπορεί να επαναλαμβάνεται κάθε εβδομάδα, μήνα ή χρόνο.': 'Add an event with a title, a date, optional time, who it concerns and notes. It can repeat weekly, monthly or yearly.',
   'Η κάρτα «Σήμερα» στην αρχική δείχνει ό,τι πέφτει σήμερα και κρύβεται από Ρυθμίσεις → Αρχική οθόνη.': 'The «Today» card on the home screen shows whatever falls today and is hidden from Settings → Home screen.',
   '«Πρόσθεσε στο ημερολόγιο του κινητού» κατεβάζει αρχείο .ics ώστε να χτυπήσουν υπενθυμίσεις και με κλειστή εφαρμογή. Μέσα στην εφαρμογή, υπενθύμιση εμφανίζεται μόνο όσο είναι ανοιχτή (όχι push).': '«Add to the phone calendar» downloads an .ics file so reminders can ring with the app closed. In the app, a reminder appears only while it is open (no push).',
+  'Τι νέο στην 1.9.35': 'What’s new in 1.9.35',
+  'Η σύνδεση εξηγείται καλύτερα στην αρχική, και εμφανίζεται μια ήπια υπενθύμιση τη στιγμή που ωφελεί.': 'Signing in is explained more clearly on the home screen, and a gentle reminder appears at the moment it helps.',
+  'Στην κάρτα σύνδεσης της αρχικής φαίνονται τρία σύντομα οφέλη: τα δεδομένα μένουν ασφαλή αν αλλάξεις ή χάσεις κινητό, μοιράζεσαι λίστα, λογαριασμούς και ημερολόγιο με το σπίτι, και είναι δωρεάν χωρίς κάρτα.': 'The home sign-in card now shows three short benefits: your data stays safe if you change or lose your phone, you can share the list, bills and calendar with the household, and it is free with no card.',
+  'Αν δεν έχεις συνδεθεί, μπορεί να εμφανιστεί μία φορά (μόνο σε αυτή τη συσκευή) μια μικρή ερώτηση μετά την 3η αποθηκευμένη απόδειξη, όταν πατάς «Κοινοποίηση» ή «Πρόσκληση μέλους», ή όταν έχεις ήδη 10 ή περισσότερες καταχωρήσεις. Επιλέγεις «Σύνδεση» ή «Όχι τώρα». Δεν στέλνεται τίποτα και δεν επαναλαμβάνεται.': 'If you are signed out, a small question may appear once (only on this device) after the 3rd saved receipt, when you tap «Share» or «Invite a member», or when you already have 10 or more entries. You choose «Sign in» or «Not now». Nothing is sent and it is not shown again.',
+  'Στην προβολή μήνα, πάτα μια ημέρα για το φύλλο της ημέρας (1.9.34). Στην αρχική προστέθηκε κάρτα σύνδεσης στην 1.9.33. Στο ημερολόγιο φαίνεται αν ένας λογαριασμός πληρώθηκε ή εκκρεμεί από την 1.9.30. Ο μηνιαίος προϋπολογισμός και το ημερολόγιο νοικοκυριού προστέθηκαν στην 1.9.29.': 'In the month view, tap a day for that day’s sheet (1.9.34). A sign-in card was added on the home screen in 1.9.33. The calendar has shown whether a bill was paid or is still outstanding since 1.9.30. The monthly budget and the household calendar were added in 1.9.29.',
   'Τι νέο στην 1.9.34': 'What’s new in 1.9.34',
+
   'Πάτα μια ημέρα στο ημερολόγιο για να δεις όλα όσα πέφτουν εκεί, σε ένα φύλλο.': 'Tap a day on the calendar to see everything that falls on it, in a sheet.',
   'Στην προβολή μήνα, πάτα μια ημέρα και ανοίγει φύλλο με λήξεις, λογαριασμούς (⏳ ή ✓), πάγιες εντολές, δουλειές και γεγονότα. Από εκεί ανοίγεις το στοιχείο ή πατάς «➕ Πρόσθεσε γεγονός» με την ημερομηνία συμπληρωμένη. Κλείνεις με το ×, σύροντας προς τα κάτω, πατώντας έξω ή με Esc.': 'In the month view, tap a day and a sheet opens with expiries, bills (⏳ or ✓), standing orders, chores and events. From there you open the item or tap «➕ Add an event» with the date already filled in. Close with ×, by swiping down, by tapping outside or with Esc.',
   'Κάτω από κάθε ημέρα φαίνονται μέχρι τρεις χρωματιστές τελείες: κόκκινο για απλήρωτο λογαριασμό, πορτοκαλί για λήξη, μπλε για γεγονός, και ουδέτερο χρώμα για τα υπόλοιπα (δουλειές, πάγιες εντολές).': 'Under each day you see up to three colored dots: red for an unpaid bill, orange for an expiry, blue for an event, and a neutral color for everything else (chores, standing orders).',

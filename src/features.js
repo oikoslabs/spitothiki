@@ -201,3 +201,45 @@ export function showSigninCard(status = {}, dismissedAt = 0, now = Date.now(), d
   const at = Number(dismissedAt) || 0;
   return !(at && now >= at && now - at < days * 86_400_000);
 }
+
+// Contextual sign-in prompts for signed-out users. Each kind is shown at most once
+// (a localStorage flag only — no personal data, no network).
+export const SIGNIN_PROMPT_KEYS = {
+  scans: 'spitothiki:signin-prompt-scans',
+  share: 'spitothiki:signin-prompt-share',
+  entries: 'spitothiki:signin-prompt-entries'
+};
+export const SIGNIN_PROMPT_SCANS = 3;
+export const SIGNIN_PROMPT_ENTRIES = 10;
+export const SIGNIN_PROMPT_ENTRY_KEYS = ['items', 'shopping', 'bills', 'purchases', 'transport', 'extras', 'receipts', 'meals', 'trips', 'dietPlans', 'chores', 'events'];
+
+export function isSignedOutForPrompt(status = {}) {
+  const signedOut = status.state === 'signed-out' || (status.state === 'error' && !status.user);
+  return Boolean(signedOut && !status.user);
+}
+
+export function promptSeen(key, storage) {
+  try { return Boolean((storage || globalThis.localStorage)?.getItem(key)); } catch { return true; }
+}
+
+export function markPromptSeen(key, storage) {
+  try { (storage || globalThis.localStorage)?.setItem(key, '1'); } catch {}
+}
+
+export function countEntries(state = {}) {
+  return SIGNIN_PROMPT_ENTRY_KEYS.reduce((n, k) => {
+    const list = state[k];
+    if (!Array.isArray(list)) return n;
+    if (k === 'items') return n + list.filter((item) => !item?.demo).length;
+    return n + list.length;
+  }, 0);
+}
+
+export function shouldShowSigninPrompt({ kind, status, seen, scanCount = 0, entryCount = 0 } = {}) {
+  if (!isSignedOutForPrompt(status) || seen) return false;
+  if (kind === 'scans') return Number(scanCount) >= SIGNIN_PROMPT_SCANS;
+  if (kind === 'entries') return Number(entryCount) >= SIGNIN_PROMPT_ENTRIES;
+  if (kind === 'share') return true;
+  return false;
+}
+

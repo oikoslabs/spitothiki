@@ -6,7 +6,7 @@ import { loadState, parseBackup, saveState } from './storage.js';
 import { classifyReceiptUrl, fetchReceipt, findRelatedReceipt, receiptId } from './receipt.js';
 import { ingredientName, isNewRecipe, pantryIngredients, recipeCat, scoreRecipe, suggestBuiltin } from './recipes.js';
 import { WASTE_REASONS, addDays, applyWaste, createStore, createWaste, groupByStore, monthKey, rowCategory, monthlySpending, moveCategory, purchaseFor, shiftMonth, storeOrder, wasteStats } from './features.js';
-import { showSigninCard } from './features.js';
+import { showSigninCard, shouldShowSigninPrompt, promptSeen, markPromptSeen, countEntries, isSignedOutForPrompt, SIGNIN_PROMPT_KEYS } from './features.js';
 import { routeCode, parseStoreReceiptBarcode } from './scan-router.js';
 import { deleteReceipt, isStaleReceipt, listReceipts, receiptCategory, receiptItems, receiptMonths } from './receipts.js';
 import { PROTECT_SEEN_KEY, PROTECT_SNOOZE_KEY, authKnown, showProtectCard, showProtectSheet, snoozeUntilFrom, storageMode } from './protect.js';
@@ -146,6 +146,8 @@ function runAutoList() {
 }
 
 let demoLoading = false;
+let signinPromptBusy = false;
+let skipEntriesSigninPrompt = false;
 function persist() {
   setProductTypes(state.productTypes);
   try {
@@ -157,6 +159,7 @@ function persist() {
     scheduleBackgroundSnapshot();
     requestPersistentStorage();
     if (!demoLoading) setTimeout(maybeProtectSheet, 600); // v1.9.0: asked only once something is saved
+    if (!demoLoading && !skipEntriesSigninPrompt) offerSigninPrompt('entries', { delay: 1200 });
     setTimeout(checkBudgetNotifications, 0);
     setTimeout(checkCalendarNotifications, 0);
     return true;
@@ -366,7 +369,11 @@ function renderSigninCard() {
     <header class="signin-head"><span class="signin-icon" aria-hidden="true">☁️</span>
     <h2 id="home-signin-title">${escapeHtml(t('Συνδέσου για να μη χάσεις τα δεδομένα σου'))}</h2>
     <button class="icon-button signin-close" type="button" data-action="home-signin-dismiss" aria-label="${escapeHtml(t('Απόκρυψη για 14 ημέρες'))}" title="${escapeHtml(t('Απόκρυψη για 14 ημέρες'))}">×</button></header>
-    <p class="signin-body">${escapeHtml(t('Με σύνδεση, όλα συγχρονίζονται σε κάθε κινητό ή υπολογιστή σου.'))}</p>
+    <ul class="signin-benefits">
+      <li>${escapeHtml(t('Μένουν ασφαλή αν αλλάξεις ή χάσεις κινητό.'))}</li>
+      <li>${escapeHtml(t('Μοιράζεσαι λίστα, λογαριασμούς και ημερολόγιο με το σπίτι.'))}</li>
+      <li>${escapeHtml(t('Δωρεάν, χωρίς κάρτα.'))}</li>
+    </ul>
     <div class="signin-actions">${google}${email}</div></section>`;
 }
 // v1.4: small, dismissible «make a backup» nudge (only when not signed in and >30 days / never).
@@ -989,7 +996,8 @@ function renderSyncCard() {
       ${(authProviders.includes('google') || authProviders.includes('password')) ? `<label class="check-row" for="marketing-optin"><input type="checkbox" id="marketing-optin" name="marketingOptIn" ${(authProviders.includes('password') ? 'form="sync-email-form" ' : '')}><span>${escapeHtml(t(MARKETING_LABEL))}</span></label><p class="field-hint">${escapeHtml(t(MARKETING_HINT))}</p>` : ''}
       ${authProviders.includes('google') ? '<div class="settings-actions"><button class="button button-primary" type="button" data-action="sync-google">Σύνδεση με Google</button></div>' : ''}
       ${authProviders.includes('password') ? `<form id="sync-email-form" class="sync-email-form" novalidate><input class="field-input" name="email" type="email" autocomplete="email" placeholder="Email" aria-label="Email" required><input class="field-input" name="password" type="password" autocomplete="current-password" placeholder="Κωδικός" aria-label="Κωδικός" minlength="6" required>
-        <div class="settings-actions"><button class="button button-quiet" type="submit" name="mode" value="signin">Σύνδεση</button><button class="button button-quiet" type="submit" name="mode" value="signup">Νέος λογαριασμός</button><button class="text-button" type="submit" name="mode" value="reset">Ξέχασα τον κωδικό</button></div></form>` : ''}</section>`;
+        <div class="settings-actions"><button class="button button-quiet" type="submit" name="mode" value="signin">Σύνδεση</button><button class="button button-quiet" type="submit" name="mode" value="signup">Νέος λογαριασμός</button><button class="text-button" type="submit" name="mode" value="reset">Ξέχασα τον κωδικό</button></div></form>` : ''}
+      <div class="settings-actions"><button class="button button-quiet" type="button" data-action="sync-invite" id="sync-invite-signed-out">＋ Πρόσκληση μέλους</button></div></section>`;
   }
   const who = status.user?.email || status.user?.name || 'Συνδεδεμένος';
   const shared = status.householdId && status.user && status.householdId !== status.user.uid;
@@ -1134,8 +1142,10 @@ async function openScanner({ onCode = fillFromBarcode, qr = false, confident = n
 // ---------- «Σκάναρε οτιδήποτε» ----------
 function openUniversalScan() { openScanner({ qr: 'all', onCode: handleScanned, confident: (v) => routeCode(v).route !== 'unknown' }); }
 
-function showChoice({ title, message = '', raw = '', choices }) {
+function showChoice({ title, message = '', raw = '', eyebrow, choices }) {
   const dialog = document.querySelector('#choice-dialog');
+  const eye = dialog?.querySelector('.eyebrow');
+  if (eye) eye.textContent = t(eyebrow || 'ΣΑΡΩΣΗ');
   document.querySelector('#choice-title').textContent = t(title);
   document.querySelector('#choice-message').textContent = message;
   const pre = document.querySelector('#choice-raw'); pre.hidden = !raw; pre.textContent = raw;
@@ -1145,6 +1155,50 @@ function showChoice({ title, message = '', raw = '', choices }) {
   dialog.querySelector('[data-action="choice"]')?.focus();
 }
 let choiceHandlers = [];
+
+// v1.9.35: once-each, local-only sign-in prompts. Cheap checks; dialog after paint to keep INP/CLS low.
+const SIGNIN_PROMPT_COPY = {
+  scans: { title: 'Συνδέσου να μη χάσεις τις αποδείξεις σου', message: 'Έχεις ήδη 3 αποδείξεις σε αυτό το κινητό. Με σύνδεση μένουν ασφαλείς αν το αλλάξεις, και τις βλέπει όλο το σπίτι.' },
+  share: { title: 'Συνδέσου για να μοιραστείς τη λίστα με το σπίτι', message: 'Με σύνδεση, η λίστα, οι λογαριασμοί και το ημερολόγιο φαίνονται σε όλα τα κινητά του σπιτιού. Μπορείς και τώρα να στείλεις το κείμενο της λίστας.' },
+  member: { title: 'Συνδέσου για να προσθέσεις μέλος στο σπίτι', message: 'Η πρόσκληση μέλους χρειάζεται λογαριασμό. Είναι δωρεάν, χωρίς κάρτα.' },
+  entries: { title: 'Συνδέσου να μη χάσεις όσα έγραψες', message: 'Έχεις ήδη αρκετά σε αυτό το κινητό. Με σύνδεση μένουν ασφαλή αν το αλλάξεις ή το χάσεις, και τα μοιράζεσαι με το σπίτι.' }
+};
+function offerSigninPrompt(kind, { onLater, delay = 0, retries = 5 } = {}) {
+  const storageKind = kind === 'member' ? 'share' : kind;
+  const key = SIGNIN_PROMPT_KEYS[storageKind];
+  if (!key || signinPromptBusy) return false;
+  if (typeof navigator !== 'undefined' && navigator.webdriver && !globalThis.__spitoSigninPrompt) return false;
+  const seen = promptSeen(key);
+  if (!shouldShowSigninPrompt({ kind: storageKind, status: syncStatus, seen, scanCount: (state.receipts || []).length, entryCount: countEntries(state) })) return false;
+  signinPromptBusy = true;
+  const show = (left) => {
+    if (document.querySelector('dialog[open]')) {
+      if (left > 0) { setTimeout(() => show(left - 1), 2000); return; }
+      signinPromptBusy = false;
+      onLater?.();
+      return;
+    }
+    if (!shouldShowSigninPrompt({ kind: storageKind, status: syncStatus, seen: promptSeen(key), scanCount: (state.receipts || []).length, entryCount: countEntries(state) })) {
+      signinPromptBusy = false;
+      return;
+    }
+    const copy = SIGNIN_PROMPT_COPY[kind] || SIGNIN_PROMPT_COPY[storageKind];
+    markPromptSeen(key);
+    showChoice({
+      eyebrow: 'ΣΥΝΔΕΣΗ',
+      title: copy.title,
+      message: t(copy.message),
+      choices: [
+        { label: 'Σύνδεση', primary: true, run: () => { signinPromptBusy = false; goToSignin(); } },
+        { label: 'Όχι τώρα', run: () => { signinPromptBusy = false; onLater?.(); } }
+      ]
+    });
+  };
+  const start = () => { afterPaint(() => show(retries)); };
+  if (delay) setTimeout(start, delay);
+  else start();
+  return true;
+}
 
 async function addBarcodeToList(code) {
   const info = codeInfo(code);
@@ -1940,12 +1994,17 @@ function importReceipt(form) {
   if (replace) Object.assign(state, deleteReceipt(state, replace));
   const refs = { ...(receipt.mark ? { mark: receipt.mark } : {}), ...(receipt.series ? { series: receipt.series } : {}), ...(receipt.number ? { number: receipt.number } : {}), ...(receipt.invoiceType ? { invoiceType: receipt.invoiceType } : {}) };
   state.receipts = [...(state.receipts || []).filter((r) => r.id !== id), { id, date, total: receipt.total, store: storeName, issuerVat: receipt.issuerVat || '', format: receipt.format, ...refs, lines: receipt.lines.length, items: receipt.lines.slice(0, 80).map((l) => ({ name: l.name, quantity: l.quantity, unit: l.unit, price: l.price })), ...(receipt.sourceUrl ? { url: receipt.sourceUrl } : {}), importedAt: now }];
-  if (!persist()) return;
+  skipEntriesSigninPrompt = true;
+  const saved = persist();
+  skipEntriesSigninPrompt = false;
+  if (!saved) return;
   document.querySelector('#receipt-dialog').close();
   renderApp();
   showToast(t('Απόδειξη: {added} νέα, {merged} ενημερώθηκαν, έξοδα {spent}.', { added, merged, spent: money(Math.round(spent * 100) / 100) }));
   // v1.9.14: also existing users: ask once after any saved receipt (not just the first).
   setTimeout(offerScanReminder, 1800);
+  // v1.9.35: after the 3rd successful scan, a one-time sign-in prompt (after the scan reminder if that is still pending).
+  offerSigninPrompt('scans', { delay: 2400 });
 }
 
 // v1.9.13: after the first scanned receipt, ask once whether to turn on the scan reminder (same path as the Settings checkbox).
@@ -4178,11 +4237,17 @@ function handleAction(button) {
     persist(); renderApp(); showToast('Το προϊόν αφαιρέθηκε από τη λίστα.');
   } else if (action === 'sync-google') syncAction(() => sync.signInWithGoogle({ marketingOptIn: readMarketingCheckbox() }));
   else if (action === 'sync-signout') syncAction(() => sync.signOut(), 'Αποσυνδέθηκες. Τα δεδομένα μένουν σε αυτή τη συσκευή.');
-  else if (action === 'sync-invite') syncAction(async () => {
+  else if (action === 'sync-invite') {
+    if (isSignedOutForPrompt(syncStatus)) {
+      if (!offerSigninPrompt('member', { onLater: () => {} })) goToSignin();
+      return;
+    }
+    syncAction(async () => {
     const code = await sync.createInvite();
     try { await navigator.clipboard.writeText(code); } catch {}
     showConfirm(t('Ο κωδικός αντιγράφηκε. Δώσ’ τον στον άλλον άνθρωπο: θα τον γράψει στο «Μπες στο σπίτι» στο δικό του κινητό. Κωδικός: {code}', { code }), null, 'Κωδικός πρόσκλησης');
   });
+  }
   else if (action === 'sync-leave') showConfirm('Θα επιστρέψεις στο δικό σου νοικοκυριό. Τα κοινά προϊόντα θα μείνουν στο κοινό νοικοκυριό.', () => syncAction(() => sync.leaveHousehold(), 'Αποχώρησες από το νοικοκυριό.'), 'Αποχώρηση;');
   else if (action === 'scan-barcode') openScanner();
   else if (action === 'scan-torch') {
@@ -4224,7 +4289,7 @@ function handleAction(button) {
   else if (action === 'guide-jump') jumpGuideSection(button.dataset.section || '');
   else if (action === 'bill-preset') openBillPreset(button.dataset.id);
   else if (action === 'choice') { const run = choiceHandlers[Number(button.dataset.index)]; document.querySelector('#choice-dialog').close(); run?.(); }
-  else if (action === 'close-choice') document.querySelector('#choice-dialog').close();
+  else if (action === 'close-choice') { document.querySelector('#choice-dialog').close(); signinPromptBusy = false; }
   else if (action === 'set-text-size') { const size = setTextSize(button.dataset.size); renderApp(); document.querySelector(`[data-action="set-text-size"][data-size="${size}"]`)?.focus(); showToast(t('Το μέγεθος γραμμάτων άλλαξε.')); }
   else if (action === 'set-store') { try { if (button.dataset.store) localStorage.setItem(STORE_KEY, button.dataset.store); else localStorage.removeItem(STORE_KEY); } catch {} renderApp(); }
   else if (action === 'vm-switch') {
@@ -4277,7 +4342,10 @@ function handleAction(button) {
   else if (action === 'remove-recurring') { state.recurring = (state.recurring || []).filter((rule) => rule.id !== id); persist(); renderApp(); showToast('Το επαναλαμβανόμενο αφαιρέθηκε.'); }
   else if (action === 'set-lang') changeLanguage(button.dataset.lang);
   else if (action === 'toggle-lang') changeLanguage(getLang() === 'en' ? 'el' : 'en');
-  else if (action === 'share-shopping') shareShoppingList();
+  else if (action === 'share-shopping') {
+    if (offerSigninPrompt('share', { onLater: () => shareShoppingList() })) return;
+    shareShoppingList();
+  }
   else if (action === 'compare-list') openCompare();
   else if (action === 'compare-one') openCompare(button.dataset.name);
   else if (action === 'close-compare') document.querySelector('#compare-dialog').close();
