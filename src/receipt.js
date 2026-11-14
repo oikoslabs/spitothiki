@@ -3,6 +3,7 @@
 import { normalizeSearch } from './domain.js';
 import { matchIngredient } from './recipes.js';
 import { allowedHost } from './receipt-domains.js';
+import { isStatsTest } from './source.js';
 
 // ---------- Minimal namespace-agnostic XML tree ----------
 // Node: { name (local name), children: Node[], text }. Uses DOMParser in the browser, a tiny parser elsewhere (tests).
@@ -237,7 +238,7 @@ export function receiptFailure(error) {
   return 'unsupported';
 }
 
-async function getText(url, { fetchImpl, proxy, known = true, used }) {
+async function getText(url, { fetchImpl, proxy, known = true, used, origin }) {
   const attempt = async (target) => {
     let res;
     const signal = typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(FETCH_TIMEOUT_MS) : undefined;
@@ -252,11 +253,12 @@ async function getText(url, { fetchImpl, proxy, known = true, used }) {
     // Only for known providers: the proxy refuses every other domain anyway.
     if (!proxy || error.status || !known) throw error;
     if (used) { used.proxied = true; used.via = 'proxy'; }
-    return attempt(`${proxy.replace(/\/+$/, '')}/?url=${encodeURIComponent(url)}`);
+    const q = `url=${encodeURIComponent(url)}` + (isStatsTest({ origin }) ? '&t=1' : '');
+    return attempt(`${proxy.replace(/\/+$/, '')}/?${q}`);
   }
 }
 
-export async function fetchReceipt(input, { fetchImpl = fetch, proxy = '' } = {}) {
+export async function fetchReceipt(input, { fetchImpl = fetch, proxy = '', origin } = {}) {
   const target = classifyReceiptUrl(input);
   if (target.kind === 'invalid') throw new Error('Ο σύνδεσμος δεν είναι έγκυρος.');
   if (target.kind === 'insecure') throw new Error('Ο σύνδεσμος πρέπει να ξεκινά με https://');
@@ -268,10 +270,10 @@ export async function fetchReceipt(input, { fetchImpl = fetch, proxy = '' } = {}
   const used = { via: 'direct', proxied: false };
   let receipt = null;
   let lastError = null;
-  try { receipt = parseMyData(await getText(`${target.url}/myDATA`, { fetchImpl, proxy, known, used })); } catch (error) { lastError = error; }
+  try { receipt = parseMyData(await getText(`${target.url}/myDATA`, { fetchImpl, proxy, known, used, origin })); } catch (error) { lastError = error; }
   let ubl = null;
   if (known && (!receipt?.lines.length || !receipt.issuerName)) {
-    try { ubl = parseUbl(await getText(`${target.url}/EN16931`, { fetchImpl, proxy, known, used })); } catch (error) { lastError = lastError || error; }
+    try { ubl = parseUbl(await getText(`${target.url}/EN16931`, { fetchImpl, proxy, known, used, origin })); } catch (error) { lastError = lastError || error; }
   }
   if (!receipt?.lines.length && ubl?.lines.length) receipt = ubl;
   else if (receipt && ubl?.issuerName) receipt.issuerName = ubl.issuerName;

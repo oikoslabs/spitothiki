@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { classifyReceiptUrl, fetchReceipt, guessCategory, parseAadeSummary, parseMyData, parseUbl, receiptId, tidyName } from '../src/receipt.js';
+import { setOwnerTestFlag } from '../src/source.js';
 
 const myData = readFileSync(new URL('./fixtures/receipt-mydata.xml', import.meta.url), 'utf8');
 const ubl = readFileSync(new URL('./fixtures/receipt-ubl.xml', import.meta.url), 'utf8');
@@ -114,4 +115,25 @@ test('fetchReceipt: AADE summary is on-device (no proxy) and is marked via=aade'
   assert.equal(r.format, 'AADE');
   assert.equal(r.via, 'aade');
   assert.equal(r.proxied, false);
+});
+
+test('fetchReceipt adds t=1 on the proxy URL only when the stats test flag is on', async () => {
+  const via = [];
+  const cors = async (url) => {
+    via.push(url);
+    if (!url.startsWith('https://proxy.test')) throw new TypeError('Failed to fetch');
+    return { ok: true, text: async () => (url.includes('myDATA') ? myData : ubl) };
+  };
+  setOwnerTestFlag(true);
+  try {
+    const p = await fetchReceipt('https://b.epsilonnet.gr/fd/x', { fetchImpl: cors, proxy: 'https://proxy.test/' });
+    assert.equal(p.via, 'proxy');
+  } finally {
+    setOwnerTestFlag(false);
+  }
+  assert.ok(via.includes(`https://proxy.test/?url=${encodeURIComponent('https://b.epsilonnet.gr/fd/x/myDATA')}&t=1`));
+  via.length = 0;
+  await fetchReceipt('https://b.epsilonnet.gr/fd/x', { fetchImpl: cors, proxy: 'https://proxy.test/' });
+  assert.ok(via.includes(`https://proxy.test/?url=${encodeURIComponent('https://b.epsilonnet.gr/fd/x/myDATA')}`));
+  assert.equal(via.some((u) => u.includes('t=1')), false);
 });
