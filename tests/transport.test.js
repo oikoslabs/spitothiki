@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyTransportRecurring, classifyReceipt, consumptionFor, createTransport, createTransportRecurring, fuelStats, pricePerLiter, transportMonth } from '../src/transport.js';
+import { readFileSync } from 'node:fs';
+import { applyTransportRecurring, classifyReceipt, consumptionFor, createTransport, createTransportRecurring, fuelStats, mergeAadePhoto, pricePerLiter, transportMonth } from '../src/transport.js';
 import { makeLine } from '../src/receipt.js';
 import { parseReceiptText } from '../src/receipt-photo.js';
 
@@ -95,4 +96,46 @@ test('v1.6.10: fuel is still detected: fuel name, station, or a single big litre
   const f = classifyReceipt({ issuerName: 'DEMO ΑΕ', total: 49, lines: shop });
   assert.deepEqual([f.type, f.liters], ['fuel', 25]);
   assert.equal(classifyReceipt({ issuerName: 'DEMO ΣΟΥΠΕΡ ΜΑΡΚΕΤ', total: 2, lines: [makeLine({ name: 'ΓΑΛΑ 1LT', quantity: 1, unit: 'λίτρα', price: 1.2 })] }), null);
+});
+
+test('fuel photo (Greek ΛΙΤΡΑ): litres, €/l, station name and date from anonymized till text', () => {
+  const text = readFileSync(new URL('./fixtures/receipt-fuel-photo-ocr.txt', import.meta.url), 'utf8');
+  const photo = parseReceiptText(text);
+  assert.equal(photo.issuerName, 'GO GAS FUELS E.E.');
+  assert.equal(photo.date, '2026-11-14');
+  assert.equal(photo.total, 50);
+  const fuel = classifyReceipt(photo, text);
+  assert.equal(fuel.type, 'fuel');
+  assert.equal(fuel.liters, 26.77);
+  assert.equal(fuel.ppl, 1.868);
+  assert.equal(fuel.note, 'GO GAS FUELS E.E.');
+  assert.equal(fuel.amount, 50);
+});
+
+test('mergeAadePhoto: QR total wins when the photo disagrees; otherwise fills store, date, litres', () => {
+  const text = readFileSync(new URL('./fixtures/receipt-fuel-photo-ocr.txt', import.meta.url), 'utf8');
+  const photo = parseReceiptText(text);
+  const qr = { format: 'AADE', issuerName: '', issuerVat: '', date: '', total: 50, lines: [], uid: '?SIG=DEMO' };
+  const ok = mergeAadePhoto(qr, photo, text);
+  assert.equal(ok.receipt.total, 50);
+  assert.equal(ok.receipt.issuerName, 'GO GAS FUELS E.E.');
+  assert.equal(ok.receipt.date, '2026-11-14');
+  assert.equal(ok.receipt.format, 'AADE');
+  assert.equal(ok.receipt.uid, '?SIG=DEMO');
+  assert.equal(ok.guess.type, 'fuel');
+  assert.equal(ok.guess.liters, 26.77);
+  assert.equal(ok.guess.ppl, 1.868);
+  assert.equal(ok.guess.amount, 50);
+  assert.equal(ok.totalMismatch, false);
+
+  const clash = mergeAadePhoto({ ...qr, total: 50 }, { ...photo, total: 60 }, text);
+  assert.equal(clash.receipt.total, 50);
+  assert.equal(clash.guess.amount, 50);
+  assert.equal(clash.guess.liters, 26.77);
+  assert.equal(clash.photoTotal, 60);
+  assert.equal(clash.totalMismatch, true);
+
+  const noQr = mergeAadePhoto({ ...qr, total: 0 }, photo, text);
+  assert.equal(noQr.receipt.total, 50);
+  assert.equal(noQr.totalMismatch, false);
 });

@@ -3,7 +3,7 @@ import { adoptCamera, decodeImageCodes, lookupBarcode, normalizeBarcode, request
 import { isUrlCode, lastTollAmount, parseTollBarcode, parseTollText, tollAmountFromText } from './toll-barcode.js';
 import { authProviders, firebaseConfig } from './firebase-config.js';
 import { loadState, parseBackup, saveState } from './storage.js';
-import { fetchReceipt, findRelatedReceipt, receiptId } from './receipt.js';
+import { classifyReceiptUrl, fetchReceipt, findRelatedReceipt, receiptId } from './receipt.js';
 import { ingredientName, isNewRecipe, pantryIngredients, recipeCat, scoreRecipe, suggestBuiltin } from './recipes.js';
 import { WASTE_REASONS, applyWaste, createStore, createWaste, groupByStore, monthKey, rowCategory, monthlySpending, moveCategory, purchaseFor, shiftMonth, storeOrder, wasteStats } from './features.js';
 import { showSigninCard } from './features.js';
@@ -45,7 +45,7 @@ import { applyReceiptEdit, receiptEditError } from './receipt-edit.js';
 import { addManualExpense, createManualExpense, guessManualCategory, manualCategory, parseAmount, shouldAskAmount } from './manual-expense.js';
 import { EXPENSE_CAT_DEFAULT_EMOJI, NO_CATEGORY, createExpenseCategory, deleteExpenseCategory, effectiveItemCategory, expenseCategories, expenseCategoryMonth, upsertExpenseCategory, visibleSpendRows } from './expense-cats.js';
 import { BACKUP_SNOOZE_KEY, LAST_BACKUP_KEY, backupReminderDue, dequeue, enqueue, hasData, loadQueue, saveQueue } from './offline.js';
-import { TRANSPORT_ICONS, TRANSPORT_TYPES, applyTransportRecurring, classifyReceipt, consumptionFor, createTransport, createTransportRecurring, fuelStats, pricePerLiter, transportMonth } from './transport.js';
+import { TRANSPORT_ICONS, TRANSPORT_TYPES, applyTransportRecurring, classifyReceipt, consumptionFor, createTransport, createTransportRecurring, fuelStats, mergeAadePhoto, pricePerLiter, transportMonth } from './transport.js';
 import { EXTRA_DEFAULT_EMOJI, EXTRA_SUGGESTIONS, LEGACY_EXTRA_CATEGORIES, createExtra, createExtraCategory, deleteExtraCategory, extraCategories, findExtraCategory, suggestEmoji, extrasMonth, extrasSummary, lastUnitPrice, quickExtra, setExtraQty, unitPrice } from './extras.js';
 import { getLang, locale, setLang, t, translateDom, untranslatedGreek } from './i18n.js';
 import { daysUntil, escapeHtml, expiryLabel, formatDate, localDateKey, readKey, writeKey } from './format.js';
@@ -1596,20 +1596,28 @@ const storedProxy = () => { try { return localStorage.getItem(PROXY_KEY) || ''; 
 const receiptProxy = () => storedProxy() || DEFAULT_PROXY;
 let receiptState = { step: 'start' };
 let receiptTarget = '';
-const photoButtons = () => `<div class="settings-actions receipt-photo-actions"><label class="button button-quiet file-button"><span>📸 Φωτογραφία απόδειξης</span><input type="file" accept="image/*" capture="environment" class="visually-hidden" data-receipt-photo id="receipt-photo-camera"></label><label class="button button-quiet file-button"><span>🖼️ Από τη συλλογή</span><input type="file" accept="image/*" class="visually-hidden" data-receipt-photo id="receipt-photo-file"></label></div>`;
+const photoButtons = (mode = '') => {
+  const cam = mode === 'fuel' ? t('Φωτογραφία για λίτρα & πρατήριο') : t('Φωτογραφία απόδειξης');
+  return `<div class="settings-actions receipt-photo-actions"><label class="button button-quiet file-button"><span>📸 ${escapeHtml(cam)}</span><input type="file" accept="image/*" capture="environment" class="visually-hidden" data-receipt-photo id="receipt-photo-camera"></label><label class="button button-quiet file-button"><span>🖼️ ${escapeHtml(t('Από τη συλλογή'))}</span><input type="file" accept="image/*" class="visually-hidden" data-receipt-photo id="receipt-photo-file"></label></div>`;
+};
 
 async function loadReceiptPhoto(file) {
   if (!file) return;
+  // Keep a scanned ΑΑΔΕ receipt so a second photo (for litres / station) can be merged with the QR total.
+  const previous = (receiptState.receipt && receiptState.step !== 'start' && receiptState.step !== 'loading') ? { ...receiptState } : null;
   receiptState = { step: 'loading', photo: true, progress: '' };
   renderReceipt();
   let toll = null;
+  let link = '';
   try {
-    // 1) A QR link or toll barcode in the photo beats OCR.
+    // 1) A QR link or toll barcode in the photo beats OCR — unless we already have an ΑΑΔΕ receipt, or the
+    //    QR itself is a cash-register link that has no litres (we still OCR and merge).
     const loading = document.querySelector('#receipt-loading');
     if (loading) loading.textContent = t('Αναζήτηση QR / barcode στη φωτογραφία…');
     const codes = await decodeImageCodes(file).catch(() => []);
-    const link = codes.find(isUrlCode);
-    if (link) { loadReceipt(link); return; }
+    link = codes.find(isUrlCode) || '';
+    const aadeLink = link && classifyReceiptUrl(link).kind === 'aade';
+    if (link && !previous && !aadeLink && receiptTarget !== 'transport') { loadReceipt(link); return; }
     toll = codes.map(parseTollBarcode).find(Boolean) || null;
   } catch {}
   try {
@@ -1627,14 +1635,39 @@ async function loadReceiptPhoto(file) {
     if (toll) { tollToTransport({ ...toll, amount: tollAmountFromText(result?.text) }); return; }
     const tollText = parseTollText(result?.text);
     if (tollText && !result.parsed.lines.length) { tollToTransport(tollText); return; }
-    const receipt = result.parsed;
-    if (!receipt.lines.length && !receipt.total) throw new Error('Δεν βρέθηκαν είδη στη φωτογραφία. Δοκίμασε πιο καθαρή, ίσια λήψη με καλό φως.');
-    const id = await receiptId(receipt, `photo:${receipt.issuerName}`);
+    let qrReceipt = previous?.receipt && previous.receipt.format === 'AADE' ? previous.receipt : null;
+    if (!qrReceipt && link && classifyReceiptUrl(link).kind === 'aade') {
+      try { qrReceipt = await fetchReceipt(link, { proxy: receiptProxy() }); }
+      catch { if (!previous?.receipt && !result.parsed.lines.length && !result.parsed.total) { loadReceipt(link); return; } }
+    }
+    const photo = result.parsed;
+    const merged = qrReceipt ? mergeAadePhoto(qrReceipt, photo, result.text) : null;
+    const useFuel = merged && (merged.guess?.type === 'fuel' || receiptTarget === 'transport' || previous?.target === 'transport');
+    if (useFuel) {
+      const receipt = merged.receipt;
+      const id = previous?.id || await receiptId(receipt, receipt.sourceUrl);
+      const duplicate = (state.receipts || []).find((entry) => entry.id === id && !isStaleReceipt(entry, state));
+      receiptState = { step: 'review', receipt, id, duplicate, photo: true, trip: tripForReceipt(state.trips || [], receipt), target: receiptTarget || previous?.target || '', guess: merged.guess, totalMismatch: merged.totalMismatch, photoTotal: merged.photoTotal };
+      reportScan({ receipt, text: result.text, success: true, via: 'photo', proxied: false });
+      renderReceipt();
+      return;
+    }
+    const receipt = photo;
+    if (!receipt.lines.length && !receipt.total) {
+      if (link && !previous) { loadReceipt(link); return; }
+      throw new Error('Δεν βρέθηκαν είδη στη φωτογραφία. Δοκίμασε πιο καθαρή, ίσια λήψη με καλό φως.');
+    }
+    const id = previous?.id || await receiptId(receipt, `photo:${receipt.issuerName}`);
     const duplicate = (state.receipts || []).find((entry) => entry.id === id);
     receiptState = { step: 'review', receipt, id, duplicate, photo: true, trip: tripForReceipt(state.trips || [], receipt), target: receiptTarget, guess: classifyReceipt(receipt, result.text) };
     reportScan({ receipt, text: result.text, success: true, via: 'photo', proxied: false });
   } catch (error) {
     if (toll) { tollToTransport(toll); return; }
+    if (previous?.receipt) {
+      receiptState = { ...previous, error: t(error.message || 'Η αναγνώριση απέτυχε.') };
+      renderReceipt();
+      return;
+    }
     reportScan({ receipt: {}, success: false, via: 'photo', proxied: false });
     receiptState = { step: 'start', error: t(error.message || 'Η αναγνώριση απέτυχε.') };
   }
@@ -1733,7 +1766,14 @@ function renderReceiptReview() {
   const head = `<div class="receipt-summary"><div><strong class="product-name" id="receipt-store">${escapeHtml(store)}</strong><span class="field-hint">${escapeHtml(receipt.date ? formatDate(receipt.date) : '')}${receipt.lines.length ? ` · ${escapeHtml(t('{count} είδη', { count: receipt.lines.length }))}` : ''}</span></div><strong class="big-number" id="receipt-total">${escapeHtml(money(receipt.total))}</strong></div>`;
   const dup = duplicate ? `<div class="alert-banner" id="receipt-duplicate" role="status"><p>${escapeHtml(t('Αυτή η απόδειξη είναι ήδη καταχωρημένη ({date}, {total}). Τη βρίσκεις στις «🧾 Αποδείξεις».', { date: formatDate(String(duplicate.importedAt || duplicate.date || '').slice(0, 10)), total: money(duplicate.total) }))}</p><div class="settings-actions"><button class="button button-quiet" type="button" data-action="receipt-save-anyway" id="receipt-save-anyway">${escapeHtml(t('Αποθήκευση ξανά'))}</button></div></div>` : '';
   if (!receipt.lines.length) {
-    return `${head}${dup}${renderRelatedOffer()}${renderTransportReceiptOffer()}${renderTripLink()}<p class="field-hint" id="receipt-aade-note">Οι αποδείξεις με QR της ΑΑΔΕ (ταμειακές) δεν περιέχουν τα είδη στο QR, μόνο το σύνολο. Για να περάσουν τα είδη, βγάλε φωτογραφία την απόδειξη — ή κατέγραψε μόνο το ποσό ως έξοδο.</p>${photoButtons()}
+    const fuelPhoto = receiptState.target === 'transport' || receiptState.guess?.type === 'fuel';
+    const mismatch = receiptState.totalMismatch ? `<div class="alert-banner" id="receipt-total-mismatch" role="status"><p>${escapeHtml(t('Το σύνολο της φωτογραφίας ({photo}) διαφέρει από το QR ({qr}) — κρατήθηκε το ποσό του QR.', { photo: money(receiptState.photoTotal), qr: money(receipt.total) }))}</p></div>` : '';
+    const aadeNote = receiptState.guess?.liters
+      ? t('Διαβάστηκαν {liters} λίτρα ({ppl} €/λίτρο). Έλεγξε και καταχώρισέ τα στις Μετακινήσεις.', { liters: fmtNum(receiptState.guess.liters, 2), ppl: fmtNum(receiptState.guess.ppl || 0, 3) })
+      : fuelPhoto
+        ? t('Το QR έχει το ποσό, όχι τα λίτρα. Βγάλε φωτογραφία την απόδειξη για λίτρα, τιμή/λίτρο και πρατήριο.')
+        : t('Οι αποδείξεις με QR της ΑΑΔΕ (ταμειακές) δεν περιέχουν τα είδη στο QR, μόνο το σύνολο. Για να περάσουν τα είδη, βγάλε φωτογραφία την απόδειξη — ή κατέγραψε μόνο το ποσό ως έξοδο.');
+    return `${head}${dup}${mismatch}${renderRelatedOffer()}${renderTransportReceiptOffer()}${renderTripLink()}<p class="field-hint" id="receipt-aade-note">${escapeHtml(aadeNote)}</p>${photoButtons(fuelPhoto ? 'fuel' : '')}
       <form id="receipt-review-form" novalidate><input type="hidden" name="mode" value="total"><div class="dialog-actions"><button class="button button-quiet" type="button" data-action="receipt-reset">Πίσω</button><button class="button button-primary" type="submit" ${duplicate ? 'disabled' : ''}>${receiptState.target === 'transport' || ['tolls', 'fuel'].includes(receiptState.guess?.type) ? `🚗 ${escapeHtml(t('Καταχώριση στις Μετακινήσεις'))}` : 'Καταγραφή εξόδου'}</button></div></form>`;
   }
   const rows = receipt.lines.map((line, index) => `<div class="receipt-line${line.doubtful ? ' is-doubtful' : ''}" data-line="${index}"${line.doubtful ? ` title="${escapeHtml(t('Έλεγξε αυτή τη γραμμή: ποσότητα × τιμή δεν ταιριάζει με το ποσό.'))}"` : ''}><input class="shopping-check" type="checkbox" name="use" checked aria-label="${escapeHtml(t('Εισαγωγή: {name}', { name: line.name }))}">
@@ -1769,7 +1809,7 @@ function renderReceiptManual() {
     ${cats}
     <p class="form-error" id="manual-error" role="alert" hidden></p>
     <div class="dialog-actions">${transport}<button class="button button-quiet" type="button" data-action="receipt-reset">${escapeHtml(t('Πίσω'))}</button><button class="button button-primary" type="submit" id="manual-save">${saveLabel}</button></div></form>
-    ${m.reason === 'aade' ? `<p class="field-hint">${escapeHtml(t('Θες και τα είδη; Βγάλε φωτογραφία την απόδειξη:'))}</p>${photoButtons()}` : ''}`;
+    ${m.reason === 'aade' ? `<p class="field-hint">${escapeHtml(t(receiptState.target === 'transport' ? 'Το QR έχει το ποσό, όχι τα λίτρα. Βγάλε φωτογραφία την απόδειξη για λίτρα, τιμή/λίτρο και πρατήριο.' : 'Θες και τα είδη; Βγάλε φωτογραφία την απόδειξη:'))}</p>${photoButtons(receiptState.target === 'transport' ? 'fuel' : '')}` : ''}`;
 }
 // v1.8.4: product group («Είδος προϊόντος» since v1.8.6), same groups/emoji as the items of a scanned receipt.
 const groupOptions = (selected) => typeOptions(manualCategory(selected));
@@ -2292,7 +2332,7 @@ function renderTransportForm() {
   const d = transportDraft || {};
   const type = d.type || 'fuel';
   const vehicles = state.vehicles || [];
-  return `<section class="panel" id="transport-add"><div class="panel-heading"><div><h2>${escapeHtml(t(d.id ? 'Επεξεργασία εξόδου' : 'Νέο έξοδο μετακίνησης'))}</h2>${d.fromReceipt ? `<p id="transport-from-receipt">${escapeHtml(t(d.tollBarcode ? (d.amountFromOcr ? 'Απόδειξη διοδίων — το ποσό διαβάστηκε από τη φωτογραφία: έλεγξέ το και πάτα Αποθήκευση.' : 'Απόδειξη διοδίων από barcode — το ποσό δεν υπάρχει στον barcode: γράψε το ποσό και πάτα Αποθήκευση.') : 'Από απόδειξη — έλεγξε τα στοιχεία και πάτα Αποθήκευση.'))}</p>` : ''}</div></div>
+  return `<section class="panel" id="transport-add"><div class="panel-heading"><div><h2>${escapeHtml(t(d.id ? 'Επεξεργασία εξόδου' : 'Νέο έξοδο μετακίνησης'))}</h2>${d.fromReceipt ? `<p id="transport-from-receipt">${escapeHtml(t(d.tollBarcode ? (d.amountFromOcr ? 'Απόδειξη διοδίων — το ποσό διαβάστηκε από τη φωτογραφία: έλεγξέ το και πάτα Αποθήκευση.' : 'Απόδειξη διοδίων από barcode — το ποσό δεν υπάρχει στον barcode: γράψε το ποσό και πάτα Αποθήκευση.') : 'Από απόδειξη — έλεγξε τα στοιχεία και πάτα Αποθήκευση.'))}</p>` : ''}${d.totalMismatch ? `<p class="alert-banner" id="transport-total-mismatch" role="status">${escapeHtml(t('Το σύνολο της φωτογραφίας ({photo}) διαφέρει από το QR ({qr}) — κρατήθηκε το ποσό του QR.', { photo: money(d.photoTotal), qr: money(d.amount) }))}</p>` : ''}</div></div>
     <form id="transport-form" novalidate><input type="hidden" name="entryId" value="${escapeHtml(d.id || '')}"><input type="hidden" name="receiptId" value="${escapeHtml(d.receiptId || '')}">
       <div class="field-row field-row-three">
         <div><label class="field-label" for="transport-type">Κατηγορία</label><select class="field-input" id="transport-type" name="type">${transportTypeOptions(type)}</select></div>
@@ -2396,7 +2436,7 @@ function receiptToTransport() {
   const date = form?.elements.date?.value || guess?.date || receipt.date || localDateKey();
   const note = String(form?.elements.store?.value || '').trim() || guess?.note || receipt.issuerName || '';
   const type = guess?.type || 'fuel';
-  transportDraft = { ...guess, type, amount: amount || '', date, note, receiptId: id, fromReceipt: true };
+  transportDraft = { ...guess, type, amount: amount || '', date, note, receiptId: id, fromReceipt: true, totalMismatch: Boolean(receiptState.totalMismatch), photoTotal: receiptState.photoTotal };
   receiptState = { step: 'start' };
   renderReceipt();
   document.querySelector('#receipt-dialog').close();

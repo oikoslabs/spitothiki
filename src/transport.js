@@ -116,7 +116,8 @@ export function classifyReceipt(receipt = {}, rawText = '') {
   const out = { type, amount: receipt.total || 0, date: receipt.date || '', note: receipt.issuerName || '' };
   if (type === 'fuel') {
     let liters = fuelLines.reduce((s, l) => s + (l.unit === 'λίτρα' || l.quantity > 1.5 ? l.quantity : 0), 0);
-    if (!liters) { const m = text.match(/(\d{1,3}[.,]\d{2,3})\s*(?:LT|LTR|L|ΛΙΤΡΑ|ΛΙΤ|Λ)\b/); if (m) liters = n(m[1]); }
+    // \b is ASCII-only, so it fails after Greek «ΛΙΤΡΑ»; allow end-of-token instead.
+    if (!liters) { const m = text.match(/(\d{1,3}[.,]\d{2,3})\s*(?:ΛΙΤΡΑ|LITRES?|LTR|LT|ΛΙΤΡΟ|ΛΙΤ|\bL\b|Λ)(?=$|[^\p{L}])/u); if (m) liters = n(m[1]); }
     const p = text.match(/(\d[.,]\d{3})\s*(?:€|EUR)?\s*\/\s*(?:LT|LTR|L|ΛΙΤ|Λ)/) || text.match(/(?:ΤΙΜΗ\s*(?:ΜΟΝ|ΛΙΤΡ)\S*|PRICE)\s*:?\s*(\d[.,]\d{3})/);
     if (liters > 0) out.liters = Math.round(liters * 1000) / 1000;
     if (p) out.ppl = n(p[1]);
@@ -124,4 +125,22 @@ export function classifyReceipt(receipt = {}, rawText = '') {
     if (!out.liters && out.ppl && out.amount) out.liters = round3(out.amount / out.ppl);
   }
   return out;
+}
+
+// Merge an ΑΑΔΕ cash-register QR (amount, maybe empty store/date) with a receipt photo (store, date, litres, €/l).
+// The QR total wins when both have an amount and they disagree.
+export function mergeAadePhoto(qrReceipt = {}, photoReceipt = {}, rawText = '') {
+  const qrTotal = Number(qrReceipt.total) > 0 ? Number(qrReceipt.total) : 0;
+  const photoTotal = Number(photoReceipt.total) > 0 ? Number(photoReceipt.total) : 0;
+  const total = round2(qrTotal || photoTotal || 0);
+  const date = qrReceipt.date || photoReceipt.date || '';
+  const issuerName = photoReceipt.issuerName || qrReceipt.issuerName || '';
+  const receipt = { ...qrReceipt, issuerName, date, total };
+  const guess = classifyReceipt({ ...photoReceipt, issuerName, date, total }, rawText);
+  return {
+    receipt,
+    guess: guess ? { ...guess, amount: total, date, note: issuerName || guess.note || '' } : null,
+    photoTotal: photoTotal || 0,
+    totalMismatch: Boolean(qrTotal && photoTotal && Math.abs(qrTotal - photoTotal) > 0.05)
+  };
 }
