@@ -1129,3 +1129,29 @@ a.menu-item { color: inherit; }
 #receipt-export-dialog .field { margin-bottom: 12px; }
 #receipt-export-dialog .field label { display: block; font-weight: 600; margin-bottom: 4px; }
 #receipt-export-dialog select, #receipt-export-dialog input[type="date"] { width: 100%; min-height: 44px; padding: 8px 10px; font: inherit; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--ink); }
+
+/* Pro badge and locked-feature soon screen */
+.pro-badge {
+  display: inline-block;
+  margin-inline-start: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.4;
+  vertical-align: middle;
+  color: #5a3d00;
+  background: #f3d17a;
+}
+.nav-item .pro-badge, .menu-item .pro-badge { margin-inline-start: auto; flex-shrink: 0; }
+.pro-soon { text-align: center; padding: 28px 16px 40px; max-width: 28rem; margin: 0 auto; }
+.pro-soon h2 { margin: 8px 0 12px; }
+.pro-soon-badge { margin: 0; }
+.doc-scan-stage { position: relative; width: 100%; background: #111; border-radius: 12px; overflow: hidden; }
+.doc-scan-stage canvas { display: block; width: 100%; height: auto; max-height: 62vh; touch-action: none; }
+.report-chart { display: block; margin: 8px 0 4px; }
+.report-bar { fill: var(--accent, #2f7c4a); }
+.report-bar-label { font-size: 0.7rem; fill: var(--ink-soft, #58616b); }
+.report-line { stroke: var(--accent, #2f7c4a); stroke-width: 2.5; }
+.report-dot { fill: var(--accent, #2f7c4a); }

@@ -69,6 +69,10 @@
         <button class="nav-item" type="button" data-view="extras"><span class="nav-icon" aria-hidden="true">☕</span><span>Μικροέξοδα</span></button>
         <button class="nav-item" type="button" data-view="chores"><span class="nav-icon" aria-hidden="true">🧹</span><span>Δουλειές σπιτιού</span></button>
         <button class="nav-item" type="button" data-view="insights"><span class="nav-icon" aria-hidden="true">∑</span><span>Σύνολο εξόδων</span></button>
+        <button class="nav-item" type="button" data-view="reports"><span class="nav-icon" aria-hidden="true">📊</span><span>Αναφορές</span><span class="pro-badge">Pro</span></button>
+        <button class="nav-item" type="button" data-view="bank"><span class="nav-icon" aria-hidden="true">🏦</span><span>Εισαγωγή κίνησης</span><span class="pro-badge">Pro</span></button>
+        <button class="nav-item" type="button" data-view="meds"><span class="nav-icon" aria-hidden="true">💊</span><span>Φάρμακα</span><span class="pro-badge">Pro</span></button>
+        <button class="nav-item" type="button" data-view="trades"><span class="nav-icon" aria-hidden="true">🛠️</span><span>Τεχνίτες</span><span class="pro-badge">Pro</span></button>
         <p class="nav-label">ΕΦΑΡΜΟΓΗ</p>
         <button class="nav-item" type="button" data-view="settings"><span class="nav-icon" aria-hidden="true">⚙</span><span>Ρυθμίσεις</span></button>
         <button class="nav-item" type="button" data-view="guide"><span class="nav-icon" aria-hidden="true">📖</span><span>Οδηγός</span></button>
@@ -117,6 +121,10 @@
       <button class="menu-item" type="button" data-view="extras"><span class="menu-icon" aria-hidden="true">☕</span><span>Μικροέξοδα</span></button>
       <button class="menu-item" type="button" data-view="chores"><span class="menu-icon" aria-hidden="true">🧹</span><span>Δουλειές σπιτιού</span></button>
       <button class="menu-item" type="button" data-view="insights"><span class="menu-icon" aria-hidden="true">∑</span><span>Σύνολο εξόδων</span></button>
+      <button class="menu-item" type="button" data-view="reports"><span class="menu-icon" aria-hidden="true">📊</span><span>Αναφορές</span><span class="pro-badge">Pro</span></button>
+      <button class="menu-item" type="button" data-view="bank"><span class="menu-icon" aria-hidden="true">🏦</span><span>Εισαγωγή κίνησης</span><span class="pro-badge">Pro</span></button>
+      <button class="menu-item" type="button" data-view="meds"><span class="menu-icon" aria-hidden="true">💊</span><span>Φάρμακα</span><span class="pro-badge">Pro</span></button>
+      <button class="menu-item" type="button" data-view="trades"><span class="menu-icon" aria-hidden="true">🛠️</span><span>Τεχνίτες</span><span class="pro-badge">Pro</span></button>
       <p class="menu-group">ΕΦΑΡΜΟΓΗ</p>
       <button class="menu-item" type="button" data-view="settings"><span class="menu-icon" aria-hidden="true">⚙</span><span>Ρυθμίσεις</span></button>
       <button class="menu-item" type="button" data-view="guide"><span class="menu-icon" aria-hidden="true">📖</span><span>Οδηγός</span></button>
@@ -306,6 +314,18 @@
       <ul class="drive-list" id="drive-list"></ul>
       <div class="dialog-actions"><button class="button button-quiet" value="cancel">Άκυρο</button></div></form>
   </dialog>
+  <dialog id="doc-scan-dialog" class="menu-sheet doc-scan-dialog" aria-labelledby="doc-scan-title">
+    <div class="dialog-heading"><div><p class="eyebrow">Pro</p><h2 id="doc-scan-title">Σάρωση εγγράφου</h2></div><button class="icon-button" type="button" data-action="doc-scan-cancel" aria-label="Κλείσιμο">×</button></div>
+    <p class="field-hint" id="doc-scan-hint">Τράβηξε τις 4 γωνίες της απόδειξης. Η βελτίωση γίνεται στη συσκευή σου και η φωτογραφία δεν αποθηκεύεται.</p>
+    <div class="doc-scan-stage"><canvas id="doc-scan-canvas"></canvas></div>
+    <label class="check-row"><input type="checkbox" id="doc-scan-enhance" checked> <span>Βελτίωση εικόνας</span></label>
+    <div class="dialog-actions">
+      <button class="button button-quiet" type="button" data-action="doc-scan-auto">Αυτόματες γωνίες</button>
+      <button class="button button-quiet" type="button" data-action="doc-scan-skip">Χωρίς περικοπή</button>
+      <button class="button button-primary" type="button" data-action="doc-scan-confirm">Συνέχεια στην αναγνώριση</button>
+    </div>
+  </dialog>
+
   <input id="backup-file" type="file" aria-label="Αρχείο αντιγράφου ασφαλείας" accept="application/json,.json,.spitobak" hidden>
 
   <dialog id="receipt-export-dialog" class="confirm-dialog" aria-labelledby="receipt-export-title">

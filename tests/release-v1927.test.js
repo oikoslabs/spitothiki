@@ -6,7 +6,7 @@ test('v1.9.27 release: version, cache bump, ΦΗΜ SIG amount parse', () => {
   assert.match(read('package.json'), /"version": "1\.9\.28"/);
   assert.equal((read('index.html').match(/data-no-i18n>1\.9\.28</g) || []).length, 2);
   const sw = read('sw.js');
-  assert.match(sw, /CACHE_VERSION = 'v134';/);
+  assert.match(sw, /CACHE_VERSION = 'v135';/);
   const receipt = read('src/receipt.js');
   assert.match(receipt, /function parseFhmSig/);
   assert.match(receipt, /11-char device serial \+ 8-digit mark \+ 40-char SHA-1 \+ amount/);

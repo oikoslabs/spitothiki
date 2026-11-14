@@ -10,7 +10,9 @@ export const BAR_OPTIONS = [
   { id: 'view:transport', icon: '🚗', label: 'Μετακινήσεις' }, { id: 'view:extras', icon: '🧾', label: 'Μικροέξοδα' }, { id: 'view:insights', icon: '∑', label: 'Σύνολο' },
   { id: 'cart', icon: '🛒', label: 'Καλάθι' }, { id: 'cook', icon: '🍳', label: 'Μαγείρεμα' }, { id: 'receipt', icon: '🧾', label: 'Απόδειξη' }, { id: 'manual', icon: '✍️', label: 'Με το χέρι' },
   { id: 'bill', icon: '➕', label: 'Νέος λογ/σμός' }, { id: 'product', icon: '＋', label: 'Προϊόν' }, { id: 'view:overview', icon: '⌂', label: 'Αρχική' },
-  { id: 'view:settings', icon: '⚙', label: 'Ρυθμίσεις' }
+  { id: 'view:settings', icon: '⚙', label: 'Ρυθμίσεις' },
+  { id: 'view:meds', icon: '💊', label: 'Φάρμακα' }, { id: 'view:trades', icon: '🛠️', label: 'Τεχνίτες' },
+  { id: 'view:reports', icon: '📊', label: 'Αναφορές' }, { id: 'view:bank', icon: '🏦', label: 'Εισαγωγή κίνησης' }
 ];
 const VALID = new Set(BAR_OPTIONS.map((o) => o.id));
 export const barOption = (id) => BAR_OPTIONS.find((o) => o.id === id);

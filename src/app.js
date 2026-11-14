@@ -52,6 +52,8 @@ import { daysUntil, escapeHtml, expiryLabel, formatDate, localDateKey, readKey, 
 import { THEME_KEY, applyTheme, currentTheme } from './theme.js';
 import { initSource, sourceSignup, reportScan } from './source.js';
 import { TESTER_COLLAPSE_KEY, TWA_SESSION_KEY, isPlayApp, showTesterCard, TESTER_GROUP_URL, TESTER_PLAY_URL } from './tester-card.js';
+import { isPro, refreshPro } from './pro.js';
+import { handleProAction, loadBankFile, proHomeBanners, renderBankPage, renderMedsPage, renderProSettingsCard, renderReportsPage, renderTradesPage, reportsLink, saveMedForm, saveTradeJobForm, saveTradePersonForm, saveTradeReminderForm } from './pro-pages.js';
 
 const viewRoot = document.querySelector('#view-content');
 const itemDialog = document.querySelector('#item-dialog');
@@ -67,7 +69,14 @@ const testerCtx = (() => { let session = null; try { session = sessionStorage; }
 initSource({ hasData: sourceHasData });
 let state = loadState();
 setProductTypes(state.productTypes); // v1.9.20: own product types («Είδος προϊόντος»)
-const VIEWS = ['overview', 'pantry', 'shopping', 'cart', 'cook', 'bills', 'transport', 'extras', 'chores', 'insights', 'receipts', 'settings', 'guide'];
+const VIEWS = ['overview', 'pantry', 'shopping', 'cart', 'cook', 'bills', 'transport', 'extras', 'chores', 'insights', 'receipts', 'reports', 'bank', 'meds', 'trades', 'settings', 'guide'];
+let medsForm = null;
+let tradesForm = null;
+let bankPreview = null;
+let lastBankBatch = null;
+let reportsMonth = monthKey(localDateKey());
+const localTimeKey = (d = new Date()) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+refreshPro(null);
 let activeView = VIEWS.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'overview';
 let pantryQuery = '';
 let pantryCategory = 'Όλα';
@@ -172,7 +181,7 @@ function pendingLabel(count) {
   return t(count === 1 ? '{count} εκκρεμές προϊόν' : '{count} εκκρεμή προϊόντα', { count });
 }
 
-const SECTION_LABELS = { overview: 'Σπιτοθήκη', pantry: 'Το απόθεμά μου', shopping: 'Λίστα αγορών', cart: 'Καλάθι στο κατάστημα', cook: 'Μαγείρεμα & γεύματα', bills: 'Λογαριασμοί', transport: 'Μετακινήσεις', extras: 'Μικροέξοδα', chores: 'Δουλειές σπιτιού', insights: 'Σύνολο εξόδων', receipts: 'Αποδείξεις', settings: 'Ρυθμίσεις', guide: 'Οδηγός' };
+const SECTION_LABELS = { overview: 'Σπιτοθήκη', pantry: 'Το απόθεμά μου', shopping: 'Λίστα αγορών', cart: 'Καλάθι στο κατάστημα', cook: 'Μαγείρεμα & γεύματα', bills: 'Λογαριασμοί', transport: 'Μετακινήσεις', extras: 'Μικροέξοδα', chores: 'Δουλειές σπιτιού', insights: 'Σύνολο εξόδων', receipts: 'Αποδείξεις', reports: 'Αναφορές', bank: 'Εισαγωγή κίνησης', meds: 'Φάρμακα', trades: 'Τεχνίτες', settings: 'Ρυθμίσεις', guide: 'Οδηγός' };
 function setActiveNavigation() {
   document.body.dataset.screen = activeView;
   const current = document.querySelector('#current-section');
@@ -193,7 +202,7 @@ const openAttr = (id) => (openPanels.has(id) ? 'open' : '');
 document.addEventListener('toggle', (event) => { const d = event.target; if (d.matches?.('details.collapsible[id]')) { if (d.open) openPanels.add(d.id); else openPanels.delete(d.id); } }, true);
 
 // Which menu group each section belongs to (shown as a breadcrumb under the top bar: ⌂ Αρχική › ΕΞΟΔΑ).
-const SECTION_GROUPS = { pantry: 'ΣΠΙΤΙ', shopping: 'ΣΠΙΤΙ', cart: 'ΣΠΙΤΙ', cook: 'ΣΠΙΤΙ', chores: 'ΣΠΙΤΙ', bills: 'ΕΞΟΔΑ', transport: 'ΕΞΟΔΑ', extras: 'ΕΞΟΔΑ', insights: 'ΕΞΟΔΑ', receipts: 'ΕΞΟΔΑ', settings: 'ΕΦΑΡΜΟΓΗ', guide: 'ΕΦΑΡΜΟΓΗ' };
+const SECTION_GROUPS = { pantry: 'ΣΠΙΤΙ', shopping: 'ΣΠΙΤΙ', cart: 'ΣΠΙΤΙ', cook: 'ΣΠΙΤΙ', chores: 'ΣΠΙΤΙ', bills: 'ΕΞΟΔΑ', transport: 'ΕΞΟΔΑ', extras: 'ΕΞΟΔΑ', insights: 'ΕΞΟΔΑ', receipts: 'ΕΞΟΔΑ', reports: 'ΕΞΟΔΑ', bank: 'ΕΞΟΔΑ', meds: 'ΣΠΙΤΙ', trades: 'ΣΠΙΤΙ', settings: 'ΕΦΑΡΜΟΓΗ', guide: 'ΕΦΑΡΜΟΓΗ' };
 function renderCrumbs() {
   const group = SECTION_GROUPS[activeView];
   return `<nav class="eyebrow crumbs" aria-label="${escapeHtml(t('Πού βρίσκομαι'))}"><button class="crumb-home" type="button" data-view="overview">⌂ ${escapeHtml(t('Αρχική'))}</button>${group ? `<span aria-hidden="true">›</span><span>${escapeHtml(t(group))}</span>` : ''}</nav>`;
@@ -670,7 +679,7 @@ function renderOverview() {
     <div class="dashboard-grid">
       <section class="panel" id="home-month"><div class="panel-heading"><div><h2>${escapeHtml(t('Τα έξοδα του μήνα'))}</h2><p data-no-i18n>${escapeHtml(monthLabel(month))}</p></div><button class="panel-link" type="button" data-view="insights">${escapeHtml(t('Αναλυτικά →'))}</button></div>
         <p class="big-number" id="home-month-total">${escapeHtml(money(totals.total))}</p>${renderHomeMonthRows(totals.rows)}
-        ${due.length ? `<button class="alert-banner home-bills-due" type="button" data-view="bills">📄 ${escapeHtml((due.length === 1 ? t('1 λογαριασμός λήγει σύντομα ή έχει λήξει') : t('{count} λογαριασμοί λήγουν σύντομα ή έχουν λήξει', { count: due.length })))} ›</button>` : ''}</section>
+        ${due.length ? `<button class="alert-banner home-bills-due" type="button" data-view="bills">📄 ${escapeHtml((due.length === 1 ? t('1 λογαριασμός λήγει σύντομα ή έχει λήξει') : t('{count} λογαριασμοί λήγουν σύντομα ή έχουν λήξει', { count: due.length })))} ›</button>` : ''}${proHomeBanners({ t, escapeHtml, state, today: localDateKey(), nowTime: localTimeKey() })}</section>
       <section class="panel" id="home-expiry"><div class="panel-heading"><div><h2>Έλεγξε τις ημερομηνίες</h2><p>Ό,τι λήγει μέσα στις επόμενες 7 ημέρες</p></div><button class="panel-link" type="button" data-action="home-card" data-card="expiring">${escapeHtml(t('Όλα όσα λήγουν →'))}</button></div><div class="product-list">${upcoming.length ? upcoming.map(renderMiniProduct).join('') : renderEmpty('Όλα καλά εδώ', 'Δεν έχεις προϊόντα που λήγουν σύντομα.', 'add-item', 'Πρόσθεσε προϊόν', '🌿')}</div></section>
     </div>
     ${renderHomeMore()}`;
@@ -791,13 +800,35 @@ function renderShopping() {
     ${renderRecurringPanel()}`;
 }
 
+function proCtx() {
+  return {
+    t, escapeHtml, state, today: localDateKey(), nowTime: localTimeKey(), money, formatDate, monthLabel, renderHeader,
+    form: activeView === 'meds' ? medsForm : tradesForm,
+    month: reportsMonth,
+    preview: bankPreview,
+    lastBankBatch,
+    hostname: location.hostname,
+    search: location.search,
+    storage: localStorage,
+    user: syncStatus?.user,
+    persist, renderApp, showToast, undoable,
+    schedule: scheduleBackgroundSnapshot,
+    setForm: (value) => { if (activeView === 'meds') medsForm = value; else tradesForm = value; },
+    setBankPreview: (value) => { bankPreview = value; },
+    setLastBankBatch: (value) => { lastBankBatch = value; },
+    shiftReportsMonth: (delta) => { reportsMonth = shiftMonth(reportsMonth, delta); },
+    localNow: new Date().toISOString(),
+    now: new Date().toISOString()
+  };
+}
+
 function renderSettings() {
   return `${renderHeader('Ρυθμίσεις', 'Διαχείριση και αντίγραφο ασφαλείας των δεδομένων σου.')}${storageBadge()}
     <div class="settings-grid"><section class="panel settings-card" id="privacy"><span class="stat-icon">🔒</span><h2>Απόρρητο πρώτα</h2><p>Τα δεδομένα σου μένουν στη συσκευή σου και η εφαρμογή δουλεύει και χωρίς internet. Δεν υπάρχουν διαφημίσεις.</p><details class="privacy-details" id="privacy-details"><summary>Τι ακριβώς αποθηκεύεται και πού</summary><ul class="privacy-list"><li>Στη συσκευή σου: απόθεμα, λίστες, έξοδα, λογαριασμοί, μετακινήσεις, πρόγραμμα διατροφής και ρυθμίσεις. Δεν φεύγουν από εκεί αν δεν συνδεθείς.</li><li>Αν συνδεθείς: τα ίδια δεδομένα συγχρονίζονται στο Firebase (Google) και τα βλέπουν μόνο τα μέλη του νοικοκυριού σου. Μπορείς να αποσυνδεθείς ή να τα διαγράψεις όποτε θες.</li><li>Αποδείξεις με QR: ο σύνδεσμος της απόδειξης περνά από έναν μικρό διακομιστή μας (Cloudflare) μόνο για να διαβαστεί, όταν ο πάροχος δεν επιτρέπει απευθείας ανάγνωση. Δεν κρατάμε τα είδη, τα ποσά ή τη διεύθυνση IP σου, μόνο ανώνυμη μέτρηση (π.χ. «σούπερ μάρκετ, επιτυχία»), και όταν η απόδειξη διαβάζεται στη συσκευή σου (QR της ΑΑΔΕ, φωτογραφία ή απευθείας σύνδεση).</li><li>Φωτογραφίες και PDF (αποδείξεις, λογαριασμοί, πρόγραμμα διατροφής) διαβάζονται μέσα στο κινητό σου και δεν ανεβαίνουν πουθενά.</li><li>Barcode: στέλνεται μόνο ο αριθμός στο Open Food Facts. Οι βασικές συνταγές είναι μέσα στην εφαρμογή. Αν ψάξεις νέα συνταγή, στέλνεται μόνο η λέξη αναζήτησης στο TheMealDB. Ειδοποιήσεις με κλειστή εφαρμογή: ο διακομιστής μας (Cloudflare) κρατά μόνο τις ημερομηνίες υπενθύμισης, όχι ονόματα, ποσά ή προϊόντα.</li><li>Δεν υπάρχουν διαφημίσεις ούτε cookies παρακολούθησης. Χρησιμοποιούμε μόνο το ανώνυμο Cloudflare Web Analytics (χωρίς cookies) για να ξέρουμε πόσοι μπαίνουν και αν η εφαρμογή είναι γρήγορη.</li><li>Μετράμε ανώνυμα από ποια σελίδα ήρθες (π.χ. TikTok, Facebook), μόνο ως συνολικό αριθμό. Χωρίς προσωπικά στοιχεία και χωρίς να δίνουμε τίποτα σε τρίτους.</li><li>Η εφαρμογή φτιάχνεται από έναν άνθρωπο με τη βοήθεια AI. Εγώ αποφασίζω τι κάνει, τη δοκιμάζω καθημερινά και διορθώνω ό,τι βρεθεί. Η πρόσβαση στα δεδομένα ελέγχεται από κανόνες ασφαλείας και ο καθένας βλέπει μόνο τα δικά του.</li></ul></details><p class="privacy-policy-link" id="privacy-policy-link"><a href="./privacy.html" target="_blank" rel="noopener">Πλήρης πολιτική απορρήτου</a> · <a href="mailto:oikoslabs.apps@gmail.com" data-no-i18n>oikoslabs.apps@gmail.com</a></p><div class="privacy-note">Αν δεν έχεις συνδεθεί και καθαρίσεις τα δεδομένα του browser ή αλλάξεις συσκευή, χρησιμοποίησε αντίγραφο ασφαλείας.</div></section>
     <section class="panel settings-card"><span class="stat-icon">◐</span><h2>Εμφάνιση</h2><p>Θέμα, μέγεθος γραμμάτων και αντίθεση. Ισχύουν σε όλη την εφαρμογή, σε αυτή τη συσκευή.</p><div class="theme-options" role="group" aria-label="Θέμα">${[['auto', 'Αυτόματο'], ['light', 'Φωτεινό'], ['dark', 'Σκούρο']].map(([value, label]) => `<button type="button" class="filter-chip ${currentTheme() === value ? 'is-active' : ''}" data-action="set-theme" data-theme="${value}" aria-pressed="${currentTheme() === value}">${label}</button>`).join('')}</div>
       <h3 class="settings-sub" id="text-size-label">Μέγεθος γραμμάτων</h3><div class="theme-options size-options" role="group" aria-labelledby="text-size-label">${[['normal', 'Κανονικά'], ['large', 'Μεγάλα'], ['xlarge', 'Πολύ μεγάλα']].map(([value, label]) => `<button type="button" class="filter-chip ${textSize() === value ? 'is-active' : ''}" data-action="set-text-size" data-size="${value}" aria-pressed="${textSize() === value}">${label}</button>`).join('')}</div>
       <label class="check-row"><input type="checkbox" id="high-contrast" ${highContrast() ? 'checked' : ''}> <span>Υψηλή αντίθεση (πιο έντονα γράμματα και περιγράμματα)</span></label></section>
-    ${renderHomeCard()}${renderBarCard()}${renderLanguageCard()}
+    ${renderProSettingsCard(proCtx())}${renderHomeCard()}${renderBarCard()}${renderLanguageCard()}
     <section class="panel settings-card" id="guide-card"><span class="stat-icon">📖</span><h2>${escapeHtml(t('Οδηγός'))}</h2><p>${escapeHtml(t('Πώς δουλεύει κάθε λειτουργία, με απλά βήματα.'))}</p><div class="settings-actions"><button class="button button-primary" type="button" data-view="guide" id="open-guide-settings">📖 ${escapeHtml(t('Άνοιξε τον οδηγό'))}</button></div></section>
     <section class="panel settings-card"><span class="stat-icon amber">👋</span><h2>Αρχικές ερωτήσεις</h2><p>Γλώσσα, οι λογαριασμοί που έχεις και μέγεθος γραμμάτων, σε ένα λεπτό.</p><div class="settings-actions"><button class="button button-quiet" type="button" data-action="onboard-again">Κάνε τις ερωτήσεις ξανά</button></div></section>
     ${renderProductTypesCard()}
@@ -842,6 +873,10 @@ function renderApp() {
   else if (activeView === 'cart') viewRoot.innerHTML = renderCart();
   else if (activeView === 'cook') { viewRoot.innerHTML = renderCook(); loadOnlineRecipes(); }
   else if (activeView === 'guide') viewRoot.innerHTML = renderGuide();
+  else if (activeView === 'meds') viewRoot.innerHTML = renderMedsPage(proCtx());
+  else if (activeView === 'trades') viewRoot.innerHTML = renderTradesPage(proCtx());
+  else if (activeView === 'bank') viewRoot.innerHTML = renderBankPage(proCtx());
+  else if (activeView === 'reports') viewRoot.innerHTML = renderReportsPage(proCtx());
   else viewRoot.innerHTML = renderSettings();
   if (activeView === 'pantry') renderPantryList();
   translateDom(viewRoot);
@@ -945,7 +980,7 @@ async function startSync() {
       },
       onNewHousehold: () => { sourceSignup(); },
       onRemote: (docs, before, me) => { if (notifySettings().listNotify) listNotices.push(shoppingChanges(before?.shopping || [], docs, me)); },
-      onStatus: (status) => { noteSignin(status); syncStatus = status; if (status.user) requestPersistentStorage(); ensureMyName(); if (activeView === 'settings' || activeView === 'overview' || activeView === 'insights') renderApp(); maybeProtectSheet(); }
+      onStatus: (status) => { noteSignin(status); syncStatus = status; if (status.user) requestPersistentStorage(); ensureMyName(); refreshPro(status.user).then(() => { if (['settings', 'overview', 'insights', 'meds', 'trades', 'bank', 'reports'].includes(activeView)) renderApp(); }); maybeProtectSheet(); }
     });
   } catch {
     syncStatus = { state: 'error', message: navigator.onLine === false ? 'Χωρίς σύνδεση: ο συγχρονισμός θα ξεκινήσει όταν επιστρέψει το internet.' : 'Δεν φόρτωσε το Firebase.' };
@@ -1183,7 +1218,7 @@ async function handleScanFile(file) {
   try { codes = await decodeImageCodes(file, { mode: 'all', timeBudgetMs: 6000 }); } catch {}
   if (codes.length) { handleScanned(codes.find(isUrlCode) || codes[0]); return; }
   showChoice({ title: 'Δεν βρέθηκε κωδικός', message: t('Δεν βρήκα QR ή barcode στην εικόνα. Τι είναι;'), choices: [
-    { label: 'Απόδειξη', primary: true, run: () => { openReceiptDialog(); loadReceiptPhoto(file); } },
+    { label: 'Απόδειξη', primary: true, run: () => { openReceiptDialog(); startReceiptPhoto(file); } },
     { label: 'Λογαριασμός', run: () => { navigate('bills'); importBillFile(file); } },
     { label: 'Κλείσιμο', run: () => {} }
   ] });
@@ -1601,6 +1636,18 @@ const photoButtons = (mode = '') => {
   return `<div class="settings-actions receipt-photo-actions"><label class="button button-quiet file-button"><span>📸 ${escapeHtml(cam)}</span><input type="file" accept="image/*" capture="environment" class="visually-hidden" data-receipt-photo id="receipt-photo-camera"></label><label class="button button-quiet file-button"><span>🖼️ ${escapeHtml(t('Από τη συλλογή'))}</span><input type="file" accept="image/*" class="visually-hidden" data-receipt-photo id="receipt-photo-file"></label></div>`;
 };
 
+async function startReceiptPhoto(file) {
+  if (!file) return;
+  if (isPro()) {
+    try {
+      const { openDocScan } = await import('./doc-scan.js');
+      const processed = await openDocScan(file, { t, escapeHtml, dialog: document.querySelector('#doc-scan-dialog') });
+      if (processed == null) return;
+      file = processed;
+    } catch {}
+  }
+  return loadReceiptPhoto(file);
+}
 async function loadReceiptPhoto(file) {
   if (!file) return;
   // Keep a scanned ΑΑΔΕ receipt so a second photo (for litres / station) can be merged with the QR total.
@@ -3170,7 +3217,7 @@ function renderReceipts() {
   const rows = listReceipts(all, receiptsMonth);
   const total = rows.reduce((s, r) => s + (Number(r.total) || 0), 0);
   const filter = months.length > 1 ? `<div class="segmented receipts-months" role="group" aria-label="${escapeHtml(t('Μήνας'))}"><button type="button" class="filter-chip${receiptsMonth ? '' : ' is-active'}" data-action="receipts-month" data-month="">${escapeHtml(t('Όλοι'))}</button>${months.map((m) => `<button type="button" class="filter-chip${m === receiptsMonth ? ' is-active' : ''}" data-action="receipts-month" data-month="${m}" data-no-i18n>${escapeHtml(monthLabel(m))}</button>`).join('')}</div>` : '';
-  const list = rows.length ? `<ul class="receipts-list" id="receipts-list">${rows.map((r) => `<li><button type="button" class="receipt-row" data-action="receipt-open" data-id="${escapeHtml(r.id)}"><span class="receipt-main"><strong data-no-i18n>${escapeHtml(r.store || t('Απόδειξη'))}</strong><small>${escapeHtml(formatDate(r.date))} · ${escapeHtml(receiptCatText(r))}</small></span><span class="receipt-total" data-no-i18n>${escapeHtml(money(r.total))}</span><span class="arrow" aria-hidden="true">›</span></button></li>`).join('')}</ul>`
+  const list = rows.length ? `<ul class="receipts-list" id="receipts-list">${rows.map((r) => `<li><button type="button" class="receipt-row" data-action="receipt-open" data-id="${escapeHtml(r.id)}"><span class="receipt-main"><strong data-no-i18n>${escapeHtml(r.store || t('Απόδειξη'))}</strong><small>${escapeHtml(formatDate(r.date))} · ${escapeHtml(receiptCatText(r))}${r.cardPaid ? ` · ${escapeHtml(t('Πληρώθηκε με κάρτα'))}` : ''}</small></span><span class="receipt-total" data-no-i18n>${escapeHtml(money(r.total))}</span><span class="arrow" aria-hidden="true">›</span></button></li>`).join('')}</ul>`
     : `<p class="subtle-empty">${escapeHtml(t(all.length ? 'Καμία απόδειξη αυτόν τον μήνα.' : 'Δεν έχεις σκανάρει αποδείξεις ακόμα. Πάτα «📷 Σάρωση» και στόχευσε το QR της απόδειξης.'))}</p>`;
   return `${renderHeader('Αποδείξεις', 'Όσες αποδείξεις έχεις σκανάρει, οι πιο πρόσφατες πρώτα.')}
     <div class="settings-actions"><button class="button button-primary" type="button" data-action="menu-receipt">📷 ${escapeHtml(t('Σάρωση απόδειξης'))}</button><button class="button button-quiet" type="button" data-action="receipt-manual" id="receipts-manual">＋ ${escapeHtml(t('Έξοδο με το χέρι'))}</button><button class="button button-quiet" type="button" data-action="receipts-export" id="receipts-export">📄 ${escapeHtml(t('Εξαγωγή PDF'))}</button></div>
@@ -3214,7 +3261,7 @@ function renderInsights() {
   const waste = wasteStats(state.waste || [], insightsMonth);
   const isCurrent = insightsMonth >= monthKey(localDateKey());
   return `${renderHeader('Σύνολο εξόδων', 'Πόσα ξοδεύεις και τι πετιέται, ανά μήνα.')}
-    <div class="settings-actions"><button class="button button-quiet" type="button" data-view="receipts" id="insights-receipts">🧾 ${escapeHtml(t('Αποδείξεις'))} (${(state.receipts || []).length})</button></div>
+    <div class="settings-actions"><button class="button button-quiet" type="button" data-view="receipts" id="insights-receipts">🧾 ${escapeHtml(t('Αποδείξεις'))} (${(state.receipts || []).length})</button>${reportsLink({ t, escapeHtml })}</div>
     <div class="month-switch" role="group" aria-label="Μήνας"><button class="icon-button" type="button" data-action="insights-month" data-delta="-1" aria-label="Προηγούμενος μήνας">‹</button><strong id="insights-month" data-no-i18n>${escapeHtml(monthLabel(insightsMonth))}</strong><button class="icon-button" type="button" data-action="insights-month" data-delta="1" aria-label="Επόμενος μήνας" ${isCurrent ? 'disabled' : ''}>›</button></div>
     <div class="settings-grid insights-grid">${renderMonthTotals(spending)}${renderWhoPaid()}
     <section class="panel settings-card" id="spending-card"><span class="stat-icon blue">€</span><h2>${escapeHtml(t('Αγορές ανά είδος προϊόντος'))}</h2>
@@ -3591,6 +3638,7 @@ async function submitReceiptExport(event) {
 
 function handleAction(button) {
   const { action, id } = button.dataset;
+  if (action && handleProAction(action, { ...proCtx(), button })) return;
   if (action === 'add-item') openItemDialog();
   else if (action === 'close-dialog') itemDialog.close();
   else if (action === 'edit-item') openItemDialog(id);
@@ -4008,7 +4056,8 @@ document.addEventListener('change', (event) => {
   if (event.target.id === 'auto-list-toggle') { try { localStorage.setItem(AUTO_LIST_KEY, event.target.checked ? '1' : '0'); } catch {} showToast(event.target.checked ? 'Η αυτόματη λίστα ενεργοποιήθηκε.' : 'Η αυτόματη λίστα απενεργοποιήθηκε.'); if (event.target.checked) persist(); return; }
   if (event.target.matches?.('[data-shelf-photo]')) { loadShelfPhoto(event.target.files?.[0]); event.target.value = ''; return; }
   if (event.target.id === 'cart-item-name') { refreshCartPriceChips(); return; }
-  if (event.target.matches?.('[data-receipt-photo]')) { loadReceiptPhoto(event.target.files?.[0]); return; }
+  if (event.target.matches?.('[data-receipt-photo]')) { startReceiptPhoto(event.target.files?.[0]); return; }
+  if (event.target.matches?.('[data-bank-file]')) { loadBankFile(event.target.files?.[0], proCtx()); event.target.value = ''; return; }
   if (event.target.classList?.contains('price-input')) {
     const row = state.shopping.find((entry) => entry.id === event.target.dataset.id);
     if (!row) return;
@@ -4071,6 +4120,10 @@ document.addEventListener('submit', (event) => {
   if (event.target.id === 'expcat-form' || event.target.id === 'expcat-edit-form') { event.preventDefault(); saveExpCatForm(event.target); return; }
   if (event.target.id === 'whopaid-form') { event.preventDefault(); openPanels.add('whopaid-settings'); saveWhoPaidForm(event.target); return; }
   if (event.target.id === 'bill-form') { event.preventDefault(); saveBillForm(event.target); return; }
+  if (event.target.id === 'med-form') { event.preventDefault(); saveMedForm(event.target, proCtx()); return; }
+  if (event.target.id === 'trade-person-form') { event.preventDefault(); saveTradePersonForm(event.target, proCtx()); return; }
+  if (event.target.id === 'trade-job-form') { event.preventDefault(); saveTradeJobForm(event.target, proCtx()); return; }
+  if (event.target.id === 'trade-reminder-form') { event.preventDefault(); saveTradeReminderForm(event.target, proCtx()); return; }
   if (event.target.id === 'chore-form') { event.preventDefault(); saveChoreForm(event.target); return; }
   if (event.target.id === 'transport-form') { event.preventDefault(); saveTransportForm(event.target); return; }
   if (event.target.id === 'extras-form') { event.preventDefault(); saveExtrasForm(event.target); return; }
