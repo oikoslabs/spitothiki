@@ -159,7 +159,7 @@ test('row note: cleaned, capped, cleared, kept in the shared text', () => {
 test('wiring: synced pastLists kind, SW precache + cache bump + notification click, settings toggle, English', () => {
   assert.ok(DATA_KINDS.includes('pastLists'));
   const sw = read('sw.js');
-  assert.match(sw, /CACHE_VERSION = 'v136';/);
+  assert.match(sw, /CACHE_VERSION = 'v137';/);
   assert.match(sw, /'\.\/src\/shopping-extras\.js'/);
   assert.match(sw, /'spitothiki-list' \? 'shopping'/);
   const app = read('src/app.js');
