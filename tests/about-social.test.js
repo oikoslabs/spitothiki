@@ -56,7 +56,7 @@ test('the in-app guide points to About in Settings for the official channels', (
 
 test('About card ships in the service worker cache notes', () => {
   const sw = read('sw.js');
-  assert.match(sw, /CACHE_VERSION = 'v139'/);
+  assert.match(sw, /CACHE_VERSION = 'v140'/);
   assert.match(sw, /About card in Settings with Facebook, Telegram and the official TikTok account/);
-  assert.match(read('package.json'), /"version": "1\.9\.31"/);
+  assert.match(read('package.json'), /"version": "1\.9\.32"/);
 });
