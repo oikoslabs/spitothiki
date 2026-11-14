@@ -189,7 +189,7 @@ test('calendar: page, home Today card and cache are wired', () => {
   assert.match(app, /TODO\(pro\)|calendarProEnabled/);
   assert.match(html, /data-view="calendar"/);
   assert.match(html, /Ημερολόγιο/);
-  assert.match(sw, /CACHE_VERSION = 'v137'/);
+  assert.match(sw, /CACHE_VERSION = 'v138'/);
   assert.match(sw, /src\/calendar\.js/);
   assert.match(home, /calendar: v\.calendar !== false/);
   assert.match(guide, /id: 'calendar'/);
