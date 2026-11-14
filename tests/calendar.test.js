@@ -2,9 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  autoEntries, buildIcs, calendarEntries, calendarProEnabled, createEvent,
+  autoEntries, billCalendarStatus, buildIcs, calendarEntries, calendarProEnabled, createEvent,
   entriesOn, eventOccurrences, googleEventUrl, monthBounds, monthGrid,
-  personColor, shouldNotify, userEntries, weekBounds
+  personColor, shortDayMonth, shouldNotify, userEntries, weekBounds
 } from '../src/calendar.js';
 import { EXTRA_KINDS } from '../src/storage.js';
 
@@ -77,6 +77,54 @@ test('calendar: auto entries include every expiry in range, bills, standing orde
   assert.equal(trash.filter((r) => r.date === '2026-11-01').length, 1);
 });
 
+test('calendar: bill entries show unpaid, overdue and paid status; stay on the due date', () => {
+  const today = '2026-11-14';
+  const unpaid = billCalendarStatus({ due: '2026-11-20', paid: false }, today);
+  assert.equal(unpaid.pending, true);
+  assert.equal(unpaid.overdue, false);
+  assert.equal(unpaid.paid, false);
+  const overdue = billCalendarStatus({ due: '2026-11-10', paid: false }, today);
+  assert.equal(overdue.pending, true);
+  assert.equal(overdue.overdue, true);
+  const paid = billCalendarStatus({ due: '2026-11-14', paid: true, paidAt: '2026-11-12' }, today);
+  assert.equal(paid.paid, true);
+  assert.equal(paid.paidAt, '2026-11-12');
+  assert.equal(paid.pending, false);
+  assert.equal(paid.overdue, false);
+  assert.equal(shortDayMonth('2026-11-12', today), '12/11');
+  assert.equal(shortDayMonth('2025-12-03', today), '3/12/2025');
+  const debitUnpaid = billCalendarStatus({ due: '2026-11-10', paid: false, autoPay: true }, today);
+  assert.equal(debitUnpaid.debit, true);
+  assert.equal(debitUnpaid.pending, false);
+  assert.equal(debitUnpaid.overdue, false);
+  const debitPaid = billCalendarStatus({ due: '2026-11-05', paid: true, paidAt: '2026-11-05', autoPay: true }, today);
+  assert.equal(debitPaid.paid, true);
+  assert.equal(debitPaid.paidAt, '2026-11-05');
+
+  const rows = autoEntries({
+    bills: [
+      { id: 'b-unpaid', name: 'ΔΕΗ', due: '2026-11-20', amount: 80, paid: false },
+      { id: 'b-late', name: 'Νερό', due: '2026-11-08', amount: 20, paid: false },
+      { id: 'b-paid', name: 'Ενοίκιο', due: '2026-11-01', amount: 400, paid: true, paidAt: '2026-11-12' },
+      { id: 'b-debit', name: 'Netflix', due: '2026-11-05', amount: 12, autoPay: true, paid: false },
+      { id: 'b-debit-paid', name: 'Cosmote', due: '2026-11-03', amount: 25, autoPay: true, paid: true, paidAt: '2026-11-03' }
+    ]
+  }, '2026-11-01', '2026-11-30', { today });
+  const byId = Object.fromEntries(rows.map((r) => [r.sourceId, r]));
+  assert.equal(byId['b-unpaid'].pending, true);
+  assert.equal(byId['b-unpaid'].date, '2026-11-20');
+  assert.equal(byId['b-late'].overdue, true);
+  assert.equal(byId['b-late'].pending, true);
+  assert.equal(byId['b-paid'].paid, true);
+  assert.equal(byId['b-paid'].date, '2026-11-01');
+  assert.equal(byId['b-paid'].paidAt, '2026-11-12');
+  assert.equal(byId['b-debit'].source, 'debit');
+  assert.equal(byId['b-debit'].pending, false);
+  assert.equal(byId['b-debit'].overdue, false);
+  assert.equal(byId['b-debit-paid'].paid, true);
+  assert.equal(byId['b-debit-paid'].paidAt, '2026-11-03');
+});
+
 test('calendar: user events merge with auto items and sort by date then time', () => {
   const ev = createEvent({ title: 'Γιατρός', date: '2026-11-14', time: '18:30', recur: 'weekly' }, now);
   const state = {
@@ -134,6 +182,9 @@ test('calendar: page, home Today card and cache are wired', () => {
   assert.match(bar, /view:calendar/);
   assert.match(app, /id: 'calendar', icon:/);
   assert.match(app, /function renderHomeCalendar/);
+  assert.match(app, /function calendarBillStatusLine/);
+  assert.match(app, /openBillDialog\(sourceId\)/);
+  assert.match(app, /is-overdue/);
   assert.match(app, /checkCalendarNotifications/);
   assert.match(app, /TODO\(pro\)|calendarProEnabled/);
   assert.match(html, /data-view="calendar"/);

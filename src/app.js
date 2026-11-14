@@ -30,7 +30,7 @@ import { initBackToTop } from './back-to-top.js';
 import { HOME_KEY, HOME_OPTIONS, DEFAULT_HOME, parseHomeState, serializeHome, toggleHome } from './home-actions.js';
 import { insightChange, insightText, monthInsights } from './month-insights.js';
 import { NOTICE_KEY, activeBudget, budgetReport, createBudget, hasBudget, monthSpend, shouldNotify } from './budget.js';
-import { NOTICE_KEY as CAL_NOTICE_KEY, PERSON_ALL, RECUR_OPTIONS, buildIcs, calendarEntries, calendarProEnabled, createEvent, entriesOn, googleEventUrl, monthBounds, monthGrid, personColor, shouldNotify as calendarShouldNotify, weekBounds } from './calendar.js';
+import { NOTICE_KEY as CAL_NOTICE_KEY, PERSON_ALL, RECUR_OPTIONS, buildIcs, calendarEntries, calendarProEnabled, createEvent, entriesOn, googleEventUrl, monthBounds, monthGrid, personColor, shortDayMonth, shouldNotify as calendarShouldNotify, weekBounds } from './calendar.js';
 import { createReceiptPdf, periodBoundsForMonth } from './receipt-pdf.js';
 import { GUIDE_SECTIONS, guideHeading, searchGuide, sectionForView } from './guide.js';
 import { PRODUCT_TYPE_DEFAULT_EMOJI, PRODUCT_TYPE_EMOJIS, allProductTypes, createProductType, customProductTypes, deleteProductType, effectiveType, isCustomTypeId, isProductType, mergeTypeRows, setProductTypes, suggestTypeEmoji, typeEmoji, typeLabel, typeName, upsertProductType, validType } from './product-types.js';
@@ -2691,6 +2691,7 @@ function saveBudgetForm(form) {
 }
 
 function calendarToday() { return localDateKey(); }
+function calendarRows(from, to) { return calendarEntries(state, from, to, { today: calendarToday() }); }
 function ensureCalendarCursor() {
   const today = calendarToday();
   if (!calendarMonth) calendarMonth = today.slice(0, 7);
@@ -2711,15 +2712,29 @@ function calendarPeopleNames() {
     return (state.people || []).map((p) => p.name).filter(Boolean);
   }
 }
+function calendarBillStatusLine(entry) {
+  if (entry.paid) {
+    return entry.paidAt
+      ? t('✓ Πληρώθηκε {date}', { date: shortDayMonth(entry.paidAt, calendarToday()) })
+      : t('✓ Πληρώθηκε');
+  }
+  return '';
+}
 function renderCalendarEntry(entry, { pro = calendarProEnabled() } = {}) {
   const color = pro ? personColor(entry.person) : '';
   const style = color ? ` style="--cal-color:${color}"` : '';
   const time = entry.time ? ` · ${escapeHtml(entry.time)}` : '';
   const who = entry.person && entry.person !== PERSON_ALL ? ` · ${escapeHtml(entry.person)}` : (entry.person === PERSON_ALL ? ` · ${escapeHtml(t('Όλοι'))}` : '');
-  const overdue = entry.overdue ? `<small>${escapeHtml(t('Εκκρεμεί από {date}', { date: formatDate(entry.due || entry.date) }))}</small>` : (entry.notes ? `<small>${escapeHtml(entry.notes)}</small>` : '');
+  const billish = entry.source === 'bill' || entry.source === 'debit';
+  const paidLine = billish ? calendarBillStatusLine(entry) : '';
+  const extra = paidLine
+    ? `<small>${escapeHtml(paidLine)}</small>`
+    : (entry.overdue && !billish ? `<small>${escapeHtml(t('Εκκρεμεί από {date}', { date: formatDate(entry.due || entry.date) }))}</small>` : (entry.notes ? `<small>${escapeHtml(entry.notes)}</small>` : ''));
   const amount = entry.amount ? ` · ${escapeHtml(money(entry.amount))}` : '';
+  const marker = entry.pending ? '⏳ ' : '';
   const action = entry.source === 'event' ? 'calendar-edit' : 'calendar-open';
-  return `<button class="cal-entry" type="button" data-action="${action}" data-id="${escapeHtml(entry.sourceId || '')}" data-source="${escapeHtml(entry.source)}" data-date="${escapeHtml(entry.date)}"${style}><span><span class="cal-entry-kind">${escapeHtml(calendarKindLabel(entry))}${time}${who}${amount}</span><strong>${escapeHtml(entry.title)}</strong>${overdue}</span></button>`;
+  const cls = ['cal-entry', entry.overdue && billish ? 'is-overdue' : ''].filter(Boolean).join(' ');
+  return `<button class="${cls}" type="button" data-action="${action}" data-id="${escapeHtml(entry.sourceId || '')}" data-source="${escapeHtml(entry.source)}" data-date="${escapeHtml(entry.date)}"${style}><span><span class="cal-entry-kind">${marker}${escapeHtml(calendarKindLabel(entry))}${time}${who}${amount}</span><strong>${escapeHtml(entry.title)}</strong>${extra}</span></button>`;
 }
 function renderCalendarList(entries, empty) {
   if (!entries.length) return `<p class="subtle-empty">${escapeHtml(t(empty))}</p>`;
@@ -2729,7 +2744,7 @@ function renderCalendarList(entries, empty) {
 function renderHomeCalendar() {
   if (!homeState().calendar) return '';
   const today = calendarToday();
-  const entries = entriesOn(calendarEntries(state, today, today), today);
+  const entries = entriesOn(calendarRows(today, today), today);
   return `<section class="panel" id="home-calendar"><div class="panel-heading"><div><h2>${escapeHtml(t('Σήμερα στο ημερολόγιο'))}</h2><p data-no-i18n>${escapeHtml(formatDate(today))}</p></div><button class="panel-link" type="button" data-view="calendar">${escapeHtml(t('Όλα στο ημερολόγιο →'))}</button></div>
     ${renderCalendarList(entries, 'Σήμερα δεν έχει τίποτα στο ημερολόγιο.')}</section>`;
 }
@@ -2768,11 +2783,11 @@ function renderCalendar() {
     `<button class="filter-chip${calendarTab === id ? ' is-active' : ''}" type="button" data-action="calendar-tab" data-id="${id}">${escapeHtml(t(label))}</button>`).join('');
   let body = '';
   if (calendarTab === 'today') {
-    const entries = calendarEntries(state, today, today);
+    const entries = calendarRows(today, today);
     body = renderCalendarList(entries, 'Σήμερα δεν έχει τίποτα στο ημερολόγιο.');
   } else if (calendarTab === 'week') {
     const week = weekBounds(today);
-    const entries = calendarEntries(state, week.from, week.to);
+    const entries = calendarRows(week.from, week.to);
     const days = [];
     for (let d = week.from; d <= week.to; d = addDays(d, 1)) {
       const on = entriesOn(entries, d);
@@ -2781,7 +2796,7 @@ function renderCalendar() {
     body = days.join('');
   } else {
     const bounds = monthBounds(calendarMonth);
-    const entries = calendarEntries(state, bounds.from, bounds.to);
+    const entries = calendarRows(bounds.from, bounds.to);
     const dows = ['Δευ', 'Τρι', 'Τετ', 'Πεμ', 'Παρ', 'Σαβ', 'Κυρ'].map((d) => `<div class="cal-dow">${escapeHtml(t(d))}</div>`).join('');
     const cells = monthGrid(calendarMonth).map((cell) => {
       const on = entriesOn(entries, cell.date);
@@ -2846,7 +2861,7 @@ function downloadCalendarIcs() {
   const month = calendarMonth || today.slice(0, 7);
   const bounds = monthBounds(month) || { from: today };
   const from = bounds.from < today ? bounds.from : today;
-  const entries = calendarEntries(state, from, addDays(today, 90));
+  const entries = calendarRows(from, addDays(today, 90));
   const blob = new Blob([buildIcs(entries)], { type: 'text/calendar;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -2886,7 +2901,7 @@ function calendarAction(action, button) {
 async function checkCalendarNotifications() {
   if (!notificationsSupported() || typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
   const today = calendarToday();
-  const items = entriesOn(calendarEntries(state, today, today), today);
+  const items = entriesOn(calendarRows(today, today), today);
   if (!items.length) return;
   let prev = null;
   try { prev = JSON.parse(localStorage.getItem(CAL_NOTICE_KEY) || ''); } catch {}

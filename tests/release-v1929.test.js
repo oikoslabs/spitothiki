@@ -26,11 +26,12 @@ test('v1.9.29 release: version, cache bump, budget, calendar and guide', () => {
   assert.match(app, /activeView === 'calendar'/);
   const guide = read('src/guide.js');
   assert.match(guide, /id: 'whats-new'/);
-  assert.match(guide, /Τι νέο στην 1\.9\.29/);
+  assert.match(guide, /Τι νέο στην 1\.9\.30/);
   assert.match(guide, /id: 'budget'/);
   assert.match(guide, /id: 'calendar'/);
   assert.ok(GUIDE_SECTIONS.some((s) => s.id === 'whats-new' && s.numbered === false));
   assert.ok(GUIDE_SECTIONS.some((s) => s.id === 'budget' && s.title === 'Προϋπολογισμός μήνα'));
+  assert.ok(searchGuide('1.9.30').some((s) => s.id === 'whats-new'));
   assert.ok(searchGuide('1.9.29').some((s) => s.id === 'whats-new'));
   assert.ok(searchGuide('προϋπολογισμ').some((s) => s.id === 'budget' || s.id === 'whats-new'));
   assert.ok(searchGuide('ημερολογιο').some((s) => s.id === 'calendar'));
