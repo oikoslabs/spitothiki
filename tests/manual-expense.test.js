@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { addManualExpense, createManualExpense, guessManualCategory, needsAmount, parseAmount } from '../src/manual-expense.js';
+import { addManualExpense, createManualExpense, guessManualCategory, needsAmount, parseAmount, shouldAskAmount } from '../src/manual-expense.js';
 import { monthlySpending } from '../src/features.js';
 import { expenseCategoryMonth } from '../src/expense-cats.js';
 import { applyReceiptEdit } from '../src/receipt-edit.js';
@@ -78,7 +78,13 @@ test('ΑΑΔΕ cash-register QR has no amount → needs the amount (never a 0 �
   const aade = parseAadeSummary('https://www1.aade.gr/tameiakes/myweb/q1.php?SIG=DEMO123');
   assert.equal(aade.total, 0);
   assert.equal(needsAmount(aade), true);
+  assert.equal(shouldAskAmount(aade), true);
+  // Scanning from Μετακινήσεις must still ask — skipping used to show 0,00 €.
+  assert.equal(shouldAskAmount(aade, { target: 'transport' }), true);
+  assert.equal(shouldAskAmount(aade, { duplicate: { id: 'x' } }), false);
   assert.equal(needsAmount(parseAadeSummary('https://mydatapi.aade.gr/TimologioQR/QRInfo?issuerVat=999999999&issueDate=10/10/2026&mark=400&totalGrossValue=12.30')), false);
+  assert.equal(needsAmount(parseAadeSummary('https://www1.aade.gr/tameiakes/myweb/q1.php?SIG=GRT99000204000003870EA2C079E722C361C6297D10F02955CA413695A918.35')), false);
+  assert.equal(shouldAskAmount(parseAadeSummary('https://www1.aade.gr/tameiakes/myweb/q1.php?SIG=GRT99000204000003870EA2C079E722C361C6297D10F02955CA413695A918.35'), { target: 'transport' }), false);
   assert.equal(needsAmount({ lines: [{ name: 'x', price: 0 }], total: 0 }), false);
   assert.equal(needsAmount(null), false);
   // Saved with the scan's id/link so the same QR can't be recorded twice.

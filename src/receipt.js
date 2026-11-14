@@ -169,11 +169,31 @@ export function classifyReceiptUrl(input) {
   return { kind: 'provider', url: base, host: url.hostname };
 }
 
-// AADE "TimologioQR" style links carry only the totals in the query string.
+// AADE "TimologioQR" links carry totals in the query string. Cash-register (ΦΗΜ) links
+// (https://www1.aade.gr/tameiakes/myweb/q1.php?SIG=…) pack the total at the end of SIG:
+// 11-char device serial + 8-digit mark + 40-char SHA-1 + amount (Α.1024/2020, e.g. 18.35).
+function parseFhmSig(sig) {
+  const raw = String(sig || '').trim();
+  if (raw.length < 60) return null;
+  const serial = raw.slice(0, 11);
+  const mark = raw.slice(11, 19);
+  const sha = raw.slice(19, 59);
+  const amountPart = raw.slice(59).trim();
+  if (!/^[A-Za-z0-9]{11}$/.test(serial) || !/^\d{8}$/.test(mark) || !/^[0-9A-Fa-f]{40}$/.test(sha)) return null;
+  if (!/^\d+(?:[.,]\d{1,2})?$/.test(amountPart)) return null;
+  const total = num(amountPart);
+  if (!Number.isFinite(total) || total < 0) return null;
+  return { total: round2(total), serial, mark };
+}
+
 export function parseAadeSummary(input) {
   const url = new URL(input);
   const params = Object.fromEntries([...url.searchParams].map(([k, v]) => [k.toLowerCase(), v]));
-  const total = num(params.totalgrossvalue || params.gross || params.total || params.amount || (num(params.totalnetvalue) + num(params.totalvatamount)));
+  let total = num(params.totalgrossvalue || params.gross || params.total || params.amount || (num(params.totalnetvalue) + num(params.totalvatamount)));
+  if (!total && params.sig) {
+    const parsed = parseFhmSig(params.sig);
+    if (parsed) total = parsed.total;
+  }
   const date = (params.issuedate || params.date || '').replace(/^(\d{2})\/(\d{2})\/(\d{4})$/, '$3-$2-$1').slice(0, 10);
   return { format: 'AADE', issuerVat: params.issuervat || params.vat || params.afm || '', issuerName: '', date: /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : '',
     series: params.series || '', number: params.aa || params.number || '', uid: params.mark || params.uid || url.search, total: round2(total), lines: [] };
