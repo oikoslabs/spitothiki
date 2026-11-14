@@ -69,7 +69,7 @@ test('receipts screen, dialog, English strings, SW cache and font are wired', ()
   assert.match(app, /createReceiptPdf/);
   assert.match(html, /id="receipt-export-dialog"/);
   assert.match(html, /Εξαγωγή αποδείξεων σε PDF/);
-  assert.match(sw, /CACHE_VERSION = 'v133'/);
+  assert.match(sw, /CACHE_VERSION = 'v134'/);
   assert.match(sw, /month-insights\.js/);
   assert.match(sw, /receipt-pdf\.js/);
   assert.match(sw, /pdf-doc\.js/);
