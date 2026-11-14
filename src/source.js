@@ -1,6 +1,7 @@
 // v1.8.2: anonymous count of where people came from (TikTok, Facebook, …), e.g. spitothiki.web.app/?src=tiktok
 // Privacy: only ONE word (the source) is kept on the device and sent once, with the event type ('visit' or
-// 'signup'). No user id, email, device info or time is sent; no third-party pixel/SDK; nothing goes to Firestore.
+// 'signup'), plus an optional t=1 flag when the event is a test (preview host or the signed-in owner).
+// No user id, email, device info, IP or time is sent; no third-party pixel/SDK; nothing goes to Firestore.
 // Fire-and-forget: never blocks the app, never shows an error; offline = try again on a later open.
 import { classifyStore } from './receipt-store.js';
 export const STATS_URL = 'https://spitothiki-stats.cornerstore553.workers.dev/e';
@@ -17,6 +18,24 @@ const LIVE_ORIGIN = /^https:\/\/spitothiki(--[a-z0-9-]{1,60})?\.web\.app$/;
 
 export const isStatsOrigin = (origin) => LIVE_ORIGIN.test(String(origin || ''));
 export const validEvent = (type, src) => EVENT_TYPES.includes(type) && SOURCE_WORDS.includes(src);
+
+export function isPreviewOrigin(origin) {
+  try {
+    const host = new URL(String(origin || '')).hostname.toLowerCase();
+    return (host.endsWith('.web.app') || host.endsWith('.firebaseapp.com')) && host.startsWith('spitothiki--');
+  } catch {
+    return false;
+  }
+}
+
+let ownerTestFlag = false;
+export function setOwnerTestFlag(on) { ownerTestFlag = Boolean(on); }
+export function isStatsTest({ origin, test } = {}) {
+  if (test === true || test === 1 || test === '1') return true;
+  if (ownerTestFlag) return true;
+  const src = origin ?? (typeof location !== 'undefined' ? location.origin : '');
+  return isPreviewOrigin(src);
+}
 
 // '?src=TikTok' -> 'tiktok'; '?utm_source=sofisstore' -> 'sofisstore'; unknown -> 'other'; nothing -> 'direct'.
 export function parseSource(search = '', pathname = '/') {
@@ -41,11 +60,12 @@ export function cleanUrl(href) {
 function read(storage) { try { return JSON.parse(storage.getItem(SOURCE_KEY) || 'null'); } catch { return null; } }
 function write(storage, value) { try { storage.setItem(SOURCE_KEY, JSON.stringify(value)); } catch {} }
 
-export async function sendEvent(type, src, { fetchImpl = globalThis.fetch, online = globalThis.navigator?.onLine !== false, origin = globalThis.location?.origin } = {}) {
+export async function sendEvent(type, src, { fetchImpl = globalThis.fetch, online = globalThis.navigator?.onLine !== false, origin = globalThis.location?.origin, test } = {}) {
   if (!online || !isStatsOrigin(origin) || !validEvent(type, src) || typeof fetchImpl !== 'function') return false;
   try {
     // text/plain = no CORS preflight; credentials omitted; keepalive so it finishes even if the page closes.
-    const res = await fetchImpl(STATS_URL, { method: 'POST', body: JSON.stringify({ type, src }), headers: { 'content-type': 'text/plain' }, credentials: 'omit', keepalive: true, referrerPolicy: 'no-referrer' });
+    const body = isStatsTest({ origin, test }) ? { type, src, t: 1 } : { type, src };
+    const res = await fetchImpl(STATS_URL, { method: 'POST', body: JSON.stringify(body), headers: { 'content-type': 'text/plain' }, credentials: 'omit', keepalive: true, referrerPolicy: 'no-referrer' });
     return Boolean(res?.ok);
   } catch { return false; }
 }
@@ -77,7 +97,7 @@ export async function sourceSignup({ storage = globalThis.localStorage, send = s
 
 // v1.9.23: one anonymous count when a receipt is read on the device (AADE, photo, or a direct
 // provider fetch that never used the proxy). Body is only {type, store, success, via} — no URL,
-// amounts, user or household ids. Offline events are queued and retried on a later open.
+// amounts, user or household ids. Optional t=1 marks a test (preview or owner). Offline events are queued and retried on a later open.
 export const SCAN_KEY = 'spitothiki:pending-scans';
 export const SCAN_KINDS = ['supermarket', 'fuel', 'toll', 'other'];
 export const SCAN_VIA = ['aade', 'photo', 'direct', 'on-device'];
@@ -89,12 +109,14 @@ export function validScan(event) {
   return Boolean(event && SCAN_KINDS.includes(event.type) && typeof event.success === 'boolean' && SCAN_VIA.includes(event.via || 'on-device'));
 }
 
-export async function sendScanEvent(event, { fetchImpl = globalThis.fetch, online = globalThis.navigator?.onLine !== false, origin = globalThis.location?.origin } = {}) {
+export async function sendScanEvent(event, { fetchImpl = globalThis.fetch, online = globalThis.navigator?.onLine !== false, origin = globalThis.location?.origin, test } = {}) {
   const via = SCAN_VIA.includes(event?.via) ? event.via : 'on-device';
   const type = SCAN_KINDS.includes(event?.type) ? event.type : '';
   if (!online || !isStatsOrigin(origin) || !type || typeof event?.success !== 'boolean' || typeof fetchImpl !== 'function') return false;
   try {
-    const res = await fetchImpl(STATS_URL, { method: 'POST', body: JSON.stringify({ type, store: word(event.store), success: event.success, via }), headers: { 'content-type': 'text/plain' }, credentials: 'omit', keepalive: true, referrerPolicy: 'no-referrer' });
+    const body = { type, store: word(event.store), success: event.success, via };
+    if (isStatsTest({ origin, test })) body.t = 1;
+    const res = await fetchImpl(STATS_URL, { method: 'POST', body: JSON.stringify(body), headers: { 'content-type': 'text/plain' }, credentials: 'omit', keepalive: true, referrerPolicy: 'no-referrer' });
     return Boolean(res?.ok);
   } catch { return false; }
 }

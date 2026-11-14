@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { SOURCES, SOURCE_KEY, SCAN_KEY, cleanUrl, initSource, isStatsOrigin, parseSource, sendEvent, sendScanEvent, reportScan, flushScans, sourceSignup, validEvent } from '../src/source.js';
+import { SOURCES, SOURCE_KEY, SCAN_KEY, cleanUrl, initSource, isStatsOrigin, isPreviewOrigin, isStatsTest, setOwnerTestFlag, parseSource, sendEvent, sendScanEvent, reportScan, flushScans, sourceSignup, validEvent } from '../src/source.js';
 
 const memory = (init = {}) => { const m = new Map(Object.entries(init)); return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), m }; };
 
@@ -69,6 +69,28 @@ test('source: sendEvent body is only {type, src}; skips offline, localhost and b
   assert.equal(await sendEvent('visit', 'evil', { fetchImpl, online: true, origin: 'https://spitothiki.web.app' }), false);
   assert.equal(await sendEvent('visit', 'tiktok', { fetchImpl: async () => { throw new Error('net'); }, online: true, origin: 'https://spitothiki.web.app' }), false);
   assert.equal(calls.length, 1);
+});
+
+test('source: preview origin or owner flag sends only t=1, never email/uid', async () => {
+  const calls = [];
+  const fetchImpl = async (url, opts) => { calls.push(JSON.parse(opts.body)); return { ok: true }; };
+  assert.equal(isPreviewOrigin('https://spitothiki--pro-preview-dxxrjo2z.web.app'), true);
+  assert.equal(isPreviewOrigin('https://spitothiki.web.app'), false);
+  assert.equal(await sendEvent('visit', 'tiktok', { fetchImpl, online: true, origin: 'https://spitothiki--pro-preview-dxxrjo2z.web.app' }), true);
+  assert.deepEqual(calls[0], { type: 'visit', src: 'tiktok', t: 1 });
+  setOwnerTestFlag(true);
+  try {
+    assert.equal(isStatsTest({ origin: 'https://spitothiki.web.app' }), true);
+    assert.equal(await sendEvent('signup', 'direct', { fetchImpl, online: true, origin: 'https://spitothiki.web.app' }), true);
+    assert.deepEqual(calls[1], { type: 'signup', src: 'direct', t: 1 });
+    assert.equal(await sendScanEvent({ type: 'supermarket', store: 'Lidl', success: true, via: 'direct' }, { fetchImpl, online: true, origin: 'https://spitothiki.web.app' }), true);
+    assert.equal(calls[2].t, 1);
+    assert.equal(JSON.stringify(calls).includes('email'), false);
+    assert.equal(JSON.stringify(calls).includes('uid'), false);
+  } finally {
+    setOwnerTestFlag(false);
+  }
+  assert.equal(isStatsTest({ origin: 'https://spitothiki.web.app' }), false);
 });
 
 test('v1.8.3 short links: /tiktok, /TikTok/, /TIKTOK count like ?src and the address becomes /', async () => {

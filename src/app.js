@@ -52,7 +52,8 @@ import { EXTRA_DEFAULT_EMOJI, EXTRA_SUGGESTIONS, LEGACY_EXTRA_CATEGORIES, create
 import { getLang, locale, setLang, t, translateDom, untranslatedGreek } from './i18n.js';
 import { daysUntil, escapeHtml, expiryLabel, formatDate, localDateKey, readKey, writeKey } from './format.js';
 import { THEME_KEY, applyTheme, currentTheme } from './theme.js';
-import { initSource, sourceSignup, reportScan } from './source.js';
+import { initSource, sourceSignup, reportScan, setOwnerTestFlag } from './source.js';
+import { isOwnerEmail } from './owner.js';
 import { TESTER_COLLAPSE_KEY, TWA_SESSION_KEY, isPlayApp, showTesterCard, TESTER_GROUP_URL, TESTER_PLAY_URL } from './tester-card.js';
 
 const viewRoot = document.querySelector('#view-content');
@@ -434,6 +435,12 @@ function renderProtectSheet() {
 }
 // v1.9.0: right after a sign-in in this tab (also after the Google redirect), point to the first step.
 const SIGNIN_WATCH_KEY = 'spitothiki:signin-watch';
+// Tag later anonymous stats as test when the signed-in user is the owner. Never send or store the email.
+async function refreshOwnerTestFlag(status) {
+  try {
+    setOwnerTestFlag(Boolean(status?.user?.email) && await isOwnerEmail(status.user.email));
+  } catch { setOwnerTestFlag(false); }
+}
 function noteSignin(status) {
   try {
     if (!status.user && status.state === 'signed-out') sessionStorage.setItem(SIGNIN_WATCH_KEY, '1');
@@ -955,7 +962,7 @@ async function startSync() {
       },
       onNewHousehold: () => { sourceSignup(); },
       onRemote: (docs, before, me) => { if (notifySettings().listNotify) listNotices.push(shoppingChanges(before?.shopping || [], docs, me)); },
-      onStatus: (status) => { noteSignin(status); syncStatus = status; if (status.user) requestPersistentStorage(); ensureMyName(); if (activeView === 'settings' || activeView === 'overview' || activeView === 'insights') renderApp(); maybeProtectSheet(); }
+      onStatus: (status) => { noteSignin(status); syncStatus = status; void refreshOwnerTestFlag(status); if (status.user) requestPersistentStorage(); ensureMyName(); if (activeView === 'settings' || activeView === 'overview' || activeView === 'insights') renderApp(); maybeProtectSheet(); }
     });
   } catch {
     syncStatus = { state: 'error', message: navigator.onLine === false ? 'Χωρίς σύνδεση: ο συγχρονισμός θα ξεκινήσει όταν επιστρέψει το internet.' : 'Δεν φόρτωσε το Firebase.' };
