@@ -131,6 +131,12 @@
     <div class="quick-actions quick-grid" id="quick-sheet-list"></div>
   </dialog>
 
+  <dialog id="cal-day-sheet" class="cal-day-sheet" aria-modal="true" aria-labelledby="cal-day-title">
+    <div class="cal-sheet-handle" aria-hidden="true"></div>
+    <div class="dialog-heading"><div><p class="eyebrow" id="cal-day-eyebrow"></p><h2 id="cal-day-title"></h2></div><button class="icon-button" type="button" data-action="calendar-sheet-close" aria-label="Κλείσιμο" id="cal-day-close">×</button></div>
+    <div id="cal-day-sheet-body"></div>
+  </dialog>
+
   <dialog id="item-dialog" class="item-dialog" aria-labelledby="dialog-title">
     <form id="item-form" method="dialog" novalidate>
       <div class="dialog-heading"><div><p class="eyebrow">ΤΟ ΑΠΟΘΕΜΑ ΜΟΥ</p><h2 id="dialog-title">Νέο προϊόν</h2></div><button class="icon-button" type="button" data-action="close-dialog" aria-label="Κλείσιμο">×</button></div>

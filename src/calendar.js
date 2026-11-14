@@ -312,6 +312,22 @@ export function googleEventUrl(entry) {
   return `https://calendar.google.com/calendar/render?${q}`;
 }
 
+
+// Colored dots under a month-grid day (unique kinds, priority order, max 3).
+// bill = unpaid or overdue, expiry, event, other (chores, standing orders, paid bills).
+export const DOT_MAX = 3;
+export function dotKind(entry = {}) {
+  if (entry.source === 'bill' && !entry.paid && (entry.pending || entry.overdue)) return 'bill';
+  if (entry.source === 'expiry') return 'expiry';
+  if (entry.source === 'event') return 'event';
+  return 'other';
+}
+export function dayDots(entries = [], { max = DOT_MAX } = {}) {
+  const order = ['bill', 'expiry', 'event', 'other'];
+  const present = new Set((entries || []).map(dotKind));
+  return order.filter((kind) => present.has(kind)).slice(0, max);
+}
+
 export const CALENDAR_EN = {
   'Ημερολόγιο': 'Calendar',
   'Λήξεις, λογαριασμοί, πάγιες εντολές, δουλειές και τα δικά σου γεγονότα, σε ένα μέρος.': 'Expiries, bills, standing orders, chores and your own events, in one place.',
@@ -368,6 +384,9 @@ export const CALENDAR_EN = {
   'Προηγούμενος μήνας': 'Previous month',
   'Επόμενος μήνας': 'Next month',
   '✓ Πληρώθηκε {date}': '✓ Paid {date}',
-  '✓ Πληρώθηκε': '✓ Paid'
+  '✓ Πληρώθηκε': '✓ Paid',
+  'Πρόσθεσε γεγονός': 'Add an event',
+  'Ήσυχη ημέρα. Δεν έχει λήξεις, λογαριασμούς ή γεγονότα.': 'A quiet day. No expiries, bills or events.',
+  'Κλείσιμο ημέρας': 'Close day'
 };
 

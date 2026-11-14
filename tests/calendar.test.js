@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   autoEntries, billCalendarStatus, buildIcs, calendarEntries, calendarProEnabled, createEvent,
-  entriesOn, eventOccurrences, googleEventUrl, monthBounds, monthGrid,
+  dayDots, dotKind, entriesOn, eventOccurrences, googleEventUrl, monthBounds, monthGrid,
   personColor, shortDayMonth, shouldNotify, userEntries, weekBounds
 } from '../src/calendar.js';
 import { EXTRA_KINDS } from '../src/storage.js';
@@ -193,4 +193,49 @@ test('calendar: page, home Today card and cache are wired', () => {
   assert.match(sw, /src\/calendar\.js/);
   assert.match(home, /calendar: v\.calendar !== false/);
   assert.match(guide, /id: 'calendar'/);
+});
+
+test('calendar: day dots are unique, typed and capped at 3', () => {
+  assert.equal(dotKind({ source: 'bill', pending: true, paid: false }), 'bill');
+  assert.equal(dotKind({ source: 'bill', overdue: true, paid: false }), 'bill');
+  assert.equal(dotKind({ source: 'bill', paid: true, pending: false }), 'other');
+  assert.equal(dotKind({ source: 'debit', pending: false }), 'other');
+  assert.equal(dotKind({ source: 'expiry' }), 'expiry');
+  assert.equal(dotKind({ source: 'event' }), 'event');
+  assert.equal(dotKind({ source: 'chore' }), 'other');
+  const entries = [
+    { source: 'chore' },
+    { source: 'bill', pending: true, paid: false },
+    { source: 'bill', overdue: true, paid: false },
+    { source: 'expiry' },
+    { source: 'event' },
+    { source: 'debit' }
+  ];
+  assert.deepEqual(dayDots(entries), ['bill', 'expiry', 'event']);
+  assert.deepEqual(dayDots([{ source: 'chore' }, { source: 'debit' }]), ['other']);
+  assert.deepEqual(dayDots([]), []);
+});
+
+test('calendar: tapping a month day opens a bottom sheet, not an inline list', () => {
+  const app = readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const css = readFileSync(new URL('../styles.css', import.meta.url), 'utf8');
+  const guide = readFileSync(new URL('../src/guide.js', import.meta.url), 'utf8');
+  assert.match(html, /id="cal-day-sheet"/);
+  assert.match(html, /aria-modal="true"/);
+  assert.match(html, /aria-labelledby="cal-day-title"/);
+  assert.match(app, /function openCalDaySheet/);
+  assert.match(app, /function closeCalDaySheet/);
+  assert.match(app, /afterPaint\(\(\) => openCalDaySheet/);
+  assert.match(app, /data-action="calendar-add"/);
+  assert.match(app, /Πρόσθεσε γεγονός/);
+  assert.match(app, /dayDots\(on\)/);
+  assert.match(app, /cal-dot is-\$\{kind\}/);
+  assert.doesNotMatch(app, /on\.slice\(0, 4\)/);
+  assert.match(css, /\.cal-dot\.is-bill/);
+  assert.match(css, /\.cal-dot\.is-expiry/);
+  assert.match(css, /\.cal-dot\.is-event/);
+  assert.match(css, /\.cal-day-sheet/);
+  assert.match(guide, /Τι νέο στην 1\.9\.34/);
+  assert.match(guide, /χρωματιστές τελείες/);
 });

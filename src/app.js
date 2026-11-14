@@ -30,7 +30,7 @@ import { initBackToTop } from './back-to-top.js';
 import { HOME_KEY, HOME_OPTIONS, DEFAULT_HOME, parseHomeState, serializeHome, toggleHome } from './home-actions.js';
 import { insightChange, insightText, monthInsights } from './month-insights.js';
 import { NOTICE_KEY, activeBudget, budgetReport, createBudget, hasBudget, monthSpend, shouldNotify } from './budget.js';
-import { NOTICE_KEY as CAL_NOTICE_KEY, PERSON_ALL, RECUR_OPTIONS, buildIcs, calendarEntries, calendarProEnabled, createEvent, entriesOn, googleEventUrl, monthBounds, monthGrid, personColor, shortDayMonth, shouldNotify as calendarShouldNotify, weekBounds } from './calendar.js';
+import { NOTICE_KEY as CAL_NOTICE_KEY, PERSON_ALL, RECUR_OPTIONS, buildIcs, calendarEntries, calendarProEnabled, createEvent, dayDots, entriesOn, googleEventUrl, monthBounds, monthGrid, personColor, shortDayMonth, shouldNotify as calendarShouldNotify, weekBounds } from './calendar.js';
 import { createReceiptPdf, periodBoundsForMonth } from './receipt-pdf.js';
 import { GUIDE_SECTIONS, guideHeading, searchGuide, sectionForView } from './guide.js';
 import { PRODUCT_TYPE_DEFAULT_EMOJI, PRODUCT_TYPE_EMOJIS, allProductTypes, createProductType, customProductTypes, deleteProductType, effectiveType, isCustomTypeId, isProductType, mergeTypeRows, setProductTypes, suggestTypeEmoji, typeEmoji, typeLabel, typeName, upsertProductType, validType } from './product-types.js';
@@ -2761,6 +2761,72 @@ function renderHomeCalendar() {
   return `<section class="panel" id="home-calendar"><div class="panel-heading"><div><h2>${escapeHtml(t('Σήμερα στο ημερολόγιο'))}</h2><p data-no-i18n>${escapeHtml(formatDate(today))}</p></div><button class="panel-link" type="button" data-view="calendar">${escapeHtml(t('Όλα στο ημερολόγιο →'))}</button></div>
     ${renderCalendarList(entries, 'Σήμερα δεν έχει τίποτα στο ημερολόγιο.')}</section>`;
 }
+
+function calDaySheet() { return document.querySelector('#cal-day-sheet'); }
+function closeCalDaySheet() { const d = calDaySheet(); if (d?.open) d.close(); }
+function renderCalDaySheetBody(date) {
+  const entries = entriesOn(calendarRows(date, date), date);
+  const list = entries.length
+    ? renderCalendarList(entries, '')
+    : `<p class="subtle-empty" id="cal-day-empty">${escapeHtml(t('Ήσυχη ημέρα. Δεν έχει λήξεις, λογαριασμούς ή γεγονότα.'))}</p>`;
+  return `${list}<div class="cal-sheet-actions"><button class="button button-primary" type="button" data-action="calendar-add" data-date="${escapeHtml(date)}" id="cal-day-add">➕ ${escapeHtml(t('Πρόσθεσε γεγονός'))}</button></div>`;
+}
+function bindCalDaySheet(dialog) {
+  if (dialog.dataset.bound) return;
+  dialog.dataset.bound = '1';
+  dialog.addEventListener('click', (event) => {
+    const r = dialog.getBoundingClientRect();
+    if (event.clientY < r.top - 1 || event.clientX < r.left - 1 || event.clientX > r.right + 1) dialog.close();
+  });
+  let startY = 0, dragging = false;
+  const reduced = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  dialog.addEventListener('pointerdown', (event) => {
+    if (event.button && event.button !== 0) return;
+    if (!event.target.closest('.cal-sheet-handle, #cal-day-sheet > .dialog-heading')) return;
+    dragging = true;
+    startY = event.clientY;
+    try { dialog.setPointerCapture(event.pointerId); } catch {}
+  });
+  dialog.addEventListener('pointermove', (event) => {
+    if (!dragging) return;
+    const dy = Math.max(0, event.clientY - startY);
+    if (!reduced()) dialog.style.transform = `translateY(${dy}px)`;
+  });
+  const endDrag = (event) => {
+    if (!dragging) return;
+    dragging = false;
+    const dy = event.clientY - startY;
+    dialog.style.transform = '';
+    if (dy > 80) dialog.close();
+  };
+  dialog.addEventListener('pointerup', endDrag);
+  dialog.addEventListener('pointercancel', endDrag);
+}
+function openCalDaySheet(date) {
+  const dialog = calDaySheet();
+  if (!dialog || !date) return;
+  bindCalDaySheet(dialog);
+  const title = dialog.querySelector('#cal-day-title');
+  const eye = dialog.querySelector('#cal-day-eyebrow');
+  if (title) title.textContent = formatDate(date);
+  if (eye) eye.textContent = date === calendarToday() ? t('Σήμερα') : t('Ημερολόγιο');
+  const body = dialog.querySelector('#cal-day-sheet-body');
+  if (body) body.innerHTML = renderCalDaySheetBody(date);
+  translateDom(dialog);
+  if (!dialog.open) dialog.showModal();
+  dialog.querySelector('#cal-day-close')?.focus();
+}
+function startNewCalendarEvent(date) {
+  closeCalDaySheet();
+  if (date) {
+    calendarDay = date;
+    calendarMonth = date.slice(0, 7);
+  }
+  calendarForm = { id: '' };
+  renderApp();
+  afterPaint(() => document.querySelector('#cal-title')?.focus());
+}
+
 function renderCalendarForm() {
   const today = calendarToday();
   const existing = calendarForm?.id ? (state.events || []).find((e) => e.id === calendarForm.id) : null;
@@ -2791,7 +2857,6 @@ function renderCalendarForm() {
 function renderCalendar() {
   ensureCalendarCursor();
   const today = calendarToday();
-  const pro = calendarProEnabled();
   const tabs = [['month', 'Μήνας'], ['today', 'Σήμερα'], ['week', 'Αυτή την εβδομάδα']].map(([id, label]) =>
     `<button class="filter-chip${calendarTab === id ? ' is-active' : ''}" type="button" data-action="calendar-tab" data-id="${id}">${escapeHtml(t(label))}</button>`).join('');
   let body = '';
@@ -2813,17 +2878,14 @@ function renderCalendar() {
     const dows = ['Δευ', 'Τρι', 'Τετ', 'Πεμ', 'Παρ', 'Σαβ', 'Κυρ'].map((d) => `<div class="cal-dow">${escapeHtml(t(d))}</div>`).join('');
     const cells = monthGrid(calendarMonth).map((cell) => {
       const on = entriesOn(entries, cell.date);
-      const dots = on.slice(0, 4).map((e) => {
-        const color = pro ? personColor(e.person) : '';
-        return `<span class="cal-dot"${color ? ` style="background:${color}"` : ''}></span>`;
-      }).join('');
+      const dots = dayDots(on).map((kind) => `<span class="cal-dot is-${kind}"></span>`).join('');
       const cls = ['cal-day', cell.inMonth ? '' : 'is-out', cell.date === today ? 'is-today' : '', cell.date === calendarDay ? 'is-selected' : ''].filter(Boolean).join(' ');
-      return `<button class="${cls}" type="button" data-action="calendar-select" data-date="${cell.date}" aria-current="${cell.date === today ? 'date' : 'false'}"><span class="cal-day-num">${Number(cell.date.slice(8, 10))}</span><span class="cal-dots">${dots}</span></button>`;
+      const count = on.length;
+      const label = count ? `${Number(cell.date.slice(8, 10))}, ${count}` : `${Number(cell.date.slice(8, 10))}`;
+      return `<button class="${cls}" type="button" data-action="calendar-select" data-date="${cell.date}" aria-current="${cell.date === today ? 'date' : 'false'}" aria-haspopup="dialog" aria-label="${escapeHtml(label)}"><span class="cal-day-num">${Number(cell.date.slice(8, 10))}</span><span class="cal-dots">${dots}</span></button>`;
     }).join('');
     body = `<div class="cal-month-nav"><button class="icon-button" type="button" data-action="calendar-month" data-delta="-1" aria-label="${escapeHtml(t('Προηγούμενος μήνας'))}">‹</button><h2 data-no-i18n>${escapeHtml(monthLabel(calendarMonth))}</h2><button class="icon-button" type="button" data-action="calendar-month" data-delta="1" aria-label="${escapeHtml(t('Επόμενος μήνας'))}">›</button></div>
-      <div class="cal-grid">${dows}${cells}</div>
-      <h3 class="settings-sub">${escapeHtml(formatDate(calendarDay))}</h3>
-      ${renderCalendarList(entriesOn(entries, calendarDay), 'Δεν υπάρχει τίποτα αυτή την ημέρα.')}`;
+      <div class="cal-grid">${dows}${cells}</div>`;
   }
   return `${renderHeader(t('Ημερολόγιο'), t('Λήξεις, λογαριασμοί, πάγιες εντολές, δουλειές και τα δικά σου γεγονότα, σε ένα μέρος.'), t('Νέο γεγονός'))}
     <div class="cal-tabs" role="tablist">${tabs}</div>
@@ -2861,6 +2923,7 @@ function saveCalendarForm(form) {
 }
 function openCalendarSource(source, sourceId) {
   document.querySelector('#menu-sheet')?.close?.();
+  closeCalDaySheet();
   if (source === 'expiry') { navigate('pantry'); openItemDialog(sourceId); return; }
   if (source === 'bill' || source === 'debit') { navigate('bills'); openBillDialog(sourceId); return; }
   if (source === 'chore') {
@@ -2896,10 +2959,18 @@ function calendarAction(action, button) {
   } else if (action === 'calendar-select') {
     calendarDay = button.dataset.date;
     if (calendarDay) calendarMonth = calendarDay.slice(0, 7);
+    const hadForm = Boolean(calendarForm);
     calendarForm = null;
-    renderApp();
-  } else if (action === 'calendar-cancel') { calendarForm = null; renderApp(); }
-  else if (action === 'calendar-edit') { calendarForm = { id }; calendarDay = button.dataset.date || calendarDay; renderApp(); document.querySelector('#cal-title')?.focus(); }
+    if (hadForm) renderApp();
+    else {
+      document.querySelectorAll('.cal-day.is-selected').forEach((el) => el.classList.remove('is-selected'));
+      button.classList.add('is-selected');
+    }
+    afterPaint(() => openCalDaySheet(calendarDay));
+  } else if (action === 'calendar-sheet-close') { closeCalDaySheet(); }
+  else if (action === 'calendar-add') { startNewCalendarEvent(button.dataset.date || calendarDay); }
+  else if (action === 'calendar-cancel') { calendarForm = null; renderApp(); }
+  else if (action === 'calendar-edit') { closeCalDaySheet(); calendarForm = { id }; calendarDay = button.dataset.date || calendarDay; renderApp(); afterPaint(() => document.querySelector('#cal-title')?.focus()); }
   else if (action === 'calendar-open') openCalendarSource(button.dataset.source, id);
   else if (action === 'calendar-ics') downloadCalendarIcs();
   else if (action === 'calendar-delete') {
@@ -3939,7 +4010,7 @@ async function submitReceiptExport(event) {
 
 function handleAction(button) {
   const { action, id } = button.dataset;
-  if (action === 'add-item' && activeView === 'calendar') { calendarForm = { id: '' }; renderApp(); document.querySelector('#cal-title')?.focus(); }
+  if (action === 'add-item' && activeView === 'calendar') { startNewCalendarEvent(calendarDay); }
   else if (action === 'add-item') openItemDialog();
   else if (action === 'close-dialog') itemDialog.close();
   else if (action === 'edit-item') openItemDialog(id);
