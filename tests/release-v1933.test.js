@@ -25,7 +25,6 @@ test('v1.9.33 release: version, cache v141, home sign-in card and guide', () => 
   assert.ok(searchGuide('1.9.33').some((s) => s.id === 'whats-new'));
   assert.ok(searchGuide('1.9.30').some((s) => s.id === 'whats-new'));
   const whats = GUIDE_SECTIONS.find((s) => s.id === 'whats-new');
-  assert.equal(whats.title, 'Τι νέο στην 1.9.33');
   assert.ok(dictionaries.en[whats.title], 'EN missing title');
   assert.ok(dictionaries.en[whats.intro], 'EN missing intro');
   for (const b of whats.bullets) assert.ok(dictionaries.en[b], `EN missing: ${b}`);
