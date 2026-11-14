@@ -11,8 +11,8 @@
   <script>try { const z = localStorage.getItem('spitothiki:text-size'); if (z === 'large' || z === 'xlarge') document.documentElement.dataset.text = z; if (localStorage.getItem('spitothiki:contrast') === 'high') document.documentElement.dataset.contrast = 'high'; } catch {}</script>
   <script>try { const t = localStorage.getItem('spitothiki:theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch {}</script>
   <link rel="preload" href="fonts/commissioner-greek.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="styles.css">
-  <link rel="modulepreload" href="src/app.js">
+  <link rel="stylesheet" href="styles.css?v=141-preview">
+  <link rel="modulepreload" href="src/app.js?v=141-preview">
   <link rel="modulepreload" href="src/guide.js">
   <link rel="modulepreload" href="src/domain.js">
   <link rel="modulepreload" href="src/barcode.js">
@@ -328,7 +328,7 @@
     </form>
   </dialog>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script type="module" src="src/app.js"></script>
+  <script type="module" src="src/app.js?v=141-preview"></script>
 <!-- Cloudflare Web Analytics (cookieless) -->
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"e9f4b97697e249649af8d287ea1925fa"}'></script>
 </body>
