@@ -1,0 +1,20 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+const read = (f) => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
+test('v1.9.26 release: version, cache bump, menu/torch INP and receipt CLS', () => {
+  assert.match(read('package.json'), /"version": "1\.9\.26"/);
+  assert.equal((read('index.html').match(/data-no-i18n>1\.9\.26</g) || []).length, 2);
+  const sw = read('sw.js');
+  assert.match(sw, /CACHE_VERSION = 'v132';/);
+  const app = read('src/app.js');
+  assert.match(app, /action === 'open-menu'/);
+  assert.match(app, /pressFeedback\(button\)/);
+  assert.match(app, /afterPaint\(\(\) => \{[\s\S]*sheet\.showModal\(\)/);
+  assert.match(app, /action === 'scan-torch'/);
+  assert.match(app, /apply\(on\)/);
+  const css = read('styles.css');
+  assert.match(css, /#receipt-body \{[^}]*min-height: min\(24rem, 58vh\)/);
+  assert.match(css, /\.receipt-dialog \{[^}]*margin-top: max\(12px, 5vh\)/);
+  assert.doesNotMatch(css, /\.receipt-dialog\[open\]/);
+});
