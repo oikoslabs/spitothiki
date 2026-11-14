@@ -11,9 +11,20 @@ export const GUIDE_SECTIONS = [
     intro: 'Ξεκίνα από εδώ: κάνε πρώτα αυτά τα 3.',
     bullets: [
       'Πάτα «Σάρωση» και σκάναρε το QR μιας απόδειξης. Τα έξοδα γράφονται μόνα τους· αν θέλεις, τα προϊόντα μπαίνουν και στο απόθεμα.',
-      'Στην αρχική οθόνη δες πόσα ξόδεψες αυτόν τον μήνα, τι άλλαξε σε σχέση με τον προηγούμενο, και τι λήγει στις επόμενες 7 ημέρες.',
+      'Στην αρχική οθόνη δες τα έξοδα του μήνα, τον προϋπολογισμό, την κάρτα «Σήμερα» του ημερολογίου, τι άλλαξε σε σχέση με τον προηγούμενο μήνα, και τι λήγει στις επόμενες 7 ημέρες.',
       'Γράψε στη λίστα αγορών ό,τι χρειάζεται το σπίτι, πριν βγεις για ψώνια.',
       'Η σύνδεση είναι προαιρετική. Χρειάζεται μόνο αν θέλεις τα ίδια δεδομένα σε άλλο κινητό ή να τα βλέπει η οικογένεια.'
+    ]
+  },
+  {
+    id: 'whats-new',
+    icon: '✨',
+    title: 'Τι νέο στην 1.9.29',
+    numbered: false,
+    intro: 'Μηνιαίος προϋπολογισμός και ημερολόγιο νοικοκυριού.',
+    bullets: [
+      'Μηνιαίος προϋπολογισμός: στο «Σύνολο εξόδων» βάζεις συνολικό όριο και, αν θέλεις, όρια ανά κατηγορία. Η κάρτα μπορεί να φαίνεται στην αρχική. Ειδοποίηση έρχεται όσο η εφαρμογή είναι ανοιχτή, τη στιγμή που προσθέτεις ένα έξοδο που σε φέρνει στο 80% ή πάνω από το όριο — όχι με κλειστή εφαρμογή.',
+      'Ημερολόγιο: λήξεις προϊόντων, λογαριασμοί, πάγιες εντολές, δουλειές και τα δικά σου γεγονότα (με επανάληψη αν θέλεις). Η κάρτα «Σήμερα» είναι στην αρχική. Για υπενθυμίσεις με κλειστή εφαρμογή, πρόσθεσε τα στο ημερολόγιο του κινητού (.ics).'
     ]
   },
   {
@@ -108,8 +119,20 @@ export const GUIDE_SECTIONS = [
     bullets: [
       'Πάτα «Σύνολο εξόδων» για αγορές, ενοίκιο, λογαριασμούς, μετακινήσεις και μικροέξοδα του μήνα.',
       'Μπορείς να φτιάξεις δικές σου κατηγορίες εξόδων (π.χ. Ρούχα). Στο κοινό σπίτι με δύο μέλη βλέπεις και «Ποιος πλήρωσε τι».',
-      'Στο «Σύνολο εξόδων» βάλε μηνιαίο προϋπολογισμό (συνολικό όριο και, αν θέλεις, ανά κατηγορία). Βλέπεις πόσα ξόδεψες, πόσα μένουν, πόσες ημέρες έμειναν και μια απλή εκτίμηση. Η κάρτα μπορεί να φαίνεται και στην αρχική.',
+      'Για μηνιαίο όριο εξόδων (συνολικό και ανά κατηγορία), μπάρες προόδου και ειδοποιήσεις, δες το κεφάλαιο «Προϋπολογισμός μήνα».',
       'Στην αρχική, η κάρτα «Τι άλλαξε αυτόν τον μήνα» συγκρίνει τα έξοδα μέχρι σήμερα με το ίδιο διάστημα του προηγούμενου μήνα. Εμφανίζεται μόνο όταν υπάρχουν αρκετά στοιχεία και υπολογίζεται στη συσκευή σου. Την κρύβεις από Ρυθμίσεις → Αρχική οθόνη.'
+    ]
+  },
+  {
+    id: 'budget',
+    icon: '🎯',
+    title: 'Προϋπολογισμός μήνα',
+    intro: 'Όρισε πόσα θέλεις να ξοδεύεις τον μήνα και βλέπεις πού βρίσκεσαι.',
+    bullets: [
+      'Στο «Σύνολο εξόδων» βάλε συνολικό όριο μήνα και, αν θέλεις, όρια ανά κατηγορία (π.χ. αγορές, λογαριασμοί). Μετράνε τα ίδια έξοδα με το σύνολο του μήνα.',
+      'Βλέπεις πόσα ξόδεψες, πόσα μένουν, πόσες ημέρες έμειναν και μια απλή εκτίμηση. Στο 80% και όταν ξεπεράσεις το όριο, η μπάρα αλλάζει χρώμα.',
+      'Ειδοποίηση εμφανίζεται όσο η εφαρμογή είναι ανοιχτή, τη στιγμή που καταχωρείς ένα έξοδο που σε φέρνει στο 80% ή πάνω από το όριο. Με κλειστή εφαρμογή δεν έρχεται ειδοποίηση προϋπολογισμού.',
+      'Η κάρτα προϋπολογισμού στην αρχική κρύβεται από Ρυθμίσεις → Αρχική οθόνη.'
     ]
   },
   {
@@ -149,9 +172,9 @@ export const GUIDE_SECTIONS = [
     intro: 'Λήξεις, λογαριασμοί, πάγιες εντολές, δουλειές και τα δικά σου γεγονότα, σε ένα μέρος.',
     bullets: [
       'Το ημερολόγιο γεμίζει μόνο του από λήξεις προϊόντων, λογαριασμούς, πάγιες εντολές και δουλειές με ημερομηνία. Πάτα ένα στοιχείο για να ανοίξεις την πηγή του.',
-      'Πρόσθεσε δικά σου γεγονότα: τίτλος, ημερομηνία, προαιρετικά ώρα, ποιος τα αφορά και σημειώσεις. Μπορούν να επαναλαμβάνονται κάθε εβδομάδα, μήνα ή χρόνο.',
-      'Η κάρτα «Σήμερα» στην αρχική κρύβεται από Ρυθμίσεις → Αρχική οθόνη.',
-      '«Πρόσθεσε στο ημερολόγιο του κινητού» κατεβάζει αρχείο .ics ώστε να χτυπήσουν υπενθυμίσεις και με κλειστή εφαρμογή. Μέσα στην εφαρμογή, υπενθύμιση εμφανίζεται όταν είναι ανοιχτή.'
+      'Πρόσθεσε γεγονός με τίτλο, ημερομηνία, προαιρετικά ώρα, ποιος το αφορά και σημειώσεις. Μπορεί να επαναλαμβάνεται κάθε εβδομάδα, μήνα ή χρόνο.',
+      'Η κάρτα «Σήμερα» στην αρχική δείχνει ό,τι πέφτει σήμερα και κρύβεται από Ρυθμίσεις → Αρχική οθόνη.',
+      '«Πρόσθεσε στο ημερολόγιο του κινητού» κατεβάζει αρχείο .ics ώστε να χτυπήσουν υπενθυμίσεις και με κλειστή εφαρμογή. Μέσα στην εφαρμογή, υπενθύμιση εμφανίζεται μόνο όσο είναι ανοιχτή (όχι push).'
     ]
   },
   {
@@ -259,7 +282,7 @@ export const GUIDE_EN = {
   'Ξεκίνημα': 'Getting started',
   'Ξεκίνα από εδώ: κάνε πρώτα αυτά τα 3.': 'Start here: do these 3 things first.',
   'Πάτα «Σάρωση» και σκάναρε το QR μιας απόδειξης. Τα έξοδα γράφονται μόνα τους· αν θέλεις, τα προϊόντα μπαίνουν και στο απόθεμα.': 'Tap «Scan» and scan the QR code on a receipt. Spending is recorded by itself; if you want, the products go into the pantry too.',
-  'Στην αρχική οθόνη δες πόσα ξόδεψες αυτόν τον μήνα, τι άλλαξε σε σχέση με τον προηγούμενο, και τι λήγει στις επόμενες 7 ημέρες.': 'On the home screen, see how much you spent this month, what changed compared with last month, and what expires in the next 7 days.',
+  'Στην αρχική οθόνη δες τα έξοδα του μήνα, τον προϋπολογισμό, την κάρτα «Σήμερα» του ημερολογίου, τι άλλαξε σε σχέση με τον προηγούμενο μήνα, και τι λήγει στις επόμενες 7 ημέρες.': 'On the home screen, see this month’s expenses, the budget, the calendar «Today» card, what changed compared with last month, and what expires in the next 7 days.',
   'Γράψε στη λίστα αγορών ό,τι χρειάζεται το σπίτι, πριν βγεις για ψώνια.': 'Write on the shopping list what the house needs, before you go out shopping.',
   'Η σύνδεση είναι προαιρετική. Χρειάζεται μόνο αν θέλεις τα ίδια δεδομένα σε άλλο κινητό ή να τα βλέπει η οικογένεια.': 'Signing in is optional. You only need it if you want the same data on another phone, or for the family to see it.',
   'Αποθήκη (τι έχεις στο σπίτι)': 'Pantry (what you have at home)',
@@ -299,7 +322,7 @@ export const GUIDE_EN = {
   'Πόσα ξόδεψες αυτόν τον μήνα, ανά κατηγορία, και σύγκριση με τον προηγούμενο.': 'How much you spent this month, by category, and a comparison with the previous one.',
   'Πάτα «Σύνολο εξόδων» για αγορές, ενοίκιο, λογαριασμούς, μετακινήσεις και μικροέξοδα του μήνα.': 'Tap «Spending overview» for this month’s shopping, rent, bills, transport and small expenses.',
   'Μπορείς να φτιάξεις δικές σου κατηγορίες εξόδων (π.χ. Ρούχα). Στο κοινό σπίτι με δύο μέλη βλέπεις και «Ποιος πλήρωσε τι».': 'You can create your own expense categories (e.g. Clothes). In a shared home with two members you also see «Who paid what».',
-  'Στο «Σύνολο εξόδων» βάλε μηνιαίο προϋπολογισμό (συνολικό όριο και, αν θέλεις, ανά κατηγορία). Βλέπεις πόσα ξόδεψες, πόσα μένουν, πόσες ημέρες έμειναν και μια απλή εκτίμηση. Η κάρτα μπορεί να φαίνεται και στην αρχική.': 'In «Monthly totals» set a monthly budget (an overall limit and, if you want, per category). You see how much you spent, how much is left, how many days remain and a simple estimate. The card can also appear on the home screen.',
+  'Για μηνιαίο όριο εξόδων (συνολικό και ανά κατηγορία), μπάρες προόδου και ειδοποιήσεις, δες το κεφάλαιο «Προϋπολογισμός μήνα».': 'For a monthly spending limit (overall and per category), progress bars and alerts, see the «Monthly budget» chapter.',
   'Στην αρχική, η κάρτα «Τι άλλαξε αυτόν τον μήνα» συγκρίνει τα έξοδα μέχρι σήμερα με το ίδιο διάστημα του προηγούμενου μήνα. Εμφανίζεται μόνο όταν υπάρχουν αρκετά στοιχεία και υπολογίζεται στη συσκευή σου. Την κρύβεις από Ρυθμίσεις → Αρχική οθόνη.': 'On the home screen, the «What changed this month» card compares spending so far with the same period last month. It appears only when there is enough data and is calculated on your device. You can hide it from Settings → Home screen.',
   'Βενζίνη, διόδια, ΜΜΜ, ταξί και στάθμευση, κάθε μήνα.': 'Fuel, tolls, public transport, taxis and parking, each month.',
   'Καταχώρισε ένα έξοδο μετακίνησης, ή μετάφερε μια απόδειξη καυσίμων ή διοδίων από τις Αποδείξεις.': 'Record a transport expense, or move a fuel or toll receipt from Receipts.',
@@ -340,7 +363,17 @@ export const GUIDE_EN = {
   'Ημερολόγιο': 'Calendar',
   'Λήξεις, λογαριασμοί, πάγιες εντολές, δουλειές και τα δικά σου γεγονότα, σε ένα μέρος.': 'Expiries, bills, standing orders, chores and your own events, in one place.',
   'Το ημερολόγιο γεμίζει μόνο του από λήξεις προϊόντων, λογαριασμούς, πάγιες εντολές και δουλειές με ημερομηνία. Πάτα ένα στοιχείο για να ανοίξεις την πηγή του.': 'The calendar fills itself from product expiries, bills, standing orders and chores with a due date. Tap an item to open its source.',
-  'Πρόσθεσε δικά σου γεγονότα: τίτλος, ημερομηνία, προαιρετικά ώρα, ποιος τα αφορά και σημειώσεις. Μπορούν να επαναλαμβάνονται κάθε εβδομάδα, μήνα ή χρόνο.': 'Add your own events: title, date, optional time, who it concerns and notes. They can repeat weekly, monthly or yearly.',
-  'Η κάρτα «Σήμερα» στην αρχική κρύβεται από Ρυθμίσεις → Αρχική οθόνη.': 'The «Today» card on the home screen is hidden from Settings → Home screen.',
-  '«Πρόσθεσε στο ημερολόγιο του κινητού» κατεβάζει αρχείο .ics ώστε να χτυπήσουν υπενθυμίσεις και με κλειστή εφαρμογή. Μέσα στην εφαρμογή, υπενθύμιση εμφανίζεται όταν είναι ανοιχτή.': '«Add to the phone calendar» downloads an .ics file so reminders can ring with the app closed. In the app, a reminder appears while it is open.'
+  'Πρόσθεσε γεγονός με τίτλο, ημερομηνία, προαιρετικά ώρα, ποιος το αφορά και σημειώσεις. Μπορεί να επαναλαμβάνεται κάθε εβδομάδα, μήνα ή χρόνο.': 'Add an event with a title, a date, optional time, who it concerns and notes. It can repeat weekly, monthly or yearly.',
+  'Η κάρτα «Σήμερα» στην αρχική δείχνει ό,τι πέφτει σήμερα και κρύβεται από Ρυθμίσεις → Αρχική οθόνη.': 'The «Today» card on the home screen shows whatever falls today and is hidden from Settings → Home screen.',
+  '«Πρόσθεσε στο ημερολόγιο του κινητού» κατεβάζει αρχείο .ics ώστε να χτυπήσουν υπενθυμίσεις και με κλειστή εφαρμογή. Μέσα στην εφαρμογή, υπενθύμιση εμφανίζεται μόνο όσο είναι ανοιχτή (όχι push).': '«Add to the phone calendar» downloads an .ics file so reminders can ring with the app closed. In the app, a reminder appears only while it is open (no push).',
+  'Τι νέο στην 1.9.29': 'What’s new in 1.9.29',
+  'Μηνιαίος προϋπολογισμός και ημερολόγιο νοικοκυριού.': 'A monthly budget and a household calendar.',
+  'Μηνιαίος προϋπολογισμός: στο «Σύνολο εξόδων» βάζεις συνολικό όριο και, αν θέλεις, όρια ανά κατηγορία. Η κάρτα μπορεί να φαίνεται στην αρχική. Ειδοποίηση έρχεται όσο η εφαρμογή είναι ανοιχτή, τη στιγμή που προσθέτεις ένα έξοδο που σε φέρνει στο 80% ή πάνω από το όριο — όχι με κλειστή εφαρμογή.': 'Monthly budget: in «Monthly totals» you set an overall limit and, if you want, per-category limits. The card can appear on the home screen. An alert arrives while the app is open, at the moment you add an expense that reaches 80% or goes over the limit — not with the app closed.',
+  'Ημερολόγιο: λήξεις προϊόντων, λογαριασμοί, πάγιες εντολές, δουλειές και τα δικά σου γεγονότα (με επανάληψη αν θέλεις). Η κάρτα «Σήμερα» είναι στην αρχική. Για υπενθυμίσεις με κλειστή εφαρμογή, πρόσθεσε τα στο ημερολόγιο του κινητού (.ics).': 'Calendar: product expiries, bills, standing orders, chores and your own events (with recurrence if you want). The «Today» card is on the home screen. For reminders with the app closed, add them to the phone calendar (.ics).',
+  'Προϋπολογισμός μήνα': 'Monthly budget',
+  'Όρισε πόσα θέλεις να ξοδεύεις τον μήνα και βλέπεις πού βρίσκεσαι.': 'Set how much you want to spend this month and see where you stand.',
+  'Στο «Σύνολο εξόδων» βάλε συνολικό όριο μήνα και, αν θέλεις, όρια ανά κατηγορία (π.χ. αγορές, λογαριασμοί). Μετράνε τα ίδια έξοδα με το σύνολο του μήνα.': 'In «Monthly totals» set an overall monthly limit and, if you want, per-category limits (e.g. shopping, bills). The same expenses as the monthly total are counted.',
+  'Βλέπεις πόσα ξόδεψες, πόσα μένουν, πόσες ημέρες έμειναν και μια απλή εκτίμηση. Στο 80% και όταν ξεπεράσεις το όριο, η μπάρα αλλάζει χρώμα.': 'You see how much you spent, how much is left, how many days remain and a simple estimate. At 80% and when you go over the limit, the bar changes colour.',
+  'Ειδοποίηση εμφανίζεται όσο η εφαρμογή είναι ανοιχτή, τη στιγμή που καταχωρείς ένα έξοδο που σε φέρνει στο 80% ή πάνω από το όριο. Με κλειστή εφαρμογή δεν έρχεται ειδοποίηση προϋπολογισμού.': 'An alert appears while the app is open, at the moment you record an expense that reaches 80% or goes over the limit. With the app closed, no budget notification arrives.',
+  'Η κάρτα προϋπολογισμού στην αρχική κρύβεται από Ρυθμίσεις → Αρχική οθόνη.': 'The budget card on the home screen is hidden from Settings → Home screen.'
 };
