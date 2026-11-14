@@ -4,11 +4,12 @@
 // on every open). A new deploy still shows up: the browser re-checks sw.js on every open, a new CACHE_VERSION
 // installs a fresh copy of the shell, and the page reloads once on «controllerchange».
 // Bump CACHE_VERSION on EVERY deploy that changes any app file; old caches are deleted on activate.
-const CACHE_VERSION = 'v142';
+const CACHE_VERSION = 'v143';
 const CACHE = `spitothiki-${CACHE_VERSION}`;
 const OCR_CACHE = 'spitothiki-vendor'; // v1.9.4: was spitothiki-ocr (CDN copies), deleted on activate
 const SHARE_CACHE = 'spitothiki-share'; // a file shared to the app (Web Share Target), picked up by the page // Tesseract.js script/worker/core/language files, kept across versions
 const DATA_CACHE = 'spitothiki-data'; // written by the app: expiry snapshot for background checks
+// v143: v1.9.35 release: sign-in benefits + once-only contextual prompts.
 // v142: v1.9.34 release: calendar day sheet + colored month dots.
 // v141: v1.9.33 release: restore home sign-in card, raise Settings sync, count new Auth signups.
 // v140: v1.9.32 release: harden owner test tagging + reload after SW update even if a dialog was open.
@@ -51,8 +52,8 @@ const DATA_CACHE = 'spitothiki-data'; // written by the app: expiry snapshot for
 // v1.8.3: short links (/tiktok, /TikTok/ …). Online, Firebase Hosting redirects them; offline we do the same.
 const SHORT_PATH = /^\/(tiktok|facebook|instagram|telegram|viber|reddit|pinterest|sofisstore|play)\/?$/i;
 const SHELL = [
-  './', './index.html', './privacy.html', './styles.css?v=142', './manifest.webmanifest',
-  './src/app.js?v=142', './src/format.js', './src/theme.js', './src/i18n.js', './src/features.js', './src/recipes.js', './src/receipt.js', './src/receipt-photo.js', './src/mealplan.js', './src/diet-plan.js', './src/receipts.js', './src/diet-ui.js', './src/diet-i18n.js', './src/bills.js', './src/transport.js', './src/extras.js', './src/chores.js', './src/bar.js', './src/bill-pdf.js', './src/prefs.js', './src/scan-router.js', './src/onboarding.js', './src/cart.js', './src/shelf-price.js', './src/push.js', './src/auto-list.js', './src/price-compare.js', './src/recipe-data.js', './src/gs1.js', './src/back-to-top.js', './src/backup-crypto.js', './src/gdrive.js', './src/gdrive-auth.js', './src/drive-key.js', './src/receipt-edit.js', './src/manual-expense.js', './src/receipt-domains.js', './src/expense-cats.js', './src/whopaid.js', './src/offline.js', './src/protect.js', './src/domain.js', './src/storage.js', './src/barcode.js', './src/toll-barcode.js', './src/firebase-config.js', './src/sync-core.js', './src/sync-firebase.js', './src/disposable-email.js', './src/marketing-consent.js', './src/source.js', './src/owner.js', './src/receipt-store.js', './src/account-delete.js', './src/tester-card.js', './src/home-actions.js', './src/product-types.js', './src/guide.js', './src/shopping-extras.js', './src/month-insights.js', './src/receipt-pdf.js', './src/budget.js', './src/calendar.js', './src/pdf-doc.js',
+  './', './index.html', './privacy.html', './styles.css?v=143', './manifest.webmanifest',
+  './src/app.js?v=143', './src/format.js', './src/theme.js', './src/i18n.js', './src/features.js', './src/recipes.js', './src/receipt.js', './src/receipt-photo.js', './src/mealplan.js', './src/diet-plan.js', './src/receipts.js', './src/diet-ui.js', './src/diet-i18n.js', './src/bills.js', './src/transport.js', './src/extras.js', './src/chores.js', './src/bar.js', './src/bill-pdf.js', './src/prefs.js', './src/scan-router.js', './src/onboarding.js', './src/cart.js', './src/shelf-price.js', './src/push.js', './src/auto-list.js', './src/price-compare.js', './src/recipe-data.js', './src/gs1.js', './src/back-to-top.js', './src/backup-crypto.js', './src/gdrive.js', './src/gdrive-auth.js', './src/drive-key.js', './src/receipt-edit.js', './src/manual-expense.js', './src/receipt-domains.js', './src/expense-cats.js', './src/whopaid.js', './src/offline.js', './src/protect.js', './src/domain.js', './src/storage.js', './src/barcode.js', './src/toll-barcode.js', './src/firebase-config.js', './src/sync-core.js', './src/sync-firebase.js', './src/disposable-email.js', './src/marketing-consent.js', './src/source.js', './src/owner.js', './src/receipt-store.js', './src/account-delete.js', './src/tester-card.js', './src/home-actions.js', './src/product-types.js', './src/guide.js', './src/shopping-extras.js', './src/month-insights.js', './src/receipt-pdf.js', './src/budget.js', './src/calendar.js', './src/pdf-doc.js',
   './fonts/commissioner-greek.woff2', './fonts/commissioner-latin.woff2', './fonts/pdf-sans-el.ttf', './icons/icon-192.png', './icons/icon.svg'
 ];
 
