@@ -42,7 +42,7 @@ import { DISPOSABLE_EMAIL_MSG, isDisposableEmail } from './disposable-email.js';
 import { MARKETING_HINT, MARKETING_LABEL, readMarketingCheckbox } from './marketing-consent.js';
 import { clearDriveKey, loadDriveKey, saveDriveKey } from './drive-key.js';
 import { applyReceiptEdit, receiptEditError } from './receipt-edit.js';
-import { addManualExpense, createManualExpense, guessManualCategory, manualCategory, needsAmount, parseAmount } from './manual-expense.js';
+import { addManualExpense, createManualExpense, guessManualCategory, manualCategory, parseAmount, shouldAskAmount } from './manual-expense.js';
 import { EXPENSE_CAT_DEFAULT_EMOJI, NO_CATEGORY, createExpenseCategory, deleteExpenseCategory, effectiveItemCategory, expenseCategories, expenseCategoryMonth, upsertExpenseCategory, visibleSpendRows } from './expense-cats.js';
 import { BACKUP_SNOOZE_KEY, LAST_BACKUP_KEY, backupReminderDue, dequeue, enqueue, hasData, loadQueue, saveQueue } from './offline.js';
 import { TRANSPORT_ICONS, TRANSPORT_TYPES, applyTransportRecurring, classifyReceipt, consumptionFor, createTransport, createTransportRecurring, fuelStats, pricePerLiter, transportMonth } from './transport.js';
@@ -1687,7 +1687,8 @@ async function loadReceipt(link, { fromQueue = false } = {}) {
     const duplicate = (state.receipts || []).find((entry) => entry.id === id && !isStaleReceipt(entry, state));
     const related = duplicate ? null : findRelatedReceipt(receipt, state.receipts || [], id);
     // v1.8.0: a scan with neither items nor an amount (ΑΑΔΕ cash-register QR) asks for the amount — never a 0 € expense.
-    if (needsAmount(receipt) && receiptTarget !== 'transport' && !duplicate) {
+    // Also when the scan started from Μετακινήσεις: skipping the form used to show 0,00 €.
+    if (shouldAskAmount(receipt, { duplicate })) {
       receiptState = { step: 'manual', receipt, id, guess: classifyReceipt(receipt), target: receiptTarget, manual: { id, url: receipt.sourceUrl, format: receipt.format, date: receipt.date, store: receipt.issuerName, reason: 'aade' } };
     } else receiptState = { step: 'review', receipt, id, duplicate, related, trip: tripForReceipt(state.trips || [], receipt), target: receiptTarget, guess: classifyReceipt(receipt) };
   } catch (error) {
@@ -1756,15 +1757,18 @@ function renderReceiptManual() {
   const note = m.reason === 'aade'
     ? `<p class="alert-banner" id="manual-aade-note" role="status">${escapeHtml(t('Αυτό το QR (ταμειακή μηχανή, ΑΑΔΕ) δεν έχει μέσα το ποσό ούτε τα είδη. Γράψε το σύνολο της απόδειξης.'))}</p>`
     : `<p class="field-hint" id="manual-note">${escapeHtml(t('Για ψώνια χωρίς απόδειξη: σούπερ μάρκετ, κρεοπωλείο, λαϊκή… Μετράει στα έξοδα του μήνα.'))}</p>`;
-  const transport = m.reason === 'aade' && receiptState.receipt ? `<button class="button button-quiet" type="button" data-action="receipt-to-transport" id="manual-to-transport">🚗 ${escapeHtml(t('Είναι καύσιμα / διόδια'))}</button>` : '';
+  const toTransport = receiptState.target === 'transport';
+  const transport = !toTransport && m.reason === 'aade' && receiptState.receipt ? `<button class="button button-quiet" type="button" data-action="receipt-to-transport" id="manual-to-transport">🚗 ${escapeHtml(t('Είναι καύσιμα / διόδια'))}</button>` : '';
+  const cats = toTransport ? '' : `<label class="field-label" for="manual-group">${escapeHtml(t('Είδος προϊόντος'))}</label><select class="field-input" id="manual-group" name="category">${groupOptions(m.category || guessManualCategory(m.store) || 'Άλλο')}</select>
+    <label class="field-label" for="manual-expcat">${escapeHtml(t('Κατηγορία εξόδου'))}</label><select class="field-input expcat-select" id="manual-expcat" name="expenseCategory" data-prev="">${expCatOptions('', 'receipt')}</select>${expCatHint('manual-expcat-hint')}${expCatInlineRow()}`;
+  const saveLabel = toTransport ? `🚗 ${escapeHtml(t('Καταχώριση στις Μετακινήσεις'))}` : escapeHtml(t('Αποθήκευση'));
   return `${note}<form id="receipt-manual-form" novalidate>
     <label class="field-label" for="manual-amount">${escapeHtml(t('Ποσό (€)'))}</label><input class="field-input" id="manual-amount" name="amount" type="number" min="0.01" max="100000" step="0.01" inputmode="decimal" required placeholder="€" value="${escapeHtml(m.amount ?? '')}">
     <label class="field-label" for="manual-store">${escapeHtml(t('Κατάστημα (προαιρετικό)'))}</label><input class="field-input" id="manual-store" name="store" maxlength="80" autocomplete="off" list="manual-stores" placeholder="${escapeHtml(t('π.χ. Κρεοπωλείο, λαϊκή'))}" value="${escapeHtml(m.store || '')}"><datalist id="manual-stores">${stores.map((n) => `<option value="${escapeHtml(n)}"></option>`).join('')}</datalist>
     <label class="field-label" for="manual-date">${escapeHtml(t('Ημερομηνία'))}</label><input class="field-input" id="manual-date" name="date" type="date" required value="${escapeHtml(m.date || localDateKey())}" max="${escapeHtml(localDateKey())}">
-    <label class="field-label" for="manual-group">${escapeHtml(t('Είδος προϊόντος'))}</label><select class="field-input" id="manual-group" name="category">${groupOptions(m.category || guessManualCategory(m.store) || 'Άλλο')}</select>
-    <label class="field-label" for="manual-expcat">${escapeHtml(t('Κατηγορία εξόδου'))}</label><select class="field-input expcat-select" id="manual-expcat" name="expenseCategory" data-prev="">${expCatOptions('', 'receipt')}</select>${expCatHint('manual-expcat-hint')}${expCatInlineRow()}
+    ${cats}
     <p class="form-error" id="manual-error" role="alert" hidden></p>
-    <div class="dialog-actions">${transport}<button class="button button-quiet" type="button" data-action="receipt-reset">${escapeHtml(t('Πίσω'))}</button><button class="button button-primary" type="submit" id="manual-save">${escapeHtml(t('Αποθήκευση'))}</button></div></form>
+    <div class="dialog-actions">${transport}<button class="button button-quiet" type="button" data-action="receipt-reset">${escapeHtml(t('Πίσω'))}</button><button class="button button-primary" type="submit" id="manual-save">${saveLabel}</button></div></form>
     ${m.reason === 'aade' ? `<p class="field-hint">${escapeHtml(t('Θες και τα είδη; Βγάλε φωτογραφία την απόδειξη:'))}</p>${photoButtons()}` : ''}`;
 }
 // v1.8.4: product group («Είδος προϊόντος» since v1.8.6), same groups/emoji as the items of a scanned receipt.
@@ -2380,8 +2384,19 @@ function saveTransportForm(form) {
 function receiptToTransport() {
   const { receipt, id, guess } = receiptState;
   if (!receipt) return;
-  const g = guess || { type: 'other', amount: receipt.total, date: receipt.date, note: receipt.issuerName };
-  transportDraft = { ...g, amount: g.amount || '', date: g.date || localDateKey(), receiptId: id, fromReceipt: true };
+  const form = document.querySelector('#receipt-manual-form');
+  const typed = form ? parseAmount(form.elements.amount?.value) : NaN;
+  if (form && !(typed > 0)) {
+    const error = document.querySelector('#manual-error');
+    if (error) { error.textContent = t('Γράψε ποσό μεγαλύτερο από 0.'); error.hidden = false; }
+    form.elements.amount?.focus();
+    return;
+  }
+  const amount = typed > 0 ? typed : (guess?.amount || receipt.total || '');
+  const date = form?.elements.date?.value || guess?.date || receipt.date || localDateKey();
+  const note = String(form?.elements.store?.value || '').trim() || guess?.note || receipt.issuerName || '';
+  const type = guess?.type || 'fuel';
+  transportDraft = { ...guess, type, amount: amount || '', date, note, receiptId: id, fromReceipt: true };
   receiptState = { step: 'start' };
   renderReceipt();
   document.querySelector('#receipt-dialog').close();
@@ -4145,7 +4160,7 @@ document.addEventListener('submit', (event) => {
     loadReceipt(event.target.elements.link.value);
     return;
   }
-  if (event.target.id === 'receipt-manual-form') { event.preventDefault(); saveManualExpense(event.target); return; }
+  if (event.target.id === 'receipt-manual-form') { event.preventDefault(); if (receiptState.target === 'transport' && receiptState.receipt) { receiptToTransport(); return; } saveManualExpense(event.target); return; }
   if (event.target.id === 'receipt-review-form') {
     event.preventDefault();
     const form = event.target;

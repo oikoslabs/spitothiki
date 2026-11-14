@@ -65,5 +65,7 @@ export function addManualExpense(state, entry) {
   return { receipts: [...(state.receipts || []), entry.receipt], purchases: [...(state.purchases || []), entry.purchase] };
 }
 
-// A scanned receipt that has neither items nor an amount (e.g. ΑΑΔΕ cash-register QR): ask for the amount instead of saving 0 €.
+// A scanned receipt that has neither items nor an amount (e.g. an ΑΑΔΕ cash-register QR we could not parse): ask for the amount instead of saving 0 €.
 export const needsAmount = (receipt) => Boolean(receipt) && !(receipt.lines || []).length && !(Number(receipt.total) > 0);
+// Always ask, including when the scan started from Μετακινήσεις — that path used to skip the form and show 0,00 €.
+export const shouldAskAmount = (receipt, { duplicate } = {}) => needsAmount(receipt) && !duplicate;

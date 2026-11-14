@@ -47,6 +47,37 @@ test('receipt URLs: https only, suffix stripped, AADE summary links', () => {
   assert.equal(s.lines.length, 0);
 });
 
+// Α.1024/2020 ΦΗΜ cash-register QR: official example (serial + mark + SHA-1 + amount).
+const FHM_OK = 'https://www1.aade.gr/tameiakes/myweb/q1.php?SIG=GRT99000204000003870EA2C079E722C361C6297D10F02955CA413695A918.35';
+const FHM_50 = 'https://www1.aade.gr/tameiakes/myweb/q1.php?SIG=DMK0000000000000001' + '0123456789ABCDEF0123456789ABCDEF01234567' + '50.00';
+
+test('ΦΗΜ cash-register SIG: amount is the suffix after serial, mark and SHA-1', () => {
+  const official = parseAadeSummary(FHM_OK);
+  assert.equal(official.total, 18.35);
+  assert.equal(official.issuerName, '');
+  assert.equal(official.issuerVat, '');
+  assert.equal(official.date, '');
+  assert.equal(official.lines.length, 0);
+  assert.equal(parseAadeSummary(FHM_50).total, 50);
+  assert.equal(parseAadeSummary('https://www1.aade.gr/tameiakes/myweb/q1.php?SIG=DMK00000000000000010123456789ABCDEF0123456789ABCDEF0123456712,50').total, 12.5);
+  // Short / invalid SIG (no amount packed in) stays 0 — the app then asks for the amount.
+  assert.equal(parseAadeSummary('https://www1.aade.gr/tameiakes/myweb/q1.php?SIG=DEMO123').total, 0);
+  assert.equal(parseAadeSummary('https://www1.aade.gr/tameiakes/myweb/q1.php?SIG=NOTAVALIDSIG00000000ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ18.35').total, 0);
+  // Query-string totals still win over a SIG, when both are present.
+  const both = parseAadeSummary('https://www1.aade.gr/tameiakes/myweb/q1.php?SIG=GRT99000204000003870EA2C079E722C361C6297D10F02955CA413695A918.35&totalGrossValue=99.00');
+  assert.equal(both.total, 99);
+});
+
+test('fetchReceipt: ΦΗΜ SIG amount is parsed on-device (no network)', async () => {
+  let calls = 0;
+  const r = await fetchReceipt(FHM_OK, { fetchImpl: async () => { calls += 1; throw new Error('should not fetch'); } });
+  assert.equal(r.format, 'AADE');
+  assert.equal(r.via, 'aade');
+  assert.equal(r.proxied, false);
+  assert.equal(r.total, 18.35);
+  assert.equal(calls, 0);
+});
+
 test('name tidy, category guess and stable receipt ids', async () => {
   assert.equal(tidyName('ΑΥΓΑ ΤΣΑΟΥΣΗ ΒΙΟΛΟΓΙΚΑ.'), 'Αυγα τσαουση βιολογικα');
   assert.equal(tidyName('Γάλα'), 'Γάλα');
