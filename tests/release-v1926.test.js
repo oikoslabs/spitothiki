@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 const read = (f) => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
 test('v1.9.26 release: version, cache bump, menu/torch INP and receipt CLS', () => {
-  assert.match(read('package.json'), /"version": "1\.9\.27"/);
-  assert.equal((read('index.html').match(/data-no-i18n>1\.9\.27</g) || []).length, 2);
+  assert.match(read('package.json'), /"version": "1\.9\.28"/);
+  assert.equal((read('index.html').match(/data-no-i18n>1\.9\.28</g) || []).length, 2);
   const sw = read('sw.js');
-  assert.match(sw, /CACHE_VERSION = 'v133';/);
+  assert.match(sw, /CACHE_VERSION = 'v134';/);
   const app = read('src/app.js');
   assert.match(app, /action === 'open-menu'/);
   assert.match(app, /pressFeedback\(button\)/);
