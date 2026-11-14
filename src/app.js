@@ -1261,13 +1261,17 @@ function applyIncomeTaxPlan(form) {
   document.querySelector('#bill-installments').open = true;
 }
 
-function closeScanner() {
+function releaseScanner() {
   scanAbort?.abort();
   scanAbort = null;
-  stopScanner?.();
+  const stop = stopScanner;
   stopScanner = null;
+  if (stop) afterPaint(() => stop());
+}
+function closeScanner() {
   const dialog = document.querySelector('#scan-dialog');
   if (dialog.open) dialog.close();
+  else releaseScanner();
 }
 
 const NOTIFY_KEY = 'spitothiki:notifications';
@@ -3580,7 +3584,15 @@ function handleAction(button) {
   else if (action === 'cart-cancel') {
     const trip = activeTrip();
     if (trip) undoable('Το καλάθι ακυρώθηκε.', () => { state.trips = state.trips.filter((entry) => entry.id !== trip.id); cartScanning = false; if (persist()) renderApp(); });
-  } else if (action === 'open-menu') { const sheet = document.querySelector('#menu-sheet'); sheet.querySelectorAll('[data-view]').forEach((b) => b.classList.toggle('is-active', b.dataset.view === activeView)); sheet.showModal(); }
+  } else if (action === 'open-menu') {
+    // Paint the tap first; building is-active and opening the sheet in the same click was a ~900ms INP on Android.
+    pressFeedback(button);
+    afterPaint(() => {
+      const sheet = document.querySelector('#menu-sheet');
+      sheet.querySelectorAll('[data-view]').forEach((b) => b.classList.toggle('is-active', b.dataset.view === activeView));
+      sheet.showModal();
+    });
+  }
   else if (action === 'close-menu') document.querySelector('#menu-sheet').close();
   else if (action === 'quick' && button.dataset.quick === 'scan') { pressFeedback(button); runQuickAction('scan'); }
   else if (action === 'quick') { const id = button.dataset.quick; if (button.closest('#quick-sheet')) document.querySelector('#quick-sheet')?.close(); pressFeedback(button); afterPaint(() => runQuickAction(id)); }
@@ -3693,7 +3705,25 @@ function handleAction(button) {
   });
   else if (action === 'sync-leave') showConfirm('Θα επιστρέψεις στο δικό σου νοικοκυριό. Τα κοινά προϊόντα θα μείνουν στο κοινό νοικοκυριό.', () => syncAction(() => sync.leaveHousehold(), 'Αποχώρησες από το νοικοκυριό.'), 'Αποχώρηση;');
   else if (action === 'scan-barcode') openScanner();
-  else if (action === 'scan-torch') { const on = button.getAttribute('aria-pressed') !== 'true'; stopScanner?.torch?.(on).then((ok) => { if (ok) { button.setAttribute('aria-pressed', String(on)); button.textContent = t(on ? '🔦 Φακός: ανοιχτός' : '🔦 Φακός'); } else { button.hidden = true; } }); }
+  else if (action === 'scan-torch') {
+    const apply = stopScanner?.torch;
+    if (!apply) return;
+    const on = button.getAttribute('aria-pressed') !== 'true';
+    // Visual feedback first; applyConstraints on the track is slow on some Androids and was blocking INP.
+    button.setAttribute('aria-pressed', String(on));
+    button.textContent = t(on ? '🔦 Φακός: ανοιχτός' : '🔦 Φακός');
+    afterPaint(() => {
+      apply(on).then((ok) => {
+        if (ok) return;
+        button.setAttribute('aria-pressed', 'false');
+        button.textContent = t('🔦 Φακός');
+        button.hidden = true;
+      }).catch(() => {
+        button.setAttribute('aria-pressed', String(!on));
+        button.textContent = t(!on ? '🔦 Φακός: ανοιχτός' : '🔦 Φακός');
+      });
+    });
+  }
   else if (action === 'close-scan') { cartScanning = false; closeScanner(); }
   else if (action === 'lookup-barcode') fillFromBarcode(itemForm.elements.barcode.value);
   else if (action === 'enable-notifications') enableNotifications();
@@ -3810,7 +3840,7 @@ function handleAction(button) {
   else if (action === 'tester-collapse') { writeKey(TESTER_COLLAPSE_KEY, '1'); renderApp(); document.querySelector('#home-tester-card')?.focus(); }
   else if (action === 'tester-expand') { writeKey(TESTER_COLLAPSE_KEY, null); renderApp(); document.querySelector('#home-tester-card')?.focus(); }
   else if (action === 'protect-snooze') { writeKey(PROTECT_SNOOZE_KEY, String(snoozeUntilFrom())); renderApp(); }
-  else if (action === 'sheet-signin') { closeProtectSheet(); goToSignin(); }
+  else if (action === 'sheet-signin') { pressFeedback(button); afterPaint(() => { closeProtectSheet(); goToSignin(); }); }
   else if (action === 'sheet-drive') { closeProtectSheet(); driveConnect(); }
   else if (action === 'sheet-later') closeProtectSheet();
   else if (action === 'home-signin-dismiss') { try { localStorage.setItem(SIGNIN_DISMISS_KEY, String(Date.now())); } catch {} renderApp(); }
@@ -3851,10 +3881,16 @@ document.addEventListener('click', (event) => {
   const viewButton = event.target.closest('[data-view]');
   if (viewButton) {
     event.preventDefault(); const view = viewButton.dataset.view;
-    // Fast feedback first (close the menu, highlight the target), heavy render after the next paint (INP).
-    if (viewButton.closest('#menu-sheet')) document.querySelector('#menu-sheet').close();
+    // Fast feedback first; close the menu and render after the next paint (INP).
+    const fromMenu = viewButton.closest('#menu-sheet');
     const focusId = viewButton.dataset.focus; // e.g. «Άλλαξε τι φαίνεται στην αρχική» → Settings → «Αρχική οθόνη»
-    pressFeedback(viewButton); afterPaint(() => { navigate(view); if (focusId) requestAnimationFrame(() => { const el = document.getElementById(focusId); el?.scrollIntoView({ block: 'start' }); el?.querySelector('input, button')?.focus({ preventScroll: true }); }); }); return;
+    pressFeedback(viewButton);
+    afterPaint(() => {
+      if (fromMenu) document.querySelector('#menu-sheet')?.close();
+      navigate(view);
+      if (focusId) requestAnimationFrame(() => { const el = document.getElementById(focusId); el?.scrollIntoView({ block: 'start' }); el?.querySelector('input, button')?.focus({ preventScroll: true }); });
+    });
+    return;
   }
   if (event.target.id === 'menu-sheet' || event.target.id === 'quick-sheet') { event.target.close(); return; }
   const button = event.target.closest('[data-action]');
@@ -4203,7 +4239,7 @@ transportHistoryDialog().addEventListener('close', () => { if (history.state?.tr
 window.addEventListener('popstate', () => { if (transportHistoryDialog().open && !history.state?.transportHistory) transportHistoryDialog().close(); });
 extrasHistoryDialog().addEventListener('close', () => { if (history.state?.extrasHistory) history.back(); });
 window.addEventListener('popstate', () => { if (extrasHistoryDialog().open && !history.state?.extrasHistory) extrasHistoryDialog().close(); });
-document.querySelector('#scan-dialog').addEventListener('close', () => { scanAbort?.abort(); scanAbort = null; stopScanner?.(); stopScanner = null; });
+document.querySelector('#scan-dialog').addEventListener('close', () => { releaseScanner(); });
 itemForm.elements.barcode.addEventListener('keydown', (event) => {
   if (event.key === 'Enter') { event.preventDefault(); fillFromBarcode(event.target.value); }
 });

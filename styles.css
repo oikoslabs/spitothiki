@@ -428,10 +428,10 @@ body[data-screen="pantry"] .topbar .button-add { display: none; }
 @media (max-width: 760px) { .primary-nav { grid-template-columns: repeat(7,minmax(0,1fr)); } .recipe-grid { grid-template-columns: 1fr; } }
 
 /* Scan receipt */
-.receipt-dialog { width: min(820px, calc(100vw - 24px)); }
-/* v1.6.10: pinned to the top, so the heading doesn't jump when the receipt arrives and the dialog grows (CLS). */
-.receipt-dialog[open] { margin-top: max(12px, 5vh); margin-bottom: auto; height: fit-content; }
-/* (no reserved height needed any more: the dialog is pinned to the top) */
+/* Pin to the top even before [open] applies, so the first paint is not the UA-centered dialog (CLS). */
+.receipt-dialog { width: min(820px, calc(100vw - 24px)); margin-top: max(12px, 5vh); margin-bottom: auto; height: fit-content; }
+/* Keep the start form's height while a receipt is loading, so the dialog doesn't shrink then jump when items arrive. */
+#receipt-body { min-height: min(24rem, 58vh); }
 .receipt-summary { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 6px 0 10px; }
 .receipt-summary > div { display: grid; gap: 2px; }
 .receipt-lines { display: grid; gap: 6px; max-height: 50vh; overflow: auto; padding-right: 4px; }
