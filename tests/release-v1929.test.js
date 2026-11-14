@@ -11,7 +11,7 @@ test('v1.9.29 release: version, cache bump, budget, calendar and guide', () => {
   assert.match(read('package.json'), /"version": "1\.9\.32"/);
   assert.equal((read('index.html').match(/data-no-i18n>1\.9\.32</g) || []).length, 2);
   const sw = read('sw.js');
-  assert.match(sw, /CACHE_VERSION = 'v140';/);
+  assert.match(sw, /CACHE_VERSION = 'v141-preview';/);
   assert.match(sw, /src\/budget\.js/);
   assert.match(sw, /src\/calendar\.js/);
   assert.match(read('src/storage.js'), /'budgets'/);

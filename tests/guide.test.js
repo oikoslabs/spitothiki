@@ -82,7 +82,7 @@ test('guide is in the menu, settings, starter, welcome and SW cache v125', () =>
   assert.match(app, /onboard-guide/);
   assert.match(app, /function helpButton/);
   const sw = read('sw.js');
-  assert.match(sw, /CACHE_VERSION = 'v140'/);
+  assert.match(sw, /CACHE_VERSION = 'v141-preview'/);
   assert.ok(sw.includes("./src/guide.js"));
 });
 
