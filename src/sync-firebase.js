@@ -89,6 +89,8 @@ export async function createFirebaseSync({ config, getState, setState, onStatus,
     loadPendingFromSession();
     if (marketingCommitDone) { clearPending(); return; }
     const isNewUser = cred?.additionalUserInfo?.isNewUser === true;
+    // Count a brand-new Auth user even if household creation races with this write.
+    if (isNewUser) { try { onNewHousehold?.(); } catch {} }
     if (!shouldApplySignupMarketing({ isNewUser, pending: pendingMarketing })) {
       clearPending();
       return;
@@ -142,16 +144,16 @@ export async function createFirebaseSync({ config, getState, setState, onStatus,
     const userDoc = await fs.getDoc(userRef).catch(() => null);
     const saved = userDoc?.exists() ? userDoc.data().householdId : '';
     if (userDoc?.exists()) marketingOptIn = normalizeMarketingOptIn(userDoc.data());
-    if (saved) return saved;
-    const own = fs.doc(db, 'households', uid);
+    const hid = saved || uid;
+    const own = fs.doc(db, 'households', hid);
     const ownDoc = await fs.getDoc(own).catch(() => null);
     if (!ownDoc?.exists()) {
       await fs.setDoc(own, { ownerUid: uid, members: [uid], createdAt: fs.serverTimestamp() });
       try { onNewHousehold?.(); } catch {} // v1.8.2: anonymous «new account» count (source word only)
     }
     // merge: true so a concurrent marketing write is not wiped
-    await fs.setDoc(userRef, { householdId: uid }, { merge: true });
-    return uid;
+    if (!saved) await fs.setDoc(userRef, { householdId: hid }, { merge: true });
+    return hid;
   }
 
   function connect(hid) {

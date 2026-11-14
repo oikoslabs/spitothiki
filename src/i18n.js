@@ -966,7 +966,8 @@ const EN = {
   'Κατάργηση φίλτρου: Λήγουν ή έληξαν': 'Clear filter: Expiring or expired', 'Λήγουν ή έληξαν': 'Expiring or expired', 'Όλα όσα λήγουν →': 'Everything expiring →',
   // Home sign-in card
   'Συνδέσου για να μη χάσεις τα δεδομένα σου': 'Sign in so you never lose your data',
-  'Με σύνδεση, όλα συγχρονίζονται αυτόματα σε κάθε κινητό ή υπολογιστή σου.': 'Once signed in, everything syncs automatically to every phone or computer you use.',
+  'Με σύνδεση, όλα συγχρονίζονται αυτόματα σε κάθε κινητό ή υπολογιστή σου. Χωρίς σύνδεση μένουν μόνο σε αυτή τη συσκευή.': 'Once signed in, everything syncs automatically to every phone or computer you use. Without an account it stays only on this device.',
+  'Email / νέος λογαριασμός': 'Email / new account',
   'Απόκρυψη για 14 ημέρες': 'Hide for 14 days',
   'ποσό (από QR)': 'amount (from QR)',
   'ποσό (από εικόνα)': 'amount (from image)',
@@ -1181,7 +1182,7 @@ const EN = {
   "Βλέπεις πού πάνε τα λεφτά σου κάθε μήνα.": "See where your money goes each month.",
   "Ξέρεις τι έχεις στο σπίτι πριν πας για ψώνια.": "Know what you have at home before you go shopping.",
   "Σκάναρε την πρώτη σου απόδειξη": "Scan your first receipt",
-  "Δωρεάν, χωρίς λογαριασμό και χωρίς κάρτα. Τα στοιχεία σου μένουν στο κινητό σου.": "Free, no account and no card. Your data stays on your phone.",
+  "Δωρεάν και χωρίς κάρτα. Μπορείς να ξεκινήσεις χωρίς λογαριασμό· σύνδεση χρειάζεται για να μην τα χάσεις αν αλλάξεις κινητό.": "Free, no card needed. You can start without an account; sign in so you don't lose your data if you change phones.",
   "Ξεκίνα: σκάναρε το QR μιας απόδειξης": "Start: scan the QR code on a receipt",
   "Τα προϊόντα και τα έξοδα μπαίνουν μόνα τους. Χωρίς λογαριασμό.": "Products and spending are added by themselves. No account needed.",
   "Σκάναρε απόδειξη": "Scan a receipt",

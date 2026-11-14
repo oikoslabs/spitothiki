@@ -356,9 +356,15 @@ function signinDismissedAt() { try { return Number(localStorage.getItem(SIGNIN_D
 // Compact nudge on the home screen while sync is available but the user is signed out.
 function renderSigninCard() {
   if (!showSigninCard(syncStatus, signinDismissedAt())) return '';
+  const google = authProviders.includes('google')
+    ? `<button class="button button-primary" type="button" data-action="sync-google" id="home-signin-google">${escapeHtml(t('Σύνδεση με Google'))}</button>`
+    : '';
+  const email = authProviders.includes('password')
+    ? `<button class="button ${google ? 'button-quiet' : 'button-primary'}" type="button" data-action="home-signin" id="home-signin">${escapeHtml(t('Email / νέος λογαριασμός'))}</button>`
+    : (google ? '' : `<button class="button button-primary" type="button" data-action="home-signin" id="home-signin">${escapeHtml(t('Σύνδεση'))}</button>`);
   return `<section class="signin-card" id="home-signin-card" aria-labelledby="home-signin-title"><span class="signin-icon" aria-hidden="true">☁️</span>
-    <div class="signin-text"><h2 id="home-signin-title">${escapeHtml(t('Συνδέσου για να μη χάσεις τα δεδομένα σου'))}</h2><p>${escapeHtml(t('Με σύνδεση, όλα συγχρονίζονται αυτόματα σε κάθε κινητό ή υπολογιστή σου.'))}</p></div>
-    <button class="button button-primary" type="button" data-action="home-signin" id="home-signin">${escapeHtml(t('Σύνδεση'))}</button>
+    <div class="signin-text"><h2 id="home-signin-title">${escapeHtml(t('Συνδέσου για να μη χάσεις τα δεδομένα σου'))}</h2><p>${escapeHtml(t('Με σύνδεση, όλα συγχρονίζονται αυτόματα σε κάθε κινητό ή υπολογιστή σου. Χωρίς σύνδεση μένουν μόνο σε αυτή τη συσκευή.'))}</p></div>
+    <div class="protect-actions">${google}${email}</div>
     <button class="icon-button signin-close" type="button" data-action="home-signin-dismiss" aria-label="${escapeHtml(t('Απόκρυψη για 14 ημέρες'))}" title="${escapeHtml(t('Απόκρυψη για 14 ημέρες'))}">×</button></section>`;
 }
 // v1.4: small, dismissible «make a backup» nudge (only when not signed in and >30 days / never).
@@ -419,7 +425,7 @@ function renderStarterCard() {
     <p class="starter-example">${escapeHtml(t('Π.χ. σκάναρες την απόδειξη από τον Σκλαβενίτη: 14 προϊόντα, 38,40 €. Μπήκαν στα έξοδα του μήνα και στο ντουλάπι σου.'))}</p>
     <ol class="starter-steps">${steps.map((x) => `<li>${escapeHtml(t(x))}</li>`).join('')}</ol>
     </details>
-    <p class="starter-note">${escapeHtml(t('Δωρεάν, χωρίς λογαριασμό και χωρίς κάρτα. Τα στοιχεία σου μένουν στο κινητό σου.'))}</p></div></section>`;
+    <p class="starter-note">${escapeHtml(t('Δωρεάν και χωρίς κάρτα. Μπορείς να ξεκινήσεις χωρίς λογαριασμό· σύνδεση χρειάζεται για να μην τα χάσεις αν αλλάξεις κινητό.'))}</p></div></section>`;
 }
 function storageBadge() {
   if (!authKnown(syncStatus) && !driveOn()) return '';
@@ -674,7 +680,7 @@ function renderOverview() {
     ${renderHomeGuide()}
     ${renderHomePrimary()}
     ${summary.expired ? `<div class="alert-banner" role="status">${t(summary.expired === 1 ? '⚠️ Έχεις {count} προϊόν που έχει λήξει. Έλεγξέ τα πριν τα χρησιμοποιήσεις.' : '⚠️ Έχεις {count} προϊόντα που έχουν λήξει. Έλεγξέ τα πριν τα χρησιμοποιήσεις.', { count: summary.expired })}</div>` : ''}
-    ${renderStarterCard()}${renderProtectCard()}${renderTesterCard()}
+    ${renderStarterCard()}${renderSigninCard()}${renderProtectCard()}${renderTesterCard()}
     <section class="stats-grid home-stats" aria-label="Σύνοψη αποθέματος">
       <button class="stat-card" type="button" data-action="home-card" data-card="all" id="home-card-all"><span class="stat-icon">🧺</span><div><strong>${summary.products}</strong><span>προϊόντα στο σπίτι</span></div></button>
       <button class="stat-card" type="button" data-action="home-card" data-card="expiring" id="home-card-expiring"><span class="stat-icon amber">◷</span><div><strong>${summary.expiringSoon + summary.expired}</strong><span>λήγουν ή έληξαν</span></div></button>
@@ -808,6 +814,7 @@ function renderShopping() {
 function renderSettings() {
   return `${renderHeader('Ρυθμίσεις', 'Διαχείριση και αντίγραφο ασφαλείας των δεδομένων σου.')}${storageBadge()}
     <div class="settings-grid"><section class="panel settings-card" id="privacy"><span class="stat-icon">🔒</span><h2>Απόρρητο πρώτα</h2><p>Τα δεδομένα σου μένουν στη συσκευή σου και η εφαρμογή δουλεύει και χωρίς internet. Δεν υπάρχουν διαφημίσεις.</p><details class="privacy-details" id="privacy-details"><summary>Τι ακριβώς αποθηκεύεται και πού</summary><ul class="privacy-list"><li>Στη συσκευή σου: απόθεμα, λίστες, έξοδα, λογαριασμοί, μετακινήσεις, πρόγραμμα διατροφής και ρυθμίσεις. Δεν φεύγουν από εκεί αν δεν συνδεθείς.</li><li>Αν συνδεθείς: τα ίδια δεδομένα συγχρονίζονται στο Firebase (Google) και τα βλέπουν μόνο τα μέλη του νοικοκυριού σου. Μπορείς να αποσυνδεθείς ή να τα διαγράψεις όποτε θες.</li><li>Αποδείξεις με QR: ο σύνδεσμος της απόδειξης περνά από έναν μικρό διακομιστή μας (Cloudflare) μόνο για να διαβαστεί, όταν ο πάροχος δεν επιτρέπει απευθείας ανάγνωση. Δεν κρατάμε τα είδη, τα ποσά ή τη διεύθυνση IP σου, μόνο ανώνυμη μέτρηση (π.χ. «σούπερ μάρκετ, επιτυχία»), και όταν η απόδειξη διαβάζεται στη συσκευή σου (QR της ΑΑΔΕ, φωτογραφία ή απευθείας σύνδεση).</li><li>Φωτογραφίες και PDF (αποδείξεις, λογαριασμοί, πρόγραμμα διατροφής) διαβάζονται μέσα στο κινητό σου και δεν ανεβαίνουν πουθενά.</li><li>Barcode: στέλνεται μόνο ο αριθμός στο Open Food Facts. Οι βασικές συνταγές είναι μέσα στην εφαρμογή. Αν ψάξεις νέα συνταγή, στέλνεται μόνο η λέξη αναζήτησης στο TheMealDB. Ειδοποιήσεις με κλειστή εφαρμογή: ο διακομιστής μας (Cloudflare) κρατά μόνο τις ημερομηνίες υπενθύμισης, όχι ονόματα, ποσά ή προϊόντα.</li><li>Δεν υπάρχουν διαφημίσεις ούτε cookies παρακολούθησης. Χρησιμοποιούμε μόνο το ανώνυμο Cloudflare Web Analytics (χωρίς cookies) για να ξέρουμε πόσοι μπαίνουν και αν η εφαρμογή είναι γρήγορη.</li><li>Μετράμε ανώνυμα από ποια σελίδα ήρθες (π.χ. TikTok, Facebook), μόνο ως συνολικό αριθμό. Χωρίς προσωπικά στοιχεία και χωρίς να δίνουμε τίποτα σε τρίτους.</li><li>Η εφαρμογή φτιάχνεται από έναν άνθρωπο με τη βοήθεια AI. Εγώ αποφασίζω τι κάνει, τη δοκιμάζω καθημερινά και διορθώνω ό,τι βρεθεί. Η πρόσβαση στα δεδομένα ελέγχεται από κανόνες ασφαλείας και ο καθένας βλέπει μόνο τα δικά του.</li></ul></details><p class="privacy-policy-link" id="privacy-policy-link"><a href="./privacy.html" target="_blank" rel="noopener">Πλήρης πολιτική απορρήτου</a> · <a href="mailto:oikoslabs.apps@gmail.com" data-no-i18n>oikoslabs.apps@gmail.com</a></p><div class="privacy-note">Αν δεν έχεις συνδεθεί και καθαρίσεις τα δεδομένα του browser ή αλλάξεις συσκευή, χρησιμοποίησε αντίγραφο ασφαλείας.</div></section>
+    ${renderSyncCard()}
     <section class="panel settings-card"><span class="stat-icon">◐</span><h2>Εμφάνιση</h2><p>Θέμα, μέγεθος γραμμάτων και αντίθεση. Ισχύουν σε όλη την εφαρμογή, σε αυτή τη συσκευή.</p><div class="theme-options" role="group" aria-label="Θέμα">${[['auto', 'Αυτόματο'], ['light', 'Φωτεινό'], ['dark', 'Σκούρο']].map(([value, label]) => `<button type="button" class="filter-chip ${currentTheme() === value ? 'is-active' : ''}" data-action="set-theme" data-theme="${value}" aria-pressed="${currentTheme() === value}">${label}</button>`).join('')}</div>
       <h3 class="settings-sub" id="text-size-label">Μέγεθος γραμμάτων</h3><div class="theme-options size-options" role="group" aria-labelledby="text-size-label">${[['normal', 'Κανονικά'], ['large', 'Μεγάλα'], ['xlarge', 'Πολύ μεγάλα']].map(([value, label]) => `<button type="button" class="filter-chip ${textSize() === value ? 'is-active' : ''}" data-action="set-text-size" data-size="${value}" aria-pressed="${textSize() === value}">${label}</button>`).join('')}</div>
       <label class="check-row"><input type="checkbox" id="high-contrast" ${highContrast() ? 'checked' : ''}> <span>Υψηλή αντίθεση (πιο έντονα γράμματα και περιγράμματα)</span></label></section>
@@ -815,7 +822,6 @@ function renderSettings() {
     <section class="panel settings-card" id="guide-card"><span class="stat-icon">📖</span><h2>${escapeHtml(t('Οδηγός'))}</h2><p>${escapeHtml(t('Πώς δουλεύει κάθε λειτουργία, με απλά βήματα.'))}</p><div class="settings-actions"><button class="button button-primary" type="button" data-view="guide" id="open-guide-settings">📖 ${escapeHtml(t('Άνοιξε τον οδηγό'))}</button></div></section>
     <section class="panel settings-card"><span class="stat-icon amber">👋</span><h2>Αρχικές ερωτήσεις</h2><p>Γλώσσα, οι λογαριασμοί που έχεις και μέγεθος γραμμάτων, σε ένα λεπτό.</p><div class="settings-actions"><button class="button button-quiet" type="button" data-action="onboard-again">Κάνε τις ερωτήσεις ξανά</button></div></section>
     ${renderProductTypesCard()}
-    ${renderSyncCard()}
     ${renderNotificationCard()}
     <section class="panel settings-card" id="auto-list-card"><span class="stat-icon">🛒</span><h2>${escapeHtml(t('Αυτόματη λίστα αγορών'))}</h2><p>${escapeHtml(t('Ό,τι τελειώνει (ποσότητα 0) ή λήγει στο απόθεμα μπαίνει μόνο του στη λίστα, με την ένδειξη «αυτόματα».'))}</p>
       <label class="check-row big-check"><input type="checkbox" id="auto-list-toggle" ${autoListOn() ? 'checked' : ''}> <span>${escapeHtml(t('Ενεργή'))}</span></label></section>
