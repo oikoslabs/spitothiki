@@ -4,11 +4,12 @@
 // on every open). A new deploy still shows up: the browser re-checks sw.js on every open, a new CACHE_VERSION
 // installs a fresh copy of the shell, and the page reloads once on «controllerchange».
 // Bump CACHE_VERSION on EVERY deploy that changes any app file; old caches are deleted on activate.
-const CACHE_VERSION = 'v139';
+const CACHE_VERSION = 'v140';
 const CACHE = `spitothiki-${CACHE_VERSION}`;
 const OCR_CACHE = 'spitothiki-vendor'; // v1.9.4: was spitothiki-ocr (CDN copies), deleted on activate
 const SHARE_CACHE = 'spitothiki-share'; // a file shared to the app (Web Share Target), picked up by the page // Tesseract.js script/worker/core/language files, kept across versions
 const DATA_CACHE = 'spitothiki-data'; // written by the app: expiry snapshot for background checks
+// v140: v1.9.32 release: harden owner test tagging + reload after SW update even if a dialog was open.
 // v139: v1.9.31 release: anonymous t=1 test flag for preview/owner stats (cache bumped).
 // v138: v1.9.30 release: calendar bill paid/unpaid/overdue status (cache bumped).
 // v137: v1.9.29 release: monthly budget + household calendar + guide chapters (cache bumped).
