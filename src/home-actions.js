@@ -2,7 +2,7 @@
 // like the bottom bar. Only controls shortcuts — never data. Pure helpers (unit-tested).
 export const HOME_KEY = 'spitothiki:home-actions';
 // Stable catalog order (ids are the same data-quick action ids used everywhere else).
-export const HOME_OPTIONS = ['scan', 'manual', 'list', 'extra', 'transport', 'bill', 'rent', 'product', 'cart', 'cook', 'receipt'];
+export const HOME_OPTIONS = ['scan', 'manual', 'list', 'extra', 'transport', 'bill', 'rent', 'product', 'cart', 'cook', 'receipt', 'calendar'];
 export const DEFAULT_HOME = ['scan', 'manual', 'list'];
 const VALID = new Set(HOME_OPTIONS);
 // Unknown ids dropped, duplicates removed, catalog order kept. An explicit empty list is allowed (zero shortcuts).
@@ -15,27 +15,28 @@ export function normalizeHome(ids) {
 // older saved custom layouts (plain arrays). Hidden only when the saved object has guide: false.
 // «insights» is the «Τι άλλαξε αυτόν τον μήνα» card: on by default the same way; hidden only when insights: false.
 export function parseHomeState(raw) {
-  if (raw == null || raw === '') return { ids: [...DEFAULT_HOME], guide: true, insights: true, budget: true };
+  if (raw == null || raw === '') return { ids: [...DEFAULT_HOME], guide: true, insights: true, budget: true, calendar: true };
   try {
     const v = JSON.parse(raw);
-    if (Array.isArray(v)) return { ids: normalizeHome(v), guide: true, insights: true, budget: true };
+    if (Array.isArray(v)) return { ids: normalizeHome(v), guide: true, insights: true, budget: true, calendar: true };
     if (v && typeof v === 'object') {
       const ids = Array.isArray(v.ids) ? normalizeHome(v.ids) : [...DEFAULT_HOME];
-      return { ids, guide: v.guide !== false, insights: v.insights !== false, budget: v.budget !== false };
+      return { ids, guide: v.guide !== false, insights: v.insights !== false, budget: v.budget !== false, calendar: v.calendar !== false };
     }
   } catch {}
-  return { ids: [...DEFAULT_HOME], guide: true, insights: true, budget: true };
+  return { ids: [...DEFAULT_HOME], guide: true, insights: true, budget: true, calendar: true };
 }
 export function parseHome(raw) {
   return parseHomeState(raw).ids;
 }
-export function serializeHome({ ids, guide, insights, budget }) {
+export function serializeHome({ ids, guide, insights, budget, calendar }) {
   const list = normalizeHome(ids);
   const showGuide = guide !== false;
   const showInsights = insights !== false;
   const showBudget = budget !== false;
-  if (JSON.stringify(list) === JSON.stringify(DEFAULT_HOME) && showGuide && showInsights && showBudget) return null;
-  return JSON.stringify({ ids: list, guide: showGuide, insights: showInsights, budget: showBudget });
+  const showCalendar = calendar !== false;
+  if (JSON.stringify(list) === JSON.stringify(DEFAULT_HOME) && showGuide && showInsights && showBudget && showCalendar) return null;
+  return JSON.stringify({ ids: list, guide: showGuide, insights: showInsights, budget: showBudget, calendar: showCalendar });
 }
 export function toggleHome(ids, id, on) {
   if (!VALID.has(id)) return normalizeHome(ids);
@@ -43,4 +44,4 @@ export function toggleHome(ids, id, on) {
   return normalizeHome(on ? [...rest, id] : rest);
 }
 export const isDefaultHome = (ids) => JSON.stringify(normalizeHome(ids)) === JSON.stringify(DEFAULT_HOME);
-export const isDefaultHomeState = ({ ids, guide, insights, budget }) => isDefaultHome(ids) && guide !== false && insights !== false && budget !== false;
+export const isDefaultHomeState = ({ ids, guide, insights, budget, calendar }) => isDefaultHome(ids) && guide !== false && insights !== false && budget !== false && calendar !== false;

@@ -26,19 +26,21 @@ test('home shortcuts: toggle on/off, reset detection', () => {
   assert.ok(isDefaultHome(['list', 'scan', 'manual'])); assert.ok(!isDefaultHome([]));
 });
 test('home shortcuts: every option is a real quick action with EN label; catalog has the approved functions', () => {
-  for (const id of ['scan', 'manual', 'list', 'extra', 'transport', 'bill', 'rent', 'product', 'cart', 'cook']) assert.ok(HOME_OPTIONS.includes(id));
+  for (const id of ['scan', 'manual', 'list', 'extra', 'transport', 'bill', 'rent', 'product', 'cart', 'cook', 'calendar']) assert.ok(HOME_OPTIONS.includes(id));
   for (const id of HOME_OPTIONS) assert.match(app, new RegExp(`\\{ id: '${id}', icon:`));
 });
 test('home shortcuts: Settings card, persistence, reset, no duplicates in «Περισσότερα», never stranded', () => {
   assert.match(app, /\$\{renderHomeCard\(\)\}\$\{renderBarCard\(\)\}/);
   assert.match(app, /saveHome\(toggleHome\(homeIds\(\), event\.target\.dataset\.homeId, event\.target\.checked\)\)/);
-  assert.match(app, /serializeHome\(\{ ids, guide: guide !== false, insights: insights !== false, budget: budget !== false \}\)/);
-  assert.match(app, /action === 'home-reset'\) \{ saveHome\(\[\.\.\.DEFAULT_HOME\], true, true, true\)/);
+  assert.match(app, /serializeHome\(\{ ids, guide: guide !== false, insights: insights !== false, budget: budget !== false, calendar: calendar !== false \}\)/);
+  assert.match(app, /action === 'home-reset'\) \{ saveHome\(\[\.\.\.DEFAULT_HOME\], true, true, true, true\)/);
   assert.match(app, /dataset\?\.homeGuide/);
   assert.match(app, /dataset\?\.homeInsights/);
   assert.match(app, /id="home-choice-insights"/);
   assert.match(app, /id="home-choice-budget"/);
   assert.match(app, /dataset\?\.homeBudget/);
+  assert.match(app, /id="home-choice-calendar"/);
+  assert.match(app, /dataset\?\.homeCalendar/);
   assert.match(app, /id="home-guide"/);
   assert.match(app, /data-home-guide="1"/);
   assert.match(app, /function renderHomeGuide/);
@@ -59,19 +61,22 @@ test('home shortcuts: Greek/English strings', () => {
 });
 
 test('home guide link: on by default, even with a saved custom layout; hidden only when explicitly turned off', () => {
-  assert.deepEqual(parseHomeState(null), { ids: DEFAULT_HOME, guide: true, insights: true, budget: true });
-  assert.deepEqual(parseHomeState(JSON.stringify(['scan', 'transport'])), { ids: ['scan', 'transport'], guide: true, insights: true, budget: true });
-  assert.deepEqual(parseHomeState('[]'), { ids: [], guide: true, insights: true, budget: true });
-  assert.deepEqual(parseHomeState(JSON.stringify({ ids: ['list'], guide: false })), { ids: ['list'], guide: false, insights: true, budget: true });
-  assert.deepEqual(parseHomeState(JSON.stringify({ ids: ['list'], guide: true, insights: false })), { ids: ['list'], guide: true, insights: false, budget: true });
+  assert.deepEqual(parseHomeState(null), { ids: DEFAULT_HOME, guide: true, insights: true, budget: true, calendar: true });
+  assert.deepEqual(parseHomeState(JSON.stringify(['scan', 'transport'])), { ids: ['scan', 'transport'], guide: true, insights: true, budget: true, calendar: true });
+  assert.deepEqual(parseHomeState('[]'), { ids: [], guide: true, insights: true, budget: true, calendar: true });
+  assert.deepEqual(parseHomeState(JSON.stringify({ ids: ['list'], guide: false })), { ids: ['list'], guide: false, insights: true, budget: true, calendar: true });
+  assert.deepEqual(parseHomeState(JSON.stringify({ ids: ['list'], guide: true, insights: false })), { ids: ['list'], guide: true, insights: false, budget: true, calendar: true });
   assert.equal(serializeHome({ ids: DEFAULT_HOME, guide: true, insights: true }), null);
-  assert.equal(serializeHome({ ids: ['scan', 'transport'], guide: true }), JSON.stringify({ ids: ['scan', 'transport'], guide: true, insights: true, budget: true }));
-  assert.equal(serializeHome({ ids: DEFAULT_HOME, guide: false }), JSON.stringify({ ids: DEFAULT_HOME, guide: false, insights: true, budget: true }));
-  assert.equal(serializeHome({ ids: DEFAULT_HOME, guide: true, insights: false }), JSON.stringify({ ids: DEFAULT_HOME, guide: true, insights: false, budget: true }));
+  assert.equal(serializeHome({ ids: ['scan', 'transport'], guide: true }), JSON.stringify({ ids: ['scan', 'transport'], guide: true, insights: true, budget: true, calendar: true }));
+  assert.equal(serializeHome({ ids: DEFAULT_HOME, guide: false }), JSON.stringify({ ids: DEFAULT_HOME, guide: false, insights: true, budget: true, calendar: true }));
+  assert.equal(serializeHome({ ids: DEFAULT_HOME, guide: true, insights: false }), JSON.stringify({ ids: DEFAULT_HOME, guide: true, insights: false, budget: true, calendar: true }));
   assert.ok(isDefaultHomeState({ ids: ['list', 'scan', 'manual'], guide: true, insights: true }));
   assert.ok(!isDefaultHomeState({ ids: DEFAULT_HOME, guide: false }));
   assert.ok(!isDefaultHomeState({ ids: DEFAULT_HOME, guide: true, insights: false }));
-  assert.deepEqual(parseHomeState(JSON.stringify({ ids: ['list'], budget: false })), { ids: ['list'], guide: true, insights: true, budget: false });
-  assert.equal(serializeHome({ ids: DEFAULT_HOME, guide: true, insights: true, budget: false }), JSON.stringify({ ids: DEFAULT_HOME, guide: true, insights: true, budget: false }));
+  assert.deepEqual(parseHomeState(JSON.stringify({ ids: ['list'], budget: false })), { ids: ['list'], guide: true, insights: true, budget: false, calendar: true });
+  assert.equal(serializeHome({ ids: DEFAULT_HOME, guide: true, insights: true, budget: false }), JSON.stringify({ ids: DEFAULT_HOME, guide: true, insights: true, budget: false, calendar: true }));
   assert.ok(!isDefaultHomeState({ ids: DEFAULT_HOME, guide: true, insights: true, budget: false }));
+  assert.deepEqual(parseHomeState(JSON.stringify({ ids: ['list'], calendar: false })), { ids: ['list'], guide: true, insights: true, budget: true, calendar: false });
+  assert.equal(serializeHome({ ids: DEFAULT_HOME, guide: true, insights: true, budget: true, calendar: false }), JSON.stringify({ ids: DEFAULT_HOME, guide: true, insights: true, budget: true, calendar: false }));
+  assert.ok(!isDefaultHomeState({ ids: DEFAULT_HOME, guide: true, insights: true, budget: true, calendar: false }));
 });

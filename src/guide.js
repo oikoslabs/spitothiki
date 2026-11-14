@@ -143,6 +143,18 @@ export const GUIDE_SECTIONS = [
     ]
   },
   {
+    id: 'calendar',
+    icon: '📅',
+    title: 'Ημερολόγιο',
+    intro: 'Λήξεις, λογαριασμοί, πάγιες εντολές, δουλειές και τα δικά σου γεγονότα, σε ένα μέρος.',
+    bullets: [
+      'Το ημερολόγιο γεμίζει μόνο του από λήξεις προϊόντων, λογαριασμούς, πάγιες εντολές και δουλειές με ημερομηνία. Πάτα ένα στοιχείο για να ανοίξεις την πηγή του.',
+      'Πρόσθεσε δικά σου γεγονότα: τίτλος, ημερομηνία, προαιρετικά ώρα, ποιος τα αφορά και σημειώσεις. Μπορούν να επαναλαμβάνονται κάθε εβδομάδα, μήνα ή χρόνο.',
+      'Η κάρτα «Σήμερα» στην αρχική κρύβεται από Ρυθμίσεις → Αρχική οθόνη.',
+      '«Πρόσθεσε στο ημερολόγιο του κινητού» κατεβάζει αρχείο .ics ώστε να χτυπήσουν υπενθυμίσεις και με κλειστή εφαρμογή. Μέσα στην εφαρμογή, υπενθύμιση εμφανίζεται όταν είναι ανοιχτή.'
+    ]
+  },
+  {
     id: 'household',
     icon: '🏠',
     title: 'Κοινό σπίτι',
@@ -205,6 +217,7 @@ export const VIEW_TO_SECTION = {
   transport: 'transport',
   extras: 'extras',
   chores: 'chores',
+  calendar: 'calendar',
   settings: 'settings'
 };
 
@@ -323,5 +336,11 @@ export const GUIDE_EN = {
   'Άνοιξε τη Σπιτοθήκη στο spitothiki.web.app. Από το μενού του browser (Chrome ή Safari) μπορείς να την προσθέσεις στην αρχική οθόνη του κινητού σου. Δεν χρειάζεται λογαριασμός.': 'Open Spitothiki at spitothiki.web.app. From the browser menu (Chrome or Safari) you can add it to your phone’s home screen. No account is needed.',
   'Η εφαρμογή είναι δωρεάν, χωρίς διαφημίσεις, και δουλεύει και χωρίς internet. Τα δεδομένα μένουν στο κινητό ώσπου να συνδεθείς.': 'The app is free, with no ads, and works offline too. Your data stays on the phone until you sign in.',
   'Μοίρασε τη λίστα αγορών με το κουμπί κοινοποίησης και, αν ψωνίζεις συχνά στο ίδιο κατάστημα, όρισε τη σειρά των διαδρόμων.': 'Share the shopping list with the share button and, if you often shop at the same store, set the aisle order.',
-  'Για απορίες ή προβλήματα, γράψε στο oikoslabs.apps@gmail.com.': 'For questions or problems, write to oikoslabs.apps@gmail.com.'
+  'Για απορίες ή προβλήματα, γράψε στο oikoslabs.apps@gmail.com.': 'For questions or problems, write to oikoslabs.apps@gmail.com.',
+  'Ημερολόγιο': 'Calendar',
+  'Λήξεις, λογαριασμοί, πάγιες εντολές, δουλειές και τα δικά σου γεγονότα, σε ένα μέρος.': 'Expiries, bills, standing orders, chores and your own events, in one place.',
+  'Το ημερολόγιο γεμίζει μόνο του από λήξεις προϊόντων, λογαριασμούς, πάγιες εντολές και δουλειές με ημερομηνία. Πάτα ένα στοιχείο για να ανοίξεις την πηγή του.': 'The calendar fills itself from product expiries, bills, standing orders and chores with a due date. Tap an item to open its source.',
+  'Πρόσθεσε δικά σου γεγονότα: τίτλος, ημερομηνία, προαιρετικά ώρα, ποιος τα αφορά και σημειώσεις. Μπορούν να επαναλαμβάνονται κάθε εβδομάδα, μήνα ή χρόνο.': 'Add your own events: title, date, optional time, who it concerns and notes. They can repeat weekly, monthly or yearly.',
+  'Η κάρτα «Σήμερα» στην αρχική κρύβεται από Ρυθμίσεις → Αρχική οθόνη.': 'The «Today» card on the home screen is hidden from Settings → Home screen.',
+  '«Πρόσθεσε στο ημερολόγιο του κινητού» κατεβάζει αρχείο .ics ώστε να χτυπήσουν υπενθυμίσεις και με κλειστή εφαρμογή. Μέσα στην εφαρμογή, υπενθύμιση εμφανίζεται όταν είναι ανοιχτή.': '«Add to the phone calendar» downloads an .ics file so reminders can ring with the app closed. In the app, a reminder appears while it is open.'
 };

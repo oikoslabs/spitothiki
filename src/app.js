@@ -5,7 +5,7 @@ import { authProviders, firebaseConfig } from './firebase-config.js';
 import { loadState, parseBackup, saveState } from './storage.js';
 import { classifyReceiptUrl, fetchReceipt, findRelatedReceipt, receiptId } from './receipt.js';
 import { ingredientName, isNewRecipe, pantryIngredients, recipeCat, scoreRecipe, suggestBuiltin } from './recipes.js';
-import { WASTE_REASONS, applyWaste, createStore, createWaste, groupByStore, monthKey, rowCategory, monthlySpending, moveCategory, purchaseFor, shiftMonth, storeOrder, wasteStats } from './features.js';
+import { WASTE_REASONS, addDays, applyWaste, createStore, createWaste, groupByStore, monthKey, rowCategory, monthlySpending, moveCategory, purchaseFor, shiftMonth, storeOrder, wasteStats } from './features.js';
 import { showSigninCard } from './features.js';
 import { routeCode, parseStoreReceiptBarcode } from './scan-router.js';
 import { deleteReceipt, isStaleReceipt, listReceipts, receiptCategory, receiptItems, receiptMonths } from './receipts.js';
@@ -30,6 +30,7 @@ import { initBackToTop } from './back-to-top.js';
 import { HOME_KEY, HOME_OPTIONS, DEFAULT_HOME, parseHomeState, serializeHome, toggleHome } from './home-actions.js';
 import { insightChange, insightText, monthInsights } from './month-insights.js';
 import { NOTICE_KEY, activeBudget, budgetReport, createBudget, hasBudget, monthSpend, shouldNotify } from './budget.js';
+import { NOTICE_KEY as CAL_NOTICE_KEY, PERSON_ALL, RECUR_OPTIONS, buildIcs, calendarEntries, calendarProEnabled, createEvent, entriesOn, googleEventUrl, monthBounds, monthGrid, personColor, shouldNotify as calendarShouldNotify, weekBounds } from './calendar.js';
 import { createReceiptPdf, periodBoundsForMonth } from './receipt-pdf.js';
 import { GUIDE_SECTIONS, guideHeading, searchGuide, sectionForView } from './guide.js';
 import { PRODUCT_TYPE_DEFAULT_EMOJI, PRODUCT_TYPE_EMOJIS, allProductTypes, createProductType, customProductTypes, deleteProductType, effectiveType, isCustomTypeId, isProductType, mergeTypeRows, setProductTypes, suggestTypeEmoji, typeEmoji, typeLabel, typeName, upsertProductType, validType } from './product-types.js';
@@ -68,7 +69,7 @@ const testerCtx = (() => { let session = null; try { session = sessionStorage; }
 initSource({ hasData: sourceHasData });
 let state = loadState();
 setProductTypes(state.productTypes); // v1.9.20: own product types («Είδος προϊόντος»)
-const VIEWS = ['overview', 'pantry', 'shopping', 'cart', 'cook', 'bills', 'transport', 'extras', 'chores', 'insights', 'receipts', 'settings', 'guide'];
+const VIEWS = ['overview', 'pantry', 'shopping', 'cart', 'cook', 'bills', 'transport', 'extras', 'chores', 'calendar', 'insights', 'receipts', 'settings', 'guide'];
 let activeView = VIEWS.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'overview';
 let pantryQuery = '';
 let pantryCategory = 'Όλα';
@@ -156,6 +157,7 @@ function persist() {
     requestPersistentStorage();
     if (!demoLoading) setTimeout(maybeProtectSheet, 600); // v1.9.0: asked only once something is saved
     setTimeout(checkBudgetNotifications, 0);
+    setTimeout(checkCalendarNotifications, 0);
     return true;
   } catch {
     showToast('Δεν ήταν δυνατή η αποθήκευση στη συσκευή.');
@@ -174,7 +176,7 @@ function pendingLabel(count) {
   return t(count === 1 ? '{count} εκκρεμές προϊόν' : '{count} εκκρεμή προϊόντα', { count });
 }
 
-const SECTION_LABELS = { overview: 'Σπιτοθήκη', pantry: 'Το απόθεμά μου', shopping: 'Λίστα αγορών', cart: 'Καλάθι στο κατάστημα', cook: 'Μαγείρεμα & γεύματα', bills: 'Λογαριασμοί', transport: 'Μετακινήσεις', extras: 'Μικροέξοδα', chores: 'Δουλειές σπιτιού', insights: 'Σύνολο εξόδων', receipts: 'Αποδείξεις', settings: 'Ρυθμίσεις', guide: 'Οδηγός' };
+const SECTION_LABELS = { overview: 'Σπιτοθήκη', pantry: 'Το απόθεμά μου', shopping: 'Λίστα αγορών', cart: 'Καλάθι στο κατάστημα', cook: 'Μαγείρεμα & γεύματα', bills: 'Λογαριασμοί', transport: 'Μετακινήσεις', extras: 'Μικροέξοδα', chores: 'Δουλειές σπιτιού', calendar: 'Ημερολόγιο', insights: 'Σύνολο εξόδων', receipts: 'Αποδείξεις', settings: 'Ρυθμίσεις', guide: 'Οδηγός' };
 function setActiveNavigation() {
   document.body.dataset.screen = activeView;
   const current = document.querySelector('#current-section');
@@ -195,7 +197,7 @@ const openAttr = (id) => (openPanels.has(id) ? 'open' : '');
 document.addEventListener('toggle', (event) => { const d = event.target; if (d.matches?.('details.collapsible[id]')) { if (d.open) openPanels.add(d.id); else openPanels.delete(d.id); } }, true);
 
 // Which menu group each section belongs to (shown as a breadcrumb under the top bar: ⌂ Αρχική › ΕΞΟΔΑ).
-const SECTION_GROUPS = { pantry: 'ΣΠΙΤΙ', shopping: 'ΣΠΙΤΙ', cart: 'ΣΠΙΤΙ', cook: 'ΣΠΙΤΙ', chores: 'ΣΠΙΤΙ', bills: 'ΕΞΟΔΑ', transport: 'ΕΞΟΔΑ', extras: 'ΕΞΟΔΑ', insights: 'ΕΞΟΔΑ', receipts: 'ΕΞΟΔΑ', settings: 'ΕΦΑΡΜΟΓΗ', guide: 'ΕΦΑΡΜΟΓΗ' };
+const SECTION_GROUPS = { pantry: 'ΣΠΙΤΙ', shopping: 'ΣΠΙΤΙ', cart: 'ΣΠΙΤΙ', cook: 'ΣΠΙΤΙ', chores: 'ΣΠΙΤΙ', calendar: 'ΣΠΙΤΙ', bills: 'ΕΞΟΔΑ', transport: 'ΕΞΟΔΑ', extras: 'ΕΞΟΔΑ', insights: 'ΕΞΟΔΑ', receipts: 'ΕΞΟΔΑ', settings: 'ΕΦΑΡΜΟΓΗ', guide: 'ΕΦΑΡΜΟΓΗ' };
 function renderCrumbs() {
   const group = SECTION_GROUPS[activeView];
   return `<nav class="eyebrow crumbs" aria-label="${escapeHtml(t('Πού βρίσκομαι'))}"><button class="crumb-home" type="button" data-view="overview">⌂ ${escapeHtml(t('Αρχική'))}</button>${group ? `<span aria-hidden="true">›</span><span>${escapeHtml(t(group))}</span>` : ''}</nav>`;
@@ -213,7 +215,8 @@ const QUICK_ACTIONS = [
   { id: 'manual', icon: '✍️', label: 'Έξοδο με το χέρι', hint: 'Σούπερ μάρκετ, κρεοπωλείο, λαϊκή — χωρίς απόδειξη' },
   { id: 'product', icon: '＋', label: 'Πρόσθεσε προϊόν', hint: 'Κάτι που έφερες σπίτι' },
   { id: 'cart', icon: '🛒', label: 'Καλάθι στο κατάστημα', hint: 'Σκάναρε ό,τι βάζεις στο καρότσι' },
-  { id: 'cook', icon: '🍳', label: 'Τι να μαγειρέψω;', hint: 'Ιδέες με ό,τι λήγει πρώτο' }
+  { id: 'cook', icon: '🍳', label: 'Τι να μαγειρέψω;', hint: 'Ιδέες με ό,τι λήγει πρώτο' },
+  { id: 'calendar', icon: '📅', label: 'Ημερολόγιο', hint: 'Λήξεις, λογαριασμοί και γεγονότα' }
 ];
 const renderQuickActions = (ids) => QUICK_ACTIONS.filter((a) => !ids || ids.includes(a.id)).map((a) => `<button class="quick-action" type="button" data-action="quick" data-quick="${a.id}"><span class="quick-action-icon" aria-hidden="true">${a.icon}</span><span><strong>${escapeHtml(t(a.label))}</strong><small>${escapeHtml(t(a.hint))}</small></span><span class="arrow" aria-hidden="true">›</span></button>`).join('');
 // v1.6.2: user-chosen bottom bar (device-local).
@@ -254,7 +257,7 @@ function runQuickAction(id) {
   else if (id === 'rent') openRentBill();
   else if (id === 'transport') { transportDraft = null; navigate('transport'); focus('#transport-amount'); }
   else if (id === 'bill') { navigate('bills'); openBillDialog(); }
-  else if (id === 'cart' || id === 'cook') navigate(id);
+  else if (id === 'cart' || id === 'cook' || id === 'calendar') navigate(id);
 }
 
 function helpButton(view = activeView) {
@@ -585,13 +588,13 @@ const HOME_HINTS = { scan: ['Σκάναρε απόδειξη', 'ή λογαρι�
 const homeAction = (id) => { const a = QUICK_ACTIONS.find((x) => x.id === id); if (!a) return null; const h = HOME_HINTS[id]; return h ? { ...a, label: h[0], hint: h[1] } : a; };
 const HOME_GROUPS = [
   { title: 'Έξοδα', ids: ['scan', 'manual', 'receipt', 'extra', 'transport', 'bill', 'rent'] },
-  { title: 'Σπίτι & ψώνια', ids: ['list', 'product', 'cart', 'cook'] }
+  { title: 'Σπίτι & ψώνια', ids: ['list', 'product', 'cart', 'cook', 'calendar'] }
 ];
-const homeState = () => { try { return parseHomeState(localStorage.getItem(HOME_KEY)); } catch { return { ids: [...DEFAULT_HOME], guide: true, insights: true, budget: true }; } };
+const homeState = () => { try { return parseHomeState(localStorage.getItem(HOME_KEY)); } catch { return { ids: [...DEFAULT_HOME], guide: true, insights: true, budget: true, calendar: true }; } };
 const homeIds = () => homeState().ids;
-function saveHome(ids, guide = homeState().guide, insights = homeState().insights, budget = homeState().budget) {
+function saveHome(ids, guide = homeState().guide, insights = homeState().insights, budget = homeState().budget, calendar = homeState().calendar) {
   try {
-    const raw = serializeHome({ ids, guide: guide !== false, insights: insights !== false, budget: budget !== false });
+    const raw = serializeHome({ ids, guide: guide !== false, insights: insights !== false, budget: budget !== false, calendar: calendar !== false });
     if (raw == null) localStorage.removeItem(HOME_KEY); else localStorage.setItem(HOME_KEY, raw);
   } catch {}
 }
@@ -614,7 +617,7 @@ function renderHomeMore() {
     <p class="field-hint home-more-hint"><button class="text-button" type="button" data-view="settings" data-focus="home-card">${escapeHtml(t('Άλλαξε τι φαίνεται στην αρχική'))}</button></p></section>`;
 }
 function renderHomeCard() {
-  const { ids, guide, insights, budget } = homeState();
+  const { ids, guide, insights, budget, calendar } = homeState();
   const chosen = new Set(ids);
   return `<section class="panel settings-card" id="home-card" aria-labelledby="home-card-title"><span class="stat-icon">⌂</span><h2 id="home-card-title">${escapeHtml(t('Αρχική οθόνη'))}</h2><p>${escapeHtml(t('Διάλεξε ποιες λειτουργίες φαίνονται ως μεγάλα κουμπιά στην αρχική. Αλλάζει μόνο τις συντομεύσεις: τίποτα δεν διαγράφεται και όλα μένουν στο μενού και στις «Όλες οι κινήσεις».'))}</p>
     <label class="home-choice" id="home-choice-guide"><input type="checkbox" data-home-guide="1"${guide ? ' checked' : ''}><span aria-hidden="true">📖</span> <span>${escapeHtml(t('Οδηγός χρήσης'))}</span></label>
@@ -623,6 +626,8 @@ function renderHomeCard() {
     <p class="field-hint">${escapeHtml(t('Φαίνεται στην αρχική όταν υπάρχουν αρκετά έξοδα για σύγκριση με τον προηγούμενο μήνα. Υπολογίζεται μόνο στη συσκευή σου.'))}</p>
     <label class="home-choice" id="home-choice-budget"><input type="checkbox" data-home-budget="1"${budget ? ' checked' : ''}><span aria-hidden="true">🎯</span> <span>${escapeHtml(t('Κάρτα προϋπολογισμού μήνα'))}</span></label>
     <p class="field-hint">${escapeHtml(t('Φαίνεται στην αρχική όταν έχεις βάλει όριο. Μετράει τα ίδια έξοδα με το «Σύνολο εξόδων».'))}</p>
+    <label class="home-choice" id="home-choice-calendar"><input type="checkbox" data-home-calendar="1"${calendar ? ' checked' : ''}><span aria-hidden="true">📅</span> <span>${escapeHtml(t('Κάρτα «Σήμερα» στο ημερολόγιο'))}</span></label>
+    <p class="field-hint">${escapeHtml(t('Φαίνεται στην αρχική με ό,τι πέφτει σήμερα: λήξεις, λογαριασμούς, δουλειές και γεγονότα.'))}</p>
     <fieldset class="home-choices"><legend class="visually-hidden">${escapeHtml(t('Λειτουργίες στην αρχική'))}</legend>${HOME_OPTIONS.map((id) => { const a = QUICK_ACTIONS.find((x) => x.id === id); return a ? `<label class="home-choice"><input type="checkbox" data-home-id="${id}"${chosen.has(id) ? ' checked' : ''}><span aria-hidden="true">${a.icon}</span> <span>${escapeHtml(t(a.label))}</span></label>` : ''; }).join('')}</fieldset>
     <p class="field-hint">${escapeHtml(t('Η κάτω μπάρα του κινητού ρυθμίζεται χωριστά, στην «Κάτω μπάρα».'))}</p>
     <div class="settings-actions"><button class="button button-quiet" type="button" data-action="home-reset" id="home-reset">↺ ${escapeHtml(t('Επαναφορά'))}</button></div></section>`;
@@ -670,7 +675,7 @@ function renderOverview() {
       <button class="stat-card" type="button" data-action="home-card" data-card="expiring" id="home-card-expiring"><span class="stat-icon amber">◷</span><div><strong>${summary.expiringSoon + summary.expired}</strong><span>λήγουν ή έληξαν</span></div></button>
       <button class="stat-card" type="button" data-action="home-card" data-card="shopping" id="home-card-shopping"><span class="stat-icon blue">✓</span><div><strong>${pending}</strong><span>${escapeHtml(t('στη λίστα αγορών'))}</span></div></button>
     </section>
-    ${renderHomeChanged()}${renderHomeBudget()}
+    ${renderHomeChanged()}${renderHomeBudget()}${renderHomeCalendar()}
     <div class="dashboard-grid">
       <section class="panel" id="home-month"><div class="panel-heading"><div><h2>${escapeHtml(t('Τα έξοδα του μήνα'))}</h2><p data-no-i18n>${escapeHtml(monthLabel(month))}</p></div><button class="panel-link" type="button" data-view="insights">${escapeHtml(t('Αναλυτικά →'))}</button></div>
         <p class="big-number" id="home-month-total">${escapeHtml(money(totals.total))}</p>${renderHomeMonthRows(totals.rows)}
@@ -843,6 +848,7 @@ function renderApp() {
   else if (activeView === 'transport') viewRoot.innerHTML = renderTransport();
   else if (activeView === 'extras') viewRoot.innerHTML = renderExtras();
   else if (activeView === 'chores') viewRoot.innerHTML = renderChores();
+  else if (activeView === 'calendar') viewRoot.innerHTML = renderCalendar();
   else if (activeView === 'cart') viewRoot.innerHTML = renderCart();
   else if (activeView === 'cook') { viewRoot.innerHTML = renderCook(); loadOnlineRecipes(); }
   else if (activeView === 'guide') viewRoot.innerHTML = renderGuide();
@@ -1489,6 +1495,7 @@ async function enableNotifications() {
   enablePush().then((push) => { if (activeView === 'settings') renderApp(); if (push) showToast('Οι ειδοποιήσεις ενεργοποιήθηκαν, και με κλειστή εφαρμογή.'); });
   checkExpiryNotifications();
   checkBudgetNotifications();
+  checkCalendarNotifications();
 }
 
 function renderNotificationCard() {
@@ -2503,6 +2510,10 @@ function renderTransportReceiptOffer() {
 
 // ---------- v1.6.0: «🧹 Δουλειές σπιτιού» ----------
 let choresMode = null; // null (list) | { edit: id|'' , draft } | { history: id }
+let calendarTab = 'month';
+let calendarMonth = '';
+let calendarDay = '';
+let calendarForm = null;
 let choresLastDone = null; // chore id of the last ✓ (undo banner)
 const choreToday = () => localDateKey();
 const myName = () => String(syncStatus?.user?.name || '').split(' ')[0];
@@ -2678,6 +2689,216 @@ function saveBudgetForm(form) {
     showToast(t(err.message || 'Σφάλμα'));
   }
 }
+
+function calendarToday() { return localDateKey(); }
+function ensureCalendarCursor() {
+  const today = calendarToday();
+  if (!calendarMonth) calendarMonth = today.slice(0, 7);
+  if (!calendarDay) calendarDay = today;
+}
+function calendarKindLabel(entry) {
+  if (entry.source === 'expiry') return t('Λήξη');
+  if (entry.source === 'debit') return t('Πάγια');
+  if (entry.source === 'bill') return t('Λογαριασμός');
+  if (entry.source === 'chore') return t('Δουλειά σπιτιού');
+  return t('Γεγονός');
+}
+function calendarPeopleNames() {
+  try {
+    const names = memberNames(householdMembers(), state.people || [], (n) => t('Μέλος {n}', { n }));
+    return [...new Set(Object.values(names).filter(Boolean))];
+  } catch {
+    return (state.people || []).map((p) => p.name).filter(Boolean);
+  }
+}
+function renderCalendarEntry(entry, { pro = calendarProEnabled() } = {}) {
+  const color = pro ? personColor(entry.person) : '';
+  const style = color ? ` style="--cal-color:${color}"` : '';
+  const time = entry.time ? ` · ${escapeHtml(entry.time)}` : '';
+  const who = entry.person && entry.person !== PERSON_ALL ? ` · ${escapeHtml(entry.person)}` : (entry.person === PERSON_ALL ? ` · ${escapeHtml(t('Όλοι'))}` : '');
+  const overdue = entry.overdue ? `<small>${escapeHtml(t('Εκκρεμεί από {date}', { date: formatDate(entry.due || entry.date) }))}</small>` : (entry.notes ? `<small>${escapeHtml(entry.notes)}</small>` : '');
+  const amount = entry.amount ? ` · ${escapeHtml(money(entry.amount))}` : '';
+  const action = entry.source === 'event' ? 'calendar-edit' : 'calendar-open';
+  return `<button class="cal-entry" type="button" data-action="${action}" data-id="${escapeHtml(entry.sourceId || '')}" data-source="${escapeHtml(entry.source)}" data-date="${escapeHtml(entry.date)}"${style}><span><span class="cal-entry-kind">${escapeHtml(calendarKindLabel(entry))}${time}${who}${amount}</span><strong>${escapeHtml(entry.title)}</strong>${overdue}</span></button>`;
+}
+function renderCalendarList(entries, empty) {
+  if (!entries.length) return `<p class="subtle-empty">${escapeHtml(t(empty))}</p>`;
+  const pro = calendarProEnabled();
+  return entries.map((e) => renderCalendarEntry(e, { pro })).join('');
+}
+function renderHomeCalendar() {
+  if (!homeState().calendar) return '';
+  const today = calendarToday();
+  const entries = entriesOn(calendarEntries(state, today, today), today);
+  return `<section class="panel" id="home-calendar"><div class="panel-heading"><div><h2>${escapeHtml(t('Σήμερα στο ημερολόγιο'))}</h2><p data-no-i18n>${escapeHtml(formatDate(today))}</p></div><button class="panel-link" type="button" data-view="calendar">${escapeHtml(t('Όλα στο ημερολόγιο →'))}</button></div>
+    ${renderCalendarList(entries, 'Σήμερα δεν έχει τίποτα στο ημερολόγιο.')}</section>`;
+}
+function renderCalendarForm() {
+  const today = calendarToday();
+  const existing = calendarForm?.id ? (state.events || []).find((e) => e.id === calendarForm.id) : null;
+  const ev = existing || { title: '', date: calendarDay || today, time: '', person: PERSON_ALL, notes: '', recur: '' };
+  const pro = calendarProEnabled();
+  const people = calendarPeopleNames();
+  const personOpts = [`<option value="${PERSON_ALL}"${(ev.person || PERSON_ALL) === PERSON_ALL ? ' selected' : ''}>${escapeHtml(t('Όλοι'))}</option>`]
+    .concat(people.map((name) => `<option value="${escapeHtml(name)}"${ev.person === name ? ' selected' : ''}>${escapeHtml(name)}</option>`))
+    .join('');
+  const recurOpts = RECUR_OPTIONS.map((o) => `<option value="${escapeHtml(o.id)}"${(ev.recur || '') === o.id ? ' selected' : ''}>${escapeHtml(t(o.label))}</option>`).join('');
+  return `<section class="panel cal-form" id="calendar-form-card"><h2>${escapeHtml(t(existing ? 'Γεγονός' : 'Νέο γεγονός'))}</h2>
+    <form id="calendar-form" novalidate>
+      <input type="hidden" name="eventId" value="${escapeHtml(existing?.id || '')}">
+      <p class="form-error" id="calendar-error" hidden></p>
+      <label class="field"><span class="field-label">${escapeHtml(t('Τίτλος'))}</span><input class="field-input" id="cal-title" name="title" maxlength="80" required value="${escapeHtml(ev.title || '')}"></label>
+      <div class="field-row">
+        <label class="field"><span class="field-label">${escapeHtml(t('Ημερομηνία'))}</span><input class="field-input" type="date" name="date" required value="${escapeHtml(ev.date || today)}"></label>
+        <label class="field"><span class="field-label">${escapeHtml(t('Ώρα (προαιρετικά)'))}</span><input class="field-input" type="time" name="time" value="${escapeHtml(ev.time || '')}"></label>
+      </div>
+      <label class="field"><span class="field-label">${escapeHtml(t('Ποιος'))}</span><select class="field-input" name="person">${personOpts}</select></label>
+      ${pro ? `<label class="field"><span class="field-label">${escapeHtml(t('Επανάληψη'))}</span><select class="field-input" name="recur">${recurOpts}</select></label>` : '<input type="hidden" name="recur" value="">'}
+      <label class="field"><span class="field-label">${escapeHtml(t('Σημειώσεις'))}</span><textarea class="field-input" name="notes" rows="3" maxlength="240">${escapeHtml(ev.notes || '')}</textarea></label>
+      <div class="dialog-actions">${existing ? `<button class="button button-danger" type="button" data-action="calendar-delete" data-id="${escapeHtml(existing.id)}">${escapeHtml(t('Διαγραφή γεγονότος'))}</button>` : ''}<button class="button button-quiet" type="button" data-action="calendar-cancel">${escapeHtml(t('Άκυρο'))}</button><button class="button button-primary" type="submit">${escapeHtml(t('Αποθήκευση'))}</button></div>
+    </form>
+    ${existing ? `<p class="field-hint"><a class="panel-link" href="${escapeHtml(googleEventUrl(existing))}" target="_blank" rel="noopener">${escapeHtml(t('Άνοιγμα στο Google Calendar'))}</a></p>` : ''}
+  </section>`;
+}
+function renderCalendar() {
+  ensureCalendarCursor();
+  const today = calendarToday();
+  const pro = calendarProEnabled();
+  const tabs = [['month', 'Μήνας'], ['today', 'Σήμερα'], ['week', 'Αυτή την εβδομάδα']].map(([id, label]) =>
+    `<button class="filter-chip${calendarTab === id ? ' is-active' : ''}" type="button" data-action="calendar-tab" data-id="${id}">${escapeHtml(t(label))}</button>`).join('');
+  let body = '';
+  if (calendarTab === 'today') {
+    const entries = calendarEntries(state, today, today);
+    body = renderCalendarList(entries, 'Σήμερα δεν έχει τίποτα στο ημερολόγιο.');
+  } else if (calendarTab === 'week') {
+    const week = weekBounds(today);
+    const entries = calendarEntries(state, week.from, week.to);
+    const days = [];
+    for (let d = week.from; d <= week.to; d = addDays(d, 1)) {
+      const on = entriesOn(entries, d);
+      days.push(`<h3 class="settings-sub">${escapeHtml(formatDate(d))}${d === today ? ` · ${escapeHtml(t('Σήμερα'))}` : ''}</h3>${renderCalendarList(on, 'Δεν υπάρχει τίποτα αυτή την ημέρα.')}`);
+    }
+    body = days.join('');
+  } else {
+    const bounds = monthBounds(calendarMonth);
+    const entries = calendarEntries(state, bounds.from, bounds.to);
+    const dows = ['Δευ', 'Τρι', 'Τετ', 'Πεμ', 'Παρ', 'Σαβ', 'Κυρ'].map((d) => `<div class="cal-dow">${escapeHtml(t(d))}</div>`).join('');
+    const cells = monthGrid(calendarMonth).map((cell) => {
+      const on = entriesOn(entries, cell.date);
+      const dots = on.slice(0, 4).map((e) => {
+        const color = pro ? personColor(e.person) : '';
+        return `<span class="cal-dot"${color ? ` style="background:${color}"` : ''}></span>`;
+      }).join('');
+      const cls = ['cal-day', cell.inMonth ? '' : 'is-out', cell.date === today ? 'is-today' : '', cell.date === calendarDay ? 'is-selected' : ''].filter(Boolean).join(' ');
+      return `<button class="${cls}" type="button" data-action="calendar-select" data-date="${cell.date}" aria-current="${cell.date === today ? 'date' : 'false'}"><span class="cal-day-num">${Number(cell.date.slice(8, 10))}</span><span class="cal-dots">${dots}</span></button>`;
+    }).join('');
+    body = `<div class="cal-month-nav"><button class="icon-button" type="button" data-action="calendar-month" data-delta="-1" aria-label="${escapeHtml(t('Προηγούμενος μήνας'))}">‹</button><h2 data-no-i18n>${escapeHtml(monthLabel(calendarMonth))}</h2><button class="icon-button" type="button" data-action="calendar-month" data-delta="1" aria-label="${escapeHtml(t('Επόμενος μήνας'))}">›</button></div>
+      <div class="cal-grid">${dows}${cells}</div>
+      <h3 class="settings-sub">${escapeHtml(formatDate(calendarDay))}</h3>
+      ${renderCalendarList(entriesOn(entries, calendarDay), 'Δεν υπάρχει τίποτα αυτή την ημέρα.')}`;
+  }
+  return `${renderHeader(t('Ημερολόγιο'), t('Λήξεις, λογαριασμοί, πάγιες εντολές, δουλειές και τα δικά σου γεγονότα, σε ένα μέρος.'), t('Νέο γεγονός'))}
+    <div class="cal-tabs" role="tablist">${tabs}</div>
+    ${calendarForm ? renderCalendarForm() : ''}
+    <div class="cal-toolbar"><button class="button" type="button" data-action="calendar-ics">${escapeHtml(t('Πρόσθεσε στο ημερολόγιο του κινητού'))}</button></div>
+    ${body}`;
+}
+function saveCalendarForm(form) {
+  const error = form.querySelector('#calendar-error');
+  const id = form.elements.eventId.value;
+  const existing = (state.events || []).find((e) => e.id === id);
+  try {
+    const rec = createEvent({
+      ...(existing || {}),
+      id: id || undefined,
+      title: form.elements.title.value,
+      date: form.elements.date.value,
+      time: form.elements.time.value,
+      person: form.elements.person.value,
+      notes: form.elements.notes.value,
+      recur: form.elements.recur.value
+    });
+    state.events = existing ? (state.events || []).map((e) => (e.id === id ? rec : e)) : [...(state.events || []), rec];
+  } catch (err) {
+    error.textContent = t(err.message);
+    error.hidden = false;
+    return;
+  }
+  if (!persist()) return;
+  calendarForm = null;
+  calendarDay = form.elements.date.value;
+  calendarMonth = calendarDay.slice(0, 7);
+  renderApp();
+  showToast(t('Το γεγονός αποθηκεύτηκε.'));
+}
+function openCalendarSource(source, sourceId) {
+  document.querySelector('#menu-sheet')?.close?.();
+  if (source === 'expiry') { navigate('pantry'); openItemDialog(sourceId); return; }
+  if (source === 'bill' || source === 'debit') { navigate('bills'); openBillDialog(sourceId); return; }
+  if (source === 'chore') {
+    const c = (state.chores || []).find((x) => x.id === sourceId);
+    if (c) choresMode = { edit: c.id, draft: { ...c } };
+    navigate('chores');
+  }
+}
+function downloadCalendarIcs() {
+  const today = calendarToday();
+  const month = calendarMonth || today.slice(0, 7);
+  const bounds = monthBounds(month) || { from: today };
+  const from = bounds.from < today ? bounds.from : today;
+  const entries = calendarEntries(state, from, addDays(today, 90));
+  const blob = new Blob([buildIcs(entries)], { type: 'text/calendar;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'spitothiki-calendar.ics';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+  showToast(t('Κατεβάστηκε ένα αρχείο .ics για να το ανοίξεις στο ημερολόγιο του κινητού.'));
+}
+function calendarAction(action, button) {
+  const id = button.dataset.id;
+  if (action === 'calendar-tab') { calendarTab = button.dataset.id || 'month'; calendarForm = null; renderApp(); }
+  else if (action === 'calendar-month') {
+    calendarMonth = shiftMonth(calendarMonth || calendarToday().slice(0, 7), Number(button.dataset.delta) || 0);
+    const days = monthBounds(calendarMonth)?.days || 28;
+    const day = Math.min(Number((calendarDay || '01').slice(8, 10)), days);
+    calendarDay = `${calendarMonth}-${String(day).padStart(2, '0')}`;
+    renderApp();
+  } else if (action === 'calendar-select') {
+    calendarDay = button.dataset.date;
+    if (calendarDay) calendarMonth = calendarDay.slice(0, 7);
+    calendarForm = null;
+    renderApp();
+  } else if (action === 'calendar-cancel') { calendarForm = null; renderApp(); }
+  else if (action === 'calendar-edit') { calendarForm = { id }; calendarDay = button.dataset.date || calendarDay; renderApp(); document.querySelector('#cal-title')?.focus(); }
+  else if (action === 'calendar-open') openCalendarSource(button.dataset.source, id);
+  else if (action === 'calendar-ics') downloadCalendarIcs();
+  else if (action === 'calendar-delete') {
+    undoable(t('Το γεγονός διαγράφηκε.'), () => {
+      state.events = (state.events || []).filter((e) => e.id !== id);
+      calendarForm = null;
+      if (persist()) renderApp();
+    });
+  }
+}
+
+async function checkCalendarNotifications() {
+  if (!notificationsSupported() || typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+  const today = calendarToday();
+  const items = entriesOn(calendarEntries(state, today, today), today);
+  if (!items.length) return;
+  let prev = null;
+  try { prev = JSON.parse(localStorage.getItem(CAL_NOTICE_KEY) || ''); } catch {}
+  if (!calendarShouldNotify(prev, { day: today, count: items.length })) return;
+  const title = items.length === 1 ? t('1 στο ημερολόγιο σήμερα') : t('{count} στο ημερολόγιο σήμερα', { count: items.length });
+  const body = items.slice(0, 4).map((e) => e.title).join(', ');
+  try {
+    await showNotification(t('Υπενθύμιση ημερολογίου'), body, 'spitothiki-calendar');
+    localStorage.setItem(CAL_NOTICE_KEY, JSON.stringify({ day: today, count: items.length }));
+  } catch {}
+}
+
 
 // Everything spent in a month: purchases + bills due + transport + small expenses (separate data, no overlap).
 function monthTotals(month) {
@@ -3690,7 +3911,8 @@ async function submitReceiptExport(event) {
 
 function handleAction(button) {
   const { action, id } = button.dataset;
-  if (action === 'add-item') openItemDialog();
+  if (action === 'add-item' && activeView === 'calendar') { calendarForm = { id: '' }; renderApp(); document.querySelector('#cal-title')?.focus(); }
+  else if (action === 'add-item') openItemDialog();
   else if (action === 'close-dialog') itemDialog.close();
   else if (action === 'edit-item') openItemDialog(id);
   else if (action === 'navigate') navigate(button.dataset.view);
@@ -3698,7 +3920,7 @@ function handleAction(button) {
     state.budgets = (state.budgets || []).filter((b) => b.id !== 'month');
     if (persist()) { showToast(t('Ο προϋπολογισμός αφαιρέθηκε.')); renderApp(); }
   }
-  else if (action === 'home-reset') { saveHome([...DEFAULT_HOME], true, true, true); const card = document.querySelector('#home-card'); if (card) { card.outerHTML = renderHomeCard(); translateDom(document.querySelector('#home-card')); } document.querySelector('#home-reset')?.focus(); showToast('Η αρχική επανήλθε.'); }
+  else if (action === 'home-reset') { saveHome([...DEFAULT_HOME], true, true, true, true); const card = document.querySelector('#home-card'); if (card) { card.outerHTML = renderHomeCard(); translateDom(document.querySelector('#home-card')); } document.querySelector('#home-reset')?.focus(); showToast('Η αρχική επανήλθε.'); }
   else if (action === 'bar-move' || action === 'bar-toggle' || action === 'bar-reset') {
     const ids = barIds();
     saveBar(action === 'bar-reset' ? [...DEFAULT_BAR] : action === 'bar-move' ? moveBar(ids, Number(button.dataset.index), Number(button.dataset.delta)) : toggleBar(ids, button.dataset.id));
@@ -3786,6 +4008,7 @@ function handleAction(button) {
   else if (action === 'close-transport-history') closeTransportHistory();
   else if (action === 'transport-receipt') openReceiptDialog('transport');
   else if (action === 'receipt-to-transport') receiptToTransport();
+  else if (action.startsWith('calendar-')) calendarAction(action, button);
   else if (action.startsWith('chore-')) choreAction(action, button);
   else if (action === 'transport-cancel') { transportDraft = null; renderApp(); }
   else if (action === 'transport-edit') { const e = (state.transport || []).find((x) => x.id === id); if (e) { closeTransportHistory(); transportDraft = { ...e }; renderApp(); document.querySelector('#transport-add')?.scrollIntoView({ behavior: 'smooth' }); } }
@@ -4075,6 +4298,7 @@ document.addEventListener('change', (event) => {
   if (event.target.dataset?.homeGuide) { saveHome(homeIds(), event.target.checked); showToast('Η αρχική ενημερώθηκε.'); return; }
   if (event.target.dataset?.homeInsights) { saveHome(homeIds(), homeState().guide, event.target.checked, homeState().budget); showToast('Η αρχική ενημερώθηκε.'); return; }
   if (event.target.dataset?.homeBudget) { saveHome(homeIds(), homeState().guide, homeState().insights, event.target.checked); showToast('Η αρχική ενημερώθηκε.'); return; }
+  if (event.target.dataset?.homeCalendar) { saveHome(homeIds(), homeState().guide, homeState().insights, homeState().budget, event.target.checked); showToast('Η αρχική ενημερώθηκε.'); return; }
   if (event.target.id === 'receipt-export-month') {
     const b = periodBoundsForMonth(event.target.value);
     const form = event.target.form;
@@ -4177,6 +4401,7 @@ document.addEventListener('submit', (event) => {
   if (event.target.id === 'bill-form') { event.preventDefault(); saveBillForm(event.target); return; }
   if (event.target.id === 'budget-form') { event.preventDefault(); saveBudgetForm(event.target); return; }
   if (event.target.id === 'chore-form') { event.preventDefault(); saveChoreForm(event.target); return; }
+  if (event.target.id === 'calendar-form') { event.preventDefault(); saveCalendarForm(event.target); return; }
   if (event.target.id === 'transport-form') { event.preventDefault(); saveTransportForm(event.target); return; }
   if (event.target.id === 'extras-form') { event.preventDefault(); saveExtrasForm(event.target); return; }
   if (event.target.id === 'extras-new-form') { event.preventDefault(); saveExtrasNew(event.target); return; }
@@ -4438,6 +4663,7 @@ function runDailyChecks() {
   runTransportRecurring();
   checkExpiryNotifications();
   checkBudgetNotifications();
+  checkCalendarNotifications();
 }
 runDailyChecks();
 updateBackgroundCheck();

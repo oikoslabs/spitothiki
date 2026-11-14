@@ -168,7 +168,7 @@ test('home card is hideable in Αρχική οθόνη settings and hidden witho
   assert.match(app, /data-home-insights/);
   assert.match(app, /if \(!homeState\(\)\.insights\) return ''/);
   assert.match(app, /monthInsights\(state, localDateKey\(\)\)/);
-  assert.match(app, /saveHome\(\[\.\.\.DEFAULT_HOME\], true, true, true\)/);
+  assert.match(app, /saveHome\(\[\.\.\.DEFAULT_HOME\], true, true, true, true\)/);
   assert.match(app, /home-changed-mark/);
   assert.match(app, /home-changed-pct/);
 });

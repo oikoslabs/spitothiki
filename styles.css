@@ -1151,3 +1151,33 @@ a.menu-item { color: inherit; }
 :root:not([data-theme="light"]) .budget-line.is-warn .budget-line-head span { color: #f0c88a; }
 :root[data-theme="dark"] .budget-line.is-over .budget-line-head span,
 :root:not([data-theme="light"]) .budget-line.is-over .budget-line-head span { color: #f0a0a0; }
+
+
+/* Household calendar */
+.cal-tabs { display: flex; gap: 0.4rem; flex-wrap: wrap; margin: 0 0 0.9rem; }
+.cal-tabs .filter-chip.is-active { background: var(--green, #2f6b4f); color: #fff; border-color: var(--green, #2f6b4f); }
+.cal-month-nav { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; margin: 0 0 0.7rem; }
+.cal-month-nav h2 { margin: 0; font-size: 1.05rem; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 0.2rem; }
+.cal-dow { text-align: center; font-size: 0.75rem; color: var(--ink-soft, #58616b); padding: 0.2rem 0; }
+.cal-day { display: flex; flex-direction: column; align-items: center; gap: 0.15rem; min-height: 2.7rem; padding: 0.25rem 0.1rem; border: 1px solid transparent; border-radius: 0.55rem; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+.cal-day:hover, .cal-day:focus-visible { background: color-mix(in srgb, var(--green, #2f6b4f) 12%, transparent); }
+.cal-day.is-out { opacity: 0.42; }
+.cal-day.is-today { box-shadow: inset 0 0 0 0.1rem var(--green, #2f6b4f); }
+.cal-day.is-selected { background: color-mix(in srgb, var(--green, #2f6b4f) 18%, transparent); border-color: var(--green, #2f6b4f); }
+.cal-day-num { font-weight: 650; line-height: 1.2; }
+.cal-dots { display: flex; gap: 0.12rem; flex-wrap: wrap; justify-content: center; min-height: 0.4rem; }
+.cal-dot { width: 0.35rem; height: 0.35rem; border-radius: 50%; background: var(--green, #2f6b4f); }
+.cal-entry { display: flex; width: 100%; text-align: left; gap: 0.7rem; align-items: flex-start; padding: 0.7rem 0.8rem; margin: 0 0 0.45rem; border: 1px solid var(--line, #d5ddd6); border-radius: 0.75rem; background: var(--surface, #fff); color: inherit; font: inherit; cursor: pointer; border-left-width: 0.28rem; border-left-color: var(--cal-color, var(--green, #2f6b4f)); }
+.cal-entry:hover, .cal-entry:focus-visible { background: color-mix(in srgb, var(--green, #2f6b4f) 8%, var(--surface, #fff)); }
+.cal-entry-kind { font-size: 0.78rem; color: var(--ink-soft, #58616b); }
+.cal-entry strong { display: block; }
+.cal-entry small { display: block; color: var(--ink-soft, #58616b); }
+.cal-toolbar { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.8rem 0 1rem; }
+.cal-form { margin-top: 0.8rem; }
+.cal-form .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.7rem; }
+@media (max-width: 30rem) { .cal-form .field-row { grid-template-columns: 1fr; } }
+#home-calendar .cal-entry { margin-bottom: 0.35rem; }
+:root[data-theme="dark"] .cal-entry { background: var(--surface); border-color: var(--line); }
+:root[data-theme="dark"] .cal-day.is-selected { background: #24312a; }
+:root[data-theme="dark"] .cal-day:hover, :root[data-theme="dark"] .cal-day:focus-visible { background: #24312a; }
