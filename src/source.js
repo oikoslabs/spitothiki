@@ -29,12 +29,63 @@ export function isPreviewOrigin(origin) {
 }
 
 let ownerTestFlag = false;
-export function setOwnerTestFlag(on) { ownerTestFlag = Boolean(on); }
-export function isStatsTest({ origin, test } = {}) {
+const FLAG_KEY = 'spitothiki:stats-test';
+const defaultSession = () => (typeof sessionStorage !== 'undefined' ? sessionStorage : null);
+function persistOwnerFlag(on, storage) {
+  try {
+    if (!storage) return;
+    if (on) storage.setItem(FLAG_KEY, '1');
+    else storage.removeItem(FLAG_KEY);
+  } catch {}
+}
+function storedOwnerFlag(storage) {
+  try { return storage?.getItem(FLAG_KEY) === '1'; } catch { return false; }
+}
+
+export function setOwnerTestFlag(on, { storage = defaultSession() } = {}) {
+  ownerTestFlag = Boolean(on);
+  persistOwnerFlag(ownerTestFlag, storage);
+}
+
+export function isStatsTest({ origin, test, storage = defaultSession() } = {}) {
   if (test === true || test === 1 || test === '1') return true;
-  if (ownerTestFlag) return true;
+  if (ownerTestFlag || storedOwnerFlag(storage)) return true;
   const src = origin ?? (typeof location !== 'undefined' ? location.origin : '');
   return isPreviewOrigin(src);
+}
+
+let resolveAuthReady;
+const authReady = new Promise((resolve) => { resolveAuthReady = resolve; });
+export function noteAuthReady() { resolveAuthReady?.(); }
+export function waitForStatsTest(ms = 2500) {
+  return Promise.race([authReady, new Promise((resolve) => setTimeout(resolve, ms))]);
+}
+
+// Keep the flag on a brief status without email; clear only on explicit sign-out.
+export async function applyOwnerTestStatus(status, isOwner, { storage = defaultSession() } = {}) {
+  if (status?.state === 'signed-out') {
+    setOwnerTestFlag(false, { storage });
+    noteAuthReady();
+    return false;
+  }
+  const email = status?.user?.email;
+  if (!email || typeof isOwner !== 'function') {
+    noteAuthReady();
+    return isStatsTest({ storage });
+  }
+  try {
+    const ok = await isOwner(email);
+    setOwnerTestFlag(ok, { storage });
+    noteAuthReady();
+    return ok;
+  } catch {
+    noteAuthReady();
+    return isStatsTest({ storage });
+  }
+}
+
+export function receiptScanHost(receipt) {
+  try { return new URL(receipt?.sourceUrl || receipt?.url || '').hostname; } catch { return ''; }
 }
 
 // '?src=TikTok' -> 'tiktok'; '?utm_source=sofisstore' -> 'sofisstore'; unknown -> 'other'; nothing -> 'direct'.
@@ -72,7 +123,7 @@ export async function sendEvent(type, src, { fetchImpl = globalThis.fetch, onlin
 
 // First open on this device: remember the source word and send one 'visit'. Devices that already used the app
 // before v1.8.2 are marked 'existing' and send nothing. Then the ?src/utm params leave the address bar.
-export async function initSource({ storage = globalThis.localStorage, loc = globalThis.location, hist = globalThis.history, hasData = false, send = sendEvent, sendScan = sendScanEvent } = {}) {
+export async function initSource({ storage = globalThis.localStorage, loc = globalThis.location, hist = globalThis.history, hasData = false, send = sendEvent, sendScan = sendScanEvent, waitTest = waitForStatsTest } = {}) {
   try {
     const clean = loc && cleanUrl(loc.href);
     let saved = read(storage);
@@ -81,6 +132,7 @@ export async function initSource({ storage = globalThis.localStorage, loc = glob
       write(storage, saved);
     }
     if (clean && hist?.replaceState) { try { hist.replaceState(hist.state ?? null, '', clean); } catch {} }
+    if (waitTest) await waitTest();
     if (!saved.visit && await send('visit', saved.src)) write(storage, { ...read(storage), visit: true });
     await flushScans({ storage, sendScan });
   } catch {}
@@ -138,7 +190,7 @@ export async function reportScan({ receipt, text = '', success, via, proxied } =
   try {
     if (proxied || via === 'proxy') return false;
     const viaWord = SCAN_VIA.includes(via) ? via : 'on-device';
-    const found = classifyStore(`${receipt?.issuerName || ''} ${text}`, '');
+    const found = classifyStore(`${receipt?.issuerName || ''} ${text}`, receiptScanHost(receipt));
     const event = { type: found.type, store: found.store, success: Boolean(success), via: viaWord };
     if (await sendScan(event)) return true;
     writeScans(storage, [...readScans(storage), event]);
