@@ -38,7 +38,7 @@ test('v1.9.0 scan hint and «Έτοιμο!» after sign-in with a scan button', 
 });
 
 test('v1.9.0 English mode: version line, footer and new strings are translated', () => {
-  for (const k of ['ΕΚΔΟΣΗ', 'Έκδοση', 'Απλά, για το σπίτι.', 'Πέτα τις αποδείξεις στο συρτάρι. Σκάναρέ τες εδώ.', 'Σκάναρε την πρώτη σου απόδειξη', 'Δωρεάν και χωρίς κάρτα. Μπορείς να ξεκινήσεις χωρίς λογαριασμό· σύνδεση χρειάζεται για να μην τα χάσεις αν αλλάξεις κινητό.', 'ή δες με παραδείγματα', 'Σκάναρε το QR της απόδειξης ή το barcode ενός προϊόντος', 'Περισσότερες ρυθμίσεις (προαιρετικά)', 'Σκάναρε τώρα'])
+  for (const k of ['ΕΚΔΟΣΗ', 'Έκδοση', 'Απλά, για το σπίτι.', 'Πέτα τις αποδείξεις στο συρτάρι. Σκάναρέ τες εδώ.', 'Σκάναρε την πρώτη σου απόδειξη', 'Δωρεάν και χωρίς κάρτα. Μπορείς να ξεκινήσεις αμέσως.', 'ή δες με παραδείγματα', 'Σκάναρε το QR της απόδειξης ή το barcode ενός προϊόντος', 'Περισσότερες ρυθμίσεις (προαιρετικά)', 'Σκάναρε τώρα'])
     assert.ok(dictionaries.en[k], k);
   assert.match(html, /<span>ΕΚΔΟΣΗ<\/span> <span data-no-i18n>1\.9\.32<\/span>/);
   assert.match(html, /<span>Απλά, για το σπίτι\.<\/span> · <span id="app-version"><span>Έκδοση<\/span>/);
@@ -58,6 +58,11 @@ test('signed-out home includes the sign-in card and Settings leads with sync', (
   assert.match(app, /\$\{renderStarterCard\(\)\}?\$\{renderSigninCard\(\)\}?\$\{renderProtectCard\(\)\}/);
   assert.match(app, /home-signin-google/);
   assert.match(app, /Email \/ νέος λογαριασμός/);
+  assert.match(app, /signin-nudge/);
+  assert.match(app, /signin-head/);
+  assert.match(app, /signin-actions/);
+  assert.match(app, /Με σύνδεση, όλα συγχρονίζονται σε κάθε κινητό ή υπολογιστή σου\./);
+  assert.doesNotMatch(app, /χωρίς λογαριασμό· σύνδεση χρειάζεται/);
   const syncAt = app.indexOf('${renderSyncCard()}');
   const themeAt = app.indexOf('<h2>Εμφάνιση</h2>');
   assert.ok(syncAt > 0 && themeAt > 0 && syncAt < themeAt);

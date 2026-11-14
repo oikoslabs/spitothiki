@@ -671,9 +671,25 @@ button.stat-card:hover { border-color: #bfd4c1; }
 .signin-card .button { min-height: 38px; }
 .signin-close { position: absolute; top: 8px; right: 8px; width: 28px; height: 28px; font-size: calc(15px * var(--text-scale)); }
 .sync-card.is-highlight { box-shadow: 0 0 0 3px #7fb2e5; transition: box-shadow .3s; }
-@media (max-width: 480px) { .signin-card { grid-template-columns: auto minmax(0,1fr); } .signin-card .button { grid-column: 1 / -1; width: 100%; } }
+@media (max-width: 480px) { .signin-card { grid-template-columns: auto minmax(0,1fr); } .signin-card .button, .signin-card .protect-actions { grid-column: 1 / -1; width: 100%; } }
 :root[data-theme="dark"] .signin-card { background: #1b2a36; border-color: #2d4356; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .signin-card { background: #1b2a36; border-color: #2d4356; } }
+/* Home sign-in nudge: stack on all widths so the icon never opens a tall empty column. */
+.signin-nudge { display: flex; flex-direction: column; align-items: stretch; gap: 8px; padding: 10px 12px 12px; }
+.signin-nudge .signin-head { display: flex; align-items: center; gap: 8px; position: relative; padding-right: 48px; min-width: 0; }
+.signin-nudge .signin-head h2 { margin: 0; flex: 1 1 auto; min-width: 0; font: 800 calc(14px * var(--text-scale))/1.3 var(--display); }
+.signin-nudge .signin-body { margin: 0; color: var(--muted); font-size: calc(12px * var(--text-scale)); line-height: 1.4; }
+.signin-nudge .signin-actions { display: flex; flex-direction: column; gap: 8px; }
+.signin-nudge .signin-actions .button { width: 100%; margin: 0; grid-column: auto; }
+.signin-nudge .signin-close { top: 6px; right: 6px; width: 36px; height: 36px; z-index: 1; }
+@media (min-width: 640px) {
+  .signin-nudge .signin-actions { flex-direction: row; flex-wrap: wrap; }
+  .signin-nudge .signin-actions .button { width: auto; flex: 1 1 160px; }
+}
+@media (max-width: 760px), (pointer: coarse) {
+  .signin-nudge .signin-close { width: 40px; height: 40px; }
+  .signin-nudge .signin-head { padding-right: 52px; }
+}
 
 /* Text size (Settings → Εμφάνιση) */
 :root[data-text="large"] { --text-scale: 1.15; }

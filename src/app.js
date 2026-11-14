@@ -362,10 +362,12 @@ function renderSigninCard() {
   const email = authProviders.includes('password')
     ? `<button class="button ${google ? 'button-quiet' : 'button-primary'}" type="button" data-action="home-signin" id="home-signin">${escapeHtml(t('Email / νέος λογαριασμός'))}</button>`
     : (google ? '' : `<button class="button button-primary" type="button" data-action="home-signin" id="home-signin">${escapeHtml(t('Σύνδεση'))}</button>`);
-  return `<section class="signin-card" id="home-signin-card" aria-labelledby="home-signin-title"><span class="signin-icon" aria-hidden="true">☁️</span>
-    <div class="signin-text"><h2 id="home-signin-title">${escapeHtml(t('Συνδέσου για να μη χάσεις τα δεδομένα σου'))}</h2><p>${escapeHtml(t('Με σύνδεση, όλα συγχρονίζονται αυτόματα σε κάθε κινητό ή υπολογιστή σου. Χωρίς σύνδεση μένουν μόνο σε αυτή τη συσκευή.'))}</p></div>
-    <div class="protect-actions">${google}${email}</div>
-    <button class="icon-button signin-close" type="button" data-action="home-signin-dismiss" aria-label="${escapeHtml(t('Απόκρυψη για 14 ημέρες'))}" title="${escapeHtml(t('Απόκρυψη για 14 ημέρες'))}">×</button></section>`;
+  return `<section class="signin-card signin-nudge" id="home-signin-card" aria-labelledby="home-signin-title">
+    <header class="signin-head"><span class="signin-icon" aria-hidden="true">☁️</span>
+    <h2 id="home-signin-title">${escapeHtml(t('Συνδέσου για να μη χάσεις τα δεδομένα σου'))}</h2>
+    <button class="icon-button signin-close" type="button" data-action="home-signin-dismiss" aria-label="${escapeHtml(t('Απόκρυψη για 14 ημέρες'))}" title="${escapeHtml(t('Απόκρυψη για 14 ημέρες'))}">×</button></header>
+    <p class="signin-body">${escapeHtml(t('Με σύνδεση, όλα συγχρονίζονται σε κάθε κινητό ή υπολογιστή σου.'))}</p>
+    <div class="signin-actions">${google}${email}</div></section>`;
 }
 // v1.4: small, dismissible «make a backup» nudge (only when not signed in and >30 days / never).
 const numKey = (key) => { try { return Number(localStorage.getItem(key)) || 0; } catch { return 0; } };
@@ -425,7 +427,7 @@ function renderStarterCard() {
     <p class="starter-example">${escapeHtml(t('Π.χ. σκάναρες την απόδειξη από τον Σκλαβενίτη: 14 προϊόντα, 38,40 €. Μπήκαν στα έξοδα του μήνα και στο ντουλάπι σου.'))}</p>
     <ol class="starter-steps">${steps.map((x) => `<li>${escapeHtml(t(x))}</li>`).join('')}</ol>
     </details>
-    <p class="starter-note">${escapeHtml(t('Δωρεάν και χωρίς κάρτα. Μπορείς να ξεκινήσεις χωρίς λογαριασμό· σύνδεση χρειάζεται για να μην τα χάσεις αν αλλάξεις κινητό.'))}</p></div></section>`;
+    <p class="starter-note">${escapeHtml(t('Δωρεάν και χωρίς κάρτα. Μπορείς να ξεκινήσεις αμέσως.'))}</p></div></section>`;
 }
 function storageBadge() {
   if (!authKnown(syncStatus) && !driveOn()) return '';
