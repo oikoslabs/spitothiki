@@ -8,10 +8,10 @@ import { dictionaries } from '../src/i18n.js';
 const read = (f) => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
 
 test('v1.9.30 release: version, cache bump, calendar bill status and guide', () => {
-  assert.match(read('package.json'), /"version": "1\.9\.30"/);
-  assert.equal((read('index.html').match(/data-no-i18n>1\.9\.30</g) || []).length, 2);
+  assert.match(read('package.json'), /"version": "1\.9\.31"/);
+  assert.equal((read('index.html').match(/data-no-i18n>1\.9\.31</g) || []).length, 2);
   const sw = read('sw.js');
-  assert.match(sw, /CACHE_VERSION = 'v138';/);
+  assert.match(sw, /CACHE_VERSION = 'v139';/);
   const today = '2026-11-14';
   assert.equal(billCalendarStatus({ due: '2026-11-10', paid: false }, today).overdue, true);
   assert.equal(billCalendarStatus({ due: '2026-11-20', paid: false }, today).pending, true);
