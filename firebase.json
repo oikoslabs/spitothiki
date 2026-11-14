@@ -1,5 +1,6 @@
 {
   "hosting": {
+    "site": "spitothiki",
     "public": ".",
     "ignore": ["firebase.json", ".firebaserc", "**/.!(well-known)", "**/.!(well-known)/**", "**/node_modules/**", "tests/**", "package.json", "package-lock.json", "*.md", "firestore.rules", "docs/**", "push/**", "stats/**", "tools/**", "proxy/**", "workers/**", "**/wrangler.toml", "**/.wrangler/**"],
     "cleanUrls": false,

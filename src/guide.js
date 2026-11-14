@@ -108,7 +108,7 @@ export const GUIDE_SECTIONS = [
     bullets: [
       'Πάτα «Σύνολο εξόδων» για αγορές, ενοίκιο, λογαριασμούς, μετακινήσεις και μικροέξοδα του μήνα.',
       'Μπορείς να φτιάξεις δικές σου κατηγορίες εξόδων (π.χ. Ρούχα). Στο κοινό σπίτι με δύο μέλη βλέπεις και «Ποιος πλήρωσε τι».',
-      'Δεν υπάρχει ακόμη εβδομαδιαίο σύνολο για όλα τα έξοδα, ούτε μηνιαίο όριο προϋπολογισμού για το νοικοκυριό. Προϋπολογισμός υπάρχει μόνο στο καλάθι, για μία επίσκεψη στο κατάστημα.',
+      'Στο «Σύνολο εξόδων» βάλε μηνιαίο προϋπολογισμό (συνολικό όριο και, αν θέλεις, ανά κατηγορία). Βλέπεις πόσα ξόδεψες, πόσα μένουν, πόσες ημέρες έμειναν και μια απλή εκτίμηση. Η κάρτα μπορεί να φαίνεται και στην αρχική.',
       'Στην αρχική, η κάρτα «Τι άλλαξε αυτόν τον μήνα» συγκρίνει τα έξοδα μέχρι σήμερα με το ίδιο διάστημα του προηγούμενου μήνα. Εμφανίζεται μόνο όταν υπάρχουν αρκετά στοιχεία και υπολογίζεται στη συσκευή σου. Την κρύβεις από Ρυθμίσεις → Αρχική οθόνη.'
     ]
   },
@@ -286,7 +286,7 @@ export const GUIDE_EN = {
   'Πόσα ξόδεψες αυτόν τον μήνα, ανά κατηγορία, και σύγκριση με τον προηγούμενο.': 'How much you spent this month, by category, and a comparison with the previous one.',
   'Πάτα «Σύνολο εξόδων» για αγορές, ενοίκιο, λογαριασμούς, μετακινήσεις και μικροέξοδα του μήνα.': 'Tap «Spending overview» for this month’s shopping, rent, bills, transport and small expenses.',
   'Μπορείς να φτιάξεις δικές σου κατηγορίες εξόδων (π.χ. Ρούχα). Στο κοινό σπίτι με δύο μέλη βλέπεις και «Ποιος πλήρωσε τι».': 'You can create your own expense categories (e.g. Clothes). In a shared home with two members you also see «Who paid what».',
-  'Δεν υπάρχει ακόμη εβδομαδιαίο σύνολο για όλα τα έξοδα, ούτε μηνιαίο όριο προϋπολογισμού για το νοικοκυριό. Προϋπολογισμός υπάρχει μόνο στο καλάθι, για μία επίσκεψη στο κατάστημα.': 'There is not yet a weekly total for all spending, nor a monthly budget limit for the household. A budget exists only in the cart, for one store visit.',
+  'Στο «Σύνολο εξόδων» βάλε μηνιαίο προϋπολογισμό (συνολικό όριο και, αν θέλεις, ανά κατηγορία). Βλέπεις πόσα ξόδεψες, πόσα μένουν, πόσες ημέρες έμειναν και μια απλή εκτίμηση. Η κάρτα μπορεί να φαίνεται και στην αρχική.': 'In «Monthly totals» set a monthly budget (an overall limit and, if you want, per category). You see how much you spent, how much is left, how many days remain and a simple estimate. The card can also appear on the home screen.',
   'Στην αρχική, η κάρτα «Τι άλλαξε αυτόν τον μήνα» συγκρίνει τα έξοδα μέχρι σήμερα με το ίδιο διάστημα του προηγούμενου μήνα. Εμφανίζεται μόνο όταν υπάρχουν αρκετά στοιχεία και υπολογίζεται στη συσκευή σου. Την κρύβεις από Ρυθμίσεις → Αρχική οθόνη.': 'On the home screen, the «What changed this month» card compares spending so far with the same period last month. It appears only when there is enough data and is calculated on your device. You can hide it from Settings → Home screen.',
   'Βενζίνη, διόδια, ΜΜΜ, ταξί και στάθμευση, κάθε μήνα.': 'Fuel, tolls, public transport, taxis and parking, each month.',
   'Καταχώρισε ένα έξοδο μετακίνησης, ή μετάφερε μια απόδειξη καυσίμων ή διοδίων από τις Αποδείξεις.': 'Record a transport expense, or move a fuel or toll receipt from Receipts.',
