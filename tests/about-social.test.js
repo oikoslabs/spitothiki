@@ -69,9 +69,9 @@ test('the in-app guide points to About in Settings for the official channels', (
 
 test('About card ships in the service worker cache notes', () => {
   const sw = read('sw.js');
-  assert.match(sw, /CACHE_VERSION = 'v145-preview'/);
+  assert.match(sw, /CACHE_VERSION = 'v145'/);
   assert.match(sw, /About card in Settings with Facebook, Telegram and the official TikTok account/);
-  assert.match(read('package.json'), /"version": "1\.9\.36"/);
+  assert.match(read('package.json'), /"version": "1\.9\.37"/);
 });
 
 test('About trust line only uses claims already in the privacy policy', () => {

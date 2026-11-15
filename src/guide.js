@@ -19,13 +19,12 @@ export const GUIDE_SECTIONS = [
   {
     id: 'whats-new',
     icon: '✨',
-    title: 'Τι νέο στην 1.9.35',
+    title: 'Τι νέο στην 1.9.37',
     numbered: false,
-    intro: 'Η σύνδεση εξηγείται καλύτερα στην αρχική, και εμφανίζεται μια ήπια υπενθύμιση τη στιγμή που ωφελεί.',
+    intro: 'Στις Ρυθμίσεις, στο «Σχετικά», φαίνεται πιο καθαρά ποιος φτιάχνει την εφαρμογή και πώς επικοινωνείς.',
     bullets: [
-      'Στην κάρτα σύνδεσης της αρχικής φαίνονται τρία σύντομα οφέλη: τα δεδομένα μένουν ασφαλή αν αλλάξεις ή χάσεις κινητό, μοιράζεσαι λίστα, λογαριασμούς και ημερολόγιο με το σπίτι, και είναι δωρεάν χωρίς κάρτα.',
-      'Αν δεν έχεις συνδεθεί, μπορεί να εμφανιστεί μία φορά (μόνο σε αυτή τη συσκευή) μια μικρή ερώτηση μετά την 3η αποθηκευμένη απόδειξη, όταν πατάς «Κοινοποίηση» ή «Πρόσκληση μέλους», ή όταν έχεις ήδη 10 ή περισσότερες καταχωρήσεις. Επιλέγεις «Σύνδεση» ή «Όχι τώρα». Δεν στέλνεται τίποτα και δεν επαναλαμβάνεται.',
-      'Στην προβολή μήνα, πάτα μια ημέρα για το φύλλο της ημέρας (1.9.34). Στην αρχική προστέθηκε κάρτα σύνδεσης στην 1.9.33. Στο ημερολόγιο φαίνεται αν ένας λογαριασμός πληρώθηκε ή εκκρεμεί από την 1.9.30. Ο μηνιαίος προϋπολογισμός και το ημερολόγιο νοικοκυριού προστέθηκαν στην 1.9.29.'
+      'Στο «Σχετικά» προστέθηκαν ποιος φτιάχνει την εφαρμογή (Oikos Labs), email επικοινωνίας, σύνδεσμος στην πολιτική απορρήτου, και μια σύντομη γραμμή: δωρεάν, χωρίς διαφημίσεις, δουλεύει και χωρίς λογαριασμό, δεν πουλάμε δεδομένα. Τα επίσημα κανάλια (Facebook, Telegram, TikTok) μένουν όπως ήταν.',
+      'Στην 1.9.36 προστέθηκαν νέες συνταγές. Στην 1.9.35 η κάρτα σύνδεσης της αρχικής εξηγεί τα οφέλη και μπορεί να εμφανιστεί ήπια υπενθύμιση σύνδεσης. Στην προβολή μήνα, πάτα μια ημέρα για το φύλλο της ημέρας (1.9.34). Στην αρχική προστέθηκε κάρτα σύνδεσης στην 1.9.33. Στο ημερολόγιο φαίνεται αν ένας λογαριασμός πληρώθηκε ή εκκρεμεί από την 1.9.30. Ο μηνιαίος προϋπολογισμός και το ημερολόγιο νοικοκυριού προστέθηκαν στην 1.9.29.'
     ]
   },
   {
@@ -367,7 +366,12 @@ export const GUIDE_EN = {
   'Πρόσθεσε γεγονός με τίτλο, ημερομηνία, προαιρετικά ώρα, ποιος το αφορά και σημειώσεις. Μπορεί να επαναλαμβάνεται κάθε εβδομάδα, μήνα ή χρόνο.': 'Add an event with a title, a date, optional time, who it concerns and notes. It can repeat weekly, monthly or yearly.',
   'Η κάρτα «Σήμερα» στην αρχική δείχνει ό,τι πέφτει σήμερα και κρύβεται από Ρυθμίσεις → Αρχική οθόνη.': 'The «Today» card on the home screen shows whatever falls today and is hidden from Settings → Home screen.',
   '«Πρόσθεσε στο ημερολόγιο του κινητού» κατεβάζει αρχείο .ics ώστε να χτυπήσουν υπενθυμίσεις και με κλειστή εφαρμογή. Μέσα στην εφαρμογή, υπενθύμιση εμφανίζεται μόνο όσο είναι ανοιχτή (όχι push).': '«Add to the phone calendar» downloads an .ics file so reminders can ring with the app closed. In the app, a reminder appears only while it is open (no push).',
+  'Τι νέο στην 1.9.37': 'What’s new in 1.9.37',
+  'Στις Ρυθμίσεις, στο «Σχετικά», φαίνεται πιο καθαρά ποιος φτιάχνει την εφαρμογή και πώς επικοινωνείς.': 'In Settings, under «About», it is clearer who makes the app and how you can get in touch.',
+  'Στο «Σχετικά» προστέθηκαν ποιος φτιάχνει την εφαρμογή (Oikos Labs), email επικοινωνίας, σύνδεσμος στην πολιτική απορρήτου, και μια σύντομη γραμμή: δωρεάν, χωρίς διαφημίσεις, δουλεύει και χωρίς λογαριασμό, δεν πουλάμε δεδομένα. Τα επίσημα κανάλια (Facebook, Telegram, TikTok) μένουν όπως ήταν.': '«About» now shows who makes the app (Oikos Labs), a contact email, a link to the privacy policy, and a short line: free, no ads, works without an account, we don’t sell data. The official channels (Facebook, Telegram, TikTok) stay as they were.',
+  'Στην 1.9.36 προστέθηκαν νέες συνταγές. Στην 1.9.35 η κάρτα σύνδεσης της αρχικής εξηγεί τα οφέλη και μπορεί να εμφανιστεί ήπια υπενθύμιση σύνδεσης. Στην προβολή μήνα, πάτα μια ημέρα για το φύλλο της ημέρας (1.9.34). Στην αρχική προστέθηκε κάρτα σύνδεσης στην 1.9.33. Στο ημερολόγιο φαίνεται αν ένας λογαριασμός πληρώθηκε ή εκκρεμεί από την 1.9.30. Ο μηνιαίος προϋπολογισμός και το ημερολόγιο νοικοκυριού προστέθηκαν στην 1.9.29.': 'New recipes were added in 1.9.36. In 1.9.35 the home sign-in card explains the benefits and a gentle sign-in reminder may appear. In the month view, tap a day for that day’s sheet (1.9.34). A sign-in card was added on the home screen in 1.9.33. The calendar has shown whether a bill was paid or is still outstanding since 1.9.30. The monthly budget and the household calendar were added in 1.9.29.',
   'Τι νέο στην 1.9.35': 'What’s new in 1.9.35',
+
   'Η σύνδεση εξηγείται καλύτερα στην αρχική, και εμφανίζεται μια ήπια υπενθύμιση τη στιγμή που ωφελεί.': 'Signing in is explained more clearly on the home screen, and a gentle reminder appears at the moment it helps.',
   'Στην κάρτα σύνδεσης της αρχικής φαίνονται τρία σύντομα οφέλη: τα δεδομένα μένουν ασφαλή αν αλλάξεις ή χάσεις κινητό, μοιράζεσαι λίστα, λογαριασμούς και ημερολόγιο με το σπίτι, και είναι δωρεάν χωρίς κάρτα.': 'The home sign-in card now shows three short benefits: your data stays safe if you change or lose your phone, you can share the list, bills and calendar with the household, and it is free with no card.',
   'Αν δεν έχεις συνδεθεί, μπορεί να εμφανιστεί μία φορά (μόνο σε αυτή τη συσκευή) μια μικρή ερώτηση μετά την 3η αποθηκευμένη απόδειξη, όταν πατάς «Κοινοποίηση» ή «Πρόσκληση μέλους», ή όταν έχεις ήδη 10 ή περισσότερες καταχωρήσεις. Επιλέγεις «Σύνδεση» ή «Όχι τώρα». Δεν στέλνεται τίποτα και δεν επαναλαμβάνεται.': 'If you are signed out, a small question may appear once (only on this device) after the 3rd saved receipt, when you tap «Share» or «Invite a member», or when you already have 10 or more entries. You choose «Sign in» or «Not now». Nothing is sent and it is not shown again.',

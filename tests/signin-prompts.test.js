@@ -79,13 +79,10 @@ test('app hooks one-time prompts after 3rd scan, share/invite, and 10+ entries, 
   assert.match(share, /onLater: \(\) => shareShoppingList\(\)/);
 });
 
-test('guide «Τι νέο στην 1.9.35» and recap of earlier releases', () => {
+test('guide what’s-new recap includes 1.9.35 and earlier releases', () => {
   const whats = GUIDE_SECTIONS.find((s) => s.id === 'whats-new');
-  assert.equal(whats.title, 'Τι νέο στην 1.9.35');
-  assert.match(whats.bullets.join(' '), /3η αποθηκευμένη απόδειξη/);
-  assert.match(whats.bullets.join(' '), /10 ή περισσότερες καταχωρήσεις/);
-  assert.match(whats.bullets.join(' '), /Όχι τώρα/);
-  for (const ver of ['1.9.35', '1.9.34', '1.9.33', '1.9.30', '1.9.29']) {
+  assert.match(whats.bullets.join(' '), /1\.9\.35/);
+  for (const ver of ['1.9.37', '1.9.36', '1.9.35', '1.9.34', '1.9.33', '1.9.30', '1.9.29']) {
     assert.ok(searchGuide(ver).some((s) => s.id === 'whats-new'), ver);
   }
 });
