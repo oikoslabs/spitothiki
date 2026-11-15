@@ -34,10 +34,22 @@ test('Settings has a Σχετικά card with Facebook, Telegram and TikTok link
     assert.match(tags[name], /rel="noopener"/);
   }
   assert.ok(!LINKS.tiktok.includes('?'), 'TikTok URL must have no tracking params');
+  assert.match(settings, /t\('Ποιοι είμαστε'\)/);
+  assert.match(settings, /t\('Η Σπιτοθήκη φτιάχνεται από την Oikos Labs \(Γιάννης Σκολαρίκης\)\.'\)/);
+  assert.match(settings, /t\('Δωρεάν, χωρίς διαφημίσεις, δουλεύει και χωρίς λογαριασμό. Δεν πουλάμε δεδομένα.'\)/);
+  assert.match(settings, /mailto:oikoslabs\.apps@gmail\.com/);
+  assert.match(settings, /href="\.\/privacy\.html"/);
+  assert.match(settings, /t\('Πολιτική απορρήτου'\)/);
+  assert.doesNotMatch(settings, /τηλέφωνο|phone:|tel:/i);
+  assert.doesNotMatch(settings, /διεύθυνση κατοικίας|home address/i);
 });
 
 test('About strings have English translations', () => {
   assert.equal(dictionaries.en['Σχετικά'], 'About');
+  assert.equal(dictionaries.en['Ποιοι είμαστε'], 'Who we are');
+  assert.equal(dictionaries.en['Η Σπιτοθήκη φτιάχνεται από την Oikos Labs (Γιάννης Σκολαρίκης).'], 'Spitothiki is made by Oikos Labs (Giannis Skolarikis).');
+  assert.equal(dictionaries.en['Δωρεάν, χωρίς διαφημίσεις, δουλεύει και χωρίς λογαριασμό. Δεν πουλάμε δεδομένα.'], 'Free, no ads, works without an account. We don’t sell data.');
+  assert.equal(dictionaries.en['Πολιτική απορρήτου'], 'Privacy policy');
   assert.equal(dictionaries.en['Ακολούθησε τη Σπιτοθήκη για νέα και tips.'], 'Follow Spitothiki for news and tips.');
 });
 
@@ -50,13 +62,24 @@ test('the in-app guide points to About in Settings for the official channels', (
   assert.match(bullet, /TikTok/);
   assert.equal(
     dictionaries.en[bullet],
-    'In Settings, under «About», you will find our Facebook page, Telegram channel and TikTok account for news and tips.'
+    'In Settings, under «About», you will see who makes the app, a contact email, the privacy policy, and our Facebook page, Telegram channel and TikTok account for news and tips.'
   );
 });
 
 test('About card ships in the service worker cache notes', () => {
   const sw = read('sw.js');
-  assert.match(sw, /CACHE_VERSION = 'v144'/);
+  assert.match(sw, /CACHE_VERSION = 'v145-preview'/);
   assert.match(sw, /About card in Settings with Facebook, Telegram and the official TikTok account/);
   assert.match(read('package.json'), /"version": "1\.9\.36"/);
+});
+
+test('About trust line only uses claims already in the privacy policy', () => {
+  const policy = read('privacy.html');
+  assert.match(policy, /δωρεάν εφαρμογή/);
+  assert.match(policy, /Δεν έχει διαφημίσεις/);
+  assert.match(policy, /δεν πουλάμε δεδομένα/);
+  assert.match(policy, /Αν δεν συνδεθείς, δεν φεύγουν από εκεί/);
+  const settings = settingsFn();
+  assert.match(settings, /Δωρεάν, χωρίς διαφημίσεις, δουλεύει και χωρίς λογαριασμό\. Δεν πουλάμε δεδομένα\./);
+  assert.doesNotMatch(settings, /χωρίς κάρτα/);
 });

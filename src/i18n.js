@@ -1173,6 +1173,10 @@ const EN = {
   "Νέα & tips στο Telegram": "News & tips on Telegram",
   // About (Settings → Σχετικά): official Facebook page, Telegram channel and TikTok account
   "Σχετικά": "About",
+  "Ποιοι είμαστε": "Who we are",
+  "Η Σπιτοθήκη φτιάχνεται από την Oikos Labs (Γιάννης Σκολαρίκης).": "Spitothiki is made by Oikos Labs (Giannis Skolarikis).",
+  "Δωρεάν, χωρίς διαφημίσεις, δουλεύει και χωρίς λογαριασμό. Δεν πουλάμε δεδομένα.": "Free, no ads, works without an account. We don’t sell data.",
+  "Πολιτική απορρήτου": "Privacy policy",
   "Ακολούθησε τη Σπιτοθήκη για νέα και tips.": "Follow Spitothiki for news and tips.",
   // v1.8.2
   "Μετράμε ανώνυμα από ποια σελίδα ήρθες (π.χ. TikTok, Facebook), μόνο ως συνολικό αριθμό. Χωρίς προσωπικά στοιχεία και χωρίς να δίνουμε τίποτα σε τρίτους.": "We anonymously count which page you came from (e.g. TikTok, Facebook), only as a total number. No personal data, and nothing is shared with third parties.",
