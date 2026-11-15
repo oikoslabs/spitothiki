@@ -839,7 +839,7 @@ function renderSettings() {
       <h3 class="settings-sub">${escapeHtml(t('Ποιοι είμαστε'))}</h3>
       <p>${escapeHtml(t('Η Σπιτοθήκη φτιάχνεται από την Oikos Labs.'))}</p>
       <p class="field-hint" id="about-trust">${escapeHtml(t('Δωρεάν, χωρίς διαφημίσεις, δουλεύει και χωρίς λογαριασμό. Δεν πουλάμε δεδομένα.'))}</p>
-      <p class="about-contact"><a href="mailto:oikoslabs.apps@gmail.com" data-no-i18n>oikoslabs.apps@gmail.com</a> · <a href="./privacy.html" target="_blank" rel="noopener">${escapeHtml(t('Πολιτική απορρήτου'))}</a></p>
+      <p class="about-contact"><a href="mailto:oikoslabs.apps@gmail.com" data-no-i18n>oikoslabs.apps@gmail.com</a> · <a href="./privacy.html" target="_blank" rel="noopener">${escapeHtml(t('Πολιτική απορρήτου'))}</a> · <a href="https://oikoslabs.github.io" target="_blank" rel="noopener" data-link="oikoslabs-site">${escapeHtml(t('Ιστότοπος Oikos Labs'))}</a></p>
       <p>${escapeHtml(t('Ακολούθησε τη Σπιτοθήκη για νέα και tips.'))}</p>
       <div class="settings-actions" id="about-links"><a class="button button-quiet" data-link="facebook-about" href="https://www.facebook.com/people/SpitoThiki/61596458362898/" target="_blank" rel="noopener">Facebook</a><a class="button button-quiet" data-link="telegram-about" href="https://t.me/spitothiki" target="_blank" rel="noopener">Telegram</a><a class="button button-quiet" data-link="tiktok-about" href="https://www.tiktok.com/@spitothikiapp" target="_blank" rel="noopener">TikTok</a></div></section></div>
     <details class="panel collapsible settings-more" id="settings-advanced" ${openAttr('settings-advanced')}><summary><h2>Για προχωρημένους</h2><span class="field-hint">Ρύθμιση αποδείξεων, δοκιμαστικά δεδομένα, διαγραφή όλων</span></summary>
