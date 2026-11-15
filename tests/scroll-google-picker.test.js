@@ -29,7 +29,7 @@ test('v1.9.18 goToSignin does not autofocus email / Google button', () => {
 
 test('v1.9.18 overscroll pull-to-refresh disabled; version bumped', () => {
   assert.match(read('styles.css'), /overscroll-behavior-y:\s*none/);
-  assert.match(read('sw.js'), /CACHE_VERSION = 'v145'/);
-  assert.match(read('package.json'), /"version": "1\.9\.37"/);
-  assert.match(read('index.html'), /data-no-i18n>1\.9\.37</);
+  assert.match(read('sw.js'), /CACHE_VERSION = 'v146'/);
+  assert.match(read('package.json'), /"version": "1\.9\.38"/);
+  assert.match(read('index.html'), /data-no-i18n>1\.9\.38</);
 });
