@@ -6,7 +6,7 @@ test('v1.9.28 release: version, cache bump, fuel photo prefill', () => {
   assert.match(read('package.json'), /"version": "1\.9\.36"/);
   assert.equal((read('index.html').match(/data-no-i18n>1\.9\.36</g) || []).length, 2);
   const sw = read('sw.js');
-  assert.match(sw, /CACHE_VERSION = 'v144';/);
+  assert.match(sw, /CACHE_VERSION = 'v145-preview';/);
   const transport = read('src/transport.js');
   assert.match(transport, /export function mergeAadePhoto/);
   assert.match(transport, /ΛΙΤΡΑ\|LITRES\?\|LTR\|LT\|ΛΙΤΡΟ/);

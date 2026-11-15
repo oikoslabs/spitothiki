@@ -1229,3 +1229,6 @@ a.menu-item { color: inherit; }
 :root[data-theme="dark"] .cal-entry { background: var(--surface); border-color: var(--line); }
 :root[data-theme="dark"] .cal-day.is-selected { background: #24312a; }
 :root[data-theme="dark"] .cal-day:hover, :root[data-theme="dark"] .cal-day:focus-visible { background: #24312a; }
+.about-contact { margin: 8px 0 0; font-size: calc(13px * var(--text-scale)); }
+.about-contact a { font-weight: 600; }
+#about-trust { margin: 0; }
