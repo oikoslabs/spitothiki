@@ -837,7 +837,7 @@ function renderSettings() {
     <section class="panel settings-card"><span class="stat-icon blue">↗</span><h2>Αντίγραφο ασφαλείας</h2><p>Αποθήκευσε όλα τα δεδομένα σου (απόθεμα, λίστες, έξοδα) σε ένα αρχείο, ή φέρε τα πίσω από ένα αρχείο. Με κωδικό, το αρχείο κρυπτογραφείται και δεν διαβάζεται χωρίς αυτόν.</p>${lastBackupLine()}${persistLine()}<div class="settings-actions" id="backup-actions"><button class="button button-primary" type="button" data-action="export-backup">⬇ Εξαγωγή αντιγράφου</button><button class="button button-quiet" type="button" data-action="import-backup">⬆ Εισαγωγή αντιγράφου</button></div>${driveSection()}</section>
     <section class="panel settings-card" id="about"><span class="stat-icon">ℹ️</span><h2>${escapeHtml(t('Σχετικά'))}</h2>
       <h3 class="settings-sub">${escapeHtml(t('Ποιοι είμαστε'))}</h3>
-      <p>${escapeHtml(t('Η Σπιτοθήκη φτιάχνεται από την Oikos Labs (Γιάννης Σκολαρίκης).'))}</p>
+      <p>${escapeHtml(t('Η Σπιτοθήκη φτιάχνεται από την Oikos Labs.'))}</p>
       <p class="field-hint" id="about-trust">${escapeHtml(t('Δωρεάν, χωρίς διαφημίσεις, δουλεύει και χωρίς λογαριασμό. Δεν πουλάμε δεδομένα.'))}</p>
       <p class="about-contact"><a href="mailto:oikoslabs.apps@gmail.com" data-no-i18n>oikoslabs.apps@gmail.com</a> · <a href="./privacy.html" target="_blank" rel="noopener">${escapeHtml(t('Πολιτική απορρήτου'))}</a></p>
       <p>${escapeHtml(t('Ακολούθησε τη Σπιτοθήκη για νέα και tips.'))}</p>

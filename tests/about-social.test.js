@@ -35,19 +35,20 @@ test('Settings has a Σχετικά card with Facebook, Telegram and TikTok link
   }
   assert.ok(!LINKS.tiktok.includes('?'), 'TikTok URL must have no tracking params');
   assert.match(settings, /t\('Ποιοι είμαστε'\)/);
-  assert.match(settings, /t\('Η Σπιτοθήκη φτιάχνεται από την Oikos Labs \(Γιάννης Σκολαρίκης\)\.'\)/);
+  assert.match(settings, /t\('Η Σπιτοθήκη φτιάχνεται από την Oikos Labs\.'\)/);
   assert.match(settings, /t\('Δωρεάν, χωρίς διαφημίσεις, δουλεύει και χωρίς λογαριασμό. Δεν πουλάμε δεδομένα.'\)/);
   assert.match(settings, /mailto:oikoslabs\.apps@gmail\.com/);
   assert.match(settings, /href="\.\/privacy\.html"/);
   assert.match(settings, /t\('Πολιτική απορρήτου'\)/);
   assert.doesNotMatch(settings, /τηλέφωνο|phone:|tel:/i);
   assert.doesNotMatch(settings, /διεύθυνση κατοικίας|home address/i);
+
 });
 
 test('About strings have English translations', () => {
   assert.equal(dictionaries.en['Σχετικά'], 'About');
   assert.equal(dictionaries.en['Ποιοι είμαστε'], 'Who we are');
-  assert.equal(dictionaries.en['Η Σπιτοθήκη φτιάχνεται από την Oikos Labs (Γιάννης Σκολαρίκης).'], 'Spitothiki is made by Oikos Labs (Giannis Skolarikis).');
+  assert.equal(dictionaries.en['Η Σπιτοθήκη φτιάχνεται από την Oikos Labs.'], 'Spitothiki is made by Oikos Labs.');
   assert.equal(dictionaries.en['Δωρεάν, χωρίς διαφημίσεις, δουλεύει και χωρίς λογαριασμό. Δεν πουλάμε δεδομένα.'], 'Free, no ads, works without an account. We don’t sell data.');
   assert.equal(dictionaries.en['Πολιτική απορρήτου'], 'Privacy policy');
   assert.equal(dictionaries.en['Ακολούθησε τη Σπιτοθήκη για νέα και tips.'], 'Follow Spitothiki for news and tips.');

@@ -1174,7 +1174,7 @@ const EN = {
   // About (Settings → Σχετικά): official Facebook page, Telegram channel and TikTok account
   "Σχετικά": "About",
   "Ποιοι είμαστε": "Who we are",
-  "Η Σπιτοθήκη φτιάχνεται από την Oikos Labs (Γιάννης Σκολαρίκης).": "Spitothiki is made by Oikos Labs (Giannis Skolarikis).",
+  "Η Σπιτοθήκη φτιάχνεται από την Oikos Labs.": "Spitothiki is made by Oikos Labs.",
   "Δωρεάν, χωρίς διαφημίσεις, δουλεύει και χωρίς λογαριασμό. Δεν πουλάμε δεδομένα.": "Free, no ads, works without an account. We don’t sell data.",
   "Πολιτική απορρήτου": "Privacy policy",
   "Ακολούθησε τη Σπιτοθήκη για νέα και tips.": "Follow Spitothiki for news and tips.",
