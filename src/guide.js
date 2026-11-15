@@ -19,12 +19,12 @@ export const GUIDE_SECTIONS = [
   {
     id: 'whats-new',
     icon: '✨',
-    title: 'Τι νέο στην 1.9.37',
+    title: 'Τι νέο στην 1.9.38',
     numbered: false,
-    intro: 'Στις Ρυθμίσεις, στο «Σχετικά», φαίνεται πιο καθαρά ποιος φτιάχνει την εφαρμογή και πώς επικοινωνείς.',
+    intro: 'Στις Ρυθμίσεις, στο «Σχετικά», προστέθηκε σύνδεσμος στον ιστότοπο της Oikos Labs.',
     bullets: [
-      'Στο «Σχετικά» προστέθηκαν ποιος φτιάχνει την εφαρμογή (Oikos Labs), email επικοινωνίας, σύνδεσμος στην πολιτική απορρήτου, και μια σύντομη γραμμή: δωρεάν, χωρίς διαφημίσεις, δουλεύει και χωρίς λογαριασμό, δεν πουλάμε δεδομένα. Τα επίσημα κανάλια (Facebook, Telegram, TikTok) μένουν όπως ήταν.',
-      'Στην 1.9.36 προστέθηκαν νέες συνταγές. Στην 1.9.35 η κάρτα σύνδεσης της αρχικής εξηγεί τα οφέλη και μπορεί να εμφανιστεί ήπια υπενθύμιση σύνδεσης. Στην προβολή μήνα, πάτα μια ημέρα για το φύλλο της ημέρας (1.9.34). Στην αρχική προστέθηκε κάρτα σύνδεσης στην 1.9.33. Στο ημερολόγιο φαίνεται αν ένας λογαριασμός πληρώθηκε ή εκκρεμεί από την 1.9.30. Ο μηνιαίος προϋπολογισμός και το ημερολόγιο νοικοκυριού προστέθηκαν στην 1.9.29.'
+      'Στο «Σχετικά» / «Ποιοι είμαστε» υπάρχει πλέον σύνδεσμος «Ιστότοπος Oikos Labs» (ανοίγει σε νέα καρτέλα).',
+      'Στην 1.9.37 το «Σχετικά» δείχνει ποιος φτιάχνει την εφαρμογή (Oikos Labs), email επικοινωνίας, πολιτική απορρήτου και τη γραμμή εμπιστοσύνης. Στην 1.9.36 προστέθηκαν νέες συνταγές. Στην 1.9.35 η κάρτα σύνδεσης της αρχικής εξηγεί τα οφέλη και μπορεί να εμφανιστεί ήπια υπενθύμιση σύνδεσης. Στην προβολή μήνα, πάτα μια ημέρα για το φύλλο της ημέρας (1.9.34). Στην αρχική προστέθηκε κάρτα σύνδεσης στην 1.9.33. Στο ημερολόγιο φαίνεται αν ένας λογαριασμός πληρώθηκε ή εκκρεμεί από την 1.9.30. Ο μηνιαίος προϋπολογισμός και το ημερολόγιο νοικοκυριού προστέθηκαν στην 1.9.29.'
     ]
   },
   {
@@ -366,6 +366,10 @@ export const GUIDE_EN = {
   'Πρόσθεσε γεγονός με τίτλο, ημερομηνία, προαιρετικά ώρα, ποιος το αφορά και σημειώσεις. Μπορεί να επαναλαμβάνεται κάθε εβδομάδα, μήνα ή χρόνο.': 'Add an event with a title, a date, optional time, who it concerns and notes. It can repeat weekly, monthly or yearly.',
   'Η κάρτα «Σήμερα» στην αρχική δείχνει ό,τι πέφτει σήμερα και κρύβεται από Ρυθμίσεις → Αρχική οθόνη.': 'The «Today» card on the home screen shows whatever falls today and is hidden from Settings → Home screen.',
   '«Πρόσθεσε στο ημερολόγιο του κινητού» κατεβάζει αρχείο .ics ώστε να χτυπήσουν υπενθυμίσεις και με κλειστή εφαρμογή. Μέσα στην εφαρμογή, υπενθύμιση εμφανίζεται μόνο όσο είναι ανοιχτή (όχι push).': '«Add to the phone calendar» downloads an .ics file so reminders can ring with the app closed. In the app, a reminder appears only while it is open (no push).',
+  'Τι νέο στην 1.9.38': 'What’s new in 1.9.38',
+  'Στις Ρυθμίσεις, στο «Σχετικά», προστέθηκε σύνδεσμος στον ιστότοπο της Oikos Labs.': 'In Settings, under «About», a link to the Oikos Labs website was added.',
+  'Στο «Σχετικά» / «Ποιοι είμαστε» υπάρχει πλέον σύνδεσμος «Ιστότοπος Oikos Labs» (ανοίγει σε νέα καρτέλα).': 'In «About» / «Who we are» there is now an «Oikos Labs website» link (opens in a new tab).',
+  'Στην 1.9.37 το «Σχετικά» δείχνει ποιος φτιάχνει την εφαρμογή (Oikos Labs), email επικοινωνίας, πολιτική απορρήτου και τη γραμμή εμπιστοσύνης. Στην 1.9.36 προστέθηκαν νέες συνταγές. Στην 1.9.35 η κάρτα σύνδεσης της αρχικής εξηγεί τα οφέλη και μπορεί να εμφανιστεί ήπια υπενθύμιση σύνδεσης. Στην προβολή μήνα, πάτα μια ημέρα για το φύλλο της ημέρας (1.9.34). Στην αρχική προστέθηκε κάρτα σύνδεσης στην 1.9.33. Στο ημερολόγιο φαίνεται αν ένας λογαριασμός πληρώθηκε ή εκκρεμεί από την 1.9.30. Ο μηνιαίος προϋπολογισμός και το ημερολόγιο νοικοκυριού προστέθηκαν στην 1.9.29.': 'In 1.9.37, «About» shows who makes the app (Oikos Labs), a contact email, the privacy policy and the trust line. New recipes were added in 1.9.36. In 1.9.35 the home sign-in card explains the benefits and a gentle sign-in reminder may appear. In the month view, tap a day for that day’s sheet (1.9.34). A sign-in card was added on the home screen in 1.9.33. The calendar shows whether a bill was paid or is still due since 1.9.30. The monthly budget and the household calendar were added in 1.9.29.',
   'Τι νέο στην 1.9.37': 'What’s new in 1.9.37',
   'Στις Ρυθμίσεις, στο «Σχετικά», φαίνεται πιο καθαρά ποιος φτιάχνει την εφαρμογή και πώς επικοινωνείς.': 'In Settings, under «About», it is clearer who makes the app and how you can get in touch.',
   'Στο «Σχετικά» προστέθηκαν ποιος φτιάχνει την εφαρμογή (Oikos Labs), email επικοινωνίας, σύνδεσμος στην πολιτική απορρήτου, και μια σύντομη γραμμή: δωρεάν, χωρίς διαφημίσεις, δουλεύει και χωρίς λογαριασμό, δεν πουλάμε δεδομένα. Τα επίσημα κανάλια (Facebook, Telegram, TikTok) μένουν όπως ήταν.': '«About» now shows who makes the app (Oikos Labs), a contact email, a link to the privacy policy, and a short line: free, no ads, works without an account, we don’t sell data. The official channels (Facebook, Telegram, TikTok) stay as they were.',
