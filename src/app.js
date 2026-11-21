@@ -1177,7 +1177,7 @@ async function openScanner({ onCode = fillFromBarcode, qr = false, confident = n
     if (qr) torchHintTimer = setTimeout(() => {
       if (!dialog.open || ac.signal.aborted || torch.hidden || torch.getAttribute('aria-pressed') === 'true') return;
       const hint = document.querySelector('#scan-torch-hint');
-      if (hint) hint.hidden = false;
+      if (hint) { hint.textContent = t('🔦 Άναψε τον φακό: οι αποδείξεις σε λεπτό χαρτί (π.χ. διόδια) διαβάζονται αμέσως.'); hint.hidden = false; }
       torch.classList.add('scan-torch-suggest');
     }, TORCH_HINT_MS);
     if (dialog.open) status.textContent = t(qr === 'all' ? 'Στόχευσε QR ή barcode: απόδειξη, λογαριασμό, διόδια ή προϊόν.' : qr === 'any' ? 'Στόχευσε το QR ή τον barcode του λογαριασμού.' : qr ? 'Στόχευσε το QR της απόδειξης μέσα στο πλαίσιο, όχι την κάρτα πόντων ή το barcode του ταμείου.' : 'Στόχευσε τον barcode με την κάμερα.');
