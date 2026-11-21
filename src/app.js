@@ -1,4 +1,4 @@
-import { MAX_QUANTITY, expiringItems, createPantryItem, createShoppingItem, expiringWithin, expiryStatus, expiryWarning, normalizeSearch, normalizeUnit, pantrySummary, receiveShoppingItem, returnShoppingItem, shoppingListText, syncShoppingWithItem, toggleShoppingItem } from './domain.js';
+import { MAX_QUANTITY, expiringItems, createPantryItem, createShoppingItem, expiringWithin, expiryStatus, expiryWarning, finishItemToShopping, normalizeSearch, normalizeUnit, pantrySummary, receiveShoppingItem, returnShoppingItem, shoppingListText, syncShoppingWithItem, toggleShoppingItem } from './domain.js';
 import { adoptCamera, decodeImageCodes, lookupBarcode, normalizeBarcode, requestCamera, startScanner, warmScanner } from './barcode.js';
 import { isUrlCode, lastTollAmount, parseTollBarcode, parseTollText, tollAmountFromText } from './toll-barcode.js';
 import { authProviders, firebaseConfig } from './firebase-config.js';
@@ -349,8 +349,9 @@ function renderInventoryCard(item) {
       <button class="icon-button" type="button" data-action="edit-item" data-id="${escapeHtml(item.id)}" aria-label="${escapeHtml(t('Επεξεργασία {name}', { name: item.name }))}">✎</button>
       <button class="icon-button" type="button" data-action="waste-item" data-id="${escapeHtml(item.id)}" aria-label="${escapeHtml(t('Πετάχτηκε: {name}', { name: item.name }))}" title="${escapeHtml(t('Πετάχτηκε: {name}', { name: item.name }))}">🗑</button>
       <button class="icon-button danger" type="button" data-action="delete-item" data-id="${escapeHtml(item.id)}" aria-label="${escapeHtml(t('Διαγραφή {name}', { name: item.name }))}">×</button>
-      <button class="button button-quiet small-action" type="button" data-action="add-to-shopping" data-id="${escapeHtml(item.id)}">Στη λίστα</button>
+      <button class="button button-quiet small-action" type="button" data-action="add-to-shopping" data-id="${escapeHtml(item.id)}">${escapeHtml(t('Στη λίστα'))}</button>
     </div>
+    <button class="button button-quiet finish-to-list" type="button" data-action="finish-to-list" data-id="${escapeHtml(item.id)}">${escapeHtml(t('Τελείωσε; Βάλ’ το στη λίστα'))}</button>
   </article>`;
 }
 
@@ -859,6 +860,17 @@ function renderSettings() {
       <h3 class="settings-sub">${escapeHtml(t('Ποιοι είμαστε'))}</h3>
       <p>${escapeHtml(t('Η Σπιτοθήκη φτιάχνεται από την Oikos Labs.'))}</p>
       <p class="field-hint" id="about-trust">${escapeHtml(t('Δωρεάν, χωρίς διαφημίσεις, δουλεύει και χωρίς λογαριασμό. Δεν πουλάμε δεδομένα.'))}</p>
+      <aside class="we-dont-box" id="we-dont-box">
+        <h3 class="settings-sub">${escapeHtml(t('Τι δεν μαζεύουμε'))}</h3>
+        <ul class="we-dont-list">
+          <li>${escapeHtml(t('Χωρίς διαφημίσεις'))}</li>
+          <li>${escapeHtml(t('Δεν πουλάμε δεδομένα'))}</li>
+          <li>${escapeHtml(t('Τα στοιχεία του σπιτιού σου τα βλέπουν μόνο τα μέλη του σπιτιού'))}</li>
+          <li>${escapeHtml(t('Ανώνυμες μετρήσεις χωρίς cookies'))}</li>
+          <li>${escapeHtml(t('Μπορείς να τα σβήσεις όλα όποτε θες'))}</li>
+        </ul>
+        <p class="we-dont-link"><a href="./privacy.html" target="_blank" rel="noopener">${escapeHtml(t('Πλήρης πολιτική απορρήτου'))}</a></p>
+      </aside>
       <p class="about-contact"><a href="mailto:oikoslabs.apps@gmail.com" data-no-i18n>oikoslabs.apps@gmail.com</a> · <a href="./privacy.html" target="_blank" rel="noopener">${escapeHtml(t('Πολιτική απορρήτου'))}</a> · <a href="https://oikoslabs.github.io" target="_blank" rel="noopener" data-link="oikoslabs-site">${escapeHtml(t('Ιστότοπος Oikos Labs'))}</a></p>
       <p>${escapeHtml(t('Ακολούθησε τη Σπιτοθήκη για νέα και tips.'))}</p>
       <div class="settings-actions" id="about-links"><a class="button button-quiet" data-link="facebook-about" href="https://www.facebook.com/people/SpitoThiki/61596458362898/" target="_blank" rel="noopener">Facebook</a><a class="button button-quiet" data-link="telegram-about" href="https://t.me/spitothiki" target="_blank" rel="noopener">Telegram</a><a class="button button-quiet" data-link="tiktok-about" href="https://www.tiktok.com/@spitothikiapp" target="_blank" rel="noopener">TikTok</a></div></section></div>
@@ -4309,6 +4321,16 @@ function handleAction(button) {
   } else if (action === 'add-to-shopping') {
     const item = state.items.find((entry) => entry.id === id);
     if (item) addItemToShopping(item);
+  } else if (action === 'finish-to-list') {
+    const item = state.items.find((entry) => entry.id === id);
+    if (!item) return;
+    const result = finishItemToShopping(state.items, state.shopping, id);
+    if (!result.changed) { showToast(t('Μπήκε στη λίστα ψωνιών')); return; }
+    undoable(t('Μπήκε στη λίστα ψωνιών'), () => {
+      state.items = result.items;
+      state.shopping = result.shopping;
+      persist(); renderApp();
+    });
   } else if (action === 'toggle-shopping') {
     const row = state.shopping.find((entry) => entry.id === id);
     if (!row) return;

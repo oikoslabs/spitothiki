@@ -165,6 +165,30 @@ export function returnShoppingItem(items = [], row, now = new Date().toISOString
   };
 }
 
+
+// One-tap «finished»: quantity goes to 0 (same as the − stepper / auto-list) and the product
+// is added to the shopping list if it is not already pending. The pantry row is kept so
+// ticking the list as bought can restock the same item.
+export function finishItemToShopping(items = [], shopping = [], itemId, now = new Date().toISOString()) {
+  const item = items.find((entry) => entry.id === itemId);
+  if (!item) return { items, shopping, added: false, alreadyOnList: false, changed: false };
+  const nameKey = String(item.name).toLocaleLowerCase('el-GR');
+  const existing = shopping.find((row) => !row.checked && (row.itemId ? row.itemId === item.id : String(row.name).toLocaleLowerCase('el-GR') === nameKey));
+  const alreadyOnList = Boolean(existing);
+  const qtyDone = !(Number(item.quantity) > 0);
+  if (qtyDone && alreadyOnList && (!existing || existing.itemId === item.id)) {
+    return { items, shopping, added: false, alreadyOnList: true, changed: false };
+  }
+  const nextItems = qtyDone ? items : items.map((entry) => entry.id === item.id ? { ...entry, quantity: 0, updatedAt: now } : entry);
+  if (alreadyOnList) {
+    const nextShopping = existing.itemId ? shopping : shopping.map((row) => row.id === existing.id ? { ...row, itemId: item.id } : row);
+    return { items: nextItems, shopping: nextShopping, added: false, alreadyOnList: true, changed: nextItems !== items || nextShopping !== shopping };
+  }
+  const quantity = Number(item.minimum) > 0 ? Number(item.minimum) : 1;
+  const row = createShoppingItem({ itemId: item.id, name: item.name, quantity, unit: item.unit }, now);
+  return { items: nextItems, shopping: [...shopping, row], added: true, alreadyOnList: false, changed: true };
+}
+
 export function shoppingListText(shopping = []) {
   const pending = shopping.filter((row) => !row.checked);
   if (!pending.length) return '';

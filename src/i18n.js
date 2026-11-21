@@ -1180,6 +1180,14 @@ const EN = {
   "Πολιτική απορρήτου": "Privacy policy",
   "Ακολούθησε τη Σπιτοθήκη για νέα και tips.": "Follow Spitothiki for news and tips.",
   "Ιστότοπος Oikos Labs": "Oikos Labs website",
+  "Τι δεν μαζεύουμε": "What we don’t collect",
+  "Χωρίς διαφημίσεις": "No ads",
+  "Δεν πουλάμε δεδομένα": "We don’t sell data",
+  "Τα στοιχεία του σπιτιού σου τα βλέπουν μόνο τα μέλη του σπιτιού": "Only members of your household can see your household data",
+  "Ανώνυμες μετρήσεις χωρίς cookies": "Anonymous measurements, no cookies",
+  "Μπορείς να τα σβήσεις όλα όποτε θες": "You can delete everything whenever you want",
+  "Τελείωσε; Βάλ’ το στη λίστα": "Finished? Add it to the list",
+  "Μπήκε στη λίστα ψωνιών": "Added to the shopping list",
   // v1.8.2
   "Μετράμε ανώνυμα από ποια σελίδα ήρθες (π.χ. TikTok, Facebook), μόνο ως συνολικό αριθμό. Χωρίς προσωπικά στοιχεία και χωρίς να δίνουμε τίποτα σε τρίτους.": "We anonymously count which page you came from (e.g. TikTok, Facebook), only as a total number. No personal data, and nothing is shared with third parties.",
   // v1.8.5
