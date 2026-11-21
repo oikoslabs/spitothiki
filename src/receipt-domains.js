@@ -37,3 +37,14 @@ export function allowedHost(host) {
 export const ALLOWED_ORIGINS = ['https://spitothiki.web.app', 'https://spitothiki.firebaseapp.com', 'http://localhost:8080', 'http://127.0.0.1:8080'];
 const PREVIEW_ORIGIN = /^https:\/\/spitothiki--[a-z0-9-]{1,60}\.web\.app$/;
 export const isAllowedOrigin = (origin) => ALLOWED_ORIGINS.includes(origin) || PREVIEW_ORIGIN.test(String(origin || ''));
+
+// v1.9.39: the one AADE page the app may read (through the proxy, the page has no CORS): the public cash-register
+// receipt check www1.aade.gr/tameiakes/myweb/q1.php?SIG=… that the receipt's own QR opens. It shows the shop name
+// and address. Exact host + exact path only, GET only (enforced by the proxy) — never any other aade.gr page.
+export function allowedAadePage(input) {
+  try {
+    const u = input instanceof URL ? input : new URL(String(input || ''));
+    return u.protocol === 'https:' && u.hostname.toLowerCase() === 'www1.aade.gr' && u.pathname === '/tameiakes/myweb/q1.php'
+      && !u.username && !u.password && !u.port && /^[A-Za-z0-9.,]{60,120}$/.test(u.searchParams.get('SIG') || '');
+  } catch { return false; }
+}

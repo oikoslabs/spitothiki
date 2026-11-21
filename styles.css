@@ -1014,6 +1014,8 @@ a.menu-item { color: inherit; }
 .onboard-more { margin-top: 12px; }
 .onboard-more > summary { cursor: pointer; font-weight: 700; padding: 8px 0; }
 .scan-hint { font-weight: 700; margin-bottom: 0; }
+.scan-torch-hint { font-weight: 700; color: var(--green); }
+#scan-torch.scan-torch-suggest { outline: 3px solid currentColor; outline-offset: 2px; font-weight: 800; }
 .onboard-more > summary::after { content: ' ▾'; } .onboard-more[open] > summary::after { content: ' ▴'; }
 
 /* v1.9.1 friendlier starter card */

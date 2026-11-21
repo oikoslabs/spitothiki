@@ -818,6 +818,7 @@ const EN = {
   'Απόδειξη διοδίων από barcode — το ποσό δεν υπάρχει στον barcode: γράψε το ποσό και πάτα Αποθήκευση.': "Toll receipt from barcode — the amount isn't in the barcode: enter the amount and tap Save.",
   'Στόχευσε το QR ή τον barcode της απόδειξης μέσα στο πλαίσιο.': "Aim at the receipt's QR or barcode inside the frame.",
   '🔦 Φακός': '🔦 Torch', 'Φακός': 'Torch',
+  '🔦 Άναψε τον φακό: οι αποδείξεις σε λεπτό χαρτί (π.χ. διόδια) διαβάζονται αμέσως.': '🔦 Turn on the torch: receipts on thin paper (e.g. tolls) read at once.',
   'ΜΕΤΑΚΙΝΗΣΕΙΣ': 'TRANSPORT',
   'Ιστορικό μετακινήσεων': 'Transport history',
   'Ιστορικό μετακινήσεων ({count})': 'Transport history ({count})',

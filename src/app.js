@@ -3,7 +3,7 @@ import { adoptCamera, decodeImageCodes, lookupBarcode, normalizeBarcode, request
 import { isUrlCode, lastTollAmount, parseTollBarcode, parseTollText, tollAmountFromText } from './toll-barcode.js';
 import { authProviders, firebaseConfig } from './firebase-config.js';
 import { loadState, parseBackup, saveState } from './storage.js';
-import { classifyReceiptUrl, fetchReceipt, findRelatedReceipt, receiptId } from './receipt.js';
+import { classifyReceiptUrl, fetchAadeShop, fetchReceipt, findRelatedReceipt, receiptId } from './receipt.js';
 import { ingredientName, isNewRecipe, pantryIngredients, recipeCat, scoreRecipe, suggestBuiltin } from './recipes.js';
 import { WASTE_REASONS, addDays, applyWaste, createStore, createWaste, groupByStore, monthKey, rowCategory, monthlySpending, moveCategory, purchaseFor, shiftMonth, storeOrder, wasteStats } from './features.js';
 import { showSigninCard, shouldShowSigninPrompt, promptSeen, markPromptSeen, countEntries, isSignedOutForPrompt, SIGNIN_PROMPT_KEYS } from './features.js';
@@ -1122,6 +1122,16 @@ async function fillFromBarcode(code) {
   }
 }
 
+// v1.9.39: anonymous scan timing for the one count per scan: camera time to the first accepted read, and whether
+// the flashlight was on. Kept in memory only for the next report (no ids, never stored).
+let scanTiming = null;
+const nowMs = () => (globalThis.performance?.now ? performance.now() : Date.now());
+function takeScanTiming() {
+  const timing = scanTiming && nowMs() - scanTiming.readAt < 10000 ? scanTiming : null;
+  scanTiming = null;
+  return timing ? { cam: timing.cam, ms: Math.round(nowMs() - timing.start), torch: timing.torch } : {};
+}
+const TORCH_HINT_MS = 3000;
 const TILL_SKIP_HINT = 'Αυτός είναι ο barcode του ταμείου και δεν έχει τα είδη. Στόχευσε το QR της απόδειξης (συνήθως κάτω δεξιά).';
 async function openScanner({ onCode = fillFromBarcode, qr = false, confident = null } = {}) {
   const dialog = document.querySelector('#scan-dialog');
@@ -1130,10 +1140,16 @@ async function openScanner({ onCode = fillFromBarcode, qr = false, confident = n
   document.querySelector('#scan-file-row').hidden = qr !== 'all';
   document.querySelector('#scan-title').textContent = t(qr === 'all' ? 'Σκάναρε οτιδήποτε' : qr === 'any' ? 'Σάρωση κωδικού λογαριασμού' : qr ? 'Σάρωση QR απόδειξης' : 'Σάρωση προϊόντος');
   const torch = document.querySelector('#scan-torch');
-  torch.hidden = true; torch.setAttribute('aria-pressed', 'false'); torch.textContent = t('🔦 Φακός');
+  torch.hidden = true; torch.setAttribute('aria-pressed', 'false'); torch.textContent = t('🔦 Φακός'); torch.classList.remove('scan-torch-suggest');
+  const torchHint = document.querySelector('#scan-torch-hint');
+  if (torchHint) torchHint.hidden = true;
   scanAbort?.abort();
   const ac = new AbortController();
   scanAbort = ac;
+  const scanStart = nowMs();
+  scanTiming = null;
+  let torchHintTimer = 0;
+  ac.signal.addEventListener('abort', () => clearTimeout(torchHintTimer), { once: true });
   // Start getUserMedia in the same turn as the tap (keeps the user gesture) and as showModal, so the dialog can paint while the camera opens.
   let streamPromise;
   try { streamPromise = adoptCamera(requestCamera(), ac.signal); }
@@ -1143,6 +1159,8 @@ async function openScanner({ onCode = fillFromBarcode, qr = false, confident = n
   if (!dialog.open) ac.abort();
   try {
     stopScanner = await startScanner(document.querySelector('#scan-video'), (code) => {
+      clearTimeout(torchHintTimer);
+      scanTiming = { start: scanStart, readAt: nowMs(), cam: Math.round(nowMs() - scanStart), torch: torch.getAttribute('aria-pressed') === 'true' ? 1 : 0 };
       stopScanner = null;
       dialog.close();
       onCode(code);
@@ -1155,6 +1173,13 @@ async function openScanner({ onCode = fillFromBarcode, qr = false, confident = n
     if (stopScanner?.hasTorch) torch.hidden = false;
     // Some phones report the flashlight only a moment after the camera starts.
     else setTimeout(() => { if (dialog.open && stopScanner?.checkTorch?.()) torch.hidden = false; }, 800);
+    // v1.9.39: receipts on thin, shiny paper (e.g. tolls) read at once with the flashlight on — suggest it after ~3 s.
+    if (qr) torchHintTimer = setTimeout(() => {
+      if (!dialog.open || ac.signal.aborted || torch.hidden || torch.getAttribute('aria-pressed') === 'true') return;
+      const hint = document.querySelector('#scan-torch-hint');
+      if (hint) hint.hidden = false;
+      torch.classList.add('scan-torch-suggest');
+    }, TORCH_HINT_MS);
     if (dialog.open) status.textContent = t(qr === 'all' ? 'Στόχευσε QR ή barcode: απόδειξη, λογαριασμό, διόδια ή προϊόν.' : qr === 'any' ? 'Στόχευσε το QR ή τον barcode του λογαριασμού.' : qr ? 'Στόχευσε το QR της απόδειξης μέσα στο πλαίσιο, όχι την κάρτα πόντων ή το barcode του ταμείου.' : 'Στόχευσε τον barcode με την κάμερα.');
     else closeScanner();
   } catch (error) {
@@ -1756,9 +1781,9 @@ async function loadReceiptPhoto(file) {
       }
     });
     // 2) Toll receipt: barcode data (if read) + amount from the OCR text, or everything from the text.
-    if (toll) { tollToTransport({ ...toll, amount: tollAmountFromText(result?.text) }); return; }
+    if (toll) { tollToTransport({ ...toll, amount: tollAmountFromText(result?.text) }, 'photo'); return; }
     const tollText = parseTollText(result?.text);
-    if (tollText && !result.parsed.lines.length) { tollToTransport(tollText); return; }
+    if (tollText && !result.parsed.lines.length) { tollToTransport(tollText, 'photo'); return; }
     let qrReceipt = previous?.receipt && previous.receipt.format === 'AADE' ? previous.receipt : null;
     if (!qrReceipt && link && classifyReceiptUrl(link).kind === 'aade') {
       try { qrReceipt = await fetchReceipt(link, { proxy: receiptProxy() }); }
@@ -1786,7 +1811,7 @@ async function loadReceiptPhoto(file) {
     receiptState = { step: 'review', receipt, id, duplicate, photo: true, trip: tripForReceipt(state.trips || [], receipt), target: receiptTarget, guess: classifyReceipt(receipt, result.text) };
     reportScan({ receipt, text: result.text, success: true, via: 'photo', proxied: false });
   } catch (error) {
-    if (toll) { tollToTransport(toll); return; }
+    if (toll) { tollToTransport(toll, 'photo'); return; }
     if (previous?.receipt) {
       receiptState = { ...previous, error: t(error.message || 'Η αναγνώριση απέτυχε.') };
       renderReceipt();
@@ -1810,7 +1835,28 @@ function receiptCode(code) {
   renderReceipt();
 }
 
-function tollToTransport(toll) {
+// v1.9.39: an AADE cash-register QR only has the amount; the shop name comes from the AADE check page a moment later.
+// It fills the shop only if nothing was typed there yet, and never changes the amount, date or receipt id.
+async function fillAadeShop(receipt) {
+  const shop = await fetchAadeShop(receipt.sourceUrl, { proxy: receiptProxy() }).catch(() => null);
+  if (!shop?.issuerName || receiptState.receipt !== receipt || receipt.issuerName) return;
+  receipt.issuerName = shop.issuerName;
+  if (shop.issuerAddress) receipt.issuerAddress = shop.issuerAddress;
+  if (receiptState.step === 'manual' && receiptState.manual) {
+    const input = document.querySelector('#manual-store');
+    if (!receiptState.manual.store && (!input || !input.value.trim())) {
+      receiptState.manual.store = shop.issuerName;
+      if (input) { input.value = shop.issuerName; if (input.form?.elements.category) input.dispatchEvent(new Event('input', { bubbles: true })); }
+    }
+  } else if (receiptState.step === 'review') {
+    const el = document.querySelector('#receipt-store');
+    if (el) el.textContent = shop.issuerName;
+  }
+}
+
+function tollToTransport(toll, via = 'barcode') {
+  // v1.9.39: one anonymous count per toll scan (type toll + operator name only; no receipt number, time or amount).
+  reportScan({ receipt: { issuerName: toll.operator || '' }, success: true, via, proxied: false, ...takeScanTiming() });
   if ((state.receipts || []).some((r) => r.id === toll.id) || (state.transport || []).some((e) => e.receiptId === toll.id)) {
     receiptState = { step: 'start', error: t('Αυτή η απόδειξη διοδίων ({no}) έχει ήδη καταχωρηθεί.', { no: toll.receiptNo }) };
     renderReceipt();
@@ -1834,10 +1880,13 @@ function openReceiptDialog(target = '') {
 async function loadReceipt(link, { fromQueue = false } = {}) {
   receiptState = { step: 'loading', link: String(link || '').trim() };
   renderReceipt();
+  const timing = takeScanTiming();
+  const started = nowMs();
+  const total = () => ({ ...timing, ms: Math.round((timing.ms || 0) + nowMs() - started) });
   try {
     if (navigator.onLine === false) throw Object.assign(new Error('Δεν υπάρχει σύνδεση στο internet.'), { cors: true });
     const receipt = await fetchReceipt(receiptState.link, { proxy: receiptProxy() });
-    reportScan({ receipt, success: true, via: receipt.via, proxied: receipt.proxied });
+    reportScan({ receipt, success: true, via: receipt.via, proxied: receipt.proxied, ...total() });
     if (fromQueue || loadQueue().some((e) => e.link === receiptState.link)) saveQueue(dequeue(loadQueue(), receiptState.link));
     const id = await receiptId(receipt, receipt.sourceUrl);
     // v1.9.7: a saved record whose expenses were all deleted no longer blocks scanning it again.
@@ -1848,8 +1897,9 @@ async function loadReceipt(link, { fromQueue = false } = {}) {
     if (shouldAskAmount(receipt, { duplicate })) {
       receiptState = { step: 'manual', receipt, id, guess: classifyReceipt(receipt), target: receiptTarget, manual: { id, url: receipt.sourceUrl, format: receipt.format, date: receipt.date, store: receipt.issuerName, reason: 'aade' } };
     } else receiptState = { step: 'review', receipt, id, duplicate, related, trip: tripForReceipt(state.trips || [], receipt), target: receiptTarget, guess: classifyReceipt(receipt) };
+    if (receipt.format === 'AADE' && !receipt.issuerName) fillAadeShop(receipt);
   } catch (error) {
-    reportScan({ receipt: {}, success: false, via: error.via, proxied: error.proxied });
+    reportScan({ receipt: {}, success: false, via: error.via, proxied: error.proxied, ...total() });
     receiptState = { step: 'start', link: receiptState.link, error: t(error.message || 'Η αναζήτηση απέτυχε.'), unsupported: Boolean(error.unsupported), cors: Boolean(error.cors), canQueue: Boolean(error.cors) && !error.status && !/πολλές αναζητήσεις/i.test(error.message || '') };
   }
   renderReceipt();
@@ -4246,7 +4296,7 @@ function handleAction(button) {
   } else if (action === 'plan-shopping') planToShopping();
   else if (action === 'open-receipt') openReceiptDialog();
   else if (action === 'close-receipt') document.querySelector('#receipt-dialog').close();
-  else if (action === 'receipt-scan') openScanner({ qr: true, onCode: receiptCode });
+  else if (action === 'receipt-scan') openScanner({ qr: true, onCode: receiptCode, confident: (v) => Boolean(parseTollBarcode(v)) });
   else if (action === 'receipt-reset') { receiptState = { step: 'start' }; renderReceipt(); }
   else if (action === 'receipt-manual') { const sheet = document.querySelector('#menu-sheet'); if (sheet?.open) sheet.close(); openManualExpense(); }
   else if (action === 'delete-item') {
@@ -4293,6 +4343,7 @@ function handleAction(button) {
     // Visual feedback first; applyConstraints on the track is slow on some Androids and was blocking INP.
     button.setAttribute('aria-pressed', String(on));
     button.textContent = t(on ? '🔦 Φακός: ανοιχτός' : '🔦 Φακός');
+    if (on) { button.classList.remove('scan-torch-suggest'); const hint = document.querySelector('#scan-torch-hint'); if (hint) hint.hidden = true; }
     afterPaint(() => {
       apply(on).then((ok) => {
         if (ok) return;

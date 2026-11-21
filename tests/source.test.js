@@ -121,15 +121,17 @@ test('v1.8.3 short links: hosting redirect (302) and service worker use the same
   for (const f of SOURCES) assert.throws(() => readFileSync(new URL(`../${f}`, import.meta.url)), 'no file or folder clashes with a short link');
 });
 
-test('reportScan sends one anonymous {type, store, success, via}; queues offline; skips proxy reads', async () => {
+test('reportScan sends one anonymous {type, store, success, via} per scan (proxy too); queues offline', async () => {
   const storage = memory(); const calls = [];
   const fetchImpl = async (url, opts) => { calls.push(JSON.parse(opts.body)); return { ok: true }; };
   const opts = { storage, sendScan: (e) => sendScanEvent(e, { fetchImpl, online: true, origin: 'https://spitothiki.web.app' }) };
   assert.equal(await reportScan({ receipt: { issuerName: 'ΣΚΛΑΒΕΝΙΤΗΣ' }, success: true, via: 'photo', proxied: false }, opts), true);
   assert.deepEqual(calls, [{ type: 'supermarket', store: 'Sklavenitis', success: true, via: 'photo' }]);
   assert.ok(!('url' in calls[0]) && !('amount' in calls[0]));
-  assert.equal(await reportScan({ receipt: { issuerName: 'Lidl' }, success: true, via: 'proxy', proxied: true }, opts), false);
-  assert.equal(calls.length, 1);
+  // v1.9.39: a proxied scan is counted once here too (the proxy marks the app's q=1 lookups as timings only).
+  assert.equal(await reportScan({ receipt: { issuerName: 'Lidl' }, success: true, via: 'proxy', proxied: true, cam: 812.4, ms: 3021, torch: true }, opts), true);
+  assert.deepEqual(calls[1], { type: 'supermarket', store: 'Lidl', success: true, via: 'proxy', cam: 812, ms: 3021, torch: 1 });
+  calls.length = 1;
   const offline = { storage, sendScan: async () => false };
   assert.equal(await reportScan({ receipt: { issuerName: 'Lidl' }, success: false, via: 'direct', proxied: false }, offline), false);
   assert.equal(JSON.parse(storage.getItem(SCAN_KEY)).length, 1);

@@ -152,10 +152,21 @@ export async function sourceSignup({ storage = globalThis.localStorage, send = s
 // amounts, user or household ids. Optional t=1 marks a test (preview or owner). Offline events are queued and retried on a later open.
 export const SCAN_KEY = 'spitothiki:pending-scans';
 export const SCAN_KINDS = ['supermarket', 'fuel', 'toll', 'other'];
-export const SCAN_VIA = ['aade', 'photo', 'direct', 'on-device'];
+export const SCAN_VIA = ['aade', 'photo', 'direct', 'on-device', 'proxy', 'barcode'];
 const word = (v, max = 40) => String(v ?? '').replace(/[^\p{L}\p{N} ._:/-]/gu, '').trim().slice(0, max);
 const readScans = (storage) => { try { const rows = JSON.parse(storage.getItem(SCAN_KEY) || '[]'); return Array.isArray(rows) ? rows : []; } catch { return []; } };
 const writeScans = (storage, rows) => { try { storage.setItem(SCAN_KEY, JSON.stringify(rows.slice(0, 20))); } catch {} };
+
+// v1.9.39: optional anonymous timings (whole ms, capped at 2 min) and the flashlight flag. No ids, no time of day.
+const msField = (v) => (Number.isFinite(Number(v)) && v !== null && v !== '' && Number(v) >= 0 ? Math.min(120000, Math.round(Number(v))) : undefined);
+export function scanTimingFields(event = {}) {
+  const out = {};
+  const cam = msField(event.cam); const ms = msField(event.ms);
+  if (cam !== undefined) out.cam = cam;
+  if (ms !== undefined) out.ms = ms;
+  if (event.torch === 1 || event.torch === 0 || typeof event.torch === 'boolean') out.torch = event.torch ? 1 : 0;
+  return out;
+}
 
 export function validScan(event) {
   return Boolean(event && SCAN_KINDS.includes(event.type) && typeof event.success === 'boolean' && SCAN_VIA.includes(event.via || 'on-device'));
@@ -166,7 +177,7 @@ export async function sendScanEvent(event, { fetchImpl = globalThis.fetch, onlin
   const type = SCAN_KINDS.includes(event?.type) ? event.type : '';
   if (!online || !isStatsOrigin(origin) || !type || typeof event?.success !== 'boolean' || typeof fetchImpl !== 'function') return false;
   try {
-    const body = { type, store: word(event.store), success: event.success, via };
+    const body = { type, store: word(event.store), success: event.success, via, ...scanTimingFields(event) };
     if (isStatsTest({ origin, test })) body.t = 1;
     const res = await fetchImpl(STATS_URL, { method: 'POST', body: JSON.stringify(body), headers: { 'content-type': 'text/plain' }, credentials: 'omit', keepalive: true, referrerPolicy: 'no-referrer' });
     return Boolean(res?.ok);
@@ -185,13 +196,13 @@ export async function flushScans({ storage = globalThis.localStorage, sendScan =
   return rows.length - left.length;
 }
 
-// Fire-and-forget. If the lookup already went through the receipt proxy, do nothing (it was counted there).
-export async function reportScan({ receipt, text = '', success, via, proxied } = {}, { storage = globalThis.localStorage, sendScan = sendScanEvent } = {}) {
+// Fire-and-forget. v1.9.39: ONE count per scan, also when the lookup went through the receipt proxy (via 'proxy';
+// the app marks its proxy lookups q=1 so the proxy no longer counts them as scans), plus optional timings.
+export async function reportScan({ receipt, text = '', success, via, proxied, cam, ms, torch } = {}, { storage = globalThis.localStorage, sendScan = sendScanEvent } = {}) {
   try {
-    if (proxied || via === 'proxy') return false;
-    const viaWord = SCAN_VIA.includes(via) ? via : 'on-device';
+    const viaWord = proxied || via === 'proxy' ? 'proxy' : SCAN_VIA.includes(via) ? via : 'on-device';
     const found = classifyStore(`${receipt?.issuerName || ''} ${text}`, receiptScanHost(receipt));
-    const event = { type: found.type, store: found.store, success: Boolean(success), via: viaWord };
+    const event = { type: found.type, store: found.store, success: Boolean(success), via: viaWord, ...scanTimingFields({ cam, ms, torch }) };
     if (await sendScan(event)) return true;
     writeScans(storage, [...readScans(storage), event]);
     return false;

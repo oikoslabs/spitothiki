@@ -73,12 +73,21 @@ export function scanMode(qr) { return qr === 'all' ? 'all' : qr === 'any' ? 'bil
 export function scanFormats(mode) { return MODE_FORMATS[mode] || MODE_FORMATS.product; }
 export function zxingFormats(mode) { return scanFormats(mode).map((f) => ZX[f]).filter((n) => n !== undefined); }
 
-// Best-effort camera tuning: continuous focus, ~2x zoom when the lens allows it. Returns torch support.
-async function tuneCamera(track) {
+// Optical zoom per scanner mode. v1.9.39: receipt and «all» scans stay at 1x, so a wide 1D toll barcode
+// (Αττική Οδός: 36 digits across the whole receipt) fits the frame at a normal distance; a small QR is still
+// covered by the centre-crop region (a 2x digital zoom). Product/bill scans keep the ~2x zoom. Pure, unit-tested.
+export function scanZoom(mode, caps = {}) {
+  if (mode === 'receipt' || mode === 'all') return 0;
+  return caps.zoom && caps.zoom.max >= 1.5 ? Math.min(2, caps.zoom.max) : 0;
+}
+
+// Best-effort camera tuning: continuous focus, ~2x zoom when the lens allows it (not for receipts). Returns torch support.
+async function tuneCamera(track, mode = 'product') {
   const caps = track.getCapabilities?.() || {};
   const advanced = [];
   if (caps.focusMode?.includes('continuous')) advanced.push({ focusMode: 'continuous' });
-  if (caps.zoom && caps.zoom.max >= 1.5) advanced.push({ zoom: Math.min(2, caps.zoom.max) });
+  const zoom = scanZoom(mode, caps);
+  if (zoom) advanced.push({ zoom });
   for (const c of advanced) { try { await track.applyConstraints({ advanced: [c] }); } catch {} }
   return Boolean(caps.torch);
 }
@@ -94,13 +103,24 @@ export function scanEnginePlan(nativeFormats = [], preferZxing = false) {
 // Frame regions (fractions of the video frame) the scanner cycles through: the on-screen box, the full frame,
 // and a tight centre crop that acts as a 2x digital zoom for a small QR (e.g. the corner of an A4 receipt).
 export const SCAN_REGIONS = [[0.1, 0.25, 0.8, 0.5], [0, 0, 1, 1], [0.275, 0.325, 0.45, 0.35]];
+// A 1D-only decoder never gets the tight centre crop: a wide barcode (toll receipts) can't fit in it.
+export const SCAN_REGIONS_1D = SCAN_REGIONS.slice(0, 2);
+const TWO_D = ['qr_code', 'data_matrix', 'pdf417'];
+export const regionsFor = (formats = []) => (formats.some((f) => TWO_D.includes(f)) ? SCAN_REGIONS : SCAN_REGIONS_1D);
+// Native detector groups: in receipt and «all» mode a 2D detector (QR…) and a 1D detector alternate (ML Kit is much
+// slower per frame with every format in one detector); product/bill keep one detector. Pure, unit-tested.
+export function detectorGroups(mode, nativeFormats = []) {
+  if (mode !== 'all' && mode !== 'receipt') return nativeFormats.length ? [nativeFormats] : [];
+  return [nativeFormats.filter((f) => TWO_D.includes(f)), nativeFormats.filter((f) => !TWO_D.includes(f))].filter((g) => g.length);
+}
 
 // Accept rule for a read: links (and, in «all» mode, anything that routes somewhere) at once;
 // otherwise the same value must come twice in a row from the same decoder (avoids partial 1D reads).
 export function isStableRead(mode, value, previous, confident = null) {
   if (!value) return false;
   if (mode === 'all') return Boolean(confident?.(value)) || value === previous;
-  if (mode === 'receipt') return /^https?:\/\//i.test(value) || value === previous;
+  // v1.9.39: a code the caller is sure of (a valid toll barcode) is accepted on the first read here too.
+  if (mode === 'receipt') return /^https?:\/\//i.test(value) || Boolean(confident?.(value)) || value === previous;
   return true;
 }
 
@@ -165,26 +185,24 @@ export async function startScanner(video, onCode, { qr = false, confident = null
   const plan = scanEnginePlan(nativeFormats, prefersZxing());
   const decoders = []; // { name, decode(canvas) → string }
   if (plan.native) {
-    // «Σκάναρε οτιδήποτε»: one detector with every format is much slower per frame on phones (ML Kit),
+    // «Σκάναρε οτιδήποτε» and receipts: one detector with every format is much slower per frame on phones (ML Kit),
     // so alternate a 2D detector (QR/DataMatrix/PDF417) and a 1D detector, each as light as the inner scanners.
-    const TWO_D = ['qr_code', 'data_matrix', 'pdf417'];
-    const groups = mode === 'all' ? [nativeFormats.filter((f) => TWO_D.includes(f)), nativeFormats.filter((f) => !TWO_D.includes(f))].filter((g) => g.length) : [nativeFormats];
-    for (const formats of groups) {
-      try { const d = new globalThis.BarcodeDetector({ formats }); decoders.push({ name: 'native', decode: async (c) => (await d.detect(c))[0]?.rawValue || '' }); } catch {}
+    for (const formats of detectorGroups(mode, nativeFormats)) {
+      try { const d = new globalThis.BarcodeDetector({ formats }); decoders.push({ name: 'native', regions: regionsFor(formats), seen: 0, decode: async (c) => (await d.detect(c))[0]?.rawValue || '' }); } catch {}
     }
   }
   let zxingReady = null;
   const addZxing = () => {
     zxingReady ||= loadZxing().then((ZXing) => {
       const reader = new ZXing.BrowserMultiFormatReader(new Map([[2, zxingFormats(mode)], [3, true]])); // POSSIBLE_FORMATS, TRY_HARDER
-      decoders.push({ name: 'zxing', decode: async (c) => { try { return reader.decodeFromCanvas(c).getText(); } catch { return ''; } } });
+      decoders.push({ name: 'zxing', regions: regionsFor(scanFormats(mode)), seen: 0, decode: async (c) => { try { return reader.decodeFromCanvas(c).getText(); } catch { return ''; } } });
     });
     return zxingReady;
   };
   if (!decoders.length) await addZxing(); // no usable native detector: ZXing is the only decoder (throws if it can't load)
   if (signal?.aborted) { abandon(); throw abortError(); }
   const track = stream.getVideoTracks()[0];
-  const hasTorch = track ? await tuneCamera(track) : false;
+  const hasTorch = track ? await tuneCamera(track, mode) : false;
   let stopped = false, frame = 0, idleTimer = 0;
   const last = new Map(); // decoder index → previous value
   const skipped = new Set();
@@ -204,7 +222,9 @@ export async function startScanner(video, onCode, { qr = false, confident = null
     if (w && h && decoders.length) {
       const n = frame++;
       const slot = n % decoders.length;
-      const [rx, ry, rw, rh] = SCAN_REGIONS[Math.floor(n / decoders.length) % SCAN_REGIONS.length];
+      const dec = decoders[slot];
+      const regions = dec.regions || SCAN_REGIONS;
+      const [rx, ry, rw, rh] = regions[(dec.seen++ || 0) % regions.length];
       const sw = Math.round(w * rw), sh = Math.round(h * rh);
       canvas.width = sw; canvas.height = sh;
       ctx.drawImage(video, Math.round(w * rx), Math.round(h * ry), sw, sh, 0, 0, sw, sh);

@@ -105,7 +105,7 @@ test('fetchReceipt: myDATA first, issuer name from EN16931, proxy only on networ
   assert.equal(p.lines.length, 8);
   assert.equal(p.via, 'proxy');
   assert.equal(p.proxied, true);
-  assert.ok(via.includes(`https://proxy.test/?url=${encodeURIComponent('https://b.epsilonnet.gr/fd/x/myDATA')}`));
+  assert.ok(via.includes(`https://proxy.test/?url=${encodeURIComponent('https://b.epsilonnet.gr/fd/x/myDATA')}&q=1`));
   await assert.rejects(fetchReceipt('https://b.epsilonnet.gr/fd/x', { fetchImpl: cors }), (e) => e.cors === true);
   await assert.rejects(fetchReceipt('http://b.gr/x'), /https/);
 });
@@ -131,9 +131,9 @@ test('fetchReceipt adds t=1 on the proxy URL only when the stats test flag is on
   } finally {
     setOwnerTestFlag(false);
   }
-  assert.ok(via.includes(`https://proxy.test/?url=${encodeURIComponent('https://b.epsilonnet.gr/fd/x/myDATA')}&t=1`));
+  assert.ok(via.includes(`https://proxy.test/?url=${encodeURIComponent('https://b.epsilonnet.gr/fd/x/myDATA')}&t=1&q=1`));
   via.length = 0;
   await fetchReceipt('https://b.epsilonnet.gr/fd/x', { fetchImpl: cors, proxy: 'https://proxy.test/' });
-  assert.ok(via.includes(`https://proxy.test/?url=${encodeURIComponent('https://b.epsilonnet.gr/fd/x/myDATA')}`));
+  assert.ok(via.includes(`https://proxy.test/?url=${encodeURIComponent('https://b.epsilonnet.gr/fd/x/myDATA')}&q=1`));
   assert.equal(via.some((u) => u.includes('t=1')), false);
 });
