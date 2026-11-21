@@ -1864,6 +1864,9 @@ function renderRelatedOffer() {
     <label class="check-row"><input type="checkbox" name="replaceRelated" id="receipt-replace-related" checked form="receipt-review-form"> <span>${escapeHtml(t('Αντικατάσταση του δελτίου (χωρίς διπλό έξοδο)'))}</span></label></div>`;
 }
 
+function receiptReviewExpCatFields() {
+  return `<div id="receipt-review-expcat"><label class="field-label" for="review-expcat">${escapeHtml(t('Κατηγορία εξόδου'))}</label><select class="field-input expcat-select" id="review-expcat" name="expenseCategory" data-prev="">${expCatOptions('', 'receipt')}</select>${expCatHint('review-expcat-hint')}${expCatInlineRow()}</div>`;
+}
 function renderReceiptReview() {
   const { receipt, duplicate } = receiptState;
   const store = receipt.issuerName || (receipt.issuerVat ? t('ΑΦΜ {vat}', { vat: receipt.issuerVat }) : t('Άγνωστο κατάστημα'));
@@ -1877,8 +1880,9 @@ function renderReceiptReview() {
       : fuelPhoto
         ? t('Το QR έχει το ποσό, όχι τα λίτρα. Βγάλε φωτογραφία την απόδειξη για λίτρα, τιμή/λίτρο και πρατήριο.')
         : t('Οι αποδείξεις με QR της ΑΑΔΕ (ταμειακές) δεν περιέχουν τα είδη στο QR, μόνο το σύνολο. Για να περάσουν τα είδη, βγάλε φωτογραφία την απόδειξη — ή κατέγραψε μόνο το ποσό ως έξοδο.');
+    const toTransport = receiptState.target === 'transport' || ['tolls', 'fuel'].includes(receiptState.guess?.type);
     return `${head}${dup}${mismatch}${renderRelatedOffer()}${renderTransportReceiptOffer()}${renderTripLink()}<p class="field-hint" id="receipt-aade-note">${escapeHtml(aadeNote)}</p>${photoButtons(fuelPhoto ? 'fuel' : '')}
-      <form id="receipt-review-form" novalidate><input type="hidden" name="mode" value="total"><div class="dialog-actions"><button class="button button-quiet" type="button" data-action="receipt-reset">Πίσω</button><button class="button button-primary" type="submit" ${duplicate ? 'disabled' : ''}>${receiptState.target === 'transport' || ['tolls', 'fuel'].includes(receiptState.guess?.type) ? `🚗 ${escapeHtml(t('Καταχώριση στις Μετακινήσεις'))}` : 'Καταγραφή εξόδου'}</button></div></form>`;
+      <form id="receipt-review-form" novalidate><input type="hidden" name="mode" value="total">${toTransport ? '' : receiptReviewExpCatFields()}<div class="dialog-actions"><button class="button button-quiet" type="button" data-action="receipt-reset">Πίσω</button><button class="button button-primary" type="submit" ${duplicate ? 'disabled' : ''}>${toTransport ? `🚗 ${escapeHtml(t('Καταχώριση στις Μετακινήσεις'))}` : 'Καταγραφή εξόδου'}</button></div></form>`;
   }
   const rows = receipt.lines.map((line, index) => `<div class="receipt-line${line.doubtful ? ' is-doubtful' : ''}" data-line="${index}"${line.doubtful ? ` title="${escapeHtml(t('Έλεγξε αυτή τη γραμμή: ποσότητα × τιμή δεν ταιριάζει με το ποσό.'))}"` : ''}><input class="shopping-check" type="checkbox" name="use" checked aria-label="${escapeHtml(t('Εισαγωγή: {name}', { name: line.name }))}">
     <input class="field-input receipt-name" name="name" value="${escapeHtml(line.name)}" maxlength="80" aria-label="Όνομα προϊόντος">
@@ -1891,6 +1895,7 @@ function renderReceiptReview() {
     <div class="receipt-lines" id="receipt-lines">${rows}</div>
     <label class="check-row"><input type="checkbox" name="toPantry" ${(receiptState.trip || receiptState.related) && !duplicate ? '' : 'checked'}> <span>Πρόσθεσε στο απόθεμα (ενώνεται με ίδια προϊόντα)</span></label>${receiptState.trip && !duplicate ? `<p class="field-hint">${escapeHtml(t('Τα προϊόντα του καλαθιού έχουν ήδη μπει στο απόθεμα.'))}</p>` : ''}
     <label class="check-row"><input type="checkbox" name="toSpending" checked> <span>Κατέγραψε τα έξοδα στο Σύνολο εξόδων</span></label>
+    ${receiptReviewExpCatFields()}
     <div class="dialog-actions"><button class="button button-quiet" type="button" data-action="receipt-reset">Πίσω</button><button class="button button-primary" type="submit" ${duplicate ? 'disabled' : ''}>Εισαγωγή</button></div></form>`;
 }
 
@@ -1963,13 +1968,18 @@ function importReceipt(form) {
   let added = 0;
   let merged = 0;
   let spent = 0;
+  const sel = form.elements.expenseCategory;
+  const chosenCat = sel ? (sel.value === '__new' ? sel.dataset.prev || '' : sel.value) : '';
+  let expenseCategory = '';
   if (form.elements.mode.value === 'total') {
     if (!(receipt.total > 0)) { receiptState = { ...receiptState, step: 'manual', manual: { id, url: receipt.sourceUrl, format: receipt.format, date: receipt.date, store: storeName, reason: 'aade' } }; renderReceipt(); return; }
-    state.purchases.push({ id: `pur-${id}`, rowId: '', name: storeName || t('Απόδειξη'), category: 'Άλλο', price: receipt.total, date, ...extra, updatedAt: now });
+    expenseCategory = chosenCat;
+    state.purchases.push({ id: `pur-${id}`, rowId: '', name: storeName || t('Απόδειξη'), category: 'Άλλο', price: receipt.total, date, ...extra, ...(expenseCategory ? { expenseCategory } : {}), updatedAt: now });
     spent = receipt.total;
   } else {
     const toPantry = form.elements.toPantry.checked;
     const toSpending = form.elements.toSpending.checked;
+    if (toSpending) expenseCategory = chosenCat;
     for (const row of form.querySelectorAll('[data-line]')) {
       const field = (name) => row.querySelector(`[name="${name}"]`);
       if (!field('use').checked) continue;
@@ -1985,7 +1995,7 @@ function importReceipt(form) {
         else { state.items = [createPantryItem({ name, quantity, unit, category }), ...state.items]; added += 1; }
       }
       if (toSpending && price > 0) {
-        state.purchases.push({ id: `pur-${id}-${row.dataset.line}`, rowId: '', name, category, price, date, ...extra, updatedAt: now });
+        state.purchases.push({ id: `pur-${id}-${row.dataset.line}`, rowId: '', name, category, price, date, ...extra, ...(expenseCategory ? { expenseCategory } : {}), updatedAt: now });
         spent += price;
       }
     }
@@ -1999,7 +2009,7 @@ function importReceipt(form) {
   const replace = receiptState.related && form.elements.replaceRelated?.checked ? receiptState.related.id : '';
   if (replace) Object.assign(state, deleteReceipt(state, replace));
   const refs = { ...(receipt.mark ? { mark: receipt.mark } : {}), ...(receipt.series ? { series: receipt.series } : {}), ...(receipt.number ? { number: receipt.number } : {}), ...(receipt.invoiceType ? { invoiceType: receipt.invoiceType } : {}) };
-  state.receipts = [...(state.receipts || []).filter((r) => r.id !== id), { id, date, total: receipt.total, store: storeName, issuerVat: receipt.issuerVat || '', format: receipt.format, ...refs, lines: receipt.lines.length, items: receipt.lines.slice(0, 80).map((l) => ({ name: l.name, quantity: l.quantity, unit: l.unit, price: l.price })), ...(receipt.sourceUrl ? { url: receipt.sourceUrl } : {}), importedAt: now }];
+  state.receipts = [...(state.receipts || []).filter((r) => r.id !== id), { id, date, total: receipt.total, store: storeName, issuerVat: receipt.issuerVat || '', format: receipt.format, ...refs, lines: receipt.lines.length, items: receipt.lines.slice(0, 80).map((l) => ({ name: l.name, quantity: l.quantity, unit: l.unit, price: l.price })), ...(expenseCategory ? { expenseCategory } : {}), ...(receipt.sourceUrl ? { url: receipt.sourceUrl } : {}), importedAt: now }];
   skipEntriesSigninPrompt = true;
   const saved = persist();
   skipEntriesSigninPrompt = false;
@@ -4493,6 +4503,11 @@ document.addEventListener('change', (event) => {
   if (event.target.id === 'manual-group') event.target.form.dataset.groupTouched = '1';
   if (event.target.id === 'cart-item-unit') updateCartQtyLabel();
   if (event.target.matches?.('select.expcat-select')) { if (event.target.value === '__new') openExpCatInline(event.target); else event.target.dataset.prev = event.target.value; return; }
+  if (event.target.name === 'toSpending' && event.target.form?.id === 'receipt-review-form') {
+    const box = event.target.form.querySelector('#receipt-review-expcat');
+    if (box) box.hidden = !event.target.checked;
+    return;
+  }
   if (event.target.id === 'bills-history-filter') { billsHistory.filter = event.target.value; billsHistory.limit = 10; renderApp(); return; }
   if (event.target.id === 'cart-store') { const row = document.querySelector('#cart-new-store-row'); row.hidden = event.target.value !== '__new'; if (!row.hidden) document.querySelector('#cart-new-store').focus(); }
   if (event.target.classList?.contains('vm-mode')) {
