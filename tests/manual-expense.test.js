@@ -152,7 +152,7 @@ test('v1.8.6 one name per idea: «Είδος προϊόντος» (Γαλακτ�
   assert.doesNotMatch(app, /for="(manual|re)-group">\$\{escapeHtml\(t\('Τι αγόρασες;'\)\)\}/);
   assert.doesNotMatch(app, /Κατηγορία: αυτόματα/);
   // expense categories: every picker explains where it ends up
-  for (const id of ['manual-expcat-hint', 'extras-expcat-hint']) assert.match(app, new RegExp(`expCatHint\\('${id}'\\)`));
+  for (const id of ['manual-expcat-hint', 'extras-expcat-hint', 'review-expcat-hint']) assert.match(app, new RegExp(`expCatHint\\('${id}'\\)`));
   assert.match(app, /id="re-expcat-hint"/);
   // the product-type bars say they include purchases moved to own categories
   assert.match(app, /t\('Αγορές ανά είδος προϊόντος'\)/);
