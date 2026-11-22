@@ -45,7 +45,7 @@ import { MARKETING_HINT, MARKETING_LABEL, readMarketingCheckbox } from './market
 import { clearDriveKey, loadDriveKey, saveDriveKey } from './drive-key.js';
 import { applyReceiptEdit, receiptEditError } from './receipt-edit.js';
 import { addManualExpense, createManualExpense, guessManualCategory, manualCategory, parseAmount, shouldAskAmount } from './manual-expense.js';
-import { EXPENSE_CAT_DEFAULT_EMOJI, NO_CATEGORY, createExpenseCategory, deleteExpenseCategory, effectiveItemCategory, expenseCategories, expenseCategoryMonth, upsertExpenseCategory, visibleSpendRows } from './expense-cats.js';
+import { EXPENSE_CAT_DEFAULT_EMOJI, NO_CATEGORY, createExpenseCategory, deleteExpenseCategory, effectiveItemCategory, expenseCategories, expenseCategoryMonth, rememberedExpenseCategory, upsertExpenseCategory, visibleSpendRows } from './expense-cats.js';
 import { BACKUP_SNOOZE_KEY, LAST_BACKUP_KEY, backupReminderDue, dequeue, enqueue, hasData, loadQueue, saveQueue } from './offline.js';
 import { TRANSPORT_ICONS, TRANSPORT_TYPES, applyTransportRecurring, classifyReceipt, consumptionFor, createTransport, createTransportRecurring, fuelStats, mergeAadePhoto, pricePerLiter, transportMonth } from './transport.js';
 import { EXTRA_DEFAULT_EMOJI, EXTRA_SUGGESTIONS, LEGACY_EXTRA_CATEGORIES, createExtra, createExtraCategory, deleteExtraCategory, extraCategories, findExtraCategory, suggestEmoji, extrasMonth, extrasSummary, lastUnitPrice, quickExtra, setExtraQty, unitPrice } from './extras.js';
@@ -1859,10 +1859,12 @@ async function fillAadeShop(receipt) {
     if (!receiptState.manual.store && (!input || !input.value.trim())) {
       receiptState.manual.store = shop.issuerName;
       if (input) { input.value = shop.issuerName; if (input.form?.elements.category) input.dispatchEvent(new Event('input', { bubbles: true })); }
+      applyExpCatMemory(document.querySelector('#manual-expcat'), receipt.issuerVat, shop.issuerName);
     }
   } else if (receiptState.step === 'review') {
     const el = document.querySelector('#receipt-store');
     if (el) el.textContent = shop.issuerName;
+    applyExpCatMemory(document.querySelector('#review-expcat'), receipt.issuerVat, shop.issuerName);
   }
 }
 
@@ -1946,8 +1948,32 @@ function renderRelatedOffer() {
     <label class="check-row"><input type="checkbox" name="replaceRelated" id="receipt-replace-related" checked form="receipt-review-form"> <span>${escapeHtml(t('Αντικατάσταση του δελτίου (χωρίς διπλό έξοδο)'))}</span></label></div>`;
 }
 
+
+function rememberedCatFor(issuerVat, store) {
+  return rememberedExpenseCategory(state.receipts || [], expCats(), { issuerVat, store });
+}
+const expCatMemoryHint = (id, suggested) => `<p class="field-hint expcat-memory-hint" id="${id}"${suggested ? '' : ' hidden'}>${suggested ? escapeHtml(t('Προτάθηκε από την προηγούμενη απόδειξη του ίδιου καταστήματος')) : ''}</p>`;
+function syncExpCatMemoryHint(root, suggested) {
+  const hint = root?.querySelector?.('.expcat-memory-hint');
+  if (!hint) return;
+  hint.hidden = !suggested;
+  hint.textContent = suggested ? t('Προτάθηκε από την προηγούμενη απόδειξη του ίδιου καταστήματος') : '';
+}
+// Update the select only if the user has not picked something else.
+function applyExpCatMemory(sel, issuerVat, store) {
+  if (!sel || sel.dataset.userSet === '1') return;
+  const suggested = rememberedCatFor(issuerVat, store);
+  if (sel.dataset.suggested !== undefined && sel.value && sel.value !== (sel.dataset.suggested || '')) return;
+  sel.value = suggested;
+  sel.dataset.prev = suggested;
+  sel.dataset.suggested = suggested;
+  syncExpCatMemoryHint(sel.form || sel.closest('form') || sel.parentElement, suggested);
+}
+
 function receiptReviewExpCatFields() {
-  return `<div id="receipt-review-expcat"><label class="field-label" for="review-expcat">${escapeHtml(t('Κατηγορία εξόδου'))}</label><select class="field-input expcat-select" id="review-expcat" name="expenseCategory" data-prev="">${expCatOptions('', 'receipt')}</select>${expCatHint('review-expcat-hint')}${expCatInlineRow()}</div>`;
+  const receipt = receiptState.receipt || {};
+  const suggested = rememberedCatFor(receipt.issuerVat, receipt.issuerName);
+  return `<div id="receipt-review-expcat"><label class="field-label" for="review-expcat">${escapeHtml(t('Κατηγορία εξόδου'))}</label><select class="field-input expcat-select" id="review-expcat" name="expenseCategory" data-prev="${escapeHtml(suggested)}" data-suggested="${escapeHtml(suggested)}">${expCatOptions(suggested, 'receipt')}</select>${expCatMemoryHint('review-expcat-memory', suggested)}${expCatHint('review-expcat-hint')}${expCatInlineRow()}</div>`;
 }
 function renderReceiptReview() {
   const { receipt, duplicate } = receiptState;
@@ -1989,9 +2015,10 @@ function renderReceiptManual() {
     ? `<p class="alert-banner" id="manual-aade-note" role="status">${escapeHtml(t('Αυτό το QR (ταμειακή μηχανή, ΑΑΔΕ) δεν έχει μέσα το ποσό ούτε τα είδη. Γράψε το σύνολο της απόδειξης.'))}</p>`
     : `<p class="field-hint" id="manual-note">${escapeHtml(t('Για ψώνια χωρίς απόδειξη: σούπερ μάρκετ, κρεοπωλείο, λαϊκή… Μετράει στα έξοδα του μήνα.'))}</p>`;
   const toTransport = receiptState.target === 'transport';
+  const suggested = toTransport ? '' : rememberedCatFor(receiptState.receipt?.issuerVat, m.store || receiptState.receipt?.issuerName);
   const transport = !toTransport && m.reason === 'aade' && receiptState.receipt ? `<button class="button button-quiet" type="button" data-action="receipt-to-transport" id="manual-to-transport">🚗 ${escapeHtml(t('Είναι καύσιμα / διόδια'))}</button>` : '';
   const cats = toTransport ? '' : `<label class="field-label" for="manual-group">${escapeHtml(t('Είδος προϊόντος'))}</label><select class="field-input" id="manual-group" name="category">${groupOptions(m.category || guessManualCategory(m.store) || 'Άλλο')}</select>
-    <label class="field-label" for="manual-expcat">${escapeHtml(t('Κατηγορία εξόδου'))}</label><select class="field-input expcat-select" id="manual-expcat" name="expenseCategory" data-prev="">${expCatOptions('', 'receipt')}</select>${expCatHint('manual-expcat-hint')}${expCatInlineRow()}`;
+    <label class="field-label" for="manual-expcat">${escapeHtml(t('Κατηγορία εξόδου'))}</label><select class="field-input expcat-select" id="manual-expcat" name="expenseCategory" data-prev="${escapeHtml(suggested)}" data-suggested="${escapeHtml(suggested)}">${expCatOptions(suggested, 'receipt')}</select>${expCatMemoryHint('manual-expcat-memory', suggested)}${expCatHint('manual-expcat-hint')}${expCatInlineRow()}`;
   const saveLabel = toTransport ? `🚗 ${escapeHtml(t('Καταχώριση στις Μετακινήσεις'))}` : escapeHtml(t('Αποθήκευση'));
   return `${note}<form id="receipt-manual-form" novalidate>
     <label class="field-label" for="manual-amount">${escapeHtml(t('Ποσό (€)'))}</label><input class="field-input" id="manual-amount" name="amount" type="number" min="0.01" max="100000" step="0.01" inputmode="decimal" required placeholder="€" value="${escapeHtml(m.amount ?? '')}">
@@ -3885,7 +3912,13 @@ function addExpCatInline() {
     sel.insertBefore(opt, sel.querySelector('option[value="__new"]'));
     sel.hidden = false;
   }
-  if (expCatTarget) { expCatTarget.value = rec.id; expCatTarget.dataset.prev = rec.id; }
+  if (expCatTarget) {
+    expCatTarget.value = rec.id; expCatTarget.dataset.prev = rec.id;
+    if (expCatTarget.id === 'review-expcat' || expCatTarget.id === 'manual-expcat') {
+      expCatTarget.dataset.userSet = '1';
+      syncExpCatMemoryHint(expCatTarget.form, '');
+    }
+  }
   row.hidden = true; expCatTarget?.focus(); expCatTarget = null;
   showToast(t('Η κατηγορία «{name}» προστέθηκε.', { name: rec.name }));
 }
@@ -4563,7 +4596,10 @@ document.addEventListener('input', (event) => {
   if (event.target.id === 'ptype-name') { const e = document.querySelector('#ptype-emoji'); if (e) e.placeholder = suggestTypeEmoji(event.target.value) || PRODUCT_TYPE_DEFAULT_EMOJI; }
   if (event.target.id === 'extras-new-name') { const e = document.querySelector('#extras-new-emoji'); if (e) e.placeholder = suggestEmoji(event.target.value) || EXTRA_DEFAULT_EMOJI; }
   if (event.target.id === 'bill-name' && !event.target.form.dataset.typeTouched) event.target.form.elements.type.value = guessBillType(event.target.value);
-  if (event.target.id === 'manual-store' && !event.target.form.dataset.groupTouched) event.target.form.elements.category.value = guessManualCategory(event.target.value) || 'Άλλο';
+  if (event.target.id === 'manual-store') {
+    if (!event.target.form.dataset.groupTouched && event.target.form.elements.category) event.target.form.elements.category.value = guessManualCategory(event.target.value) || 'Άλλο';
+    applyExpCatMemory(event.target.form.elements.expenseCategory, receiptState.receipt?.issuerVat, event.target.value);
+  }
   if ((event.target.id === 'bill-name' || event.target.name === 'type') && event.target.form?.id === 'bill-form' && !event.target.form.elements.billId.value && event.target.form.elements.type.value === 'rent') event.target.form.elements.period.value = '1';
   if (event.target.id === 'bill-name') rememberAutoPay(event.target.form);
   if (event.target.name === 'name' && event.target.form?.id === 'shopping-form') refreshSuggestChips();
@@ -4595,7 +4631,18 @@ document.addEventListener('change', (event) => {
   if (event.target.id === 'bill-type') event.target.form.dataset.typeTouched = '1';
   if (event.target.id === 'manual-group') event.target.form.dataset.groupTouched = '1';
   if (event.target.id === 'cart-item-unit') updateCartQtyLabel();
-  if (event.target.matches?.('select.expcat-select')) { if (event.target.value === '__new') openExpCatInline(event.target); else event.target.dataset.prev = event.target.value; return; }
+  if (event.target.matches?.('select.expcat-select')) {
+    if (event.target.value === '__new') openExpCatInline(event.target);
+    else {
+      event.target.dataset.prev = event.target.value;
+      if (event.target.id === 'review-expcat' || event.target.id === 'manual-expcat') {
+        const same = event.target.value === (event.target.dataset.suggested || '');
+        event.target.dataset.userSet = same ? '' : '1';
+        syncExpCatMemoryHint(event.target.form, same ? event.target.dataset.suggested : '');
+      }
+    }
+    return;
+  }
   if (event.target.name === 'toSpending' && event.target.form?.id === 'receipt-review-form') {
     const box = event.target.form.querySelector('#receipt-review-expcat');
     if (box) box.hidden = !event.target.checked;
