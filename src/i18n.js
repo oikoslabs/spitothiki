@@ -137,6 +137,7 @@ const EN = {
   'Δουλεύει και χωρίς internet': 'Works offline too',
   'Προσθήκη προϊόντος': 'Add product',
   'Απλά, για το σπίτι.': 'Simply, for the home.',
+  'Η Σπιτοθήκη είναι δωρεάν εφαρμογή της Oikos Labs για το απόθεμα, τις αγορές και τα έξοδα του σπιτιού. Προαιρετικά μπορείς να συνδεθείς με Google για συγχρονισμό, ή να κρατήσεις κρυπτογραφημένο αντίγραφο σε κρυφό φάκελο του δικού σου Drive.': 'Spitothiki is a free household app by Oikos Labs for pantry, shopping and expenses. You can optionally sign in with Google to sync, or keep an encrypted backup in a hidden folder of your own Drive.',
   'Αντίγραφο ασφαλείας & απόρρητο': 'Backup & privacy',
   'Γλώσσα': 'Language',
   'Αλλαγή γλώσσας': 'Change language',

@@ -17,7 +17,7 @@ test('guide has a numbered manual ending with useful tips, 2–4 bullets each', 
   assert.equal(numbered.length, 17);
   for (const section of GUIDE_SECTIONS) {
     assert.ok(section.intro.trim());
-    const max = section.id === 'shopping' ? 8 : section.id === 'receipts' ? 7 : (section.id === 'settings' || section.id === 'spending' || section.id === 'pantry') ? 6 : 4;
+    const max = section.id === 'shopping' ? 8 : section.id === 'receipts' ? 7 : (section.id === 'settings' || section.id === 'spending' || section.id === 'pantry') ? 6 : section.id === 'whats-new' ? 5 : 4;
     assert.ok(section.bullets.length >= 2 && section.bullets.length <= max, section.id);
   }
 });
@@ -83,7 +83,7 @@ test('guide is in the menu, settings, starter, welcome and SW cache v125', () =>
   assert.match(app, /onboard-guide/);
   assert.match(app, /function helpButton/);
   const sw = read('sw.js');
-  assert.match(sw, /CACHE_VERSION = 'v162'/);
+  assert.match(sw, /CACHE_VERSION = 'v163'/);
   assert.ok(sw.includes("./src/guide.js"));
 });
 
@@ -120,7 +120,7 @@ test('guide covers last prices, electronic payments, receipt links, CSV export a
   const byId = Object.fromEntries(GUIDE_SECTIONS.map((section) => [section.id, section]));
   const textOf = (id) => [byId[id].intro, ...byId[id].bullets].join('\n');
   const whats = byId['whats-new'];
-  assert.equal(whats.title, 'Τι νέο στην 1.9.46');
+  assert.equal(whats.title, 'Τι νέο στην 1.9.47');
   assert.match(whats.intro, /Τελευταίες τιμές|στόχος ηλεκτρονικών|λινκ|Excel/);
   assert.match(textOf('whats-new'), /📈 Τελευταίες τιμές/);
   assert.match(textOf('whats-new'), /💳 Στόχος ηλεκτρονικών πληρωμών/);

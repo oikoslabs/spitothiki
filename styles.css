@@ -80,7 +80,13 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .button-add { min-height: 40px; padding: 0 14px; font-size: calc(12px * var(--text-scale)); }
 .button-add span { font-size: calc(18px * var(--text-scale)); }
 .text-button { padding: 6px 0; border: 0; background: none; color: var(--green); font-size: calc(11px * var(--text-scale)); font-weight: 700; cursor: pointer; }
-.app-footer { display: flex; align-items: center; justify-content: space-between; width: min(100%, 1120px); margin: 8px auto 0; padding: 14px 0 6px; color: var(--muted); font-size: calc(10px * var(--text-scale)); }
+.app-footer { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px 16px; flex-wrap: wrap; width: min(100%, 1120px); margin: 8px auto 0; padding: 14px 0 6px; color: var(--muted); font-size: calc(10px * var(--text-scale)); }
+.app-footer-copy { flex: 1 1 16rem; min-width: 0; }
+.app-footer-desc { margin: 0 0 6px; line-height: 1.45; max-width: 52rem; }
+.app-footer-meta { margin: 0; line-height: 1.45; }
+.app-footer a { color: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
+a.privacy-card { color: inherit; text-decoration: none; }
+a.privacy-card:hover, a.privacy-card:focus-visible { border-color: var(--green, #2d6b4c); }
 
 .hero-panel { position: relative; overflow: hidden; display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: center; gap: 20px; min-height: 180px; margin-bottom: 22px; padding: 30px 34px; border-radius: 22px; background: #e9f1e4; }
 .hero-panel::after { position: absolute; right: 11%; bottom: -80px; width: 220px; height: 220px; border: 1px solid rgba(45,107,76,.09); border-radius: 50%; content: ''; }
@@ -770,7 +776,7 @@ button.stat-card:hover { border-color: #bfd4c1; }
 /* Performance (INP/CLS): instant tap feedback, footer space reserved until the first render, off-screen days skipped. */
 .is-pressed { opacity: .7; transform: scale(.98); }
 .view-content:empty { min-height: 100vh; }
-.app-footer { content-visibility: auto; contain-intrinsic-size: auto 40px; }
+.app-footer { content-visibility: auto; contain-intrinsic-size: auto 90px; }
 .plan-day { content-visibility: auto; contain-intrinsic-size: auto 220px; }
 .privacy-details { margin: 6px 0 10px; } .privacy-details summary { cursor: pointer; font-weight: 600; } .privacy-list { margin: 8px 0 0; padding-left: 18px; display: grid; gap: 6px; font-size: calc(13px * var(--text-scale)); }
 
