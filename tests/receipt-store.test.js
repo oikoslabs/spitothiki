@@ -32,3 +32,59 @@ test('classifyStore: words that only contain the letters bp are not BP', () => {
     assert.deepEqual(classifyStore(text, ''), { type: 'fuel', store: '' }, extra);
   }
 });
+
+test('classifyStore: added supermarket chains (Greek and Latin) are supermarket, not short tokens', () => {
+  const cases = [
+    ['MARKET IN ΑΕΕ', 'Market In'],
+    ['Μάρκετ Ιν', 'Market In'],
+    ['Discount Markt', 'Discount Markt'],
+    ['ΘΑΝΟΠΟΥΛΟΣ ΑΕ', 'Thanopoulos'],
+    ['Thanopoulos', 'Thanopoulos'],
+    ['ΧΑΛΚΙΑΔΑΚΗΣ ΑΕ', 'Chalkiadakis'],
+    ['Chalkiadakis', 'Chalkiadakis'],
+    ['Halkiadakis', 'Chalkiadakis'],
+    ['ΣΥΝ.ΚΑ', 'Synka'],
+    ['Συν. Κα Κρήτης', 'Synka'],
+    ['SYNKA', 'Synka'],
+    ['ΠΡΟΜΗΘΕΥΤΙΚΗ ΠΕΙΡΑΙΩΣ', 'Promitheftiki'],
+    ['ΓΑΛΑΞΙΑΣ', 'Galaxias'],
+    ['ΜΠΑΖΑΡ', 'Bazaar'],
+  ];
+  for (const [text, store] of cases) {
+    assert.deepEqual(classifyStore(text, ''), { type: 'supermarket', store }, text);
+  }
+  for (const [text, store] of [['in the shop', ''], ['market', ''], ['discount sale', ''], ['markt', ''], ['συν ΑΕ', ''], ['κα', ''], ['προμηθευτής', '']]) {
+    const found = classifyStore(text, '');
+    assert.equal(found.store, store, text);
+    assert.notEqual(found.store, 'Market In', text);
+    assert.notEqual(found.store, 'Discount Markt', text);
+    assert.notEqual(found.store, 'Synka', text);
+    assert.notEqual(found.store, 'Promitheftiki', text);
+  }
+});
+
+test('classifyStore: added fuel brands are fuel even without diesel words; short tokens do not match', () => {
+  const cases = [
+    ['JET OIL ΠΡΑΤΗΡΙΟ', 'Jet Oil'],
+    ['Jetoil', 'Jet Oil'],
+    ['CORAL gas station', 'Coral'],
+    ['CYCLON ΑΕ', 'Cyclon'],
+    ['SILK OIL', 'Silk Oil'],
+    ['Silkoil', 'Silk Oil'],
+    ['ETEKA', 'ETEKA'],
+    ['Ετεκα', 'ETEKA'],
+    ['DRACOIL', 'Dracoil'],
+    ['KMOIL', 'Kmoil'],
+    ['ELINOIL', 'Elin'],
+    ['ΕΛΙΝΟΪΛ ΑΕ', 'Elin'],
+    ['Elin Oil', 'Elin'],
+  ];
+  for (const [text, store] of cases) {
+    assert.deepEqual(classifyStore(text, ''), { type: 'fuel', store }, text);
+  }
+  for (const text of ['jet plane', 'olive oil', 'silk scarf', 'corals', 'cyclone', 'oil change']) {
+    const found = classifyStore(text, '');
+    assert.equal(found.store, '', text);
+    assert.notEqual(found.type, 'fuel', text);
+  }
+});
