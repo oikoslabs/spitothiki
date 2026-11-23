@@ -3,7 +3,7 @@
 // 'signup'), plus an optional t=1 flag when the event is a test (preview host or the signed-in owner).
 // No user id, email, device info, IP or time is sent; no third-party pixel/SDK; nothing goes to Firestore.
 // Fire-and-forget: never blocks the app, never shows an error; offline = try again on a later open.
-import { classifyStore } from './receipt-store.js';
+import { classifyStore, receiptClassifyText } from './receipt-store.js';
 export const STATS_URL = 'https://spitothiki-stats.cornerstore553.workers.dev/e';
 export const SOURCES = ['tiktok', 'facebook', 'instagram', 'telegram', 'viber', 'reddit', 'pinterest', 'sofisstore', 'play'];
 export const SOURCE_WORDS = [...SOURCES, 'other', 'direct', 'existing'];
@@ -201,7 +201,7 @@ export async function flushScans({ storage = globalThis.localStorage, sendScan =
 export async function reportScan({ receipt, text = '', success, via, proxied, cam, ms, torch } = {}, { storage = globalThis.localStorage, sendScan = sendScanEvent } = {}) {
   try {
     const viaWord = proxied || via === 'proxy' ? 'proxy' : SCAN_VIA.includes(via) ? via : 'on-device';
-    const found = classifyStore(`${receipt?.issuerName || ''} ${text}`, receiptScanHost(receipt));
+    const found = classifyStore(receiptClassifyText(receipt, text), receiptScanHost(receipt));
     const event = { type: found.type, store: found.store, success: Boolean(success), via: viaWord, ...scanTimingFields({ cam, ms, torch }) };
     if (await sendScan(event)) return true;
     writeScans(storage, [...readScans(storage), event]);

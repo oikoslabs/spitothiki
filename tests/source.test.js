@@ -186,3 +186,27 @@ test('reportScan classifies the store from the receipt host; still never sends t
   assert.equal(JSON.stringify(calls).includes('epsilonnet'), false);
   assert.equal(JSON.stringify(calls).includes('http'), false);
 });
+
+test('reportScan: franchise fuel receipt with BP in items or page text sends only BP + fuel', async () => {
+  const calls = [];
+  const fetchImpl = async (_url, opts) => { calls.push(JSON.parse(opts.body)); return { ok: true }; };
+  const opts = { sendScan: (e) => sendScanEvent(e, { fetchImpl, online: true, origin: 'https://spitothiki.web.app' }) };
+  const issuer = { issuerName: 'ΠΑΠΑΔΟΠΟΥΛΟΣ ΕΝΕΡΓΕΙΑΚΗ Α.Ε.', lines: [{ rawName: 'ΑΜΟΛΥΒΔΗ 95 BP', name: 'Αμόλυβδη 95 BP' }] };
+  assert.equal(await reportScan({ receipt: issuer, success: true, via: 'proxy', proxied: true }, opts), true);
+  assert.deepEqual(calls[0], { type: 'fuel', store: 'BP', success: true, via: 'proxy' });
+  assert.equal(JSON.stringify(calls[0]).includes('ΠΑΠΑΔΟΠΟΥΛΟΣ'), false);
+  assert.equal(JSON.stringify(calls[0]).includes('ΑΜΟΛΥΒΔΗ'), false);
+  assert.equal('pageText' in calls[0], false);
+  assert.equal('url' in calls[0], false);
+
+  calls.length = 0;
+  const html = '<html><title>BP station</title><div>Αμόλυβδη 95</div></html>';
+  assert.equal(await reportScan({ receipt: { issuerName: 'ΠΑΠΑΔΟΠΟΥΛΟΣ ΕΝΕΡΓΕΙΑΚΗ Α.Ε.', pageText: html }, success: true, via: 'direct', proxied: false }, opts), true);
+  assert.deepEqual(calls[0], { type: 'fuel', store: 'BP', success: true, via: 'direct' });
+  assert.equal(JSON.stringify(calls).includes('station'), false);
+  assert.equal(JSON.stringify(calls).includes('<html'), false);
+
+  calls.length = 0;
+  assert.equal(await reportScan({ receipt: { issuerName: 'ΠΑΠΑΔΟΠΟΥΛΟΣ ΕΝΕΡΓΕΙΑΚΗ Α.Ε.' }, text: 'subpage diesel', success: true, via: 'photo', proxied: false }, opts), true);
+  assert.deepEqual(calls[0], { type: 'fuel', store: '', success: true, via: 'photo' });
+});
