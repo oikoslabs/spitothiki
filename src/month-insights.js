@@ -160,6 +160,16 @@ export const MONTH_INSIGHTS_EN = {
   'Ξόδεψες {change} λιγότερα στα «{category}» από τον προηγούμενο μήνα στο ίδιο διάστημα ({current} αντί για {previous}).': 'You spent {change} less on “{category}” than last month over the same period ({current} vs {previous}).',
   'Ξόδεψες περίπου το {change} στα «{category}» από τον προηγούμενο μήνα στο ίδιο διάστημα ({current} αντί για {previous}).': 'You spent about {change} on “{category}” compared with last month over the same period ({current} vs {previous}).',
   'Κάρτα «Τι άλλαξε αυτόν τον μήνα»': '“What changed this month” card',
+  '{change} από τον προηγούμενο μήνα': '{change} vs last month',
+  '{change} περισσότερα από τον προηγούμενο μήνα': '{change} more than last month',
+  'Περίπου το {change} του προηγούμενου μήνα': 'About {change} of last month',
+  'Περίπου ίδια με τον προηγούμενο μήνα': 'About the same as last month',
+  '{category}: {change}': '{category}: {change}',
+  '{category}: {change} περισσότερα': '{category}: {change} more',
+  '{category}: περίπου το {change}': '{category}: about {change}',
+  'Αυτόν τον μήνα': 'This month',
+  'Άλλα': 'Other',
+  'Τα έξοδα του μήνα ανά κατηγορία': 'This month’s spending by category',
   'Φαίνεται στην αρχική όταν υπάρχουν αρκετά έξοδα για σύγκριση με τον προηγούμενο μήνα. Υπολογίζεται μόνο στη συσκευή σου.': 'Shown on the home screen when there is enough spending to compare with last month. It is calculated only on your device.'
 };
 
@@ -207,4 +217,41 @@ export function insightText(insight, { t = fill, money = (n) => String(n), categ
   if (fraction) return t('Ξόδεψες περίπου το {change} από τον προηγούμενο μήνα στο ίδιο διάστημα ({current} αντί για {previous}).', { change, current, previous });
   if (insight.dir === 'up') return t('Ξόδεψες {change} περισσότερα από τον προηγούμενο μήνα στο ίδιο διάστημα ({current} αντί για {previous}).', { change, current, previous });
   return t('Ξόδεψες {change} λιγότερα από τον προηγούμενο μήνα στο ίδιο διάστημα ({current} αντί για {previous}).', { change, current, previous });
+}
+
+// v1.9.39 home polish: one short line per change, e.g. «+18% από τον προηγούμενο μήνα»,
+// «3,3× περισσότερα από τον προηγούμενο μήνα», «Αγορές: −12%». The long sentence (insightText) stays as the tooltip.
+export function insightShort(insight, { t = fill, categoryLabel = (s) => s, locale = 'el-GR' } = {}) {
+  const ch = insightChange(insight, { locale });
+  if (insight.kind === 'category') {
+    const category = categoryLabel(insight.label);
+    if (ch.kind === 'same') return { text: t('{category}: {change}', { category, change: '≈' }), change: '≈' };
+    if (ch.kind === 'times') return { text: t('{category}: {change} περισσότερα', { category, change: ch.label }), change: ch.label };
+    if (ch.kind === 'fraction') return { text: t('{category}: περίπου το {change}', { category, change: ch.label }), change: ch.label };
+    const change = `${ch.dir === 'up' ? '+' : '\u2212'}${ch.label}`;
+    return { text: t('{category}: {change}', { category, change }), change };
+  }
+  if (ch.kind === 'same') return { text: t('Περίπου ίδια με τον προηγούμενο μήνα'), change: '' };
+  if (ch.kind === 'times') return { text: t('{change} περισσότερα από τον προηγούμενο μήνα', { change: ch.label }), change: ch.label };
+  if (ch.kind === 'fraction') return { text: t('Περίπου το {change} του προηγούμενου μήνα', { change: ch.label }), change: ch.label };
+  const change = `${ch.dir === 'up' ? '+' : '\u2212'}${ch.label}`;
+  return { text: t('{change} από τον προηγούμενο μήνα', { change }), change };
+}
+
+// v1.9.39 home donut: biggest categories first (only what was spent), the rest folded into «Άλλα».
+// rows: [{ label, value }] → [{ label, value, share (0–1), other? }]; shares add up to 1.
+export function spendSlices(rows = [], { limit = 5, otherLabel = 'Άλλα' } = {}) {
+  const spent = rows.map((row, i) => ({ label: row.label, value: r2(row.value), i }))
+    .filter((row) => row.value > 0)
+    .sort((a, b) => b.value - a.value || a.i - b.i);
+  const total = r2(spent.reduce((s, r) => s + r.value, 0));
+  if (!(total > 0)) return [];
+  const top = spent.length > limit + 1 ? spent.slice(0, limit) : spent;
+  const rest = spent.slice(top.length);
+  const out = top.map(({ label, value }) => ({ label, value, share: value / total }));
+  if (rest.length) {
+    const value = r2(rest.reduce((s, r) => s + r.value, 0));
+    out.push({ label: otherLabel, value, share: value / total, other: true });
+  }
+  return out;
 }

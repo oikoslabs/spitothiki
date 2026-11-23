@@ -28,7 +28,7 @@ import { addCartItem, budgetState, createTrip, finishTrip, lastPrice, lineTotal,
 import { VM_MODES, interpretCode } from './gs1.js';
 import { initBackToTop } from './back-to-top.js';
 import { HOME_KEY, HOME_OPTIONS, DEFAULT_HOME, parseHomeState, serializeHome, toggleHome } from './home-actions.js';
-import { insightChange, insightText, monthInsights } from './month-insights.js';
+import { insightChange, insightShort, insightText, monthInsights, spendSlices } from './month-insights.js';
 import { NOTICE_KEY, activeBudget, budgetReport, createBudget, hasBudget, monthSpend, shouldNotify } from './budget.js';
 import { NOTICE_KEY as CAL_NOTICE_KEY, PERSON_ALL, RECUR_OPTIONS, buildIcs, calendarEntries, calendarProEnabled, createEvent, dayDots, entriesOn, googleEventUrl, monthBounds, monthGrid, personColor, shortDayMonth, shouldNotify as calendarShouldNotify, weekBounds } from './calendar.js';
 import { createReceiptPdf, periodBoundsForMonth } from './receipt-pdf.js';
@@ -593,11 +593,30 @@ function goToSignin() {
   });
 }
 
-// v1.6.14: only what was actually spent this month, biggest first, at most 5 rows (+N → «Σύνολο εξόδων»).
-function renderHomeMonthRows(rows) {
-  const { rows: shown, more } = visibleSpendRows(rows, 5);
-  if (!shown.length) return `<p class="subtle-empty" id="home-month-empty">${escapeHtml(t('Κανένα έξοδο αυτόν τον μήνα ακόμη.'))}</p>`;
-  return `${renderBars(shown, money)}${more ? `<button class="text-button home-month-more" type="button" data-view="insights" id="home-month-more">${escapeHtml(t('+{count} ακόμα →', { count: more }))}</button>` : ''}`;
+// v1.9.39 home polish: big month total, a small donut per category (pure SVG, no library) and a short legend:
+// the 5 biggest categories that were actually spent this month, the rest folded into «Άλλα».
+const HOME_DONUT_R = 15.9155; // circumference ≈ 100, so dash lengths are percentages
+function renderHomeDonut(slices) {
+  let at = 0;
+  const gap = slices.length > 1 ? 0.8 : 0;
+  const segs = slices.map((s, i) => {
+    const len = Math.max(0.01, s.share * 100 - gap);
+    const seg = `<circle class="home-donut-seg ${s.other ? 'c-other' : `c${i + 1}`}" cx="21" cy="21" r="${HOME_DONUT_R}" stroke-dasharray="${len.toFixed(2)} ${(100 - len).toFixed(2)}" stroke-dashoffset="${(25 - at).toFixed(2)}"></circle>`;
+    at += s.share * 100;
+    return seg;
+  }).join('');
+  return `<svg class="home-donut" viewBox="0 0 42 42" aria-hidden="true" focusable="false"><circle class="home-donut-ring" cx="21" cy="21" r="${HOME_DONUT_R}"></circle>${segs}</svg>`;
+}
+function homeShare(share) {
+  const p = share * 100;
+  return p > 0 && p < 1 ? '<1%' : `${Math.round(p)}%`;
+}
+function renderHomeMonthBody(totals) {
+  const slices = spendSlices(totals.rows, { limit: 5, otherLabel: t('Άλλα') });
+  const head = `<div class="home-month-summary"><div class="home-month-amount"><p class="home-month-label">${escapeHtml(t('Αυτόν τον μήνα'))}</p><p class="big-number home-month-total" id="home-month-total">${escapeHtml(money(totals.total))}</p></div>${slices.length ? renderHomeDonut(slices) : ''}</div>`;
+  if (!slices.length) return `${head}<p class="subtle-empty" id="home-month-empty">${escapeHtml(t('Κανένα έξοδο αυτόν τον μήνα ακόμη.'))}</p>`;
+  const legend = slices.map((s, i) => `<li class="home-legend-row"><span class="home-legend-dot ${s.other ? 'c-other' : `c${i + 1}`}" aria-hidden="true"></span><span class="home-legend-label">${escapeHtml(s.label)}</span><strong class="home-legend-value" data-no-i18n>${escapeHtml(money(s.value))}</strong><span class="home-legend-pct" data-no-i18n>${escapeHtml(homeShare(s.share))}</span></li>`).join('');
+  return `${head}<ul class="home-month-legend" id="home-month-legend" aria-label="${escapeHtml(t('Τα έξοδα του μήνα ανά κατηγορία'))}">${legend}</ul>`;
 }
 
 // Friendly home (preview): three big primary actions first, everything else grouped and quieter below.
@@ -661,17 +680,18 @@ function renderHomeChanged() {
   const catLabel = (name) => t(name);
   const loc = locale();
   const list = items.map((ins) => {
-    const text = insightText(ins, { t, money, categoryLabel: catLabel, locale: loc });
+    const full = insightText(ins, { t, money, categoryLabel: catLabel, locale: loc });
+    const short = insightShort(ins, { t, categoryLabel: catLabel, locale: loc });
     const change = insightChange(ins, { locale: loc });
-    let body = escapeHtml(text);
-    if (change.label) {
-      const needle = escapeHtml(change.label);
+    let body = escapeHtml(short.text);
+    if (change.label && short.change) {
+      const needle = escapeHtml(short.change);
       const at = body.indexOf(needle);
       if (at >= 0) body = `${body.slice(0, at)}<span class="home-changed-pct">${needle}</span>${body.slice(at + needle.length)}`;
     }
     const mark = ins.dir === 'up' ? '▲' : ins.dir === 'down' ? '▼' : '';
     const markHtml = mark ? `<span class="home-changed-mark" aria-hidden="true">${mark}</span>` : '';
-    return `<li class="home-changed-item ${ins.dir}">${markHtml}${body}</li>`;
+    return `<li class="home-changed-item ${ins.dir}" title="${escapeHtml(full)}">${markHtml}${body}</li>`;
   }).join('');
   return `<section class="panel" id="home-changed"><div class="panel-heading"><div><h2>${escapeHtml(t('Τι άλλαξε αυτόν τον μήνα'))}</h2><p>${escapeHtml(t('Σύγκριση με το ίδιο διάστημα του προηγούμενου μήνα'))}</p></div><button class="panel-link" type="button" data-view="insights">${escapeHtml(t('Αναλυτικά →'))}</button></div><ul class="home-changed-list" id="home-changed-list">${list}</ul></section>`;
 }
@@ -698,7 +718,7 @@ function renderOverview() {
     ${renderHomeChanged()}${renderHomeBudget()}${renderHomeCalendar()}
     <div class="dashboard-grid">
       <section class="panel" id="home-month"><div class="panel-heading"><div><h2>${escapeHtml(t('Τα έξοδα του μήνα'))}</h2><p data-no-i18n>${escapeHtml(monthLabel(month))}</p></div><button class="panel-link" type="button" data-view="insights">${escapeHtml(t('Αναλυτικά →'))}</button></div>
-        <p class="big-number" id="home-month-total">${escapeHtml(money(totals.total))}</p>${renderHomeMonthRows(totals.rows)}
+        ${renderHomeMonthBody(totals)}
         ${due.length ? `<button class="alert-banner home-bills-due" type="button" data-view="bills">📄 ${escapeHtml((due.length === 1 ? t('1 λογαριασμός λήγει σύντομα ή έχει λήξει') : t('{count} λογαριασμοί λήγουν σύντομα ή έχουν λήξει', { count: due.length })))} ›</button>` : ''}</section>
       <section class="panel" id="home-expiry"><div class="panel-heading"><div><h2>Έλεγξε τις ημερομηνίες</h2><p>Ό,τι λήγει μέσα στις επόμενες 7 ημέρες</p></div><button class="panel-link" type="button" data-action="home-card" data-card="expiring">${escapeHtml(t('Όλα όσα λήγουν →'))}</button></div><div class="product-list">${upcoming.length ? upcoming.map(renderMiniProduct).join('') : renderEmpty('Όλα καλά εδώ', 'Δεν έχεις προϊόντα που λήγουν σύντομα.', 'add-item', 'Πρόσθεσε προϊόν', '🌿')}</div></section>
     </div>
