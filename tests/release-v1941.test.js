@@ -1,0 +1,40 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { GUIDE_SECTIONS, searchGuide } from '../src/guide.js';
+import { dictionaries } from '../src/i18n.js';
+
+const read = (f) => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
+
+test('v1.9.41 release: version, cache v151, toll barcodes not mistaken for a product EAN', () => {
+  assert.match(read('package.json'), /"version": "1\.9\.41"/);
+  assert.equal((read('index.html').match(/data-no-i18n>1\.9\.41</g) || []).length, 2);
+  const html = read('index.html');
+  assert.match(html, /styles\.css\?v=151/);
+  assert.match(html, /src\/app\.js\?v=151/);
+  assert.doesNotMatch(html, /v=151-preview/);
+  const sw = read('sw.js');
+  assert.match(sw, /CACHE_VERSION = 'v151';/);
+  assert.doesNotMatch(sw, /CACHE_VERSION = 'v151-preview'/);
+  assert.match(sw, /styles\.css\?v=151'/);
+  assert.match(sw, /src\/app\.js\?v=151'/);
+  const barcode = read('src/barcode.js');
+  assert.match(barcode, /export function isStableRead\(/);
+  assert.match(barcode, /if \(isUrlCode\(value\) \|\| parseTollBarcode\(value\)\) return true;/);
+  assert.match(barcode, /1D EAN\/UPC only after two identical consecutive reads/);
+  const app = read('src/app.js');
+  assert.match(app, /const toll = parseTollBarcode\(code\);/);
+  assert.doesNotMatch(app, /Γιάννης /);
+  assert.doesNotMatch(app, /Σκολαρ|Skolarikis/);
+  const guide = read('src/guide.js');
+  assert.match(guide, /Τι νέο στην 1\.9\.41/);
+  assert.match(guide, /δεν μπερδεύει πια το barcode με προϊόν/);
+  assert.doesNotMatch(guide, /Γιάννης /);
+  assert.ok(searchGuide('1.9.41').some((s) => s.id === 'whats-new'));
+  assert.ok(searchGuide('1.9.40').some((s) => s.id === 'whats-new'));
+  const whats = GUIDE_SECTIONS.find((s) => s.id === 'whats-new');
+  assert.equal(whats.title, 'Τι νέο στην 1.9.41');
+  assert.ok(dictionaries.en[whats.title]);
+  assert.ok(dictionaries.en[whats.intro]);
+  for (const b of whats.bullets) assert.ok(dictionaries.en[b], `EN missing: ${b}`);
+});
