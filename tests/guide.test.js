@@ -17,7 +17,8 @@ test('guide has a numbered manual ending with useful tips, 2–4 bullets each', 
   assert.equal(numbered.length, 17);
   for (const section of GUIDE_SECTIONS) {
     assert.ok(section.intro.trim());
-    assert.ok(section.bullets.length >= 2 && section.bullets.length <= (section.id === 'shopping' ? 8 : (section.id === 'receipts' || section.id === 'settings') ? 5 : 4), section.id);
+    const max = section.id === 'shopping' ? 8 : section.id === 'receipts' ? 7 : (section.id === 'settings' || section.id === 'spending' || section.id === 'pantry') ? 6 : 4;
+    assert.ok(section.bullets.length >= 2 && section.bullets.length <= max, section.id);
   }
 });
 
@@ -113,4 +114,39 @@ test('home screen has a permanent user-guide entry, default on, hideable in Sett
   // still shown after first data: it is not behind hasAnyData / starter
   const guideFn = app.slice(app.indexOf('function renderHomeGuide'), app.indexOf('function renderHomePrimary'));
   assert.doesNotMatch(guideFn, /hasAnyData|renderStarterCard/);
+});
+
+test('guide covers last prices, electronic payments, receipt links, CSV export and toll scan', () => {
+  const byId = Object.fromEntries(GUIDE_SECTIONS.map((section) => [section.id, section]));
+  const textOf = (id) => [byId[id].intro, ...byId[id].bullets].join('\n');
+  const whats = byId['whats-new'];
+  assert.equal(whats.title, 'Τι νέο στην 1.9.42');
+  assert.match(whats.intro, /Τελευταίες τιμές|στόχος ηλεκτρονικών|λινκ|Excel/);
+  assert.match(textOf('whats-new'), /📈 Τελευταίες τιμές/);
+  assert.match(textOf('whats-new'), /💳 Στόχος ηλεκτρονικών πληρωμών/);
+  assert.match(textOf('whats-new'), /🔗 Επικόλληση λινκ απόδειξης/);
+  assert.match(textOf('whats-new'), /📊 Εξαγωγή εξόδων \(Excel\)/);
+  assert.match(textOf('whats-new'), /1\.9\.41/);
+  assert.match(textOf('pantry'), /📈 Τελευταίες τιμές/);
+  assert.match(textOf('shopping'), /📈 Τελευταίες τιμές/);
+  assert.match(textOf('receipts'), /🔗 Επικόλληση λινκ απόδειξης/);
+  assert.match(textOf('receipts'), /Κοινοποίηση/);
+  assert.match(textOf('receipts'), /Κατηγορία εξόδου/);
+  assert.match(textOf('receipts'), /Πληρώθηκε με μετρητά/);
+  assert.match(textOf('spending'), /💳 Στόχος ηλεκτρονικών πληρωμών/);
+  assert.match(textOf('spending'), /30%/);
+  assert.match(textOf('spending'), /20\.000 €/);
+  assert.match(textOf('spending'), /Ενδεικτικό· για ακρίβεια ρώτα τον λογιστή σου/);
+  assert.match(textOf('spending'), /📊 Εξαγωγή εξόδων \(Excel\)/);
+  assert.match(textOf('settings'), /📊 Εξαγωγή εξόδων \(Excel\)/);
+  assert.match(textOf('settings'), /Αντίγραφο ασφαλείας/);
+  assert.match(textOf('transport'), /📷 Σάρωση/);
+  assert.match(textOf('transport'), /τελευταίο ποσό διοδίων/);
+  assert.ok(searchGuide('λινκ απόδειξης').some((s) => s.id === 'receipts'));
+  assert.ok(searchGuide('ηλεκτρονικών πληρωμών').some((s) => s.id === 'spending'));
+  assert.ok(searchGuide('εξαγωγή εξόδων').some((s) => s.id === 'settings'));
+  assert.ok(searchGuide('τελευταίες τιμές').some((s) => s.id === 'pantry'));
+  const guide = read('src/guide.js');
+  assert.doesNotMatch(guide, /Γιάννης /);
+  assert.doesNotMatch(guide, /Σκολαρ|Skolarikis/);
 });
