@@ -182,7 +182,8 @@ const steps = [
     const bottom = width < 700 ? await page.evaluate(() => { const vis = (sel) => [...document.querySelectorAll(sel)].filter((e) => e.offsetParent !== null).length; return vis('.quick-bar .quick-bar-item') === 6 && vis('.primary-nav .nav-item') === 0 && vis('[data-action="open-menu"]') === 2 ? 4 : -1; }) : 4;
     await page.evaluate(() => document.querySelector('#menu-sheet').open && document.querySelector('#menu-sheet').close());
     await nav('pantry');
-    const ok = open && items.length === 13 && items.includes('chores') && items.includes('receipts') && items.includes('extras') && items.includes('cook') && !items.includes('menu-mealplan') && items.includes('menu-receipt') && view === 'transport' && closed && header === 'Μετακινήσεις' && bottom === 4;
+    const required = ['overview', 'pantry', 'shopping', 'cart', 'cook', 'menu-receipt', 'receipts', 'bills', 'transport', 'extras', 'chores', 'calendar', 'insights', 'settings', 'guide'];
+    const ok = open && required.every((v) => items.includes(v)) && !items.includes('menu-mealplan') && view === 'transport' && closed && header === 'Μετακινήσεις' && bottom === 4;
     if (!ok) console.log('  menu:', { open, items, view, closed, header, bottom });
     return ok;
   }],
