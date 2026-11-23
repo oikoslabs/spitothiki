@@ -317,24 +317,24 @@ test('v1.9.46: data Firestore cannot store is set aside without sending it', asy
 });
 
 test('v1.9.46: «Έλεγχος & αποστολή όσων λείπουν» uploads only what the server lacks and deletes nothing', async () => {
-  const backend = manualBackend([
-    { kind: 'extras', id: 'there', data: { id: 'there', amount: 1 }, deleted: false, ts: 5 },
-    { kind: 'extras', id: 'gone', data: null, deleted: true, ts: 50 },
-    { kind: 'extras', id: 'other-device', data: { id: 'other-device', amount: 8 }, deleted: false, ts: 7 }
-  ]);
-  const d = engineOn(backend, { items: [], shopping: [], extras: [] });
-  d.engine.start(); await d.engine.receive(backend.serverDocs(), { fromCache: false });
-  // A device whose state lost track: it has a missing record, a stale copy of a deleted one, and lacks «other-device».
-  const local = { items: [], shopping: [], extras: [{ id: 'there', amount: 1 }, { id: 'gone', amount: 2 }, { id: 'taxi', amount: 7.5 }] };
-  d.engine.getState = () => local;
+  const backend = manualBackend();
+  const d = engineOn(backend, { items: [], shopping: [], extras: [{ id: 'there', amount: 1 }, { id: 'gone', amount: 2 }, { id: 'taxi', amount: 7.5 }] });
+  d.engine.start(); await d.engine.receive([], { fromCache: false });
+  assert.equal(backend.server.size, 3);
+  // Out of sight of this device: the server lost «taxi», another device deleted «gone» and added «other-device».
+  backend.server.delete('extras:taxi');
+  backend.server.set('extras:gone', { kind: 'extras', id: 'gone', data: null, deleted: true, ts: 9999 });
+  backend.server.set('extras:other-device', { kind: 'extras', id: 'other-device', data: { id: 'other-device', amount: 8 }, deleted: false, ts: 9999 });
   backend.writes.length = 0;
   const result = await d.engine.uploadMissing(new Set(backend.server.keys()));
   assert.deepEqual(backend.writes, [['extras:taxi']], 'only the missing one');
   assert.equal(result.missing, 1);
+  assert.equal(backend.server.get('extras:taxi').data.amount, 7.5);
   assert.equal(backend.server.get('extras:gone').deleted, true, 'a deleted record is not brought back');
   assert.equal(backend.server.get('extras:other-device').deleted, false, 'nothing is deleted on the server');
   const again = await d.engine.uploadMissing(new Set(backend.server.keys()));
   assert.equal(again.missing, 0);
+  assert.equal(backend.writes.length, 1);
 });
 
 test('v1.9.46: the manual check tries refused records again', async () => {

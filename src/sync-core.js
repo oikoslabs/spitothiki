@@ -286,6 +286,7 @@ export class SyncEngine {
   // and never brings back a record deleted on another device (its tombstone is on the server).
   async uploadMissing(serverKeys) {
     if (!this.ready || this.stopped) throw new Error('not-ready');
+    this.push(); // queue any local change first, so it isn't counted (or sent) twice
     const current = this.getState();
     const ts = this.now();
     const me = this.uid() || '';
@@ -314,7 +315,6 @@ export class SyncEngine {
       this.outbox[key] = { kind, id, data: null, deleted: true, ts };
       missing += 1;
     }
-    this.snapshot = JSON.parse(JSON.stringify(lists(current)));
     this.persistMeta();
     await this.flush();
     return { missing, pending: this.pending(), failed: this.failedCount() };
