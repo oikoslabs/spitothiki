@@ -101,6 +101,9 @@ export function parseMyData(xml) {
   })).filter((line) => line.rawName);
   const summary = kid(invoice, 'invoiceSummary');
   const total = summary ? num(val(summary, 'totalGrossValue')) || num(val(summary, 'totalNetValue')) + num(val(summary, 'totalVatAmount')) : lines.reduce((s, l) => s + l.price, 0);
+  const paymentMethods = kids(invoice, 'paymentMethods').flatMap((block) => kids(block, 'paymentMethodDetails')).map((d) => ({
+    type: val(d, 'type'), amount: num(val(d, 'amount'))
+  })).filter((m) => m.type);
   return {
     format: 'myDATA',
     issuerVat: val(invoice, 'issuer', 'vatNumber'), issuerName: '',
@@ -108,7 +111,8 @@ export function parseMyData(xml) {
     uid: val(invoice, 'uid') || val(invoice, 'mark'), total: round2(total), lines,
     // v1.9.7: links to an earlier document (restaurant order slip → retail receipt) so the slip can be replaced, not doubled.
     mark: val(invoice, 'mark'), invoiceType: val(header, 'invoiceType'),
-    connectedMarks: kids(header, 'multipleConnectedMarks').map((n) => n.text).filter(Boolean), related: []
+    connectedMarks: kids(header, 'multipleConnectedMarks').map((n) => n.text).filter(Boolean), related: [],
+    ...(paymentMethods.length ? { paymentMethods } : {})
   };
 }
 
@@ -125,12 +129,16 @@ export function parseUbl(xml) {
   const supplier = path(root, 'AccountingSupplierParty', 'Party');
   const id = val(root, 'ID');
   const totals = kid(root, 'LegalMonetaryTotal');
+  const paymentMethods = kids(root, 'PaymentMeans').map((m) => ({
+    type: val(m, 'PaymentMeansCode'), amount: num(val(m, 'PaymentDueAmount') || val(m, 'PaymentAmount'))
+  })).filter((m) => m.type);
   return {
     format: 'EN16931',
     issuerVat: val(supplier, 'PartyTaxScheme', 'CompanyID').replace(/^EL/, ''), issuerName: val(supplier, 'PartyName', 'Name') || val(supplier, 'PartyLegalEntity', 'RegistrationName'),
     date: val(root, 'IssueDate').slice(0, 10), series: '', number: id, uid: id,
     total: round2(num(val(totals, 'PayableAmount')) || num(val(totals, 'TaxInclusiveAmount')) || lines.reduce((s, l) => s + l.price, 0)), lines,
-    ...ublRefs(root)
+    ...ublRefs(root),
+    ...(paymentMethods.length ? { paymentMethods } : {})
   };
 }
 

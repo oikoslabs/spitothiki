@@ -1175,6 +1175,11 @@ a.menu-item { color: inherit; }
 :root[data-theme="dark"] .budget-line.is-over .budget-line-head span,
 :root:not([data-theme="light"]) .budget-line.is-over .budget-line-head span { color: #f0a0a0; }
 
+#epay-card .epay-note { margin-top: 8px; }
+#epay-card .budget-line.is-met .budget-track span { background: var(--green, #2f6b4f); }
+#epay-card .epay-form { margin-top: 12px; }
+
+
 
 /* Household calendar */
 .cal-tabs { display: flex; gap: 0.4rem; flex-wrap: wrap; margin: 0 0 0.9rem; }

@@ -31,6 +31,7 @@ import { initBackToTop } from './back-to-top.js';
 import { HOME_KEY, HOME_OPTIONS, DEFAULT_HOME, parseHomeState, serializeHome, toggleHome } from './home-actions.js';
 import { insightChange, insightShort, insightText, monthInsights, spendSlices } from './month-insights.js';
 import { NOTICE_KEY, activeBudget, budgetReport, createBudget, hasBudget, monthSpend, shouldNotify } from './budget.js';
+import { EPAY_ID, activeEpayTarget, createEpayTarget, epaymentReport, paymentFromMethods } from './epayment-target.js';
 import { NOTICE_KEY as CAL_NOTICE_KEY, PERSON_ALL, RECUR_OPTIONS, buildIcs, calendarEntries, calendarProEnabled, createEvent, dayDots, entriesOn, googleEventUrl, monthBounds, monthGrid, personColor, shortDayMonth, shouldNotify as calendarShouldNotify, weekBounds } from './calendar.js';
 import { createReceiptPdf, periodBoundsForMonth } from './receipt-pdf.js';
 import { GUIDE_SECTIONS, guideHeading, searchGuide, sectionForView } from './guide.js';
@@ -2148,8 +2149,9 @@ function importReceipt(form) {
   // v1.9.7: replace the order slip this receipt supersedes (user ticked it), and any stale record with the same id.
   const replace = receiptState.related && form.elements.replaceRelated?.checked ? receiptState.related.id : '';
   if (replace) Object.assign(state, deleteReceipt(state, replace));
+  const payment = paymentFromMethods(receipt.paymentMethods);
   const refs = { ...(receipt.mark ? { mark: receipt.mark } : {}), ...(receipt.series ? { series: receipt.series } : {}), ...(receipt.number ? { number: receipt.number } : {}), ...(receipt.invoiceType ? { invoiceType: receipt.invoiceType } : {}) };
-  state.receipts = [...(state.receipts || []).filter((r) => r.id !== id), { id, date, total: receipt.total, store: storeName, issuerVat: receipt.issuerVat || '', format: receipt.format, ...refs, lines: receipt.lines.length, items: receipt.lines.slice(0, 80).map((l) => ({ name: l.name, quantity: l.quantity, unit: l.unit, price: l.price })), ...(expenseCategory ? { expenseCategory } : {}), ...(receipt.sourceUrl ? { url: receipt.sourceUrl } : {}), importedAt: now }];
+  state.receipts = [...(state.receipts || []).filter((r) => r.id !== id), { id, date, total: receipt.total, store: storeName, issuerVat: receipt.issuerVat || '', format: receipt.format, ...refs, lines: receipt.lines.length, items: receipt.lines.slice(0, 80).map((l) => ({ name: l.name, quantity: l.quantity, unit: l.unit, price: l.price })), ...(expenseCategory ? { expenseCategory } : {}), ...(payment ? { payment } : {}), ...(receipt.sourceUrl ? { url: receipt.sourceUrl } : {}), importedAt: now }];
   skipEntriesSigninPrompt = true;
   const saved = persist();
   skipEntriesSigninPrompt = false;
@@ -2913,6 +2915,39 @@ function saveBudgetForm(form) {
     const rest = (state.budgets || []).filter((b) => b.id !== rec.id);
     state.budgets = [...rest, rec];
     if (persist()) { showToast(t('Ο προϋπολογισμός αποθηκεύτηκε.')); renderApp(); }
+  } catch (err) {
+    showToast(t(err.message || 'Σφάλμα'));
+  }
+}
+
+function renderEpayCard() {
+  const today = localDateKey();
+  const saved = activeEpayTarget(state.epayTargets || []);
+  const report = epaymentReport({ income: saved?.income, state, today });
+  const width = Math.min(100, report?.pct || 0);
+  const progress = report && report.target != null ? `<div class="budget-line is-${report.status === 'met' ? 'met' : 'ok'}">
+      <div class="budget-line-head"><strong>${escapeHtml(t('Στόχος ηλεκτρονικών πληρωμών'))}</strong><span>${escapeHtml(t('Ξόδεψες {spent} από {target}', { spent: money(report.spent), target: money(report.target) }))}</span></div>
+      <div class="budget-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.min(100, report.pct || 0)}"><span style="width:${width}%"></span></div>
+      <p class="field-hint">${escapeHtml(report.status === 'met' ? t('Έφτασες τον ενδεικτικό στόχο.') : t('Απομένουν {amount}', { amount: money(report.remaining) }))}</p>
+      ${report.monthly > 0 ? `<p class="field-hint">${escapeHtml(t('Χρειάζεσαι ~{amount} τον μήνα μέχρι τέλος χρονιάς', { amount: money(report.monthly) }))}</p>` : ''}
+      <p class="field-hint epay-note">${escapeHtml(t('(όσα δεν ξέρουμε τρόπο πληρωμής μετράνε ως κάρτα)'))}</p>
+    </div>` : '';
+  const form = `<form id="epay-form" class="epay-form">
+      <label class="field"><span class="field-label">${escapeHtml(t('Ετήσιο εισόδημα (€)'))}</span><input class="field-input" name="income" inputmode="decimal" value="${escapeHtml(saved?.income != null ? String(saved.income) : '')}" placeholder="${escapeHtml(t('π.χ. 18.000'))}"></label>
+      <div class="dialog-actions"><button class="button button-primary" type="submit">${escapeHtml(t(saved ? 'Άλλαξε το εισόδημα' : 'Αποθήκευση εισοδήματος'))}</button></div>
+    </form>`;
+  return `<section class="panel settings-card" id="epay-card"><span class="stat-icon">💳</span><h2>${escapeHtml(t('Στόχος ηλεκτρονικών πληρωμών'))}</h2>
+    <p>${escapeHtml(t('Για τον φόρο, μετράνε οι πληρωμές με κάρτα ή τράπεζα, περίπου στο 30% του εισοδήματος της χρονιάς (το πολύ 20.000 € στόχος). Ενδεικτικό· για ακρίβεια ρώτα τον λογιστή σου.'))}</p>
+    ${progress}${form}</section>`;
+}
+
+function saveEpayForm(form) {
+  try {
+    const existing = activeEpayTarget(state.epayTargets || []);
+    const rec = createEpayTarget({ ...(existing || {}), id: EPAY_ID, income: form.elements.income.value, createdAt: existing?.createdAt });
+    const rest = (state.epayTargets || []).filter((row) => row.id !== rec.id);
+    state.epayTargets = [...rest, rec];
+    if (persist()) { showToast(t('Το εισόδημα αποθηκεύτηκε.')); renderApp(); }
   } catch (err) {
     showToast(t(err.message || 'Σφάλμα'));
   }
@@ -3850,7 +3885,7 @@ function renderInsights() {
   return `${renderHeader('Σύνολο εξόδων', 'Πόσα ξοδεύεις και τι πετιέται, ανά μήνα.')}
     <div class="settings-actions"><button class="button button-quiet" type="button" data-view="receipts" id="insights-receipts">🧾 ${escapeHtml(t('Αποδείξεις'))} (${(state.receipts || []).length})</button></div>
     <div class="month-switch" role="group" aria-label="Μήνας"><button class="icon-button" type="button" data-action="insights-month" data-delta="-1" aria-label="Προηγούμενος μήνας">‹</button><strong id="insights-month" data-no-i18n>${escapeHtml(monthLabel(insightsMonth))}</strong><button class="icon-button" type="button" data-action="insights-month" data-delta="1" aria-label="Επόμενος μήνας" ${isCurrent ? 'disabled' : ''}>›</button></div>
-    <div class="settings-grid insights-grid">${renderMonthTotals(spending)}${renderBudgetCard()}${renderWhoPaid()}
+    <div class="settings-grid insights-grid">${renderMonthTotals(spending)}${renderEpayCard()}${renderBudgetCard()}${renderWhoPaid()}
     <section class="panel settings-card" id="spending-card"><span class="stat-icon blue">€</span><h2>${escapeHtml(t('Αγορές ανά είδος προϊόντος'))}</h2>
       <p class="big-number" id="spending-total">${escapeHtml(money(spending.total))}</p>
       <p class="field-hint">${escapeHtml(t('{count} αγορές με τιμή · προηγούμενος μήνας: {prev}', { count: spending.count, prev: money(previous.total) }))}</p>${renderOwnCatNote(spending)}
@@ -4761,6 +4796,7 @@ document.addEventListener('submit', (event) => {
   if (event.target.id === 'whopaid-form') { event.preventDefault(); openPanels.add('whopaid-settings'); saveWhoPaidForm(event.target); return; }
   if (event.target.id === 'bill-form') { event.preventDefault(); saveBillForm(event.target); return; }
   if (event.target.id === 'budget-form') { event.preventDefault(); saveBudgetForm(event.target); return; }
+  if (event.target.id === 'epay-form') { event.preventDefault(); saveEpayForm(event.target); return; }
   if (event.target.id === 'chore-form') { event.preventDefault(); saveChoreForm(event.target); return; }
   if (event.target.id === 'calendar-form') { event.preventDefault(); saveCalendarForm(event.target); return; }
   if (event.target.id === 'transport-form') { event.preventDefault(); saveTransportForm(event.target); return; }
