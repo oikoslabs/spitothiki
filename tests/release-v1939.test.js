@@ -7,17 +7,17 @@ import { dictionaries } from '../src/i18n.js';
 const read = (f) => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
 
 test('v1.9.39 release: version, cache v147, expense category on scanned receipt review', () => {
-  assert.match(read('package.json'), /"version": "1\.9\.39"/);
-  assert.equal((read('index.html').match(/data-no-i18n>1\.9\.39</g) || []).length, 2);
+  assert.match(read('package.json'), /"version": "1\.9\.40"/);
+  assert.equal((read('index.html').match(/data-no-i18n>1\.9\.40</g) || []).length, 2);
   const html = read('index.html');
-  assert.match(html, /styles\.css\?v=147/);
-  assert.match(html, /src\/app\.js\?v=147/);
-  assert.doesNotMatch(html, /v=147-preview/);
+  assert.match(html, /styles\.css\?v=150/);
+  assert.match(html, /src\/app\.js\?v=150/);
+  assert.doesNotMatch(html, /v=150-preview/);
   const sw = read('sw.js');
-  assert.match(sw, /CACHE_VERSION = 'v147';/);
+  assert.match(sw, /CACHE_VERSION = 'v150';/);
   assert.doesNotMatch(sw, /CACHE_VERSION = 'v147-preview'/);
-  assert.match(sw, /styles\.css\?v=147'/);
-  assert.match(sw, /src\/app\.js\?v=147'/);
+  assert.match(sw, /styles\.css\?v=150'/);
+  assert.match(sw, /src\/app\.js\?v=150'/);
   const app = read('src/app.js');
   assert.match(app, /function receiptReviewExpCatFields\(/);
   assert.match(app, /id="review-expcat"/);
@@ -31,7 +31,8 @@ test('v1.9.39 release: version, cache v147, expense category on scanned receipt 
   assert.ok(searchGuide('1.9.39').some((s) => s.id === 'whats-new'));
   assert.ok(searchGuide('1.9.38').some((s) => s.id === 'whats-new'));
   const whats = GUIDE_SECTIONS.find((s) => s.id === 'whats-new');
-  assert.equal(whats.title, 'Τι νέο στην 1.9.39');
+  assert.match(whats.title, /Τι νέο στην 1\.9\.\d+/);
+  assert.match(guide, /Τι νέο στην 1\.9\.39/);
   assert.ok(dictionaries.en[whats.title]);
   assert.ok(dictionaries.en[whats.intro]);
   for (const b of whats.bullets) assert.ok(dictionaries.en[b], `EN missing: ${b}`);
