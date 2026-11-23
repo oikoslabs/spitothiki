@@ -55,7 +55,7 @@ export function createManualExpense(input = {}, today, now = new Date().toISOStr
   if (!isDate(date)) throw new Error('Διάλεξε ημερομηνία.');
   const id = input.id || makeId();
   const cat = String(input.expenseCategory || '');
-  const receipt = { id, date, total, store, issuerVat: '', format: input.format || 'manual', lines: 0, items: [], ...(cat ? { expenseCategory: cat } : {}), ...(input.url ? { url: input.url } : {}), importedAt: now };
+  const receipt = { id, date, total, store, issuerVat: '', format: input.format || 'manual', lines: 0, items: [], ...(cat ? { expenseCategory: cat } : {}), ...(input.paidCash ? { paidCash: true } : {}), ...(input.url ? { url: input.url } : {}), importedAt: now };
   const purchase = { id: `pur-${id}`, rowId: '', name: store || 'Έξοδο', category: manualCategory(input.category), price: total, date, receiptId: id, ...(store ? { storeName: store } : {}), ...(cat ? { expenseCategory: cat } : {}), updatedAt: now };
   return { receipt, purchase };
 }

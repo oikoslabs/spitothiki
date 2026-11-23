@@ -31,7 +31,7 @@ import { initBackToTop } from './back-to-top.js';
 import { HOME_KEY, HOME_OPTIONS, DEFAULT_HOME, parseHomeState, serializeHome, toggleHome } from './home-actions.js';
 import { insightChange, insightShort, insightText, monthInsights, spendSlices } from './month-insights.js';
 import { NOTICE_KEY, activeBudget, budgetReport, createBudget, hasBudget, monthSpend, shouldNotify } from './budget.js';
-import { EPAY_ID, activeEpayTarget, createEpayTarget, epaymentReport, paymentFromMethods } from './epayment-target.js';
+import { EPAY_ID, activeEpayTarget, createEpayTarget, epaymentReport, isMarkedCash, paidCashWrite, paymentFromMethods } from './epayment-target.js';
 import { NOTICE_KEY as CAL_NOTICE_KEY, PERSON_ALL, RECUR_OPTIONS, buildIcs, calendarEntries, calendarProEnabled, createEvent, dayDots, entriesOn, googleEventUrl, monthBounds, monthGrid, personColor, shortDayMonth, shouldNotify as calendarShouldNotify, weekBounds } from './calendar.js';
 import { createReceiptPdf, periodBoundsForMonth } from './receipt-pdf.js';
 import { GUIDE_SECTIONS, guideHeading, searchGuide, sectionForView } from './guide.js';
@@ -2002,6 +2002,12 @@ function applyExpCatMemory(sel, issuerVat, store) {
   syncExpCatMemoryHint(sel.form || sel.closest('form') || sel.parentElement, suggested);
 }
 
+function receiptPaidCashRow(checked = false, { id = 'receipt-paid-cash' } = {}) {
+  return `<label class="check-row" for="${id}"><input type="checkbox" id="${id}" name="paidCash" ${checked ? 'checked' : ''}> <span>${escapeHtml(t('Πληρώθηκε με μετρητά'))} <small class="field-hint">— ${escapeHtml(t('δεν μετράει στον στόχο ηλεκτρονικών πληρωμών'))}</small></span></label>`;
+}
+function receiptReviewPaidCashRow() {
+  return receiptPaidCashRow(isMarkedCash(receiptState.receipt || {}), { id: 'review-paid-cash' });
+}
 function receiptReviewExpCatFields() {
   const receipt = receiptState.receipt || {};
   const suggested = rememberedCatFor(receipt.issuerVat, receipt.issuerName);
@@ -2022,7 +2028,7 @@ function renderReceiptReview() {
         : t('Οι αποδείξεις με QR της ΑΑΔΕ (ταμειακές) δεν περιέχουν τα είδη στο QR, μόνο το σύνολο. Για να περάσουν τα είδη, βγάλε φωτογραφία την απόδειξη — ή κατέγραψε μόνο το ποσό ως έξοδο.');
     const toTransport = receiptState.target === 'transport' || ['tolls', 'fuel'].includes(receiptState.guess?.type);
     return `${head}${dup}${mismatch}${renderRelatedOffer()}${renderTransportReceiptOffer()}${renderTripLink()}<p class="field-hint" id="receipt-aade-note">${escapeHtml(aadeNote)}</p>${photoButtons(fuelPhoto ? 'fuel' : '')}
-      <form id="receipt-review-form" novalidate><input type="hidden" name="mode" value="total">${toTransport ? '' : receiptReviewExpCatFields()}<div class="dialog-actions"><button class="button button-quiet" type="button" data-action="receipt-reset">Πίσω</button><button class="button button-primary" type="submit" ${duplicate ? 'disabled' : ''}>${toTransport ? `🚗 ${escapeHtml(t('Καταχώριση στις Μετακινήσεις'))}` : 'Καταγραφή εξόδου'}</button></div></form>`;
+      <form id="receipt-review-form" novalidate><input type="hidden" name="mode" value="total">${toTransport ? '' : receiptReviewExpCatFields()}${toTransport ? '' : receiptReviewPaidCashRow()}<div class="dialog-actions"><button class="button button-quiet" type="button" data-action="receipt-reset">Πίσω</button><button class="button button-primary" type="submit" ${duplicate ? 'disabled' : ''}>${toTransport ? `🚗 ${escapeHtml(t('Καταχώριση στις Μετακινήσεις'))}` : 'Καταγραφή εξόδου'}</button></div></form>`;
   }
   const rows = receipt.lines.map((line, index) => `<div class="receipt-line${line.doubtful ? ' is-doubtful' : ''}" data-line="${index}"${line.doubtful ? ` title="${escapeHtml(t('Έλεγξε αυτή τη γραμμή: ποσότητα × τιμή δεν ταιριάζει με το ποσό.'))}"` : ''}><input class="shopping-check" type="checkbox" name="use" checked aria-label="${escapeHtml(t('Εισαγωγή: {name}', { name: line.name }))}">
     <input class="field-input receipt-name" name="name" value="${escapeHtml(line.name)}" maxlength="80" aria-label="Όνομα προϊόντος">
@@ -2036,6 +2042,7 @@ function renderReceiptReview() {
     <label class="check-row"><input type="checkbox" name="toPantry" ${(receiptState.trip || receiptState.related) && !duplicate ? '' : 'checked'}> <span>Πρόσθεσε στο απόθεμα (ενώνεται με ίδια προϊόντα)</span></label>${receiptState.trip && !duplicate ? `<p class="field-hint">${escapeHtml(t('Τα προϊόντα του καλαθιού έχουν ήδη μπει στο απόθεμα.'))}</p>` : ''}
     <label class="check-row"><input type="checkbox" name="toSpending" checked> <span>Κατέγραψε τα έξοδα στο Σύνολο εξόδων</span></label>
     ${receiptReviewExpCatFields()}
+    ${receiptReviewPaidCashRow()}
     <div class="dialog-actions"><button class="button button-quiet" type="button" data-action="receipt-reset">Πίσω</button><button class="button button-primary" type="submit" ${duplicate ? 'disabled' : ''}>Εισαγωγή</button></div></form>`;
 }
 
@@ -2057,6 +2064,7 @@ function renderReceiptManual() {
     <label class="field-label" for="manual-store">${escapeHtml(t('Κατάστημα (προαιρετικό)'))}</label><input class="field-input" id="manual-store" name="store" maxlength="80" autocomplete="off" list="manual-stores" placeholder="${escapeHtml(t('π.χ. Κρεοπωλείο, λαϊκή'))}" value="${escapeHtml(m.store || '')}"><datalist id="manual-stores">${stores.map((n) => `<option value="${escapeHtml(n)}"></option>`).join('')}</datalist>
     <label class="field-label" for="manual-date">${escapeHtml(t('Ημερομηνία'))}</label><input class="field-input" id="manual-date" name="date" type="date" required value="${escapeHtml(m.date || localDateKey())}" max="${escapeHtml(localDateKey())}">
     ${cats}
+    ${receiptPaidCashRow(false, { id: 'manual-paid-cash' })}
     <p class="form-error" id="manual-error" role="alert" hidden></p>
     <div class="dialog-actions">${transport}<button class="button button-quiet" type="button" data-action="receipt-reset">${escapeHtml(t('Πίσω'))}</button><button class="button button-primary" type="submit" id="manual-save">${saveLabel}</button></div></form>
     ${m.reason === 'aade' ? `<p class="field-hint">${escapeHtml(t(receiptState.target === 'transport' ? 'Το QR έχει το ποσό, όχι τα λίτρα. Βγάλε φωτογραφία την απόδειξη για λίτρα, τιμή/λίτρο και πρατήριο.' : 'Θες και τα είδη; Βγάλε φωτογραφία την απόδειξη:'))}</p>${photoButtons(receiptState.target === 'transport' ? 'fuel' : '')}` : ''}`;
@@ -2078,7 +2086,7 @@ function saveManualExpense(form) {
   let entry;
   try {
     if (m.id && (state.receipts || []).some((r) => r.id === m.id)) throw new Error('Αυτή η απόδειξη έχει ήδη καταχωρηθεί.');
-    entry = createManualExpense({ amount: form.elements.amount.value, store: form.elements.store.value, date: form.elements.date.value, category: form.elements.category?.value, expenseCategory, id: m.id, url: m.url, format: m.format === 'AADE' ? 'AADE' : 'manual' }, localDateKey());
+    entry = createManualExpense({ amount: form.elements.amount.value, store: form.elements.store.value, date: form.elements.date.value, category: form.elements.category?.value, expenseCategory, paidCash: Boolean(form.elements.paidCash?.checked), id: m.id, url: m.url, format: m.format === 'AADE' ? 'AADE' : 'manual' }, localDateKey());
   } catch (err) { error.textContent = t(err.message); error.hidden = false; form.elements.amount.focus(); return; }
   const next = addManualExpense(state, entry);
   state.receipts = next.receipts; state.purchases = next.purchases;
@@ -2150,8 +2158,9 @@ function importReceipt(form) {
   const replace = receiptState.related && form.elements.replaceRelated?.checked ? receiptState.related.id : '';
   if (replace) Object.assign(state, deleteReceipt(state, replace));
   const payment = paymentFromMethods(receipt.paymentMethods);
+  const cash = paidCashWrite(Boolean(form.elements.paidCash?.checked), { payment, paymentMethods: receipt.paymentMethods });
   const refs = { ...(receipt.mark ? { mark: receipt.mark } : {}), ...(receipt.series ? { series: receipt.series } : {}), ...(receipt.number ? { number: receipt.number } : {}), ...(receipt.invoiceType ? { invoiceType: receipt.invoiceType } : {}) };
-  state.receipts = [...(state.receipts || []).filter((r) => r.id !== id), { id, date, total: receipt.total, store: storeName, issuerVat: receipt.issuerVat || '', format: receipt.format, ...refs, lines: receipt.lines.length, items: receipt.lines.slice(0, 80).map((l) => ({ name: l.name, quantity: l.quantity, unit: l.unit, price: l.price })), ...(expenseCategory ? { expenseCategory } : {}), ...(payment ? { payment } : {}), ...(receipt.sourceUrl ? { url: receipt.sourceUrl } : {}), importedAt: now }];
+  state.receipts = [...(state.receipts || []).filter((r) => r.id !== id), { id, date, total: receipt.total, store: storeName, issuerVat: receipt.issuerVat || '', format: receipt.format, ...refs, lines: receipt.lines.length, items: receipt.lines.slice(0, 80).map((l) => ({ name: l.name, quantity: l.quantity, unit: l.unit, price: l.price })), ...(expenseCategory ? { expenseCategory } : {}), ...(payment ? { payment } : {}), ...cash, ...(receipt.sourceUrl ? { url: receipt.sourceUrl } : {}), importedAt: now }];
   skipEntriesSigninPrompt = true;
   const saved = persist();
   skipEntriesSigninPrompt = false;
@@ -2930,7 +2939,7 @@ function renderEpayCard() {
       <div class="budget-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.min(100, report.pct || 0)}"><span style="width:${width}%"></span></div>
       <p class="field-hint">${escapeHtml(report.status === 'met' ? t('Έφτασες τον ενδεικτικό στόχο.') : t('Απομένουν {amount}', { amount: money(report.remaining) }))}</p>
       ${report.monthly > 0 ? `<p class="field-hint">${escapeHtml(t('Χρειάζεσαι ~{amount} τον μήνα μέχρι τέλος χρονιάς', { amount: money(report.monthly) }))}</p>` : ''}
-      <p class="field-hint epay-note">${escapeHtml(t('(όσα δεν ξέρουμε τρόπο πληρωμής μετράνε ως κάρτα)'))}</p>
+      <p class="field-hint epay-note">${escapeHtml(t('(όσα δεν ξέρουμε τρόπο πληρωμής μετράνε ως κάρτα· μπορείς να σημειώσεις «Πληρώθηκε με μετρητά» στην απόδειξη)'))}</p>
     </div>` : '';
   const form = `<form id="epay-form" class="epay-form">
       <label class="field"><span class="field-label">${escapeHtml(t('Ετήσιο εισόδημα (€)'))}</span><input class="field-input" name="income" inputmode="decimal" value="${escapeHtml(saved?.income != null ? String(saved.income) : '')}" placeholder="${escapeHtml(t('π.χ. 18.000'))}"></label>
@@ -3863,6 +3872,7 @@ function openReceiptDetails(id) {
   dialog.querySelector('#receipt-detail-body').innerHTML = `<p class="field-hint">${escapeHtml(formatDate(r.date))} · ${escapeHtml(receiptCatText(r))} · <strong data-no-i18n>${escapeHtml(money(r.total))}</strong>${rc ? ` · <span id="receipt-expcat" data-no-i18n>${escapeHtml(expCatLabel(rc))}</span>` : ''}</p>
     ${items.length ? `<ul class="receipt-items" id="receipt-items">${items.map((it) => `<li><span data-no-i18n>${escapeHtml(it.name)}${it.quantity && it.quantity !== 1 ? ` ×${escapeHtml(String(it.quantity))}` : ''}${escapeHtml(itemCat(it))}</span><span data-no-i18n>${it.price ? escapeHtml(money(it.price)) : ''}</span><button class="panel-link price-history-link" type="button" data-action="price-history" data-name="${escapeHtml(it.name)}" aria-label="${escapeHtml(t('Τελευταίες τιμές για {name}', { name: it.name }))}">📈</button></li>`).join('')}</ul>` : `<p class="subtle-empty">${escapeHtml(t(r.lines ? 'Τα είδη δεν κρατήθηκαν για αυτή την απόδειξη (καταγράφηκε μόνο το σύνολο).' : 'Χωρίς αναλυτικά είδη.'))}</p>`}
     ${/^https:\/\//i.test(String(r.url || '')) ? `<p><a class="panel-link" href="${escapeHtml(r.url)}" target="_blank" rel="noopener noreferrer" id="receipt-link">${escapeHtml(t('Άνοιγμα ηλεκτρονικής απόδειξης'))} ↗</a></p>` : ''}
+    ${receiptPaidCashRow(isMarkedCash(r), { id: 'receipt-detail-paid-cash' })}
     <div class="dialog-actions">${r.format !== 'transport' && looksLikeTransport(r) ? `<button class="button button-primary" type="button" data-action="receipt-move-transport" data-id="${escapeHtml(r.id)}" id="receipt-move-transport">🚗 ${escapeHtml(t('Μεταφορά στις Μετακινήσεις'))}</button>` : ''}<button class="button button-danger" type="button" data-action="receipt-delete" data-id="${escapeHtml(r.id)}">🗑 ${escapeHtml(t('Διαγραφή'))}</button><button class="button button-quiet" type="button" data-action="receipt-edit" data-id="${escapeHtml(r.id)}" id="receipt-edit">✎ ${escapeHtml(t('Διόρθωση'))}</button><button class="button button-quiet" type="button" data-action="receipt-detail-close">${escapeHtml(t('Κλείσιμο'))}</button></div>`;
   translateDom(dialog);
   dialog.showModal();
@@ -4111,6 +4121,7 @@ function openReceiptEdit(id) {
       <input class="field-input receipt-price" name="price" type="text" inputmode="decimal" autocomplete="off" value="${escapeHtml((Number(it.price) || 0).toFixed(2).replace('.', ','))}" aria-label="${escapeHtml(t('Τιμή'))}">${hasSpend ? `<select class="field-input receipt-expcat expcat-select" name="itemCategory" data-prev="${escapeHtml(it.expenseCategory || '')}" aria-label="${escapeHtml(t('Κατηγορία εξόδου: {name}', { name: it.name }))}"${expCats().length || it.expenseCategory ? '' : ' hidden'}>${expCatOptions(it.expenseCategory || '', 'item')}</select>` : ''}</div>`).join('')}</div>
       <p class="field-hint" id="receipt-edit-sum"></p>`
       : `<label class="field-label" for="re-total">${escapeHtml(t('Σύνολο (€)'))}</label><input class="field-input" id="re-total" name="total" type="text" inputmode="decimal" autocomplete="off" aria-describedby="receipt-edit-error" value="${escapeHtml((Number(r.total) || 0).toFixed(2).replace('.', ','))}">${whole ? `<label class="field-label" for="re-group">${escapeHtml(t('Είδος προϊόντος'))}</label><select class="field-input" id="re-group" name="category">${groupOptions(whole.category)}</select>` : ''}`}
+    ${receiptPaidCashRow(isMarkedCash(r), { id: 're-paid-cash' })}
     <p class="field-error" id="receipt-edit-error" role="alert" hidden></p>
     <div class="dialog-actions"><button class="button button-quiet" type="button" data-action="receipt-open" data-id="${escapeHtml(r.id)}">${escapeHtml(t('Άκυρο'))}</button><button class="button button-primary" type="submit" id="receipt-edit-save">${escapeHtml(t('Αποθήκευση αλλαγών'))}</button></div></form>`;
   updateReceiptEditSum();
@@ -4122,7 +4133,8 @@ function readReceiptEdit(form) {
   const items = rows.length ? rows.map((row) => { const f = (n) => row.querySelector(`[name="${n}"]`); const c = f('itemCategory'); return f('use').checked ? { name: f('name').value, quantity: f('quantity').value, price: f('price').value, ...(c ? { expenseCategory: cat(c) } : {}) } : { name: '', price: 0 }; }) : undefined;
   const receiptCat = form.querySelector('#re-expcat');
   const group = form.querySelector('#re-group');
-  return { store: form.elements.store.value, date: form.elements.date.value, ...(group ? { category: group.value } : {}), ...(receiptCat ? { expenseCategory: cat(receiptCat) } : {}), ...(items ? { items } : { total: form.elements.total.value }) };
+  const cash = paidCashWrite(Boolean(form.elements.paidCash?.checked), (state.receipts || []).find((x) => x.id === form.dataset.id) || {});
+  return { store: form.elements.store.value, date: form.elements.date.value, ...(group ? { category: group.value } : {}), ...(receiptCat ? { expenseCategory: cat(receiptCat) } : {}), ...(items ? { items } : { total: form.elements.total.value }), paidCash: cash.paidCash === true ? true : cash.paidCash === false ? false : null };
 }
 function updateReceiptEditSum() {
   const form = document.querySelector('#receipt-edit-form'); const out = document.querySelector('#receipt-edit-sum');
@@ -4148,6 +4160,19 @@ function saveReceiptEdit(form) {
   renderApp();
   openReceiptDetails(id);
   showToast('Η απόδειξη διορθώθηκε.');
+}
+function saveReceiptPaidCash(input) {
+  const dialog = document.querySelector('#receipt-detail-dialog');
+  const id = dialog?.querySelector('[data-action="receipt-edit"]')?.dataset.id || dialog?.querySelector('[data-action="receipt-delete"]')?.dataset.id;
+  if (!id) return;
+  const rec = (state.receipts || []).find((x) => x.id === id);
+  if (!rec) return;
+  const cash = paidCashWrite(Boolean(input.checked), rec);
+  const paidCash = cash.paidCash === true ? true : cash.paidCash === false ? false : null;
+  const next = applyReceiptEdit(state, id, { paidCash });
+  state.receipts = next.receipts; state.purchases = next.purchases;
+  if (!persist()) { input.checked = isMarkedCash(rec); return; }
+  showToast(t(input.checked ? 'Σημειώθηκε ως μετρητά.' : 'Αφαιρέθηκε η σήμανση μετρητών.'));
 }
 
 // ---------- v1.4: offline bar + receipts saved for later ----------
@@ -4709,6 +4734,10 @@ document.addEventListener('change', (event) => {
         syncExpCatMemoryHint(event.target.form, same ? event.target.dataset.suggested : '');
       }
     }
+    return;
+  }
+  if (event.target.id === 'receipt-detail-paid-cash') {
+    saveReceiptPaidCash(event.target);
     return;
   }
   if (event.target.name === 'toSpending' && event.target.form?.id === 'receipt-review-form') {

@@ -4,11 +4,14 @@ import { readFileSync } from 'node:fs';
 import { EXTRA_KINDS, loadState, saveState } from '../src/storage.js';
 import { parseMyData, parseUbl } from '../src/receipt.js';
 import { dictionaries } from '../src/i18n.js';
+import { applyReceiptEdit } from '../src/receipt-edit.js';
+import { createManualExpense } from '../src/manual-expense.js';
 import {
   EPAY_ID, EPAY_TARGET_CAP,
   EPAY_EN,
   activeEpayTarget, createEpayTarget, electronicPaymentTarget, epaymentReport,
-  isElectronicPayment, monthlyNeed, monthsLeftInYear, paymentFromMethods,
+  isElectronicPayment, isMarkedCash, monthlyNeed, monthsLeftInYear,
+  paidCashWrite, paymentFromMethods,
   yearElectronicSpend
 } from '../src/epayment-target.js';
 
@@ -40,6 +43,16 @@ test('isElectronicPayment: known cash is out, unknown counts as card', () => {
   assert.equal(isElectronicPayment({ payment: 1 }), false);
   assert.equal(isElectronicPayment({ payment: '10' }), false);
   assert.equal(isElectronicPayment({ paidCash: true }), false);
+  assert.equal(isElectronicPayment({ paidCash: false }), true);
+  assert.equal(isElectronicPayment({ paidCash: false, payment: 'cash' }), true);
+  assert.equal(isElectronicPayment({ paidCash: true, payment: 'card' }), false);
+  assert.equal(isMarkedCash({ payment: 'cash' }), true);
+  assert.equal(isMarkedCash({ paidCash: false, payment: 'cash' }), false);
+  assert.equal(isMarkedCash({ paidCash: true }), true);
+  assert.equal(isMarkedCash({}), false);
+  assert.deepEqual(paidCashWrite(true, {}), { paidCash: true });
+  assert.deepEqual(paidCashWrite(false, { payment: 'card' }), {});
+  assert.deepEqual(paidCashWrite(false, { payment: 'cash' }), { paidCash: false });
   assert.equal(isElectronicPayment({ paymentMethod: 3 }), false);
   assert.equal(paymentFromMethods([{ type: 7 }, { type: 1 }]), 'electronic');
   assert.equal(paymentFromMethods([{ type: 1 }, { type: 2 }]), 'cash');
@@ -137,6 +150,35 @@ test('myDATA type 7 (provider POS) is electronic; cash type 1 is not', () => {
   assert.equal(isElectronicPayment({ paymentMethods: [{ type: 1, amount: 10 }] }), false);
 });
 
+test('applyReceiptEdit and manual expense persist paidCash; unchecking removes or overrides it', () => {
+  const base = {
+    receipts: [{ id: 'r1', store: 'Φούρνος', date: '2026-11-23', total: 10, items: [], payment: 'card' }],
+    purchases: [{ id: 'pur-r1', receiptId: 'r1', name: 'Φούρνος', price: 10, date: '2026-11-23' }]
+  };
+  const marked = applyReceiptEdit(base, 'r1', { store: 'Φούρνος', date: '2026-11-23', total: '10', paidCash: true }, now);
+  assert.equal(marked.receipts[0].paidCash, true);
+  assert.equal(isElectronicPayment(marked.receipts[0]), false);
+  assert.equal(yearElectronicSpend({ ...marked, purchases: marked.purchases }, 2026).total, 0);
+  const cleared = applyReceiptEdit(marked, 'r1', { store: 'Φούρνος', date: '2026-11-23', total: '10', paidCash: null }, now);
+  assert.equal(cleared.receipts[0].paidCash, undefined);
+  assert.equal(isElectronicPayment(cleared.receipts[0]), true);
+  const cashScan = {
+    receipts: [{ id: 'r2', store: 'Λαϊκή', date: '2026-11-23', total: 8, items: [], payment: 'cash' }],
+    purchases: [{ id: 'pur-r2', receiptId: 'r2', name: 'Λαϊκή', price: 8, date: '2026-11-23' }]
+  };
+  const override = applyReceiptEdit(cashScan, 'r2', { store: 'Λαϊκή', date: '2026-11-23', total: '8', paidCash: false }, now);
+  assert.equal(override.receipts[0].paidCash, false);
+  assert.equal(override.receipts[0].payment, 'cash');
+  assert.equal(isElectronicPayment(override.receipts[0]), true);
+  assert.equal(yearElectronicSpend({ ...override, purchases: override.purchases }, 2026).total, 8);
+  const kept = applyReceiptEdit(marked, 'r1', { store: 'Φούρνος Νέο', date: '2026-11-23', total: '10' }, now);
+  assert.equal(kept.receipts[0].paidCash, true);
+  const manual = createManualExpense({ amount: '12,50', store: 'Λαϊκή', date: '2026-11-23', paidCash: true }, '2026-11-23', now);
+  assert.equal(manual.receipt.paidCash, true);
+  const plain = createManualExpense({ amount: '5', date: '2026-11-23' }, '2026-11-23', now);
+  assert.equal(plain.receipt.paidCash, undefined);
+});
+
 test('UI: insights card, no Pro gate, cached in the SW shell, English strings present', () => {
   const app = read('src/app.js');
   const sw = read('sw.js');
@@ -148,6 +190,14 @@ test('UI: insights card, no Pro gate, cached in the SW shell, English strings pr
   assert.match(app, /id="epay-card"/);
   assert.match(app, /t\('Στόχος ηλεκτρονικών πληρωμών'\)/);
   assert.match(app, /όσα δεν ξέρουμε τρόπο πληρωμής μετράνε ως κάρτα/);
+  assert.match(app, /μπορείς να σημειώσεις «Πληρώθηκε με μετρητά» στην απόδειξη/);
+  assert.match(app, /function receiptPaidCashRow/);
+  assert.match(app, /'receipt-detail-paid-cash'/);
+  assert.match(app, /'re-paid-cash'/);
+  assert.match(app, /'review-paid-cash'/);
+  assert.match(app, /'manual-paid-cash'/);
+  assert.match(app, /function saveReceiptPaidCash/);
+  assert.match(app, /paidCashWrite\(Boolean\(form\.elements\.paidCash\?\.checked\)/);
   assert.match(app, /Ενδεικτικό· για ακρίβεια ρώτα τον λογιστή σου/);
   const from = app.indexOf('function renderEpayCard');
   assert.doesNotMatch(app.slice(from, from + 3500), /calendarProEnabled|isPro|proGate/);

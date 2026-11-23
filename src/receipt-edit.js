@@ -2,6 +2,7 @@
 // v1.6.8: optional expense category for the whole receipt (edits.expenseCategory) and per item (items[i].expenseCategory:
 // '' = same as the receipt, '-' = none). Omitted fields keep what the receipt already had.
 // v1.8.4: edits.category = product group («Τι αγόρασες;») of a receipt with only a total (e.g. «＋ Έξοδο με το χέρι»).
+// paidCash: explicit user mark (true / false / omit). false overrides a scanned cash payment so it counts as electronic.
 import { effectiveItemCategory, totalPurchaseCategory } from './expense-cats.js';
 import { validType } from './product-types.js';
 import { parseAmount } from './manual-expense.js';
@@ -74,6 +75,11 @@ export function applyReceiptEdit(state, id, edits, now = new Date().toISOString(
     if (r.id !== id) return r;
     const next = { ...r, store, date, total, ...(items ? { items: items.filter((it) => it.name) } : {}), editedAt: now };
     if (receiptCat) next.expenseCategory = receiptCat; else delete next.expenseCategory;
+    if (Object.prototype.hasOwnProperty.call(edits, 'paidCash')) {
+      if (edits.paidCash === true) next.paidCash = true;
+      else if (edits.paidCash === false) next.paidCash = false;
+      else delete next.paidCash;
+    }
     return next;
   });
   return { ...state, receipts, purchases };

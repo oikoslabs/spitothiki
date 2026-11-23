@@ -53,10 +53,11 @@ function methodIsElectronic(method) {
 }
 
 // Unknown method counts as electronic (card). Known cash / cheque / on-credit do not.
+// paidCash is an explicit user mark: true = cash (out), false = not cash (counts), even if payment said otherwise.
 export function isElectronicPayment(row, receiptsById) {
   if (row == null || row === '') return true;
   if (typeof row !== 'object') return methodIsElectronic(row);
-  if (row.paidCash === true) return false;
+  if (typeof row.paidCash === 'boolean') return !row.paidCash;
   if (row.payment != null && row.payment !== '') return methodIsElectronic(row.payment);
   if (row.paymentMethod != null && row.paymentMethod !== '') return methodIsElectronic(row.paymentMethod);
   if (Array.isArray(row.paymentMethods) && row.paymentMethods.length) {
@@ -67,6 +68,22 @@ export function isElectronicPayment(row, receiptsById) {
     if (receipt) return isElectronicPayment(receipt, null);
   }
   return true;
+}
+
+// Checkbox state for a receipt: honour an explicit paidCash, else infer from payment methods.
+export function isMarkedCash(row, receiptsById) {
+  if (row == null || row === '') return false;
+  if (typeof row === 'object' && typeof row.paidCash === 'boolean') return row.paidCash;
+  return !isElectronicPayment(row, receiptsById);
+}
+
+// Field to write on a receipt when the user ticks or unticks «Πληρώθηκε με μετρητά».
+// Unticking stores paidCash: false only when the record would otherwise count as cash.
+export function paidCashWrite(checked, current = {}) {
+  if (checked) return { paidCash: true };
+  const probe = { ...current };
+  delete probe.paidCash;
+  return isElectronicPayment(probe) ? {} : { paidCash: false };
 }
 
 export function paymentFromMethods(methods) {
@@ -160,6 +177,11 @@ export const EPAY_EN = {
   'Έφτασες τον ενδεικτικό στόχο.': 'You have reached the indicative target.',
   'Χρειάζεσαι ~{amount} τον μήνα μέχρι τέλος χρονιάς': 'You need ~{amount} a month until the end of the year',
   '(όσα δεν ξέρουμε τρόπο πληρωμής μετράνε ως κάρτα)': '(amounts with an unknown payment method count as card)',
+  '(όσα δεν ξέρουμε τρόπο πληρωμής μετράνε ως κάρτα· μπορείς να σημειώσεις «Πληρώθηκε με μετρητά» στην απόδειξη)': '(amounts with an unknown payment method count as card; you can mark a receipt as “Paid in cash”)',
+  'Πληρώθηκε με μετρητά': 'Paid in cash',
+  'δεν μετράει στον στόχο ηλεκτρονικών πληρωμών': 'it does not count toward the electronic payments target',
+  'Σημειώθηκε ως μετρητά.': 'Marked as cash.',
+  'Αφαιρέθηκε η σήμανση μετρητών.': 'The cash mark was removed.',
   'Βάλε το ετήσιο εισόδημά σου.': 'Enter your yearly income.',
   'Το εισόδημα πρέπει να είναι μεγαλύτερο από 0.': 'Income must be greater than 0.',
   'Το εισόδημα αποθηκεύτηκε.': 'The income was saved.',
