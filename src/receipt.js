@@ -2,7 +2,7 @@
 // Appending /myDATA gives the AADE InvoicesDoc XML with the item lines; /EN16931 gives a UBL invoice.
 import { normalizeSearch } from './domain.js';
 import { matchIngredient } from './recipes.js';
-import { allowedHost } from './receipt-domains.js';
+import { allowedAadePage, allowedHost } from './receipt-domains.js';
 import { isStatsTest } from './source.js';
 
 // ---------- Minimal namespace-agnostic XML tree ----------
@@ -238,27 +238,93 @@ export function receiptFailure(error) {
   return 'unsupported';
 }
 
-async function getText(url, { fetchImpl, proxy, known = true, used, origin }) {
+// v1.9.39: hosts whose receipt pages never allow a direct browser read (no CORS header; measured 21/11/2026), so the
+// app goes straight to the proxy and saves a full failed round trip. Other hosts are learned on the device:
+// a direct read that fails as CORS/network and then works through the proxy is remembered for 7 days.
+export const PROXY_FIRST_HOSTS = ['e-invoicing.gr', 'www1.aade.gr'];
+export const PROXY_HOSTS_KEY = 'spitothiki:proxy-first-hosts';
+export const PROXY_HOSTS_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const hostKey = (host) => String(host || '').toLowerCase().replace(/\.$/, '').replace(/^www\.(?=[^.]+\.[^.]+$)/, '');
+const defaultStorage = () => { try { return globalThis.localStorage || null; } catch { return null; } };
+function readProxyHosts(storage) {
+  try { const v = JSON.parse(storage?.getItem(PROXY_HOSTS_KEY) || '{}'); return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; } catch { return {}; }
+}
+export function isProxyFirstHost(host, { storage = defaultStorage(), now = Date.now() } = {}) {
+  const key = hostKey(host);
+  if (!key) return false;
+  if (PROXY_FIRST_HOSTS.includes(key)) return true;
+  const until = Number(readProxyHosts(storage)[key]);
+  return Number.isFinite(until) && until > now;
+}
+export function rememberProxyHost(host, { storage = defaultStorage(), now = Date.now() } = {}) {
+  const key = hostKey(host);
+  if (!key || !storage || PROXY_FIRST_HOSTS.includes(key)) return;
+  try {
+    const rows = Object.entries(readProxyHosts(storage)).filter(([, until]) => Number(until) > now);
+    const next = Object.fromEntries([...rows.filter(([h]) => h !== key).slice(-29), [key, now + PROXY_HOSTS_TTL_MS]]);
+    storage.setItem(PROXY_HOSTS_KEY, JSON.stringify(next));
+  } catch {}
+}
+
+async function getText(url, { fetchImpl, proxy, known = true, used, origin, proxyFirst = false, storage, now, timeoutMs = FETCH_TIMEOUT_MS }) {
   const attempt = async (target) => {
     let res;
-    const signal = typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(FETCH_TIMEOUT_MS) : undefined;
+    const signal = typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(timeoutMs) : undefined;
     try { res = await fetchImpl(target, { headers: { accept: 'application/xml, text/xml, */*' }, cache: 'no-store', ...(signal ? { signal } : {}) }); }
     catch (error) { throw Object.assign(error instanceof Error ? error : new Error(String(error)), { network: true }); }
     if (!res.ok) { const error = new Error(`HTTP ${res.status}`); error.status = res.status; try { error.body = String(await res.text()).slice(0, 300); } catch {} throw error; }
     return res.text();
   };
+  // q=1: this lookup is part of a scan the app counts once itself, so the proxy keeps it only as an anonymous timing.
+  const proxyUrl = () => `${proxy.replace(/\/+$/, '')}/?url=${encodeURIComponent(url)}` + (isStatsTest({ origin }) ? '&t=1' : '') + '&q=1';
+  const viaProxy = () => { if (used) { used.proxied = true; used.via = 'proxy'; } return attempt(proxyUrl()); };
+  if (proxy && known && proxyFirst) {
+    try { return await viaProxy(); }
+    catch (error) {
+      // The proxy answered (e.g. 404 «not published yet»): that's the answer. Only if the proxy itself
+      // can't be reached, try the provider directly once.
+      if (error.status) throw error;
+      try { return await attempt(url); } catch { throw error; }
+    }
+  }
   try { return await attempt(url); }
   catch (error) {
     // A CORS block or network error surfaces as TypeError; retry through the proxy if one is configured.
     // Only for known providers: the proxy refuses every other domain anyway.
     if (!proxy || error.status || !known) throw error;
-    if (used) { used.proxied = true; used.via = 'proxy'; }
-    const q = `url=${encodeURIComponent(url)}` + (isStatsTest({ origin }) ? '&t=1' : '');
-    return attempt(`${proxy.replace(/\/+$/, '')}/?${q}`);
+    const text = await viaProxy();
+    try { rememberProxyHost(new URL(url).hostname, { storage, ...(now ? { now } : {}) }); } catch {}
+    return text;
   }
 }
 
-export async function fetchReceipt(input, { fetchImpl = fetch, proxy = '', origin } = {}) {
+// v1.9.39: the AADE cash-register check page (q1.php) shows the shop's name and address. Pure, unit-tested.
+const decodeEntities = (s) => String(s || '').replace(/&nbsp;/gi, ' ').replace(/&amp;/gi, '&').replace(/&quot;/gi, '"').replace(/&#0*39;|&apos;/gi, "'").replace(/&lt;/gi, '<').replace(/&gt;/gi, '>')
+  .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n))).replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCodePoint(parseInt(n, 16)));
+const cellText = (html) => decodeEntities(String(html || '').replace(/<br\s*\/?>/gi, ' ').replace(/<[^>]*>/g, ' ')).replace(/\s+/g, ' ').trim();
+export function parseAadeFhmPage(html) {
+  const rows = [...String(html || '').matchAll(/<tr[^>]*>\s*<td[^>]*>([\s\S]*?)<\/td>\s*<td[^>]*>([\s\S]*?)<\/td>/gi)].map((m) => [cellText(m[1]), cellText(m[2])]);
+  const find = (re) => rows.find(([k]) => re.test(k))?.[1] || '';
+  const name = find(/^Επωνυμία/i).slice(0, 120);
+  let address = find(/^Διεύθυνση/i).slice(0, 160);
+  if (/^ΕΞΩΤΕΡΙΚΟ$/i.test(address)) address = '';
+  return { issuerName: name, issuerAddress: name ? address : '' };
+}
+const AADE_PAGE_TIMEOUT_MS = 8000;
+
+// v1.9.39: the shop name (and address) of an AADE cash-register receipt, read from the AADE check page through the
+// proxy (the page has no CORS). Runs AFTER the receipt is shown, so the scan is as fast as before; the amount,
+// date and id never come from here. Returns null when there's nothing (other AADE links, offline, page error).
+export async function fetchAadeShop(input, { fetchImpl = fetch, proxy = '', origin, storage = defaultStorage() } = {}) {
+  const target = classifyReceiptUrl(input);
+  if (target.kind !== 'aade' || !proxy || !allowedAadePage(target.url) || globalThis.navigator?.onLine === false) return null;
+  try {
+    const page = parseAadeFhmPage(await getText(target.url, { fetchImpl, proxy, known: true, origin, proxyFirst: true, storage, timeoutMs: AADE_PAGE_TIMEOUT_MS }));
+    return page.issuerName ? page : null;
+  } catch { return null; }
+}
+
+export async function fetchReceipt(input, { fetchImpl = fetch, proxy = '', origin, storage = defaultStorage(), now = Date.now() } = {}) {
   const target = classifyReceiptUrl(input);
   if (target.kind === 'invalid') throw new Error('Ο σύνδεσμος δεν είναι έγκυρος.');
   if (target.kind === 'insecure') throw new Error('Ο σύνδεσμος πρέπει να ξεκινά με https://');
@@ -270,10 +336,16 @@ export async function fetchReceipt(input, { fetchImpl = fetch, proxy = '', origi
   const used = { via: 'direct', proxied: false };
   let receipt = null;
   let lastError = null;
-  try { receipt = parseMyData(await getText(`${target.url}/myDATA`, { fetchImpl, proxy, known, used, origin })); } catch (error) { lastError = error; }
+  const opts = { fetchImpl, proxy, known, used, origin, storage, now, proxyFirst: known && isProxyFirstHost(target.host, { storage, now }) };
+  // v1.9.39: myDATA never carries the shop name, so for a known provider EN16931 was always read next, one after
+  // the other. Both are now requested at the same time; the result is decided exactly as before.
+  const myData = getText(`${target.url}/myDATA`, opts).then(parseMyData);
+  const en = known ? getText(`${target.url}/EN16931`, opts).then(parseUbl) : null;
+  en?.catch(() => {});
+  try { receipt = await myData; } catch (error) { lastError = error; }
   let ubl = null;
   if (known && (!receipt?.lines.length || !receipt.issuerName)) {
-    try { ubl = parseUbl(await getText(`${target.url}/EN16931`, { fetchImpl, proxy, known, used, origin })); } catch (error) { lastError = lastError || error; }
+    try { ubl = await en; } catch (error) { lastError = lastError || error; }
   }
   if (!receipt?.lines.length && ubl?.lines.length) receipt = ubl;
   else if (receipt && ubl?.issuerName) receipt.issuerName = ubl.issuerName;
