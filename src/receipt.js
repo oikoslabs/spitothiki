@@ -4,6 +4,7 @@ import { normalizeSearch } from './domain.js';
 import { matchIngredient } from './recipes.js';
 import { allowedAadePage, allowedHost } from './receipt-domains.js';
 import { isStatsTest } from './source.js';
+import { stripReceiptMarkup } from './receipt-store.js';
 
 // ---------- Minimal namespace-agnostic XML tree ----------
 // Node: { name (local name), children: Node[], text }. Uses DOMParser in the browser, a tiny parser elsewhere (tests).
@@ -127,6 +128,8 @@ export function parseUbl(xml) {
     return makeLine({ name: val(line, 'Item', 'Name'), quantity: num(qtyNode?.text), unit: UBL_UNITS[qtyNode?.unitCode] || 'τεμ.', price: net * (1 + percent / 100) });
   }).filter((line) => line.rawName);
   const supplier = path(root, 'AccountingSupplierParty', 'Party');
+  const partyName = val(supplier, 'PartyName', 'Name');
+  const legalName = val(supplier, 'PartyLegalEntity', 'RegistrationName');
   const id = val(root, 'ID');
   const totals = kid(root, 'LegalMonetaryTotal');
   const paymentMethods = kids(root, 'PaymentMeans').map((m) => ({
@@ -134,7 +137,9 @@ export function parseUbl(xml) {
   })).filter((m) => m.type);
   return {
     format: 'EN16931',
-    issuerVat: val(supplier, 'PartyTaxScheme', 'CompanyID').replace(/^EL/, ''), issuerName: val(supplier, 'PartyName', 'Name') || val(supplier, 'PartyLegalEntity', 'RegistrationName'),
+    issuerVat: val(supplier, 'PartyTaxScheme', 'CompanyID').replace(/^EL/, ''),
+    issuerName: partyName || legalName,
+    ...(partyName && legalName && partyName !== legalName ? { issuerTradeName: legalName } : {}),
     date: val(root, 'IssueDate').slice(0, 10), series: '', number: id, uid: id,
     total: round2(num(val(totals, 'PayableAmount')) || num(val(totals, 'TaxInclusiveAmount')) || lines.reduce((s, l) => s + l.price, 0)), lines,
     ...ublRefs(root),
@@ -391,8 +396,10 @@ export async function fetchReceipt(input, { fetchImpl = fetch, proxy = '', origi
   const opts = { fetchImpl, proxy, known, used, origin, storage, now, proxyFirst: known && isProxyFirstHost(target.host, { storage, now }) };
   // v1.9.39: myDATA never carries the shop name, so for a known provider EN16931 was always read next, one after
   // the other. Both are now requested at the same time; the result is decided exactly as before.
-  const myData = getText(`${target.url}/myDATA`, opts).then(parseMyData);
-  const en = known ? getText(`${target.url}/EN16931`, opts).then(parseUbl) : null;
+  const myRaw = getText(`${target.url}/myDATA`, opts);
+  const enRaw = known ? getText(`${target.url}/EN16931`, opts) : null;
+  const myData = myRaw.then(parseMyData);
+  const en = enRaw ? enRaw.then(parseUbl) : null;
   en?.catch(() => {});
   try { receipt = await myData; } catch (error) { lastError = error; }
   let ubl = null;
@@ -401,12 +408,20 @@ export async function fetchReceipt(input, { fetchImpl = fetch, proxy = '', origi
   }
   if (!receipt?.lines.length && ubl?.lines.length) receipt = ubl;
   else if (receipt && ubl?.issuerName) receipt.issuerName = ubl.issuerName;
-  if (receipt && ubl && receipt !== ubl) { receipt.related = ubl.related || []; receipt.mark ||= ubl.mark || ''; }
+  if (receipt && ubl && receipt !== ubl) {
+    receipt.related = ubl.related || [];
+    receipt.mark ||= ubl.mark || '';
+    if (ubl.issuerTradeName && ubl.issuerTradeName !== receipt.issuerName) receipt.issuerTradeName = ubl.issuerTradeName;
+  }
   if (!receipt || (!receipt.lines.length && !(receipt.total > 0))) {
     // Body arrived but isn't receipt data (e.g. an HTML page) → unsupported layout; otherwise judge by the error.
     const kind = receipt || !known ? 'unsupported'
       : [400, 404].includes(lastError?.status) && NOT_YET.test(lastError.body || '') ? 'pending' : receiptFailure(lastError);
     throw Object.assign(new Error(RECEIPT_MESSAGES[kind]), { kind, unsupported: kind === 'unsupported', cors: kind !== 'unsupported', via: used.via, proxied: used.proxied, ...(kind === 'network' ? {} : { status: lastError?.status || 0 }) });
   }
-  return { ...receipt, sourceUrl: target.url, via: used.via, proxied: used.proxied };
+  // Keep a stripped copy of the raw page/XML so on-device classifyStore can find a franchise brand
+  // (e.g. BP) that is not in the legal issuer name. Not saved with the receipt; never sent to stats.
+  const rawBits = await Promise.all([myRaw, enRaw || Promise.resolve('')].map((p) => p.then((t) => t, () => '')));
+  const pageText = stripReceiptMarkup(rawBits.join('\n'));
+  return { ...receipt, sourceUrl: target.url, via: used.via, proxied: used.proxied, ...(pageText ? { pageText } : {}) };
 }

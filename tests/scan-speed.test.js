@@ -112,13 +112,16 @@ test('myDATA and EN16931 are requested together; the receipt is identical to the
   release.reverse().forEach((f) => f());
   const now = await pending;
   const old = (await legacyFetch('https://a.epsilonnet.gr/fd/abc:1', async (u) => (u.endsWith('myDATA') ? myData : ubl))).receipt;
-  const { sourceUrl, via, proxied, ...rest } = now;
+  const { sourceUrl, via, proxied, pageText, ...rest } = now;
   assert.deepEqual(rest, old);
+  assert.ok(pageText);
+  assert.doesNotMatch(pageText, /<[^>]+>/);
+  assert.match(pageText, /ΔΟΚΙΜΑΣΤΙΚΟ ΣΟΥΠΕΡΜΑΡΚΕΤ/);
   assert.equal(await receiptId(now, sourceUrl), await receiptId(old, sourceUrl), 'same id → duplicates still detected');
   // EN16931 failing, myDATA fine: same as before (name stays empty, lines from myDATA).
   const r2 = await fetchReceipt('https://a.epsilonnet.gr/fd/abc:1', { storage: memory(), fetchImpl: async (u) => (u.endsWith('myDATA') ? ok(myData) : { ok: false, status: 500, text: async () => '' }) });
   const o2 = (await legacyFetch('x', async (u) => { if (u.endsWith('myDATA')) return myData; throw Object.assign(new Error('HTTP 500'), { status: 500 }); })).receipt;
-  const { sourceUrl: _a, via: _b, proxied: _c, ...rest2 } = r2;
+  const { sourceUrl: _a, via: _b, proxied: _c, pageText: _p2, ...rest2 } = r2;
   assert.deepEqual(rest2, o2);
   // myDATA failing, EN16931 fine: the UBL receipt, as before.
   const r3 = await fetchReceipt('https://a.epsilonnet.gr/fd/abc:1', { storage: memory(), fetchImpl: async (u) => (u.endsWith('EN16931') ? ok(ubl) : { ok: false, status: 404, text: async () => '' }) });

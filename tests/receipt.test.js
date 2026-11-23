@@ -137,3 +137,67 @@ test('fetchReceipt adds t=1 on the proxy URL only when the stats test flag is on
   assert.ok(via.includes(`https://proxy.test/?url=${encodeURIComponent('https://b.epsilonnet.gr/fd/x/myDATA')}&q=1`));
   assert.equal(via.some((u) => u.includes('t=1')), false);
 });
+
+test('parseUbl keeps a distinct legal name as issuerTradeName', () => {
+  const xml = `<?xml version="1.0" encoding="utf-8"?>
+<Invoice xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2" xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2" xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2">
+  <cbc:ID>1</cbc:ID>
+  <cbc:IssueDate>2026-11-23</cbc:IssueDate>
+  <cac:AccountingSupplierParty><cac:Party>
+    <cac:PartyName><cbc:Name>ΠΑΠΑΔΟΠΟΥΛΟΣ ΕΝΕΡΓΕΙΑΚΗ ΑΕ</cbc:Name></cac:PartyName>
+    <cac:PartyLegalEntity><cbc:RegistrationName>BP HELLAS</cbc:RegistrationName></cac:PartyLegalEntity>
+    <cac:PartyTaxScheme><cbc:CompanyID>EL123456789</cbc:CompanyID></cac:PartyTaxScheme>
+  </cac:Party></cac:AccountingSupplierParty>
+  <cac:LegalMonetaryTotal><cbc:PayableAmount currencyID="EUR">40.00</cbc:PayableAmount></cac:LegalMonetaryTotal>
+  <cac:InvoiceLine>
+    <cbc:InvoicedQuantity unitCode="LTR">20</cbc:InvoicedQuantity>
+    <cbc:LineExtensionAmount currencyID="EUR">40</cbc:LineExtensionAmount>
+    <cac:Item>
+      <cbc:Name>ΑΜΟΛΥΒΔΗ 95</cbc:Name>
+      <cac:ClassifiedTaxCategory><cbc:Percent>24</cbc:Percent></cac:ClassifiedTaxCategory>
+    </cac:Item>
+  </cac:InvoiceLine>
+</Invoice>`;
+  const r = parseUbl(xml);
+  assert.equal(r.issuerName, 'ΠΑΠΑΔΟΠΟΥΛΟΣ ΕΝΕΡΓΕΙΑΚΗ ΑΕ');
+  assert.equal(r.issuerTradeName, 'BP HELLAS');
+});
+
+test('fetchReceipt keeps stripped page text so a franchise brand in the XML can be classified', async () => {
+  const my = `<InvoicesDoc xmlns="http://www.aade.gr/myDATA/invoice/v1.0"><invoice>
+    <uid>FUELUID0000000000000000000000000000000001</uid>
+    <issuer><vatNumber>123456789</vatNumber></issuer>
+    <invoiceHeader><series>1</series><aa>1</aa><issueDate>2026-11-20</issueDate><invoiceType>11.1</invoiceType></invoiceHeader>
+    <invoiceDetails><itemDescr>ΑΜΟΛΥΒΔΗ 95</itemDescr><quantity>22</quantity><measurementUnit>1</measurementUnit><netValue>32.26</netValue><vatAmount>7.74</vatAmount></invoiceDetails>
+    <invoiceSummary><totalNetValue>32.26</totalNetValue><totalVatAmount>7.74</totalVatAmount><totalGrossValue>40.00</totalGrossValue></invoiceSummary>
+  </invoice></InvoicesDoc>`;
+  const en = `<?xml version="1.0" encoding="utf-8"?>
+<Invoice xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2" xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2" xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2">
+  <cbc:ID>1</cbc:ID>
+  <cbc:IssueDate>2026-11-20</cbc:IssueDate>
+  <cbc:Note>Πρατήριο BP</cbc:Note>
+  <cac:AccountingSupplierParty><cac:Party>
+    <cac:PartyName><cbc:Name>ΠΑΠΑΔΟΠΟΥΛΟΣ ΕΝΕΡΓΕΙΑΚΗ ΑΕ</cbc:Name></cac:PartyName>
+    <cac:PartyTaxScheme><cbc:CompanyID>EL123456789</cbc:CompanyID></cac:PartyTaxScheme>
+  </cac:Party></cac:AccountingSupplierParty>
+  <cac:LegalMonetaryTotal><cbc:PayableAmount currencyID="EUR">40.00</cbc:PayableAmount></cac:LegalMonetaryTotal>
+  <cac:InvoiceLine>
+    <cbc:InvoicedQuantity unitCode="LTR">22</cbc:InvoicedQuantity>
+    <cbc:LineExtensionAmount currencyID="EUR">32.26</cbc:LineExtensionAmount>
+    <cac:Item>
+      <cbc:Name>ΑΜΟΛΥΒΔΗ 95</cbc:Name>
+      <cac:ClassifiedTaxCategory><cbc:Percent>24</cbc:Percent></cac:ClassifiedTaxCategory>
+    </cac:Item>
+  </cac:InvoiceLine>
+</Invoice>`;
+  const ok = (body) => ({ ok: true, status: 200, text: async () => body });
+  const r = await fetchReceipt('https://a.epsilonnet.gr/fd/fuel-bp', { fetchImpl: async (url) => ok(url.endsWith('/myDATA') ? my : en) });
+  assert.equal(r.issuerName, 'ΠΑΠΑΔΟΠΟΥΛΟΣ ΕΝΕΡΓΕΙΑΚΗ ΑΕ');
+  assert.ok(r.pageText);
+  assert.doesNotMatch(r.pageText, /<[^>]+>/);
+  assert.match(r.pageText, /BP/);
+  assert.match(r.pageText, /ΠΑΠΑΔΟΠΟΥΛΟΣ/);
+  assert.match(r.pageText, /ΑΜΟΛΥΒΔΗ/);
+  const { classifyStore, receiptClassifyText } = await import('../src/receipt-store.js');
+  assert.deepEqual(classifyStore(receiptClassifyText(r), 'a.epsilonnet.gr'), { type: 'fuel', store: 'BP' });
+});
