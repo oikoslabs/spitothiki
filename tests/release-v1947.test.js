@@ -1,0 +1,40 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { GUIDE_SECTIONS } from '../src/guide.js';
+import { dictionaries } from '../src/i18n.js';
+
+const read = (f) => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
+
+test('v1.9.47 release: version, cache v163, homepage privacy link, Limited Use, updated guide', () => {
+  assert.match(read('package.json'), /"version": "1\.9\.47"/);
+  assert.equal((read('index.html').match(/data-no-i18n>1\.9\.47</g) || []).length, 2);
+  const html = read('index.html');
+  assert.match(html, /styles\.css\?v=163/);
+  assert.match(html, /src\/app\.js\?v=163/);
+  assert.doesNotMatch(html, /v=163-preview/);
+  assert.match(html, /<a href="\.\/privacy\.html">Πολιτική απορρήτου<\/a>/);
+  assert.match(html, /mailto:oikoslabs\.apps@gmail\.com/);
+  assert.match(html, /<a class="privacy-card" href="\.\/privacy\.html">/);
+  assert.match(html, /Η Σπιτοθήκη είναι δωρεάν εφαρμογή της Oikos Labs/);
+  assert.doesNotMatch(html, /Σκολαρ|Skolarikis|Giannis |Γιάννης /);
+  const sw = read('sw.js');
+  assert.match(sw, /CACHE_VERSION = 'v163';/);
+  assert.doesNotMatch(sw, /CACHE_VERSION = 'v163-preview'/);
+  assert.match(sw, /styles\.css\?v=163'/);
+  assert.match(sw, /src\/app\.js\?v=163'/);
+  const privacy = read('privacy.html');
+  assert.match(privacy, /23 Νοεμβρίου 2026/);
+  assert.match(privacy, /23 November 2026/);
+  assert.match(privacy, /Περιορισμένη χρήση δεδομένων Google \(Limited Use\)/);
+  assert.match(privacy, /Limited Use of Google user data/);
+  assert.match(privacy, /api-services-user-data-policy/);
+  assert.doesNotMatch(privacy, /Σκολαρ|Skolarikis|Giannis |Γιάννης /);
+  const whats = GUIDE_SECTIONS.find((s) => s.id === 'whats-new');
+  assert.equal(whats.title, 'Τι νέο στην 1.9.47');
+  assert.match(whats.bullets.join('\n'), /Πολιτική απορρήτου/);
+  assert.match(whats.bullets.join('\n'), /Limited Use/);
+  for (const b of whats.bullets) assert.ok(dictionaries.en[b], `EN missing: ${b}`);
+  assert.ok(dictionaries.en[whats.intro], 'EN missing whats-new intro');
+  assert.ok(dictionaries.en[whats.title], 'EN missing whats-new title');
+});
