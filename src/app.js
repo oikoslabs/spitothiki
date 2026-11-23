@@ -1,4 +1,5 @@
 import { MAX_QUANTITY, expiringItems, createPantryItem, createShoppingItem, expiringWithin, expiryStatus, expiryWarning, finishItemToShopping, normalizeSearch, normalizeUnit, pantrySummary, receiveShoppingItem, returnShoppingItem, shoppingListText, syncShoppingWithItem, toggleShoppingItem } from './domain.js';
+import { filterRows, searchFieldHtml } from './list-search.js';
 import { adoptCamera, decodeImageCodes, lookupBarcode, normalizeBarcode, requestCamera, startScanner, warmScanner } from './barcode.js';
 import { isUrlCode, lastTollAmount, parseTollBarcode, parseTollText, tollAmountFromText } from './toll-barcode.js';
 import { authProviders, firebaseConfig } from './firebase-config.js';
@@ -76,6 +77,23 @@ setProductTypes(state.productTypes); // v1.9.20: own product types («Είδος
 const VIEWS = ['overview', 'pantry', 'shopping', 'cart', 'cook', 'bills', 'transport', 'extras', 'chores', 'calendar', 'insights', 'receipts', 'settings', 'guide'];
 let activeView = VIEWS.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'overview';
 let pantryQuery = '';
+// v1.9.45: search inside long lists (target list id → what the user typed); see src/list-search.js.
+const listQueries = {};
+const listSearchField = (target, count, min = 2) => (count >= min ? searchFieldHtml(target, listQueries[target] || '') : '');
+function runListSearch(target) {
+  const q = listQueries[target] || '';
+  const shown = filterRows(document.getElementById(target), q);
+  const box = document.querySelector(`[data-list-search-box="${target}"]`);
+  const input = box?.querySelector('input');
+  if (input && input.value !== q) input.value = q;
+  const clear = box?.querySelector('[data-list-search-clear]');
+  if (clear) clear.hidden = !q;
+  const empty = document.querySelector(`[data-list-search-empty="${target}"]`);
+  if (empty) empty.hidden = !(q.trim() && shown === 0);
+}
+function applyListSearch(root = document) {
+  for (const input of root.querySelectorAll('[data-list-search]')) runListSearch(input.dataset.listSearch);
+}
 let pantryCategory = 'Όλα';
 let pantryStatus = ''; // '' | 'expiring' (opened from the home card «λήγουν ή έληξαν»)
 let toastTimer;
@@ -865,7 +883,7 @@ function renderShopping() {
     <div class="suggest-chips" id="shopping-suggest" aria-label="Γρήγορες προτάσεις">${renderSuggestChips()}</div>
     <p class="form-error" id="shopping-error" role="alert" hidden></p>
     ${renderStoreBar()}
-    <div class="shopping-list">${state.shopping.length ? renderShoppingRows(pending, checked) : renderEmpty('Η λίστα είναι άδεια', 'Πρόσθεσε όσα χρειάζεσαι πριν πας για ψώνια.', 'focus-shopping', 'Γράψε το πρώτο προϊόν', '🛒')}</div></section>
+    ${listSearchField('shopping-rows', state.shopping.length, 6)}<div class="shopping-list" id="shopping-rows">${state.shopping.length ? renderShoppingRows(pending, checked) : renderEmpty('Η λίστα είναι άδεια', 'Πρόσθεσε όσα χρειάζεσαι πριν πας για ψώνια.', 'focus-shopping', 'Γράψε το πρώτο προϊόν', '🛒')}</div></section>
     <aside class="panel shopping-summary"><span class="stat-icon">🛍️</span><h2>Μικρή υπενθύμιση</h2><p>Κράτησε τη λίστα απλή και πρόσθεσε μόνο ό,τι χρειάζεσαι.</p><div class="shopping-summary-list"><div class="summary-line"><span>Εκκρεμούν</span><strong>${pending.length}</strong></div><div class="summary-line"><span>Στο καλάθι</span><strong>${checked.length}</strong></div><div class="summary-line"><span>Στη συσκευή</span><strong>Ιδιωτικά</strong></div></div></aside></div>
     ${renderRecurringPanel()}`;
 }
@@ -943,10 +961,12 @@ function renderApp() {
   else viewRoot.innerHTML = renderSettings();
   if (activeView === 'pantry') renderPantryList();
   translateDom(viewRoot);
+  applyListSearch(viewRoot);
 }
 
 function navigate(view) {
   if (!VIEWS.includes(view)) return;
+  if (view !== activeView) for (const key of Object.keys(listQueries)) delete listQueries[key];
   activeView = view;
   if (location.hash !== `#${view}`) history.replaceState(null, '', `#${view}`);
   pantryQuery = view === 'pantry' ? pantryQuery : '';
@@ -2697,12 +2717,14 @@ function renderTransportHistory() {
   const isCurrent = transportMonthKey >= monthKey(localDateKey());
   const total = list.reduce((sum, e) => sum + e.amount, 0);
   body.innerHTML = `<div class="month-switch" role="group" aria-label="${escapeHtml(t('Μήνας'))}"><button class="icon-button" type="button" data-action="transport-month" data-delta="-1" aria-label="${escapeHtml(t('Προηγούμενος μήνας'))}">‹</button><strong id="transport-history-month" data-no-i18n>${escapeHtml(monthLabel(transportMonthKey))}</strong><button class="icon-button" type="button" data-action="transport-month" data-delta="1" aria-label="${escapeHtml(t('Επόμενος μήνας'))}" ${isCurrent ? 'disabled' : ''}>›</button></div>
-    ${list.length ? `<p class="field-hint" id="transport-history-total">${escapeHtml(t('{count} έξοδα · σύνολο {total}', { count: list.length, total: money(Math.round(total * 100) / 100) }))}</p><div class="product-list" id="transport-list">${list.map(renderTransportEntry).join('')}</div>` : `<p class="subtle-empty">${escapeHtml(t('Κανένα έξοδο μετακίνησης αυτόν τον μήνα.'))}</p>`}`;
+    ${list.length ? `<p class="field-hint" id="transport-history-total">${escapeHtml(t('{count} έξοδα · σύνολο {total}', { count: list.length, total: money(Math.round(total * 100) / 100) }))}</p>${listSearchField('transport-list', list.length)}<div class="product-list" id="transport-list">${list.map(renderTransportEntry).join('')}</div>` : `<p class="subtle-empty">${escapeHtml(t('Κανένα έξοδο μετακίνησης αυτόν τον μήνα.'))}</p>`}`;
+  applyListSearch(body);
 }
 
 const transportHistoryDialog = () => document.querySelector('#transport-history-dialog');
 function openTransportHistory() {
   const dialog = transportHistoryDialog();
+  if (!dialog?.open) listQueries['transport-list'] = '';
   renderTransportHistory();
   if (dialog.open) return;
   dialog.showModal();
@@ -3561,12 +3583,14 @@ function renderExtrasHistory() {
   const isCurrent = extrasMonthKey >= monthKey(localDateKey());
   const total = list.reduce((sum, e) => sum + e.amount, 0);
   body.innerHTML = `<div class="month-switch" role="group" aria-label="${escapeHtml(t('Μήνας'))}"><button class="icon-button" type="button" data-action="extras-month" data-delta="-1" aria-label="${escapeHtml(t('Προηγούμενος μήνας'))}">‹</button><strong id="extras-history-month" data-no-i18n>${escapeHtml(monthLabel(extrasMonthKey))}</strong><button class="icon-button" type="button" data-action="extras-month" data-delta="1" aria-label="${escapeHtml(t('Επόμενος μήνας'))}" ${isCurrent ? 'disabled' : ''}>›</button></div>
-    ${list.length ? `<p class="field-hint" id="extras-history-total">${escapeHtml(t('{count} έξοδα · σύνολο {total}', { count: list.length, total: money(Math.round(total * 100) / 100) }))}</p><div class="product-list" id="extras-list">${list.map(renderExtraEntry).join('')}</div>` : `<p class="subtle-empty">${escapeHtml(t('Κανένα μικροέξοδο αυτόν τον μήνα.'))}</p>`}`;
+    ${list.length ? `<p class="field-hint" id="extras-history-total">${escapeHtml(t('{count} έξοδα · σύνολο {total}', { count: list.length, total: money(Math.round(total * 100) / 100) }))}</p>${listSearchField('extras-list', list.length)}<div class="product-list" id="extras-list">${list.map(renderExtraEntry).join('')}</div>` : `<p class="subtle-empty">${escapeHtml(t('Κανένα μικροέξοδο αυτόν τον μήνα.'))}</p>`}`;
   translateDom(body);
+  applyListSearch(body);
 }
 const extrasHistoryDialog = () => document.querySelector('#extras-history-dialog');
 function openExtrasHistory() {
   const dialog = extrasHistoryDialog();
+  if (!dialog?.open) listQueries['extras-list'] = '';
   renderExtrasHistory();
   if (dialog.open) return;
   dialog.showModal();
@@ -3891,7 +3915,7 @@ function renderReceipts() {
   const rows = listReceipts(all, receiptsMonth);
   const total = rows.reduce((s, r) => s + (Number(r.total) || 0), 0);
   const filter = months.length > 1 ? `<div class="segmented receipts-months" role="group" aria-label="${escapeHtml(t('Μήνας'))}"><button type="button" class="filter-chip${receiptsMonth ? '' : ' is-active'}" data-action="receipts-month" data-month="">${escapeHtml(t('Όλοι'))}</button>${months.map((m) => `<button type="button" class="filter-chip${m === receiptsMonth ? ' is-active' : ''}" data-action="receipts-month" data-month="${m}" data-no-i18n>${escapeHtml(monthLabel(m))}</button>`).join('')}</div>` : '';
-  const list = rows.length ? `<ul class="receipts-list" id="receipts-list">${rows.map((r) => `<li><button type="button" class="receipt-row" data-action="receipt-open" data-id="${escapeHtml(r.id)}"><span class="receipt-main"><strong data-no-i18n>${escapeHtml(r.store || t('Απόδειξη'))}</strong><small>${escapeHtml(formatDate(r.date))} · ${escapeHtml(receiptCatText(r))}</small></span><span class="receipt-total" data-no-i18n>${escapeHtml(money(r.total))}</span><span class="arrow" aria-hidden="true">›</span></button></li>`).join('')}</ul>`
+  const list = rows.length ? `${listSearchField('receipts-list', rows.length)}<ul class="receipts-list" id="receipts-list">${rows.map((r) => `<li><button type="button" class="receipt-row" data-action="receipt-open" data-id="${escapeHtml(r.id)}"><span class="receipt-main"><strong data-no-i18n>${escapeHtml(r.store || t('Απόδειξη'))}</strong><small>${escapeHtml(formatDate(r.date))} · ${escapeHtml(receiptCatText(r))}</small></span><span class="receipt-total" data-no-i18n>${escapeHtml(money(r.total))}</span><span class="arrow" aria-hidden="true">›</span></button></li>`).join('')}</ul>`
     : `<p class="subtle-empty">${escapeHtml(t(all.length ? 'Καμία απόδειξη αυτόν τον μήνα.' : 'Δεν έχεις σκανάρει αποδείξεις ακόμα. Πάτα «📷 Σάρωση» και στόχευσε το QR της απόδειξης.'))}</p>`;
   return `${renderHeader('Αποδείξεις', 'Όσες αποδείξεις έχεις σκανάρει, οι πιο πρόσφατες πρώτα.')}
     <div class="settings-actions"><button class="button button-primary" type="button" data-action="menu-receipt">📷 ${escapeHtml(t('Σάρωση απόδειξης'))}</button><button class="button button-quiet" type="button" data-action="receipt-manual" id="receipts-manual">＋ ${escapeHtml(t('Έξοδο με το χέρι'))}</button><button class="button button-quiet" type="button" data-action="receipts-export" id="receipts-export">📄 ${escapeHtml(t('Εξαγωγή PDF'))}</button></div>
@@ -4743,6 +4767,8 @@ document.addEventListener('pointerdown', (event) => {
 }, { passive: true });
 
 document.addEventListener('click', (event) => {
+  const clearSearch = event.target.closest?.('[data-list-search-clear]');
+  if (clearSearch) { const target = clearSearch.dataset.listSearchClear; listQueries[target] = ''; runListSearch(target); document.querySelector(`[data-list-search="${target}"]`)?.focus(); return; }
   const viewButton = event.target.closest('[data-view]');
   if (viewButton) {
     event.preventDefault(); const view = viewButton.dataset.view;
@@ -4768,6 +4794,7 @@ document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && event.target.closest?.('.expcat-new')) { event.preventDefault(); event.stopPropagation(); closeExpCatInline(); }
 });
 document.addEventListener('input', (event) => {
+  if (event.target.dataset?.listSearch) { listQueries[event.target.dataset.listSearch] = event.target.value; runListSearch(event.target.dataset.listSearch); return; }
   if (event.target.id === 'ptype-name') { const e = document.querySelector('#ptype-emoji'); if (e) e.placeholder = suggestTypeEmoji(event.target.value) || PRODUCT_TYPE_DEFAULT_EMOJI; }
   if (event.target.id === 'extras-new-name') { const e = document.querySelector('#extras-new-emoji'); if (e) e.placeholder = suggestEmoji(event.target.value) || EXTRA_DEFAULT_EMOJI; }
   if (event.target.id === 'bill-name' && !event.target.form.dataset.typeTouched) event.target.form.elements.type.value = guessBillType(event.target.value);

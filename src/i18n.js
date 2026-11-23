@@ -202,6 +202,7 @@ const EN = {
   'Καταχώρισε κάτι που έφερες σπίτι': 'Log something you brought home', 'Άνοιξε τη λίστα': 'Open the list', '{pending} για ψώνια': '{pending} to buy',
   // Pantry
   '{count} προϊόν': '{count} product', '{count} προϊόντα': '{count} products',
+  'Δεν βρέθηκε τίποτα': 'Nothing found', '🔍 Αναζήτηση…': '🔍 Search…', 'Αναζήτηση στη λίστα': 'Search the list', 'Καθαρισμός αναζήτησης': 'Clear search',
   'Δεν βρήκα προϊόντα': 'No products found', 'Το απόθεμα είναι άδειο': 'The pantry is empty',
   'Δοκίμασε άλλη αναζήτηση ή κατηγορία.': 'Try another search or category.', 'Πρόσθεσε τα πρώτα προϊόντα που έχεις στο σπίτι.': 'Add the first products you have at home.',
   'Καθαρισμός φίλτρων': 'Clear filters', 'Όσα έχεις στο σπίτι, οργανωμένα σε ένα σημείο.': 'Everything you have at home, organised in one place.',
