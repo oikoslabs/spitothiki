@@ -1289,3 +1289,10 @@ a.menu-item { color: inherit; }
 .receipt-items .price-history-link { margin: 0; flex: 0 0 auto; }
 .inventory-card .price-history-btn { grid-column: 1 / -1; justify-self: start; }
 :root[data-theme="dark"] .price-history-list small, :root:not([data-theme="light"]) .price-history-list small { color: var(--muted); }
+
+/* v1.9.45: search inside long lists (src/list-search.js) */
+.list-search { display: flex; align-items: center; gap: 8px; margin: 8px 0 10px; }
+.list-search .list-search-input { flex: 1 1 auto; min-width: 0; padding-left: 13px; }
+.list-search-clear[hidden], .list-search-empty[hidden], #extras-list > [hidden], #transport-list > [hidden], #receipts-list > [hidden], #shopping-rows > [hidden] { display: none !important; }
+.list-search-empty { margin: 6px 0 10px; }
+.list-search-input::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; display: none; }
