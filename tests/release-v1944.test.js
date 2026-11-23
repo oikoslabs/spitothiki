@@ -1,0 +1,43 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+
+const read = (f) => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
+
+test('v1.9.44 release: version, cache v160, more supermarket and fuel chains in scan counts', () => {
+  assert.match(read('package.json'), /"version": "1\.9\.44"/);
+  assert.equal((read('index.html').match(/data-no-i18n>1\.9\.44</g) || []).length, 2);
+  const html = read('index.html');
+  assert.match(html, /styles\.css\?v=160/);
+  assert.match(html, /src\/app\.js\?v=160/);
+  assert.doesNotMatch(html, /v=160-preview/);
+  const sw = read('sw.js');
+  assert.match(sw, /CACHE_VERSION = 'v160';/);
+  assert.doesNotMatch(sw, /CACHE_VERSION = 'v160-preview'/);
+  assert.match(sw, /styles\.css\?v=160'/);
+  assert.match(sw, /src\/app\.js\?v=160'/);
+  assert.match(sw, /more supermarket and fuel chains/);
+  const store = read('src/receipt-store.js');
+  assert.match(store, /'Market In'/);
+  assert.match(store, /'Discount Markt'/);
+  assert.match(store, /'Thanopoulos'/);
+  assert.match(store, /'Chalkiadakis'/);
+  assert.match(store, /'Synka'/);
+  assert.match(store, /'Promitheftiki'/);
+  assert.match(store, /'Jet Oil'/);
+  assert.match(store, /'Coral'/);
+  assert.match(store, /'Cyclon'/);
+  assert.match(store, /'Silk Oil'/);
+  assert.match(store, /'ETEKA'/);
+  assert.match(store, /'Dracoil'/);
+  assert.match(store, /'Kmoil'/);
+  assert.match(store, /elinoil: 'Elin'/);
+  assert.match(store, /FUEL_STORES/);
+  assert.match(store, /SUPER_STORES/);
+  const app = read('src/app.js');
+  assert.doesNotMatch(app, /Γιάννης /);
+  assert.doesNotMatch(app, /Σκολαρ|Skolarikis/);
+  const smoke = read('tests/smoke/browser-smoke.mjs');
+  assert.match(smoke, /required\.every/);
+  assert.doesNotMatch(smoke, /items\.length === 13/);
+});
