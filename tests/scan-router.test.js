@@ -13,6 +13,8 @@ test('scan anything: routes receipts, bills, products and unknown values', () =>
   assert.equal(routeCode('(01)09506000134352(17)261231').route, 'product');
   assert.equal(routeCode('https://id.gs1.org/01/09506000134352').route, 'product');
   assert.equal(routeCode('052026101416334700835339100998700009').route, 'toll');
+  assert.equal(routeCode('052026112307404501144092800970000006').route, 'toll');
+  assert.deepEqual([routeCode('7289822868460').route, routeCode('7289822868460').barcode], ['product', '7289822868460']);
   assert.deepEqual(routeCode('hello world 42'), { route: 'unknown', raw: 'hello world 42' });
   assert.equal(routeCode('').route, 'unknown');
 });

@@ -53,8 +53,9 @@ test('receipt-QR scanner accepts a valid toll barcode on the first read; other 1
   assert.equal(isStableRead('receipt', '5201234567890', '5201234567890', confident), true);
   assert.equal(isStableRead('receipt', '0520261014', '', confident), false, 'a partial read is not a toll barcode');
   assert.equal(isStableRead('receipt', 'https://e-invoicing.gr/x', '', confident), true);
-  assert.equal(isStableRead('receipt', TOLL, ''), false, 'without the toll check: old two-read rule');
-  assert.equal(isStableRead('product', '5201234567890', ''), true);
+  assert.equal(isStableRead('receipt', TOLL, ''), true, 'a valid toll is first-read even without the caller\'s confident hook');
+  assert.equal(isStableRead('product', '5201234567890', ''), false);
+  assert.equal(isStableRead('product', TOLL, ''), true, 'product mode also accepts a toll on the first read');
 });
 
 test('proxy-first hosts: e-invoicing.gr skips the failing direct read; proxy unreachable → one direct try', async () => {

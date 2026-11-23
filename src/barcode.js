@@ -1,4 +1,5 @@
 import { interpretCode } from './gs1.js';
+import { isUrlCode, parseTollBarcode } from './toll-barcode.js';
 // Barcode scanning (camera) and product lookup through the Open Food Facts API.
 // v1.9.4: self-hosted (same bytes as the CDN file; SRI kept). Fingerprints in vendor/SHA256SUMS.
 const ZXING_URL = new URL('../vendor/zxing-browser-0.1.5/zxing-browser.min.js', import.meta.url).href;
@@ -64,7 +65,7 @@ function loadZxing() {
 const MODE_FORMATS = {
   product: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'data_matrix', 'qr_code'],
   bill: ['code_128', 'itf', 'code_39', 'pdf417', 'qr_code', 'data_matrix'],
-  receipt: ['qr_code', 'code_128', 'itf', 'code_39', 'ean_13', 'pdf417'],
+  receipt: ['qr_code', 'code_128', 'itf', 'code_39', 'pdf417'],
   all: ['qr_code', 'ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'itf', 'code_39', 'data_matrix', 'pdf417']
 };
 // ZXing BarcodeFormat enum values for the same names.
@@ -114,13 +115,21 @@ export function detectorGroups(mode, nativeFormats = []) {
   return [nativeFormats.filter((f) => TWO_D.includes(f)), nativeFormats.filter((f) => !TWO_D.includes(f))].filter((g) => g.length);
 }
 
-// Accept rule for a read: links (and, in «all» mode, anything that routes somewhere) at once;
-// otherwise the same value must come twice in a row from the same decoder (avoids partial 1D reads).
+// Retail 1D product lengths (EAN-8 / UPC-E 6–8, UPC-A 12, EAN-13 13). A dense Code128
+// (toll receipts, 36 digits) can be misread as a valid-checksum EAN-13, so these always
+// need two identical consecutive reads — even when `confident` would accept them.
+export function isEanUpcCode(value) {
+  return /^(?:\d{6,8}|\d{12,13})$/.test(String(value ?? '').trim());
+}
+
+// Accept rule: HTTP(S) links and valid toll barcodes on the first read in every mode;
+// 1D EAN/UPC only after two identical consecutive reads; otherwise receipt/«all» need a
+// repeat (unless `confident`), and product/bill accept other formats at once.
 export function isStableRead(mode, value, previous, confident = null) {
   if (!value) return false;
-  if (mode === 'all') return Boolean(confident?.(value)) || value === previous;
-  // v1.9.39: a code the caller is sure of (a valid toll barcode) is accepted on the first read here too.
-  if (mode === 'receipt') return /^https?:\/\//i.test(value) || Boolean(confident?.(value)) || value === previous;
+  if (isUrlCode(value) || parseTollBarcode(value)) return true;
+  if (isEanUpcCode(value)) return value === previous;
+  if (mode === 'all' || mode === 'receipt') return Boolean(confident?.(value)) || value === previous;
   return true;
 }
 

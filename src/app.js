@@ -1175,6 +1175,10 @@ async function openScanner({ onCode = fillFromBarcode, qr = false, confident = n
       scanTiming = { start: scanStart, readAt: nowMs(), cam: Math.round(nowMs() - scanStart), torch: torch.getAttribute('aria-pressed') === 'true' ? 1 : 0 };
       stopScanner = null;
       dialog.close();
+      // Every scanner mode: a valid toll Code128 goes to Μετακινήσεις, including «📷 Σάρωση»
+      // and the pantry/cart product scanner (not only receipt mode / handleScanned).
+      const toll = parseTollBarcode(code);
+      if (toll) { tollToTransport(toll); return; }
       onCode(code);
     }, { qr, confident, signal: ac.signal, streamPromise,
       // Receipt/«all» scans: a receipt's till barcode (date + till + transaction) is skipped so the QR can be read.

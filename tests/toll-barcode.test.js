@@ -43,3 +43,15 @@ test('toll: last amount and url check', () => {
   assert.equal(lastTollAmount([]), '');
   assert.ok(isUrlCode('https://x.gr/a') && !isUrlCode(REAL));
 });
+
+const TODAY = '052026112307404501144092800970000006'; // printed digits from a Nea Attiki Odos receipt scanned 23/11/2026
+
+test('toll barcode: real 36-digit read from 23/11/2026 (Rupaki morning receipt)', () => {
+  const r = parseTollBarcode(TODAY);
+  assert.deepEqual([r.date, r.time, r.receiptNo, r.prefix, r.id], ['2026-11-23', '07:40:45', '11440928', '05', 'toll:11440928:2026-11-23']);
+  assert.equal(TODAY.length, 36);
+});
+
+test('toll barcode: the ghost EAN-13 from a partial Code128 read is not a toll', () => {
+  assert.equal(parseTollBarcode('7289822868460'), null);
+});

@@ -36,12 +36,13 @@ test('scanner modes enable the right formats', () => {
   assert.equal(scanMode(false), 'product'); assert.equal(scanMode('any'), 'bill'); assert.equal(scanMode(true), 'receipt');
   for (const f of ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128']) assert.ok(scanFormats('product').includes(f), f);
   for (const f of ['code_128', 'itf', 'code_39', 'pdf417', 'qr_code']) assert.ok(scanFormats('bill').includes(f), f);
-  for (const f of ['qr_code', 'code_128', 'itf', 'code_39', 'ean_13', 'pdf417']) assert.ok(scanFormats('receipt').includes(f), f);
-  assert.deepEqual(zxingFormats('receipt'), [11, 4, 8, 2, 7, 10]);
+  for (const f of ['qr_code', 'code_128', 'itf', 'code_39', 'pdf417']) assert.ok(scanFormats('receipt').includes(f), f);
+  assert.ok(!scanFormats('receipt').includes('ean_13'), 'receipt mode does not enable ean_13 (ghost reads of a toll Code128)');
+  assert.deepEqual(zxingFormats('receipt'), [11, 4, 8, 2, 10]);
   assert.deepEqual(zxingFormats('product').slice(0, 5), [7, 6, 14, 15, 4]);
 });
 
-import { SCAN_REGIONS, isStableRead, scanEnginePlan } from '../src/barcode.js';
+import { SCAN_REGIONS, isEanUpcCode, isStableRead, scanEnginePlan } from '../src/barcode.js';
 test('scanner engine plan: ZXing always joins native (some Android detectors never find anything)', () => {
   assert.deepEqual(scanEnginePlan([], false), { native: false, zxingDelayMs: 0 });
   assert.deepEqual(scanEnginePlan(['qr_code'], false), { native: true, zxingDelayMs: 1500 });
@@ -52,14 +53,17 @@ test('scan regions include a tight centre crop for small QRs on A4 receipts, all
   assert.ok(SCAN_REGIONS.some(([, , w, h]) => w <= 0.5 && h <= 0.4));
   for (const [x, y, w, h] of SCAN_REGIONS) { assert.ok(x >= 0 && y >= 0 && x + w <= 1.0001 && y + h <= 1.0001); }
 });
-test('stable reads: links at once in receipt mode, other codes twice; «all» trusts routable values', () => {
+test('stable reads: links at once in receipt mode, other codes twice; «all» trusts routable non-EAN values', () => {
   const link = 'https://e-invoicing.gr/edocuments/ViewInvoice/-1/demo/EN16931';
   assert.equal(isStableRead('receipt', link, ''), true);
   assert.equal(isStableRead('receipt', '0042', ''), false);
   assert.equal(isStableRead('receipt', '0042', '0042'), true);
-  assert.equal(isStableRead('all', '5201234567890', '', () => true), true);
+  assert.equal(isStableRead('all', '5201234567890', '', () => true), false, 'EAN is never first-read, even if confident');
+  assert.equal(isStableRead('all', '5201234567890', '5201234567890', () => true), true);
   assert.equal(isStableRead('all', '1234', '', () => false), false);
-  assert.equal(isStableRead('product', '5201234567890', ''), true);
+  assert.equal(isStableRead('all', 'RF18539007547034', '', () => true), true, 'a confident bill RF code is still first-read');
+  assert.equal(isStableRead('product', '5201234567890', ''), false);
+  assert.equal(isStableRead('product', '5201234567890', '5201234567890'), true);
   assert.equal(isStableRead('product', '', ''), false);
 });
 
