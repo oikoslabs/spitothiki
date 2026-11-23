@@ -377,6 +377,7 @@ body[data-screen="pantry"] .topbar .button-add { display: none; }
 .store-bar .panel-link { margin-left: auto; }
 .store-manager { padding: 12px; margin-bottom: 12px; border: 1px dashed var(--line); border-radius: 14px; }
 .store-form { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 8px; margin-bottom: 8px; }
+.receipt-link-form:has([data-action="receipt-paste-link"]) { grid-template-columns: minmax(0,1fr) auto auto; }
 .aisle-list { display: grid; gap: 6px; padding: 0; margin: 8px 0; list-style: none; }
 .aisle-row { display: grid; grid-template-columns: 28px minmax(0,1fr) auto auto; align-items: center; gap: 6px; }
 .aisle-number { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--green-soft); font-size: calc(12px * var(--text-scale)); font-weight: 700; }

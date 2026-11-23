@@ -3,7 +3,7 @@ import { adoptCamera, decodeImageCodes, lookupBarcode, normalizeBarcode, request
 import { isUrlCode, lastTollAmount, parseTollBarcode, parseTollText, tollAmountFromText } from './toll-barcode.js';
 import { authProviders, firebaseConfig } from './firebase-config.js';
 import { loadState, parseBackup, saveState } from './storage.js';
-import { classifyReceiptUrl, fetchAadeShop, fetchReceipt, findRelatedReceipt, receiptId } from './receipt.js';
+import { classifyReceiptUrl, extractReceiptLink, fetchAadeShop, fetchReceipt, findRelatedReceipt, receiptId, receiptLinkError } from './receipt.js';
 import { ingredientName, isNewRecipe, pantryIngredients, recipeCat, scoreRecipe, suggestBuiltin } from './recipes.js';
 import { WASTE_REASONS, addDays, applyWaste, createStore, createWaste, groupByStore, monthKey, rowCategory, monthlySpending, moveCategory, purchaseFor, shiftMonth, storeOrder, wasteStats } from './features.js';
 import { showSigninCard, shouldShowSigninPrompt, promptSeen, markPromptSeen, countEntries, isSignedOutForPrompt, SIGNIN_PROMPT_KEYS } from './features.js';
@@ -1041,11 +1041,12 @@ async function startSync() {
       },
       onNewHousehold: () => { sourceSignup(); },
       onRemote: (docs, before, me) => { if (notifySettings().listNotify) listNotices.push(shoppingChanges(before?.shopping || [], docs, me)); },
-      onStatus: (status) => { noteSignin(status); syncStatus = status; void refreshOwnerTestFlag(status); if (status.user) requestPersistentStorage(); ensureMyName(); if (activeView === 'settings' || activeView === 'overview' || activeView === 'insights') renderApp(); maybeProtectSheet(); }
+      onStatus: (status) => { noteSignin(status); syncStatus = status; void refreshOwnerTestFlag(status); if (status.user) requestPersistentStorage(); ensureMyName(); if (activeView === 'settings' || activeView === 'overview' || activeView === 'insights') renderApp(); maybeProtectSheet(); takeSharedReceipt(); }
     });
   } catch {
     syncStatus = { state: 'error', message: navigator.onLine === false ? 'Χωρίς σύνδεση: ο συγχρονισμός θα ξεκινήσει όταν επιστρέψει το internet.' : 'Δεν φόρτωσε το Firebase.' };
     if (activeView === 'settings') renderApp();
+    takeSharedReceipt();
   }
 }
 
@@ -1923,6 +1924,45 @@ function openReceiptDialog(target = '') {
   document.querySelector('#receipt-dialog').showModal();
 }
 
+function openReceiptFromText(raw) {
+  const error = receiptLinkError(raw);
+  if (error) {
+    receiptState = { step: 'start', link: String(raw || '').trim(), error: t(error) };
+    renderReceipt();
+    return;
+  }
+  receiptCode(extractReceiptLink(raw));
+}
+
+async function pasteReceiptLink() {
+  try {
+    const text = await navigator.clipboard.readText();
+    openReceiptFromText(text);
+  } catch {
+    showToast(t('Δεν μπόρεσα να διαβάσω το πρόχειρο. Επικόλλησε το λινκ με το χέρι.'));
+  }
+}
+
+let pendingSharedReceipt = null;
+function takeSharedReceipt() {
+  const params = new URLSearchParams(location.search);
+  const fromPath = /\/share-target\/?$/.test(location.pathname);
+  if (params.has('share-target') || fromPath) {
+    const shared = [params.get('url'), params.get('text'), params.get('title')].filter(Boolean).join('\n');
+    if (shared) pendingSharedReceipt = shared;
+    const path = fromPath ? location.pathname.replace(/share-target\/?$/, '') || '/' : location.pathname;
+    history.replaceState(null, '', `${path}${location.hash}`);
+  }
+  if (!pendingSharedReceipt) return;
+  if (!authKnown(syncStatus)) return;
+  const onboard = document.querySelector('#onboard-dialog');
+  if (onboard?.open) { onboard.addEventListener('close', () => takeSharedReceipt(), { once: true }); return; }
+  const text = pendingSharedReceipt;
+  pendingSharedReceipt = null;
+  openReceiptDialog();
+  openReceiptFromText(text);
+}
+
 async function loadReceipt(link, { fromQueue = false } = {}) {
   receiptState = { step: 'loading', link: String(link || '').trim() };
   renderReceipt();
@@ -1958,7 +1998,8 @@ function renderReceiptStart() {
     <p class="field-hint receipt-qr-hint" id="receipt-qr-hint">💡 ${escapeHtml(t('Σκάναρε το QR της απόδειξης, όχι την κάρτα πόντων ή το barcode του ταμείου.'))}</p>
     <div class="settings-actions"><button class="button button-primary" type="button" data-action="receipt-scan">📷 Σάρωση QR</button>${error ? '' : manualButton(false)}</div>
     <p class="field-hint">Χωρίς QR παρόχου (π.χ. ταμειακή με QR της ΑΑΔΕ); Βγάλε φωτογραφία την απόδειξη και θα διαβαστούν τα είδη στη συσκευή σου.</p>${photoButtons()}
-    <form id="receipt-link-form" class="store-form" novalidate><input class="field-input" name="link" type="url" inputmode="url" value="${escapeHtml(link)}" placeholder="https://… (σύνδεσμος απόδειξης)" aria-label="Σύνδεσμος απόδειξης" autocomplete="off"><button class="button button-quiet" type="submit">Άνοιγμα</button></form>
+    <label class="field-label" for="receipt-link-input">🔗 ${escapeHtml(t('Επικόλληση λινκ απόδειξης'))}</label>
+    <form id="receipt-link-form" class="store-form receipt-link-form" novalidate><input class="field-input" id="receipt-link-input" name="link" type="text" inputmode="url" value="${escapeHtml(link)}" placeholder="https://… (σύνδεσμος απόδειξης)" aria-label="${escapeHtml(t('Σύνδεσμος απόδειξης'))}" autocomplete="off">${navigator.clipboard?.readText ? `<button class="button button-quiet" type="button" data-action="receipt-paste-link" id="receipt-paste-link">${escapeHtml(t('Επικόλληση'))}</button>` : ''}<button class="button button-quiet" type="submit">${escapeHtml(t('Άνοιγμα'))}</button></form>
     ${error ? `<div class="receipt-fail" id="receipt-fail"><p class="form-error" id="receipt-error" role="alert">${escapeHtml(error)}</p><p class="field-hint">${escapeHtml(t('Χωρίς απόδειξη ή δεν διαβάζεται; Γράψε απλώς το ποσό:'))}</p><div class="settings-actions">${manualButton(true)}</div></div>` : ''}${receiptState.raw ? `<p class="field-hint" id="receipt-raw-code"><small>${escapeHtml(t('Διαβάστηκε:'))} <code data-no-i18n>${escapeHtml(receiptState.raw)}</code> (${receiptState.raw.length})</small></p>` : ''}
     ${error && canQueue && link ? `<div class="alert-banner" id="receipt-save-later-box"><p>${escapeHtml(t('Χωρίς σύνδεση; Κράτα την απόδειξη και θα ανοίξει μόνη της μόλις επιστρέψει το internet.'))}</p><div class="settings-actions"><button class="button button-primary" type="button" data-action="receipt-save-later" id="receipt-save-later">💾 ${escapeHtml(t('Αποθήκευση για αργότερα'))}</button></div></div>` : ''}
     ${cors && !receiptProxy() ? '<p class="field-hint">Αν δεν ανοίγει, δοκίμασε τη φωτογραφία της απόδειξης.</p>' : ''}`;
@@ -4433,6 +4474,7 @@ function handleAction(button) {
   else if (action === 'open-receipt') openReceiptDialog();
   else if (action === 'close-receipt') document.querySelector('#receipt-dialog').close();
   else if (action === 'receipt-scan') openScanner({ qr: true, onCode: receiptCode, confident: (v) => Boolean(parseTollBarcode(v)) });
+  else if (action === 'receipt-paste-link') pasteReceiptLink();
   else if (action === 'receipt-reset') { receiptState = { step: 'start' }; renderReceipt(); }
   else if (action === 'receipt-manual') { const sheet = document.querySelector('#menu-sheet'); if (sheet?.open) sheet.close(); openManualExpense(); }
   else if (action === 'delete-item') {
@@ -4953,7 +4995,7 @@ document.addEventListener('submit', (event) => {
   }
   if (event.target.id === 'receipt-link-form') {
     event.preventDefault();
-    loadReceipt(event.target.elements.link.value);
+    openReceiptFromText(event.target.elements.link.value);
     return;
   }
   if (event.target.id === 'receipt-manual-form') { event.preventDefault(); if (receiptState.target === 'transport' && receiptState.receipt) { receiptToTransport(); return; } saveManualExpense(event.target); return; }
@@ -5090,6 +5132,7 @@ if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.
 }
 
 takeSharedFile();
+takeSharedReceipt();
 maybeOnboard();
 
 function runDailyChecks() {

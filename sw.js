@@ -84,20 +84,39 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
-  // Web Share Target: a bill PDF/photo shared from another app (Android, installed PWA).
-  if (request.method === 'POST' && url.origin === self.location.origin && url.pathname.endsWith('/share-target')) {
-    event.respondWith((async () => {
-      try {
-        const form = await request.formData();
-        const file = form.getAll('file').find((f) => f && typeof f === 'object' && f.size);
-        if (file) {
-          const cache = await caches.open(SHARE_CACHE);
-          await cache.put('./__shared-file', new Response(file, { headers: { 'content-type': file.type || 'application/octet-stream', 'x-file-name': encodeURIComponent(file.name || 'shared') } }));
-        }
-      } catch {}
-      return Response.redirect('./?share=1#bills', 303);
-    })());
-    return;
+  // Web Share Target: a bill PDF/photo, or a receipt link in text/url, shared from another app (installed PWA / TWA).
+  if (url.origin === self.location.origin && url.pathname.endsWith('/share-target')) {
+    if (request.method === 'GET') {
+      const params = new URLSearchParams(url.search);
+      params.set('share-target', '1');
+      event.respondWith(Response.redirect(`./?${params.toString()}`, 303));
+      return;
+    }
+    if (request.method === 'POST') {
+      event.respondWith((async () => {
+        try {
+          const form = await request.formData();
+          const file = form.getAll('file').find((f) => f && typeof f === 'object' && f.size);
+          if (file) {
+            const cache = await caches.open(SHARE_CACHE);
+            await cache.put('./__shared-file', new Response(file, { headers: { 'content-type': file.type || 'application/octet-stream', 'x-file-name': encodeURIComponent(file.name || 'shared') } }));
+            return Response.redirect('./?share=1#bills', 303);
+          }
+          const clip = (v) => String(v || '').trim().slice(0, 1500);
+          const params = new URLSearchParams();
+          params.set('share-target', '1');
+          const sharedUrl = clip(form.get('url'));
+          const sharedText = clip(form.get('text'));
+          const sharedTitle = clip(form.get('title'));
+          if (sharedUrl) params.set('url', sharedUrl);
+          if (sharedText) params.set('text', sharedText);
+          if (!sharedUrl && !sharedText && sharedTitle) params.set('title', sharedTitle);
+          if (sharedUrl || sharedText || sharedTitle) return Response.redirect(`./?${params.toString()}`, 303);
+        } catch {}
+        return Response.redirect('./?share=1#bills', 303);
+      })());
+      return;
+    }
   }
   // v1.9.4: self-hosted libraries under /vendor/<name>-<version>/ never change: cache-first, on demand
   // (not precached; Tesseract core + language data are ~8 MB and only load when OCR is used).
