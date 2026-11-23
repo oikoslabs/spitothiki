@@ -178,6 +178,50 @@ export function classifyReceiptUrl(input) {
   return { kind: 'provider', url: base, host: url.hostname };
 }
 
+// Pull receipt URLs out of pasted or shared text (e.g. «Δες την απόδειξη: https://…»).
+const URL_IN_TEXT = /https?:\/\/[^\s<>"'\\]+/gi;
+function urlsInText(text) {
+  const out = [];
+  const seen = new Set();
+  for (const match of String(text || '').matchAll(URL_IN_TEXT)) {
+    const href = match[0].replace(/[.,;:!?)\]}>"]+$/g, '');
+    if (!href || seen.has(href)) continue;
+    seen.add(href);
+    out.push(href);
+  }
+  return out;
+}
+
+export function isReceiptLink(input) {
+  const target = classifyReceiptUrl(input);
+  if (target.kind === 'aade') return true;
+  return target.kind === 'provider' && allowedHost(target.host);
+}
+
+export function extractReceiptLink(text) {
+  return urlsInText(text).find(isReceiptLink) || '';
+}
+
+export const RECEIPT_LINK_MESSAGES = {
+  empty: 'Γράψε ή επικόλλησε τον σύνδεσμο της απόδειξης.',
+  missing: 'Δεν βρήκα σύνδεσμο απόδειξης σε αυτό το κείμενο.',
+  insecure: 'Ο σύνδεσμος πρέπει να ξεκινά με https://',
+  invalid: 'Ο σύνδεσμος δεν είναι έγκυρος.',
+  notReceipt: 'Αυτός δεν είναι σύνδεσμος απόδειξης (π.χ. e-invoicing.gr, myDATA ή QR ΑΑΔΕ). Έλεγξε το λινκ ή σκάναρε το QR.'
+};
+
+export function receiptLinkError(text) {
+  const raw = String(text || '').trim();
+  if (!raw) return RECEIPT_LINK_MESSAGES.empty;
+  const urls = urlsInText(raw);
+  if (!urls.length) return RECEIPT_LINK_MESSAGES.missing;
+  if (extractReceiptLink(raw)) return '';
+  const kind = classifyReceiptUrl(urls[0]).kind;
+  if (kind === 'insecure') return RECEIPT_LINK_MESSAGES.insecure;
+  if (kind === 'invalid') return RECEIPT_LINK_MESSAGES.invalid;
+  return RECEIPT_LINK_MESSAGES.notReceipt;
+}
+
 // AADE "TimologioQR" links carry totals in the query string. Cash-register (ΦΗΜ) links
 // (https://www1.aade.gr/tameiakes/myweb/q1.php?SIG=…) pack the total at the end of SIG:
 // 11-char device serial + 8-digit mark + 40-char SHA-1 + amount (Α.1024/2020, e.g. 18.35).
