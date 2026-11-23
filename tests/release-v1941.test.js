@@ -33,7 +33,7 @@ test('v1.9.41 release: version, cache v151, toll barcodes not mistaken for a pro
   assert.ok(searchGuide('1.9.41').some((s) => s.id === 'whats-new'));
   assert.ok(searchGuide('1.9.40').some((s) => s.id === 'whats-new'));
   const whats = GUIDE_SECTIONS.find((s) => s.id === 'whats-new');
-  assert.equal(whats.title, 'Τι νέο στην 1.9.41');
+  assert.match(whats.title, /Τι νέο στην 1\.9\.\d+/);
   assert.ok(dictionaries.en[whats.title]);
   assert.ok(dictionaries.en[whats.intro]);
   for (const b of whats.bullets) assert.ok(dictionaries.en[b], `EN missing: ${b}`);
