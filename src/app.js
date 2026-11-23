@@ -1092,7 +1092,7 @@ function renderSyncCard() {
   const shared = status.householdId && status.user && status.householdId !== status.user.uid;
   const line = status.state === 'error' ? `<p class="form-error" id="sync-status">${escapeHtml(t(AUTH_ERRORS[status.message] || status.message || 'Σφάλμα συγχρονισμού'))}</p>`
     : `<p class="field-hint" id="sync-status">${status.offline ? 'Εκτός σύνδεσης: οι αλλαγές θα σταλούν μόλις επιστρέψει το internet.' : 'Συγχρονισμένο ✓'}</p>`;
-  return `${head}<p>Συνδεδεμένος ως <strong>${escapeHtml(who)}</strong>${shared ? ` · ${escapeHtml(t('μέλος κοινού σπιτιού'))}` : ''}.</p>${line}
+  return `${head}<p>Συνδεδεμένος ως <strong>${escapeHtml(who)}</strong>${shared ? ` · ${escapeHtml(t('μέλος κοινού σπιτιού'))}` : ''}.</p>${line}${renderSyncCounts()}
     <h3 class="settings-sub">Κοινό σπίτι</h3>
     <p>Όσοι είναι στο ίδιο σπίτι βλέπουν και αλλάζουν τα ίδια: απόθεμα, λίστα αγορών, λογαριασμούς και έξοδα. Ό,τι αλλάζει ο ένας, το βλέπει ο άλλος σε λίγα δευτερόλεπτα.</p>
     ${Array.isArray(status.members) && status.members.length ? `<p class="field-hint" id="sync-members">${escapeHtml(t('Μέλη σε αυτό το σπίτι: {n}', { n: status.members.length }))}</p>` : ''}
@@ -1136,6 +1136,32 @@ async function deleteAccountNow() {
   location.reload();
 }
 try { if (sessionStorage.getItem('spitothiki:account-deleted')) { sessionStorage.removeItem('spitothiki:account-deleted'); setTimeout(() => showToast('Ο λογαριασμός σου και τα δεδομένα σου διαγράφηκαν.'), 800); } } catch {}
+
+// v1.9.46: what is still waiting to be uploaded / what the server refused, and the manual check.
+let syncCheckBusy = false;
+function renderSyncCounts() {
+  const pending = sync?.pending?.() || 0;
+  const failed = sync?.failed?.() || 0;
+  const rows = [];
+  if (pending) rows.push(`<p class="field-hint" id="sync-pending">⏳ ${escapeHtml(t(pending === 1 ? '1 αλλαγή σε αναμονή για αποστολή' : '{n} αλλαγές σε αναμονή για αποστολή', { n: pending }))}</p>`);
+  if (failed) rows.push(`<p class="form-error" id="sync-failed">⚠️ ${escapeHtml(t(failed === 1 ? '1 αλλαγή δεν ανέβηκε. Πάτα «Έλεγχος & αποστολή όσων λείπουν».' : '{n} αλλαγές δεν ανέβηκαν. Πάτα «Έλεγχος & αποστολή όσων λείπουν».', { n: failed }))}</p>`);
+  return `${rows.join('')}<div class="settings-actions"><button class="button button-quiet" type="button" data-action="sync-check" id="sync-check"${syncCheckBusy ? ' disabled' : ''}>${escapeHtml(t(syncCheckBusy ? '🔄 Έλεγχος…' : '🔄 Έλεγχος & αποστολή όσων λείπουν'))}</button></div>
+    <p class="field-hint">${escapeHtml(t('Αν μια συσκευή δείχνει κάτι που δεν βλέπεις στην άλλη, πάτα το σε εκείνη που το έχει: ανεβάζει ό,τι λείπει από τον λογαριασμό. Δεν σβήνει τίποτα.'))}</p>`;
+}
+function syncCheckMessage(r) {
+  if (r.waiting) return t('Στάλθηκαν. Περιμένουν επιβεβαίωση από τον server, θα ολοκληρωθεί μόλις υπάρχει internet.');
+  if (r.failed) return t('Ανέβηκαν {sent}. {failed} δεν ανέβηκαν, δοκίμασε ξανά αργότερα.', { sent: Math.max(0, r.missing - r.failed - r.pending), failed: r.failed });
+  if (r.pending) return t('Στάλθηκαν {n}. Μερικές περιμένουν ακόμα, θα ξαναδοκιμάσει μόνο του.', { n: r.missing });
+  if (!r.missing) return t('Όλα είναι ήδη στον λογαριασμό ✓');
+  return t(r.missing === 1 ? 'Ανέβηκε 1 εγγραφή που έλειπε ✓' : 'Ανέβηκαν {n} εγγραφές που έλειπαν ✓', { n: r.missing });
+}
+async function runSyncCheck() {
+  if (syncCheckBusy || !sync?.checkMissing) return;
+  syncCheckBusy = true; if (activeView === 'settings') renderApp();
+  try { showToast(syncCheckMessage(await sync.checkMissing())); }
+  catch (error) { showToast(error?.code === 'not-ready' ? t('Ο συγχρονισμός δεν έχει συνδεθεί ακόμα. Δοκίμασε σε λίγο.') : authMessage(error)); }
+  finally { syncCheckBusy = false; if (activeView === 'settings') renderApp(); }
+}
 
 async function syncAction(fn, success) {
   try { const result = await fn(); if (success) showToast(typeof success === 'function' ? success(result) : success); }
@@ -4573,6 +4599,7 @@ function handleAction(button) {
     state.shopping = state.shopping.filter((entry) => entry.id !== id);
     persist(); renderApp(); showToast('Το προϊόν αφαιρέθηκε από τη λίστα.');
   } else if (action === 'sync-google') syncAction(() => sync.signInWithGoogle({ marketingOptIn: readMarketingCheckbox() }));
+  else if (action === 'sync-check') runSyncCheck();
   else if (action === 'sync-signout') syncAction(() => sync.signOut(), 'Αποσυνδέθηκες. Τα δεδομένα μένουν σε αυτή τη συσκευή.');
   else if (action === 'sync-invite') {
     if (isSignedOutForPrompt(syncStatus)) {
