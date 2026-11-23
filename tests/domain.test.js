@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createPantryItem, createShoppingItem, expiryStatus, pantrySummary, toggleShoppingItem } from '../src/domain.js';
+import { createPantryItem, createShoppingItem, expiryStatus, finishItemToShopping, pantrySummary, toggleShoppingItem } from '../src/domain.js';
 
 test('creates a normalized pantry item with stable defaults', () => {
   const item = createPantryItem({
@@ -156,4 +156,36 @@ test('expiringItems: only expiring/expired, expired first then soonest', async (
   const { expiringItems } = await import('../src/domain.js');
   const items = [{ name: 'a', expiry: '2026-10-24' }, { name: 'b', expiry: '2026-10-10' }, { name: 'c', expiry: '2026-12-01' }, { name: 'd', expiry: '' }, { name: 'e', expiry: '2026-10-18' }, { name: 'f', expiry: '2026-10-15' }];
   assert.deepEqual(expiringItems(items, '2026-10-17').map((i) => i.name), ['b', 'f', 'e', 'a']);
+});
+
+test('finishItemToShopping: sets pantry quantity to 0 and adds a pending list row', () => {
+  const now = '2026-11-21T18:00:00.000Z';
+  const item = createPantryItem({ id: 'p1', name: 'Γάλα', quantity: 2, unit: 'λίτρα', minimum: 2 }, now);
+  const r = finishItemToShopping([item], [], 'p1', now);
+  assert.equal(r.changed, true);
+  assert.equal(r.added, true);
+  assert.equal(r.alreadyOnList, false);
+  assert.equal(r.items[0].quantity, 0);
+  assert.equal(r.items[0].id, 'p1');
+  assert.equal(r.shopping.length, 1);
+  assert.equal(r.shopping[0].name, 'Γάλα');
+  assert.equal(r.shopping[0].quantity, 2);
+  assert.equal(r.shopping[0].itemId, 'p1');
+  assert.equal(r.shopping[0].checked, false);
+});
+
+test('finishItemToShopping: does not duplicate a pending list row and can no-op', () => {
+  const now = '2026-11-21T18:00:00.000Z';
+  const item = createPantryItem({ id: 'p1', name: 'Γάλα', quantity: 1, unit: 'λίτρα', minimum: 1 }, now);
+  const existing = createShoppingItem({ id: 's1', itemId: 'p1', name: 'Γάλα', quantity: 1, unit: 'λίτρα' }, now);
+  const r = finishItemToShopping([item], [existing], 'p1', now);
+  assert.equal(r.added, false);
+  assert.equal(r.alreadyOnList, true);
+  assert.equal(r.shopping.length, 1);
+  assert.equal(r.shopping[0].quantity, 1);
+  assert.equal(r.items[0].quantity, 0);
+  const again = finishItemToShopping(r.items, r.shopping, 'p1', now);
+  assert.equal(again.changed, false);
+  assert.equal(again.shopping.length, 1);
+  assert.equal(again.shopping[0].quantity, 1);
 });
