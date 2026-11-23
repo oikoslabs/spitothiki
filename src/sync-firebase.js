@@ -119,22 +119,39 @@ export async function createFirebaseSync({ config, getState, setState, onStatus,
     return {
       subscribe(onDocs) {
         let first = true;
-        return fs.onSnapshot(records, { includeMetadataChanges: false }, (snapshot) => {
+        let serverSeen = false;
+        let lastOffline = null;
+        // v1.9.45: metadata changes too, to learn when the first answer from the server arrives
+        // (the first one can come from the device cache) and to keep the «offline» note right.
+        const toDoc = (d) => { const data = d.data(); return d.metadata?.hasPendingWrites ? { ...data, pendingWrite: true } : data; };
+        return fs.onSnapshot(records, { includeMetadataChanges: true }, (snapshot) => {
+          const fromCache = Boolean(snapshot.metadata.fromCache);
           const changes = first ? snapshot.docs : snapshot.docChanges().filter((c) => c.type !== 'removed').map((c) => c.doc);
+          const info = { fromCache };
+          if (!fromCache && !serverSeen) {
+            serverSeen = true;
+            info.serverKeys = new Set(snapshot.docs.filter((d) => !d.metadata?.hasPendingWrites).map((d) => { const v = d.data(); return `${v.kind}:${v.id}`; }));
+          }
+          const wasFirst = first;
           first = false;
-          onDocs(changes.map((d) => d.data()));
-          report({ state: 'synced', user, householdId: hid, members, marketingOptIn, offline: snapshot.metadata.fromCache });
+          if (wasFirst || changes.length || info.serverKeys) onDocs(changes.map(toDoc), info);
+          if (wasFirst || changes.length || lastOffline !== fromCache) report({ state: 'synced', user, householdId: hid, members, marketingOptIn, offline: fromCache });
+          lastOffline = fromCache;
         }, (error) => report({ state: 'error', user, householdId: hid, members, marketingOptIn, message: error.code || error.message }));
       },
+      // v1.9.45: resolves only when the server confirmed every batch (offline, Firestore keeps it queued
+      // and the promise waits). A rejected batch rejects, so the engine keeps it in its outbox and retries.
       async write(docs) {
+        const commits = [];
         for (let i = 0; i < docs.length; i += 400) {
           const batch = fs.writeBatch(db);
           for (const doc of docs.slice(i, i + 400)) {
             batch.set(fs.doc(records, `${doc.kind}_${doc.id}`), { kind: doc.kind, id: String(doc.id), data: doc.deleted ? null : doc.data, deleted: Boolean(doc.deleted), ts: doc.ts, by: user?.uid || '' });
           }
-          // Offline: Firestore queues the batch and sends it when back online.
-          batch.commit().catch((error) => report({ state: 'error', user, householdId: hid, members, marketingOptIn, message: error.code || error.message }));
+          commits.push(batch.commit());
         }
+        try { await Promise.all(commits); }
+        catch (error) { report({ state: 'error', user, householdId: hid, members, marketingOptIn, message: error.code || error.message }); throw error; }
       }
     };
   }
@@ -191,11 +208,19 @@ export async function createFirebaseSync({ config, getState, setState, onStatus,
     catch (error) { report({ state: 'error', user, marketingOptIn, message: error.code || error.message }); }
   });
 
+  // v1.9.45: send whatever is still waiting when the internet comes back or the app is opened again.
+  const retrySync = () => { try { engine?.retry(); } catch {} };
+  try {
+    window.addEventListener('online', retrySync);
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') retrySync(); });
+  } catch {}
+
   // Google redirect: checkbox choice was stashed in sessionStorage before leaving the page.
   auth.getRedirectResult(authApi).then((cred) => { if (cred?.user) commitSignupMarketing(cred); }).catch(() => {});
 
   return {
     push: () => engine?.push(),
+    pending: () => engine?.pending() || 0,
     writers: () => engine?.writers || {},
     async signInWithGoogle({ marketingOptIn: optIn = false } = {}) {
       rememberPending(optIn, 'google-signup');
