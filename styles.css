@@ -1272,3 +1272,14 @@ a.menu-item { color: inherit; }
 :root[data-text="xlarge"] .home-month-summary { flex-wrap: wrap; }
 @media (forced-colors: active) { .home-legend-dot { forced-color-adjust: none; } }
 #home-changed .panel-link, #home-month .panel-link { white-space: nowrap; }
+
+/* Last paid prices for a product (from the user's own receipts). */
+.price-history-summary { margin: 0 0 10px; padding: 10px 12px; border-radius: 12px; background: color-mix(in srgb, var(--accent, #2f7d4f) 12%, transparent); font-weight: 700; }
+.price-history-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.price-history-list li { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: baseline; padding: 8px 8px; border-radius: 10px; }
+.price-history-list li.is-cheapest { background: color-mix(in srgb, var(--accent, #2f7d4f) 12%, transparent); font-weight: 700; }
+.price-history-list small { color: var(--muted, #667066); }
+.price-history-link { display: inline-block; margin-top: 2px; font-size: calc(12px * var(--text-scale)); }
+.receipt-items .price-history-link { margin: 0; flex: 0 0 auto; }
+.inventory-card .price-history-btn { grid-column: 1 / -1; justify-self: start; }
+:root[data-theme="dark"] .price-history-list small, :root:not([data-theme="light"]) .price-history-list small { color: var(--muted); }

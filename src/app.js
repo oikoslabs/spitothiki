@@ -22,6 +22,7 @@ import { SHARED, cleanName, memberNames, monthBalance, monthExpenses, payerOf, s
 import { lastScanDate, pushDates, scanNudgeDates, pushSupported, pushSubscription, syncPush, stopPush } from './push.js';
 import { autoListAdds } from './auto-list.js';
 import { comparePrices, listComparison } from './price-compare.js';
+import { productPriceHistory } from './price-history.js';
 import { extractShelfPrice, lastReceiptPrice } from './shelf-price.js';
 import { NOTE_MAX, archiveChecked, cleanNote, createNoticeBatcher, listNoticeText, quickSuggestions, reshop, reshopSource, setRowNote, shoppingChanges } from './shopping-extras.js';
 import { addCartItem, budgetState, createTrip, finishTrip, lastPrice, lineTotal, remainingShopping, removeCartItem, tripForReceipt, updateCartItem } from './cart.js';
@@ -128,6 +129,31 @@ function openCompare(single = '') {
     <p class="field-hint">${escapeHtml(t('Για τις τιμές όλων των αλυσίδων, το κουμπί ανοίγει το επίσημο posokanei.gov.gr (ενδεικτικές τιμές).'))}</p>`;
   translateDom(body);
   document.querySelector('#compare-dialog').showModal();
+}
+
+// ---------- Last paid prices for one product (from saved receipts / purchases / cart prices) ----------
+function priceLabel(entry) {
+  return entry.unit === 'κιλά' ? t('{price} / κιλό', { price: money(entry.price) }) : money(entry.price);
+}
+function openPriceHistory(name = '', barcode = '') {
+  const dialog = document.querySelector('#price-history-dialog');
+  const body = document.querySelector('#price-history-body');
+  const title = document.querySelector('#price-history-title');
+  if (!dialog || !body) return;
+  if (title) title.textContent = t('Τελευταίες τιμές');
+  const r = productPriceHistory(state, { name, barcode }, 10);
+  const storeOf = (s) => s || t('Άγνωστο κατάστημα');
+  const cheapestKey = r.cheapest ? `${r.cheapest.date}|${r.cheapest.store}|${r.cheapest.price}|${r.cheapest.unit}` : '';
+  const rows = r.entries.map((e) => {
+    const key = `${e.date}|${e.store}|${e.price}|${e.unit}`;
+    return `<li class="${key === cheapestKey ? 'is-cheapest' : ''}"><small data-no-i18n>${escapeHtml(formatDate(e.date) || e.date)}</small><span data-no-i18n>${escapeHtml(storeOf(e.store))}</span><strong data-no-i18n>${escapeHtml(priceLabel(e))}</strong></li>`;
+  }).join('');
+  const summary = r.cheapest ? `<p class="price-history-summary" id="price-history-lowest">${escapeHtml(t('Χαμηλότερη τιμή: {price} στο {store}', { price: priceLabel(r.cheapest), store: storeOf(r.cheapest.store) }))}</p>
+    ${r.stores.length > 1 ? `<p class="field-hint" id="price-history-best">${escapeHtml(t('Φθηνότερα στο {store}', { store: storeOf(r.cheapest.store) }))}</p>` : ''}` : '';
+  body.innerHTML = `${name ? `<h3 class="field-label" data-no-i18n>${escapeHtml(name)}</h3>` : ''}
+    ${r.entries.length ? `${summary}<ul class="price-history-list" id="price-history-list">${rows}</ul>` : `<p class="subtle-empty" id="price-history-empty">${escapeHtml(t('Δεν υπάρχουν ακόμα τιμές. Σκάναρε αποδείξεις και θα εμφανιστούν εδώ.'))}</p>`}`;
+  translateDom(body);
+  dialog.showModal();
 }
 
 // ---------- Auto shopping list (out of stock / expired → list, tagged «αυτόματα») ----------
@@ -350,6 +376,7 @@ function renderInventoryCard(item) {
       <button class="icon-button" type="button" data-action="waste-item" data-id="${escapeHtml(item.id)}" aria-label="${escapeHtml(t('Πετάχτηκε: {name}', { name: item.name }))}" title="${escapeHtml(t('Πετάχτηκε: {name}', { name: item.name }))}">🗑</button>
       <button class="icon-button danger" type="button" data-action="delete-item" data-id="${escapeHtml(item.id)}" aria-label="${escapeHtml(t('Διαγραφή {name}', { name: item.name }))}">×</button>
       <button class="button button-quiet small-action" type="button" data-action="add-to-shopping" data-id="${escapeHtml(item.id)}">${escapeHtml(t('Στη λίστα'))}</button>
+      <button class="button button-quiet small-action price-history-btn" type="button" data-action="price-history" data-name="${escapeHtml(item.name)}" data-barcode="${escapeHtml(item.barcode || '')}" aria-label="${escapeHtml(t('Τελευταίες τιμές για {name}', { name: item.name }))}">📈 ${escapeHtml(t('Τελευταίες τιμές'))}</button>
     </div>
     <button class="button button-quiet finish-to-list" type="button" data-action="finish-to-list" data-id="${escapeHtml(item.id)}">${escapeHtml(t('Τελείωσε; Βάλ’ το στη λίστα'))}</button>
   </article>`;
@@ -759,7 +786,7 @@ function renderPantry() {
 }
 
 function renderShoppingRow(item) {
-  return `<div class="shopping-row ${item.checked ? 'checked has-price' : ''}"><input class="shopping-check" type="checkbox" data-action="toggle-shopping" data-id="${escapeHtml(item.id)}" ${item.checked ? 'checked' : ''} aria-label="${escapeHtml(t(item.checked ? 'Ολοκληρώθηκε: {name}' : 'Σημείωση ως αγορασμένο: {name}', { name: item.name }))}"><div><strong class="shopping-row-name">${escapeHtml(item.name)}</strong>${item.auto && !item.checked ? ` <span class="auto-tag">${escapeHtml(t('αυτόματα'))}</span>` : ''}<div class="shopping-row-detail">${escapeHtml(item.quantity)} ${escapeHtml(t(item.unit))}</div>${renderRowNote(item)}</div><span class="shopping-state">${item.checked ? (item.pantryAdded ? 'Μπήκε στο απόθεμα' : 'Μπήκε στο καλάθι') : ''}</span>${item.checked ? renderPriceField(item) : ''}<button class="icon-button danger" type="button" data-action="remove-shopping" data-id="${escapeHtml(item.id)}" aria-label="${escapeHtml(t('Αφαίρεση {name} από τη λίστα', { name: item.name }))}">×</button></div>`;
+  return `<div class="shopping-row ${item.checked ? 'checked has-price' : ''}"><input class="shopping-check" type="checkbox" data-action="toggle-shopping" data-id="${escapeHtml(item.id)}" ${item.checked ? 'checked' : ''} aria-label="${escapeHtml(t(item.checked ? 'Ολοκληρώθηκε: {name}' : 'Σημείωση ως αγορασμένο: {name}', { name: item.name }))}"><div><strong class="shopping-row-name">${escapeHtml(item.name)}</strong>${item.auto && !item.checked ? ` <span class="auto-tag">${escapeHtml(t('αυτόματα'))}</span>` : ''}<div class="shopping-row-detail">${escapeHtml(item.quantity)} ${escapeHtml(t(item.unit))}</div>${renderRowNote(item)}<button class="panel-link price-history-link" type="button" data-action="price-history" data-name="${escapeHtml(item.name)}" aria-label="${escapeHtml(t('Τελευταίες τιμές για {name}', { name: item.name }))}">📈 ${escapeHtml(t('Τελευταίες τιμές'))}</button></div><span class="shopping-state">${item.checked ? (item.pantryAdded ? 'Μπήκε στο απόθεμα' : 'Μπήκε στο καλάθι') : ''}</span>${item.checked ? renderPriceField(item) : ''}<button class="icon-button danger" type="button" data-action="remove-shopping" data-id="${escapeHtml(item.id)}" aria-label="${escapeHtml(t('Αφαίρεση {name} από τη λίστα', { name: item.name }))}">×</button></div>`;
 }
 
 // v1.9.22: note per row (brand/size), visible to whoever shops; ✎ opens a small inline editor.
@@ -3799,7 +3826,7 @@ function openReceiptDetails(id) {
   const rc = expCatOf(r.expenseCategory);
   const itemCat = (it) => { const c = expCatOf(effectiveItemCategory(it.expenseCategory, r.expenseCategory)); return c && c !== rc ? ` · ${expCatLabel(c)}` : ''; };
   dialog.querySelector('#receipt-detail-body').innerHTML = `<p class="field-hint">${escapeHtml(formatDate(r.date))} · ${escapeHtml(receiptCatText(r))} · <strong data-no-i18n>${escapeHtml(money(r.total))}</strong>${rc ? ` · <span id="receipt-expcat" data-no-i18n>${escapeHtml(expCatLabel(rc))}</span>` : ''}</p>
-    ${items.length ? `<ul class="receipt-items" id="receipt-items">${items.map((it) => `<li><span data-no-i18n>${escapeHtml(it.name)}${it.quantity && it.quantity !== 1 ? ` ×${escapeHtml(String(it.quantity))}` : ''}${escapeHtml(itemCat(it))}</span><span data-no-i18n>${it.price ? escapeHtml(money(it.price)) : ''}</span></li>`).join('')}</ul>` : `<p class="subtle-empty">${escapeHtml(t(r.lines ? 'Τα είδη δεν κρατήθηκαν για αυτή την απόδειξη (καταγράφηκε μόνο το σύνολο).' : 'Χωρίς αναλυτικά είδη.'))}</p>`}
+    ${items.length ? `<ul class="receipt-items" id="receipt-items">${items.map((it) => `<li><span data-no-i18n>${escapeHtml(it.name)}${it.quantity && it.quantity !== 1 ? ` ×${escapeHtml(String(it.quantity))}` : ''}${escapeHtml(itemCat(it))}</span><span data-no-i18n>${it.price ? escapeHtml(money(it.price)) : ''}</span><button class="panel-link price-history-link" type="button" data-action="price-history" data-name="${escapeHtml(it.name)}" aria-label="${escapeHtml(t('Τελευταίες τιμές για {name}', { name: it.name }))}">📈</button></li>`).join('')}</ul>` : `<p class="subtle-empty">${escapeHtml(t(r.lines ? 'Τα είδη δεν κρατήθηκαν για αυτή την απόδειξη (καταγράφηκε μόνο το σύνολο).' : 'Χωρίς αναλυτικά είδη.'))}</p>`}
     ${/^https:\/\//i.test(String(r.url || '')) ? `<p><a class="panel-link" href="${escapeHtml(r.url)}" target="_blank" rel="noopener noreferrer" id="receipt-link">${escapeHtml(t('Άνοιγμα ηλεκτρονικής απόδειξης'))} ↗</a></p>` : ''}
     <div class="dialog-actions">${r.format !== 'transport' && looksLikeTransport(r) ? `<button class="button button-primary" type="button" data-action="receipt-move-transport" data-id="${escapeHtml(r.id)}" id="receipt-move-transport">🚗 ${escapeHtml(t('Μεταφορά στις Μετακινήσεις'))}</button>` : ''}<button class="button button-danger" type="button" data-action="receipt-delete" data-id="${escapeHtml(r.id)}">🗑 ${escapeHtml(t('Διαγραφή'))}</button><button class="button button-quiet" type="button" data-action="receipt-edit" data-id="${escapeHtml(r.id)}" id="receipt-edit">✎ ${escapeHtml(t('Διόρθωση'))}</button><button class="button button-quiet" type="button" data-action="receipt-detail-close">${escapeHtml(t('Κλείσιμο'))}</button></div>`;
   translateDom(dialog);
@@ -4495,6 +4522,8 @@ function handleAction(button) {
   else if (action === 'compare-list') openCompare();
   else if (action === 'compare-one') openCompare(button.dataset.name);
   else if (action === 'close-compare') document.querySelector('#compare-dialog').close();
+  else if (action === 'price-history') openPriceHistory(button.dataset.name || '', button.dataset.barcode || '');
+  else if (action === 'close-price-history') document.querySelector('#price-history-dialog')?.close();
   else if (action === 'posokanei') { const name = button.dataset.name || ''; navigator.clipboard?.writeText(name).catch(() => {}); window.open('https://posokanei.gov.gr/', '_blank', 'noopener'); if (name) showToast(t('Αντιγράφηκε «{name}»: επικόλλησέ το στην αναζήτηση.', { name })); }
   else if (action === 'copy-share') copyShareText();
   else if (action === 'close-share') document.querySelector('#share-dialog').close();
