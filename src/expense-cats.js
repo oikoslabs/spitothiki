@@ -110,3 +110,24 @@ export function visibleSpendRows(rows = [], limit = Infinity) {
   const shown = spent.slice(0, limit);
   return { rows: shown, more: spent.length - shown.length };
 }
+
+// Next receipt from the same shop: reuse the last non-default expense category the user picked.
+// Prefer the same issuerVat; if none, the same normalised shop name. No extra stored field.
+export function rememberedExpenseCategory(receipts = [], categories = [], { issuerVat = '', store = '' } = {}) {
+  const known = new Set(expenseCategories(categories).map((c) => c.id));
+  const vat = String(issuerVat || '').trim().replace(/^(EL|el)/, '');
+  const name = foldCat(store);
+  const recency = (r) => String(r.importedAt || r.updatedAt || r.date || '');
+  const picks = (Array.isArray(receipts) ? receipts : [])
+    .filter((r) => r && r.format !== 'transport' && known.has(r.expenseCategory))
+    .sort((a, b) => recency(b).localeCompare(recency(a)));
+  if (vat) {
+    const hit = picks.find((r) => String(r.issuerVat || '').trim().replace(/^(EL|el)/, '') === vat);
+    if (hit) return hit.expenseCategory;
+  }
+  if (name) {
+    const hit = picks.find((r) => foldCat(r.store) === name);
+    if (hit) return hit.expenseCategory;
+  }
+  return '';
+}

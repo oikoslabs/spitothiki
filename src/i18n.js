@@ -999,6 +999,7 @@ const EN = {
   'Σκάναρε οτιδήποτε': 'Scan anything',
   'Απόδειξη, λογαριασμός, διόδια ή προϊόν': 'Receipt, bill, toll or product',
   'Κατηγορία εξόδου': 'Expense category',
+  'Προτάθηκε από την προηγούμενη απόδειξη του ίδιου καταστήματος': 'Suggested from the previous receipt of the same store',
   'Όπως η απόδειξη': 'Same as the receipt',
   'Μικροέξοδα (προεπιλογή)': 'Small expenses (default)',
   'Αγορές (προεπιλογή)': 'Shopping (default)',

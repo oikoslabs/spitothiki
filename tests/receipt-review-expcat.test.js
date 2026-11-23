@@ -9,7 +9,7 @@ test('receipt review (lines and total) offers the same «Κατηγορία εξ
   assert.match(app, /function receiptReviewExpCatFields\(/);
   assert.match(app, /id="review-expcat"/);
   assert.match(app, /id="receipt-review-expcat"/);
-  assert.match(app, /expCatOptions\('', 'receipt'\)/);
+  assert.match(app, /expCatOptions\(suggested, 'receipt'\)/);
   assert.match(app, /expCatHint\('review-expcat-hint'\)/);
   assert.match(app, /function receiptReviewExpCatFields[\s\S]*?expCatInlineRow\(\)/);
   // lines mode: the select sits under «Κατέγραψε τα έξοδα στο Σύνολο εξόδων»
@@ -41,4 +41,14 @@ test('importReceipt stores the chosen expenseCategory on the receipt and its pur
   assert.equal(month.shopping, 80);
   assert.equal(month.rows[0].total, 120);
   assert.equal(month.rows[0].id, 'ec-oil');
+});
+
+test('review and manual forms preselect the remembered store category and show the hint', () => {
+  assert.match(app, /function rememberedCatFor\(/);
+  assert.match(app, /rememberedExpenseCategory\(state\.receipts \|\| \[\], expCats\(\), \{ issuerVat, store \}\)/);
+  assert.match(app, /expCatMemoryHint\('review-expcat-memory', suggested\)/);
+  assert.match(app, /expCatMemoryHint\('manual-expcat-memory', suggested\)/);
+  assert.match(app, /Προτάθηκε από την προηγούμενη απόδειξη του ίδιου καταστήματος/);
+  assert.match(app, /applyExpCatMemory\(document\.querySelector\('#review-expcat'\)/);
+  assert.match(app, /applyExpCatMemory\(event\.target\.form\.elements\.expenseCategory/);
 });
