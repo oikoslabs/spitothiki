@@ -7,15 +7,15 @@ import { dictionaries } from '../src/i18n.js';
 const read = (f) => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
 
 test('v1.9.34 release: version, cache v142, day sheet and typed dots', () => {
-  assert.match(read('package.json'), /"version": "1\.9\.44"/);
-  assert.equal((read('index.html').match(/data-no-i18n>1\.9\.44</g) || []).length, 2);
+  assert.match(read('package.json'), /"version": "1\.9\.45"/);
+  assert.equal((read('index.html').match(/data-no-i18n>1\.9\.45</g) || []).length, 2);
   const html = read('index.html');
-  assert.match(html, /styles\.css\?v=160/);
-  assert.match(html, /src\/app\.js\?v=160/);
+  assert.match(html, /styles\.css\?v=161/);
+  assert.match(html, /src\/app\.js\?v=161/);
   assert.match(html, /id="cal-day-sheet"/);
   const sw = read('sw.js');
-  assert.match(sw, /CACHE_VERSION = 'v160';/);
-  assert.match(sw, /styles\.css\?v=160/);
+  assert.match(sw, /CACHE_VERSION = 'v161';/);
+  assert.match(sw, /styles\.css\?v=161/);
   const app = read('src/app.js');
   assert.match(app, /function openCalDaySheet/);
   assert.match(app, /dayDots\(/);

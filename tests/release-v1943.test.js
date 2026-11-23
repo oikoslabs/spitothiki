@@ -5,17 +5,17 @@ import { readFileSync } from 'node:fs';
 const read = (f) => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
 
 test('v1.9.43 release: version, cache v159, franchise fuel brands classified from full receipt text', () => {
-  assert.match(read('package.json'), /"version": "1\.9\.44"/);
-  assert.equal((read('index.html').match(/data-no-i18n>1\.9\.44</g) || []).length, 2);
+  assert.match(read('package.json'), /"version": "1\.9\.45"/);
+  assert.equal((read('index.html').match(/data-no-i18n>1\.9\.45</g) || []).length, 2);
   const html = read('index.html');
-  assert.match(html, /styles\.css\?v=160/);
-  assert.match(html, /src\/app\.js\?v=160/);
-  assert.doesNotMatch(html, /v=160-preview/);
+  assert.match(html, /styles\.css\?v=161/);
+  assert.match(html, /src\/app\.js\?v=161/);
+  assert.doesNotMatch(html, /v=161-preview/);
   const sw = read('sw.js');
-  assert.match(sw, /CACHE_VERSION = 'v160';/);
-  assert.doesNotMatch(sw, /CACHE_VERSION = 'v160-preview'/);
-  assert.match(sw, /styles\.css\?v=160'/);
-  assert.match(sw, /src\/app\.js\?v=160'/);
+  assert.match(sw, /CACHE_VERSION = 'v161';/);
+  assert.doesNotMatch(sw, /CACHE_VERSION = 'v161-preview'/);
+  assert.match(sw, /styles\.css\?v=161'/);
+  assert.match(sw, /src\/app\.js\?v=161'/);
   assert.match(sw, /franchise fuel brands/);
   const store = read('src/receipt-store.js');
   assert.match(store, /export function receiptClassifyText\(/);
