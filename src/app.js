@@ -32,6 +32,7 @@ import { HOME_KEY, HOME_OPTIONS, DEFAULT_HOME, parseHomeState, serializeHome, to
 import { insightChange, insightShort, insightText, monthInsights, spendSlices } from './month-insights.js';
 import { NOTICE_KEY, activeBudget, budgetReport, createBudget, hasBudget, monthSpend, shouldNotify } from './budget.js';
 import { EPAY_ID, activeEpayTarget, createEpayTarget, epaymentReport, isMarkedCash, paidCashWrite, paymentFromMethods } from './epayment-target.js';
+import { buildExpenseCsv } from './csv-export.js';
 import { NOTICE_KEY as CAL_NOTICE_KEY, PERSON_ALL, RECUR_OPTIONS, buildIcs, calendarEntries, calendarProEnabled, createEvent, dayDots, entriesOn, googleEventUrl, monthBounds, monthGrid, personColor, shortDayMonth, shouldNotify as calendarShouldNotify, weekBounds } from './calendar.js';
 import { createReceiptPdf, periodBoundsForMonth } from './receipt-pdf.js';
 import { GUIDE_SECTIONS, guideHeading, searchGuide, sectionForView } from './guide.js';
@@ -884,6 +885,7 @@ function renderSettings() {
     <section class="panel settings-card" id="auto-list-card"><span class="stat-icon">🛒</span><h2>${escapeHtml(t('Αυτόματη λίστα αγορών'))}</h2><p>${escapeHtml(t('Ό,τι τελειώνει (ποσότητα 0) ή λήγει στο απόθεμα μπαίνει μόνο του στη λίστα, με την ένδειξη «αυτόματα».'))}</p>
       <label class="check-row big-check"><input type="checkbox" id="auto-list-toggle" ${autoListOn() ? 'checked' : ''}> <span>${escapeHtml(t('Ενεργή'))}</span></label></section>
     <section class="panel settings-card"><span class="stat-icon blue">↗</span><h2>Αντίγραφο ασφαλείας</h2><p>Αποθήκευσε όλα τα δεδομένα σου (απόθεμα, λίστες, έξοδα) σε ένα αρχείο, ή φέρε τα πίσω από ένα αρχείο. Με κωδικό, το αρχείο κρυπτογραφείται και δεν διαβάζεται χωρίς αυτόν.</p>${lastBackupLine()}${persistLine()}<div class="settings-actions" id="backup-actions"><button class="button button-primary" type="button" data-action="export-backup">⬇ Εξαγωγή αντιγράφου</button><button class="button button-quiet" type="button" data-action="import-backup">⬆ Εισαγωγή αντιγράφου</button></div>${driveSection()}</section>
+    <section class="panel settings-card" id="csv-export-card"><span class="stat-icon">📊</span><h2>${escapeHtml(t('Εξαγωγή εξόδων (Excel)'))}</h2><p>${escapeHtml(t('Κατέβασε τα έξοδά σου σε αρχείο που ανοίγει στο Excel ή το δίνεις σε κάποιο AI. Μένει στη συσκευή σου, δεν ανεβαίνει πουθενά.'))}</p><div class="settings-actions"><button class="button button-quiet" type="button" data-action="export-expenses" id="settings-export-csv">${escapeHtml(t('📊 Εξαγωγή εξόδων (Excel)'))}</button></div></section>
     <section class="panel settings-card" id="about"><span class="stat-icon">ℹ️</span><h2>${escapeHtml(t('Σχετικά'))}</h2>
       <h3 class="settings-sub">${escapeHtml(t('Ποιοι είμαστε'))}</h3>
       <p>${escapeHtml(t('Η Σπιτοθήκη φτιάχνεται από την Oikos Labs.'))}</p>
@@ -3934,7 +3936,7 @@ function renderInsights() {
   const waste = wasteStats(state.waste || [], insightsMonth);
   const isCurrent = insightsMonth >= monthKey(localDateKey());
   return `${renderHeader('Σύνολο εξόδων', 'Πόσα ξοδεύεις και τι πετιέται, ανά μήνα.')}
-    <div class="settings-actions"><button class="button button-quiet" type="button" data-view="receipts" id="insights-receipts">🧾 ${escapeHtml(t('Αποδείξεις'))} (${(state.receipts || []).length})</button></div>
+    <div class="settings-actions"><button class="button button-quiet" type="button" data-view="receipts" id="insights-receipts">🧾 ${escapeHtml(t('Αποδείξεις'))} (${(state.receipts || []).length})</button><button class="button button-quiet" type="button" data-action="export-expenses" id="insights-export-csv">${escapeHtml(t('📊 Εξαγωγή εξόδων (Excel)'))}</button></div>
     <div class="month-switch" role="group" aria-label="Μήνας"><button class="icon-button" type="button" data-action="insights-month" data-delta="-1" aria-label="Προηγούμενος μήνας">‹</button><strong id="insights-month" data-no-i18n>${escapeHtml(monthLabel(insightsMonth))}</strong><button class="icon-button" type="button" data-action="insights-month" data-delta="1" aria-label="Επόμενος μήνας" ${isCurrent ? 'disabled' : ''}>›</button></div>
     <div class="settings-grid insights-grid">${renderMonthTotals(spending)}${renderEpayCard()}${renderBudgetCard()}${renderWhoPaid()}
     <section class="panel settings-card" id="spending-card"><span class="stat-icon blue">€</span><h2>${escapeHtml(t('Αγορές ανά είδος προϊόντος'))}</h2>
@@ -4130,6 +4132,43 @@ async function downloadBackup() {
   URL.revokeObjectURL(url);
   markDone();
   showToast(pass ? 'Το κρυπτογραφημένο αντίγραφο κατέβηκε.' : 'Το αντίγραφο ασφαλείας κατέβηκε.');
+}
+
+function openExpenseExport() {
+  showChoice({
+    title: 'Εξαγωγή εξόδων (Excel)',
+    eyebrow: 'ΕΞΟΔΑ',
+    message: t('Διάλεξε περίοδο. Το αρχείο μένει στη συσκευή σου και δεν ανεβαίνει πουθενά.'),
+    choices: [
+      { label: 'Αυτός ο μήνας', primary: true, run: () => downloadExpenseCsv('month') },
+      { label: 'Αυτή η χρονιά', run: () => downloadExpenseCsv('year') },
+      { label: 'Όλα', run: () => downloadExpenseCsv('all') }
+    ]
+  });
+}
+
+async function downloadExpenseCsv(period) {
+  let built;
+  try { built = buildExpenseCsv(state, { period, today: localDateKey(), translate: t }); }
+  catch (error) { showToast(error.message || t('Δεν ήταν δυνατή η δημιουργία του αρχείου.')); return; }
+  if (!built.count) { showToast(t('Δεν υπάρχουν έξοδα σε αυτή την περίοδο.')); return; }
+  const blob = new Blob([built.csv], { type: 'text/csv;charset=utf-8' });
+  const name = built.filename;
+  const file = typeof File === 'function' ? new File([blob], name, { type: blob.type }) : null;
+  if (file && /Android/i.test(navigator.userAgent) && navigator.canShare?.({ files: [file] })) {
+    try { await navigator.share({ files: [file], title: t('Εξαγωγή εξόδων (Excel)') }); showToast(t('Το αρχείο εξόδων στάλθηκε.')); return; }
+    catch (error) { if (error?.name === 'AbortError') return; }
+  }
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = name;
+  link.rel = 'noopener';
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+  showToast(t('Το αρχείο εξόδων κατέβηκε.'));
 }
 
 async function importBackupText(text) {
@@ -4679,6 +4718,7 @@ function handleAction(button) {
   } else if (action === 'focus-shopping') {
     document.querySelector('#shopping-form input[name="name"]')?.focus();
   } else if (action === 'export-backup') downloadBackup();
+  else if (action === 'export-expenses') openExpenseExport();
   else if (action === 'import-backup') backupFile.click();
   else if (action === 'drive-connect') driveConnect();
   else if (action === 'drive-backup') driveBackupNow();
