@@ -31,7 +31,7 @@ test('v1.9.45 release: version, cache v161, list search, reliable sync, updated 
   assert.match(fb, /visibilitychange/);
   assert.match(fb, /await Promise\.all\(commits\)/);
   const whats = GUIDE_SECTIONS.find((s) => s.id === 'whats-new');
-  assert.equal(whats.title, 'Τι νέο στην 1.9.45');
+  assert.equal(whats.title, 'Τι νέο στην 1.9.46');
   assert.match(whats.bullets.join('\n'), /🔍 Αναζήτηση…/);
   assert.match(whats.bullets.join('\n'), /συγχρονισμός/);
 });

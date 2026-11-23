@@ -266,3 +266,89 @@ test('v1.9.45: a failed deletion is retried and reaches the server', async () =>
   assert.equal(backend.server.get('transport:x').deleted, true);
   assert.equal(d.engine.pending(), 0);
 });
+
+// v1.9.46: unconfirmed cached copies, one bad record, the manual «Έλεγχος & αποστολή όσων λείπουν».
+function refusingBackend(serverDocs = [], refuse = () => false) {
+  const backend = manualBackend(serverDocs);
+  const plain = backend.write;
+  backend.write = (docs) => {
+    if (docs.some(refuse)) { backend.writes.push(docs.map((d) => `${d.kind}:${d.id}`)); return Promise.reject(Object.assign(new Error('refused'), { code: 'invalid-argument' })); }
+    return plain(docs);
+  };
+  return backend;
+}
+
+test('v1.9.46: a cached copy the server never confirmed is uploaded again on the server answer', async () => {
+  const backend = manualBackend([{ kind: 'extras', id: 'ok', data: { id: 'ok', amount: 1 }, deleted: false, ts: 5 }]);
+  const taxi = { id: 'taxi', amount: 9, date: '2026-11-10' };
+  const state = { items: [], shopping: [], extras: [{ id: 'ok', amount: 1 }, taxi] };
+  const d = engineOn(backend, state, { meta: { snapshot: structuredClone(state), times: { 'extras:ok': 5, 'extras:taxi': 6 } } });
+  d.engine.start();
+  await d.engine.receive([...backend.serverDocs(), { kind: 'extras', id: 'taxi', data: taxi, deleted: false, ts: 6, pendingWrite: true }], { fromCache: true });
+  assert.deepEqual(backend.writes, [], 'nothing sent on cache data');
+  await d.engine.receive([], { fromCache: false, serverKeys: new Set(['extras:ok']) });
+  assert.deepEqual(backend.writes, [['extras:taxi']]);
+  assert.equal(backend.server.get('extras:taxi').data.amount, 9);
+  assert.equal(d.engine.pending(), 0);
+});
+
+test('v1.9.46: one record the server refuses does not hold back the others', async () => {
+  const backend = refusingBackend([], (doc) => doc.id === 'bad');
+  const d = engineOn(backend, { items: [], shopping: [], extras: [] });
+  d.engine.start(); await d.engine.receive([], { fromCache: false });
+  await d.set({ ...d.state, extras: [{ id: 'a', amount: 1 }, { id: 'bad', amount: 2 }, { id: 'b', amount: 3 }] });
+  assert.ok(backend.server.has('extras:a') && backend.server.has('extras:b'), 'the good ones arrive');
+  assert.equal(backend.server.has('extras:bad'), false);
+  assert.equal(d.engine.pending(), 0);
+  assert.equal(d.engine.failedCount(), 1);
+  assert.equal(d.box.meta.failed['extras:bad'].code, 'invalid-argument', 'kept with its reason');
+  assert.equal(d.timers.length, 0, 'no endless retry for a refused record');
+  await d.set({ ...d.state, extras: [{ id: 'c', amount: 4 }, ...d.state.extras] });
+  assert.ok(backend.server.has('extras:c'), 'later changes still go through');
+});
+
+test('v1.9.46: data Firestore cannot store is set aside without sending it', async () => {
+  const backend = manualBackend();
+  const d = engineOn(backend, { items: [], shopping: [], extras: [] });
+  d.engine.start(); await d.engine.receive([], { fromCache: false });
+  await d.set({ ...d.state, extras: [{ id: 'nested', rows: [[1, 2]] }, { id: 'fine', amount: 1 }] });
+  assert.deepEqual(backend.writes, [['extras:fine']]);
+  assert.equal(d.engine.failedCount(), 1);
+});
+
+test('v1.9.46: «Έλεγχος & αποστολή όσων λείπουν» uploads only what the server lacks and deletes nothing', async () => {
+  const backend = manualBackend();
+  const d = engineOn(backend, { items: [], shopping: [], extras: [{ id: 'there', amount: 1 }, { id: 'gone', amount: 2 }, { id: 'taxi', amount: 7.5 }] });
+  d.engine.start(); await d.engine.receive([], { fromCache: false });
+  assert.equal(backend.server.size, 3);
+  // Out of sight of this device: the server lost «taxi», another device deleted «gone» and added «other-device».
+  backend.server.delete('extras:taxi');
+  backend.server.set('extras:gone', { kind: 'extras', id: 'gone', data: null, deleted: true, ts: 9999 });
+  backend.server.set('extras:other-device', { kind: 'extras', id: 'other-device', data: { id: 'other-device', amount: 8 }, deleted: false, ts: 9999 });
+  backend.writes.length = 0;
+  const result = await d.engine.uploadMissing(new Set(backend.server.keys()));
+  assert.deepEqual(backend.writes, [['extras:taxi']], 'only the missing one');
+  assert.equal(result.missing, 1);
+  assert.equal(backend.server.get('extras:taxi').data.amount, 7.5);
+  assert.equal(backend.server.get('extras:gone').deleted, true, 'a deleted record is not brought back');
+  assert.equal(backend.server.get('extras:other-device').deleted, false, 'nothing is deleted on the server');
+  const again = await d.engine.uploadMissing(new Set(backend.server.keys()));
+  assert.equal(again.missing, 0);
+  assert.equal(backend.writes.length, 1);
+});
+
+test('v1.9.46: the manual check tries refused records again', async () => {
+  let refuse = true;
+  const backend = refusingBackend([], (doc) => refuse && doc.id === 'bad');
+  const counts = [];
+  const d = engineOn(backend, { items: [], shopping: [], extras: [] });
+  d.engine.onCounts = (c) => counts.push(`${c.pending}/${c.failed}`);
+  d.engine.start(); await d.engine.receive([], { fromCache: false });
+  await d.set({ ...d.state, extras: [{ id: 'bad', amount: 2 }] });
+  assert.equal(d.engine.failedCount(), 1);
+  refuse = false;
+  const result = await d.engine.uploadMissing(new Set(backend.server.keys()));
+  assert.equal(result.failed, 0);
+  assert.ok(backend.server.has('extras:bad'));
+  assert.ok(counts.includes('0/1') && counts.at(-1) === '0/0', 'the Settings card hears about the counts');
+});

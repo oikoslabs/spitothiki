@@ -48,7 +48,7 @@ test('v1.9.42 release: version, cache v158, prices, e-payments, link import, CSV
   assert.ok(searchGuide('1.9.42').some((s) => s.id === 'whats-new'));
   assert.ok(searchGuide('1.9.41').some((s) => s.id === 'whats-new'));
   const whats = GUIDE_SECTIONS.find((s) => s.id === 'whats-new');
-  assert.equal(whats.title, 'Τι νέο στην 1.9.45');
+  assert.equal(whats.title, 'Τι νέο στην 1.9.46');
   assert.ok(dictionaries.en[whats.title]);
   assert.ok(dictionaries.en[whats.intro]);
   for (const b of whats.bullets) assert.ok(dictionaries.en[b], `EN missing: ${b}`);

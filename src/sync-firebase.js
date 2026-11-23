@@ -177,7 +177,9 @@ export async function createFirebaseSync({ config, getState, setState, onStatus,
     engine?.stop();
     householdId = hid;
     engine = new SyncEngine({ backend: backendFor(hid), getState, setState, store: metaStore(hid), uid: () => user?.uid || '',
-      onRemote: onRemote ? (docs, before) => onRemote(docs, before, user?.uid || '') : null });
+      onRemote: onRemote ? (docs, before) => onRemote(docs, before, user?.uid || '') : null,
+      // v1.9.46: «N σε αναμονή / M δεν ανέβηκαν» in the Settings card follows the outbox.
+      onCounts: () => { if (lastStatus.user && lastStatus.householdId === hid) report({ ...lastStatus }); } });
     engine.start();
     // v1.7.0: household members (read only; a failure just hides «Ποιος πλήρωσε τι»).
     stopMembers?.(); members = [];
@@ -221,6 +223,20 @@ export async function createFirebaseSync({ config, getState, setState, onStatus,
   return {
     push: () => engine?.push(),
     pending: () => engine?.pending() || 0,
+    failed: () => engine?.failedCount() || 0,
+    // v1.9.46: «🔄 Έλεγχος & αποστολή όσων λείπουν». Reads the record list straight from the server (one read
+    // per record) and uploads what this device has but the server lacks. Never deletes anything.
+    async checkMissing({ timeoutMs = 20000 } = {}) {
+      if (!user || !householdId || !engine?.ready) throw Object.assign(new Error('not-ready'), { code: 'not-ready' });
+      const current = engine;
+      const snap = await fs.getDocsFromServer(fs.collection(db, 'households', householdId, 'records'));
+      const serverKeys = new Set(snap.docs.map((d) => { const v = d.data(); return `${v.kind}:${v.id}`; }));
+      let timer = null;
+      const waited = new Promise((resolve) => { timer = setTimeout(() => resolve(null), timeoutMs); });
+      const result = await Promise.race([current.uploadMissing(serverKeys), waited]);
+      clearTimeout(timer);
+      return result ? { ...result, waiting: false } : { missing: -1, pending: current.pending(), failed: current.failedCount(), waiting: true };
+    },
     writers: () => engine?.writers || {},
     async signInWithGoogle({ marketingOptIn: optIn = false } = {}) {
       rememberPending(optIn, 'google-signup');
