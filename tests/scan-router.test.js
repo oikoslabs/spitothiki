@@ -32,3 +32,13 @@ test('till barcode on a retail receipt (date + till + transaction) is recognised
   assert.equal(routeCode('20251231').route === 'store-receipt', false);
   assert.equal(routeCode('https://e-invoicing.gr/edocuments/ViewInvoice/-1/demo/EN16931').route, 'receipt');
 });
+
+test('EYDAP payment barcode routes to a bill, not a shop till receipt', () => {
+  const r = routeCode('|2027031510472836|0000036400|10021|42|');
+  assert.equal(r.route, 'bill');
+  assert.deepEqual([r.bill.kind, r.bill.amount, r.bill.due, r.bill.name], ['eydap', 36.4, '2027-03-15', 'ΕΥΔΑΠ']);
+  const compact = routeCode('202703151047283600000364001002142');
+  assert.equal(compact.route, 'bill');
+  // A failed checksum is not an EYDAP bill (and 33 digits is too long to be a till barcode).
+  assert.equal(routeCode('202703151047283600000364011002142').route, 'unknown');
+});

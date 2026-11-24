@@ -10,12 +10,12 @@ test('v1.9.46 release: version, cache v162, sync check button, counts, sturdier 
   assert.match(read('package.json'), /"version": "1\.9\.48"/);
   assert.equal((read('index.html').match(/data-no-i18n>1\.9\.48</g) || []).length, 2);
   const html = read('index.html');
-  assert.match(html, /styles\.css\?v=165/);
-  assert.match(html, /src\/app\.js\?v=165/);
-  assert.doesNotMatch(html, /v=165-preview/);
+  assert.match(html, /styles\.css\?v=166/);
+  assert.match(html, /src\/app\.js\?v=166/);
+  assert.doesNotMatch(html, /v=166-preview/);
   const sw = read('sw.js');
-  assert.match(sw, /CACHE_VERSION = 'v165';/);
-  assert.match(sw, /src\/app\.js\?v=165'/);
+  assert.match(sw, /CACHE_VERSION = 'v166';/);
+  assert.match(sw, /src\/app\.js\?v=166'/);
   const app = read('src/app.js');
   assert.match(app, /data-action="sync-check"/);
   assert.match(app, /action === 'sync-check'/);

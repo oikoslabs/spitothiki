@@ -3805,11 +3805,14 @@ function applyBillCode(code) {
   const form = document.querySelector('#bill-form');
   const status = document.querySelector('#bill-scan-status');
   const parsed = parseBillCode(code);
-  if (!parsed || (!parsed.reference && !parsed.amount)) { status.textContent = t('Ο κωδικός δεν αναγνωρίστηκε. Συμπλήρωσε τα στοιχεία με το χέρι.'); return; }
+  if (!parsed || (!parsed.reference && !parsed.amount && !parsed.due)) { status.textContent = t('Ο κωδικός δεν αναγνωρίστηκε. Συμπλήρωσε τα στοιχεία με το χέρι.'); return; }
   if (parsed.reference) form.elements.reference.value = parsed.reference;
   if (parsed.amount) form.elements.amount.value = parsed.amount;
-  if (parsed.name && !form.elements.name.value) { form.elements.name.value = parsed.name; if (!form.dataset.typeTouched) form.elements.type.value = guessBillType(parsed.name); }
-  status.textContent = parsed.kind === 'epc' ? t('Βρέθηκε QR πληρωμής: συμπληρώθηκαν δικαιούχος, ποσό και κωδικός πληρωμής.')
+  if (parsed.due) form.elements.due.value = parsed.due;
+  if (parsed.name && !form.elements.name.value) { form.elements.name.value = parsed.name; if (!form.dataset.typeTouched) form.elements.type.value = parsed.type || guessBillType(parsed.name); }
+  if (parsed.kind === 'eydap' && !form.elements.billId.value) { form.elements.type.value = 'water'; form.elements.period.value = '4'; form.dataset.typeTouched = '1'; }
+  status.textContent = parsed.kind === 'eydap' ? t('Βρέθηκε barcode ΕΥΔΑΠ: συμπληρώθηκαν πάροχος, ποσό, λήξη και κωδικός πληρωμής.')
+    : parsed.kind === 'epc' ? t('Βρέθηκε QR πληρωμής: συμπληρώθηκαν δικαιούχος, ποσό και κωδικός πληρωμής.')
     : parsed.rfValid ? t('Βρέθηκε έγκυρος κωδικός πληρωμής.')
     : parsed.kind === 'rf' ? t('Βρέθηκε κωδικός πληρωμής, αλλά φαίνεται λάθος. Έλεγξέ τον με τον λογαριασμό.')
     : t('Ο κωδικός αποθηκεύτηκε ως αναφορά πληρωμής. Συμπλήρωσε ποσό και λήξη.');

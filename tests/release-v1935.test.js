@@ -10,13 +10,13 @@ test('v1.9.35 release: version, cache v143, sign-in benefits and once-only promp
   assert.match(read('package.json'), /"version": "1\.9\.48"/);
   assert.equal((read('index.html').match(/data-no-i18n>1\.9\.48</g) || []).length, 2);
   const html = read('index.html');
-  assert.match(html, /styles\.css\?v=165/);
-  assert.match(html, /src\/app\.js\?v=165/);
+  assert.match(html, /styles\.css\?v=166/);
+  assert.match(html, /src\/app\.js\?v=166/);
   const sw = read('sw.js');
-  assert.match(sw, /CACHE_VERSION = 'v165';/);
+  assert.match(sw, /CACHE_VERSION = 'v166';/);
   assert.doesNotMatch(sw, /CACHE_VERSION = 'v142-preview'/);
-  assert.match(sw, /styles\.css\?v=165/);
-  assert.match(sw, /src\/app\.js\?v=165/);
+  assert.match(sw, /styles\.css\?v=166/);
+  assert.match(sw, /src\/app\.js\?v=166/);
   const app = read('src/app.js');
   assert.match(app, /signin-benefits/);
   assert.match(app, /function offerSigninPrompt/);

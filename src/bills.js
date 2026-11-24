@@ -171,8 +171,73 @@ export function validRf(code) {
   return rem === 1;
 }
 
-// Scanned text -> what we can prefill. Understands EPC/SEPA QR ("BCD"), RF references anywhere in the text,
-// and otherwise keeps a long numeric barcode as the payment reference.
+// EYDAP payment-slip barcode (Code 128). Fields: 16-digit due date (YYYYMMDD) + id, 10-digit
+// amount (9-digit cents + Luhn check), a short tail. Printed as |…|…|…|…| or OCR'd as
+// >YYYYMMDD########< 00000CCCCC< #####< ##>. A failed Luhn or invalid date is rejected.
+const EYDAP_FIELDS = /(?:^|[>|])(\d{16})(?:[|<]\s*|\s+)(\d{10})(?:[|<]\s*|\s+)(\d{4,6})(?:[|<]\s*|\s+)(\d{2})(?:[|<]|$)/;
+
+function validYmd(s) {
+  if (!/^20\d{6}$/.test(s)) return '';
+  const y = Number(s.slice(0, 4)), mo = Number(s.slice(4, 6)), d = Number(s.slice(6, 8));
+  if (y < 2020 || y > 2035) return '';
+  const dt = new Date(Date.UTC(y, mo - 1, d));
+  if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== mo - 1 || dt.getUTCDate() !== d) return '';
+  return `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`;
+}
+
+function luhnOk(digits) {
+  const s = String(digits || '');
+  if (!/^\d{2,}$/.test(s)) return false;
+  let sum = 0;
+  for (let i = 0; i < s.length; i++) {
+    let n = Number(s[s.length - 1 - i]);
+    if (i % 2 === 1) { n *= 2; if (n > 9) n -= 9; }
+    sum += n;
+  }
+  return sum % 10 === 0;
+}
+
+function eydapFields(pay16, amount10) {
+  const due = validYmd(String(pay16).slice(0, 8));
+  if (!due || !/^\d{10}$/.test(amount10) || !luhnOk(amount10)) return null;
+  const cents = Number(amount10.slice(0, 9));
+  if (cents <= 0 || cents > 10_000_000) return null;
+  return { kind: 'eydap', name: 'ΕΥΔΑΠ', type: 'water', amount: cents / 100, due, reference: pay16, rfValid: false };
+}
+
+function looksLikeEydap(text) {
+  const spaced = String(text || '').replace(/[OΟoο]/g, '0');
+  if (EYDAP_FIELDS.test(spaced.toUpperCase())) return true;
+  const digits = spaced.replace(/\D/g, '');
+  return digits.length === 33 && Boolean(validYmd(digits.slice(0, 8)));
+}
+
+export function parseEydapBarcode(text) {
+  const raw = String(text || '').trim();
+  if (!raw) return null;
+  const spaced = raw.replace(/[OΟoο]/g, '0');
+  const m = spaced.toUpperCase().match(EYDAP_FIELDS);
+  if (m) return eydapFields(m[1], m[2]);
+  const digits = spaced.replace(/\D/g, '');
+  // Compact 33-digit slip: 16 (date+id) + 10 (amount+Luhn) + 5 + 2.
+  if (digits.length === 33) return eydapFields(digits.slice(0, 16), digits.slice(16, 26));
+  return null;
+}
+
+export function findEydapCode(text) {
+  const raw = String(text || '');
+  const direct = parseEydapBarcode(raw);
+  if (direct) return direct;
+  for (const line of raw.split(/\r?\n/)) {
+    const parsed = parseEydapBarcode(line.trim());
+    if (parsed) return parsed;
+  }
+  const m = raw.replace(/[OΟoο]/g, '0').toUpperCase().match(EYDAP_FIELDS);
+  return m ? eydapFields(m[1], m[2]) : null;
+}
+
+// Scanned text -> what we can prefill. Understands EPC/SEPA QR ("BCD"), RF references, EYDAP
+// payment barcodes, and otherwise keeps a long numeric barcode as the payment reference.
 export function parseBillCode(text) {
   const raw = String(text || '').trim();
   if (!raw) return null;
@@ -189,6 +254,10 @@ export function parseBillCode(text) {
     for (let len = rf[0].length; len >= 5; len--) { const candidate = rf[0].slice(0, len); if (validRf(candidate)) return { kind: 'rf', reference: candidate, rfValid: true, amount: null, name: '' }; }
     return { kind: 'rf', reference: rf[0], rfValid: false, amount: null, name: '' };
   }
+  const eydap = parseEydapBarcode(raw);
+  if (eydap) return eydap;
+  // Looks like an EYDAP slip but the checksum or date failed: do not keep a misleading reference.
+  if (looksLikeEydap(raw)) return null;
   if (/^\d{10,40}$/.test(compact)) return { kind: 'barcode', reference: compact, rfValid: false, amount: null, name: '' };
   if (/^https?:\/\//i.test(raw)) return { kind: 'url', reference: '', url: raw, amount: null, name: '' };
   return { kind: 'text', reference: compact.slice(0, 40), rfValid: false, amount: null, name: '' };

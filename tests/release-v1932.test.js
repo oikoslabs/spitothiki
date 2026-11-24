@@ -8,7 +8,7 @@ test('v1.9.32 release: version, cache bump, owner flag hardening and deferred SW
   assert.match(read('package.json'), /"version": "1\.9\.48"/);
   assert.equal((read('index.html').match(/data-no-i18n>1\.9\.48</g) || []).length, 2);
   const sw = read('sw.js');
-  assert.match(sw, /CACHE_VERSION = 'v165';/);
+  assert.match(sw, /CACHE_VERSION = 'v166';/);
   const app = read('src/app.js');
   assert.match(app, /reloadWhenIdle/);
   assert.match(app, /addEventListener\('close'/);

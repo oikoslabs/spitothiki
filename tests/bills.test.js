@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyAutoPay, addMonths, billStats, billsDue, createBill, guessBillType, parseBillCode, payBill, unpaidBills, unpayBill, validRf } from '../src/bills.js';
+import { applyAutoPay, addMonths, billStats, billsDue, createBill, findEydapCode, guessBillType, parseBillCode, parseEydapBarcode, payBill, unpaidBills, unpayBill, validRf } from '../src/bills.js';
 
 const now = '2026-10-18T10:00:00.000Z';
 
@@ -71,7 +71,16 @@ test('bills: RF references, EPC QR and barcodes', () => {
   assert.deepEqual([epc.kind, epc.name, epc.amount, epc.reference, epc.rfValid], ['epc', 'ΕΤΑΙΡΕΙΑ ΥΔΡΕΥΣΗΣ', 31.4, 'RF18539007547034', true]);
   assert.equal(parseBillCode('123456789012345678').kind, 'barcode');
   assert.equal(parseBillCode(''), null);
+  const slip = '|2027031510472836|0000036400|10021|42|';
+  const eydap = parseBillCode(slip);
+  assert.deepEqual([eydap.kind, eydap.name, eydap.type, eydap.amount, eydap.due, eydap.reference], ['eydap', 'ΕΥΔΑΠ', 'water', 36.4, '2027-03-15', '2027031510472836']);
+  assert.deepEqual(parseEydapBarcode('>2027031510472836< 0000036400< 10021< 42>'), eydap);
+  assert.deepEqual(parseBillCode('202703151047283600000364001002142').kind, 'eydap');
+  assert.equal(parseEydapBarcode('|2027031510472836|0000036401|10021|42|'), null);
+  assert.equal(parseEydapBarcode('|2027131510472836|0000036400|10021|42|'), null); // invalid date
+  assert.equal(findEydapCode('foo\n>2027031510472836< 0000036400< 10021< 42>\nbar').amount, 36.4);
 });
+
 
 test('bills: unpaid order and paid history grouping, filters, paging', async () => {
   const { unpaidBills, paidHistory } = await import('../src/bills.js');

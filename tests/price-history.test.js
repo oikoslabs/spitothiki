@@ -109,6 +109,6 @@ test('UI hooks: pantry, shopping list, receipt line, dialog, no Pro gate, cached
   assert.match(html, /id="price-history-dialog"/);
   assert.match(i18n, /PRICE_HISTORY_EN/);
   assert.match(sw, /src\/price-history\.js/);
-  assert.match(sw, /CACHE_VERSION = 'v165'/);
+  assert.match(sw, /CACHE_VERSION = 'v166'/);
   assert.doesNotMatch(hist, /isPro|proGate|calendarProEnabled/);
 });

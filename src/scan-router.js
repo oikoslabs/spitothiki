@@ -34,10 +34,10 @@ export function routeCode(value) {
   }
   const toll = parseTollBarcode(raw);
   if (toll) return { route: 'toll', raw, toll };
+  const bill = parseBillCode(raw);
+  if (bill && (bill.kind === 'epc' || bill.kind === 'rf' || bill.kind === 'eydap')) return { route: 'bill', raw, bill };
   const till = parseStoreReceiptBarcode(raw);
   if (till) return { route: 'store-receipt', raw, till };
-  const bill = parseBillCode(raw);
-  if (bill && (bill.kind === 'epc' || bill.kind === 'rf')) return { route: 'bill', raw, bill };
   const product = interpretCode(raw);
   if (product.barcode) return { route: 'product', raw, barcode: product.barcode, info: product };
   return { route: 'unknown', raw };
