@@ -1873,10 +1873,12 @@ async function loadReceiptPhoto(file) {
           : m.status === 'orientation' ? t('Αναγνώριση κειμένου… (περιστροφή {angle}°)', { angle: m.angle }) : t('Φόρτωση αναγνώρισης κειμένου (μόνο την πρώτη φορά)…');
       }
     });
-    // 2) Toll receipt: barcode data (if read) + amount from the OCR text, or everything from the text.
+    // 2) Toll receipt: barcode data (if read) + amount from the OCR text, or everything from the text
+    //    (printed digits under a defective barcode, and/or station/date/amount lines). Prefer this
+    //    even if the till-text parser also picked up a couple of lines.
     if (toll) { tollToTransport({ ...toll, amount: tollAmountFromText(result?.text) }, 'photo'); return; }
     const tollText = parseTollText(result?.text);
-    if (tollText && !result.parsed.lines.length) { tollToTransport(tollText, 'photo'); return; }
+    if (tollText) { tollToTransport(tollText, 'photo'); return; }
     let qrReceipt = previous?.receipt && previous.receipt.format === 'AADE' ? previous.receipt : null;
     if (!qrReceipt && link && classifyReceiptUrl(link).kind === 'aade') {
       try { qrReceipt = await fetchReceipt(link, { proxy: receiptProxy() }); }

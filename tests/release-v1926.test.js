@@ -6,7 +6,7 @@ test('v1.9.26 release: version, cache bump, menu/torch INP and receipt CLS', () 
   assert.match(read('package.json'), /"version": "1\.9\.47"/);
   assert.equal((read('index.html').match(/data-no-i18n>1\.9\.47</g) || []).length, 2);
   const sw = read('sw.js');
-  assert.match(sw, /CACHE_VERSION = 'v163';/);
+  assert.match(sw, /CACHE_VERSION = 'v164';/);
   const app = read('src/app.js');
   assert.match(app, /action === 'open-menu'/);
   assert.match(app, /pressFeedback\(button\)/);
