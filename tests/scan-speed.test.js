@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { SCAN_REGIONS, SCAN_REGIONS_1D, detectorGroups, isStableRead, regionsFor, scanZoom } from '../src/barcode.js';
+import { SCAN_REGIONS, SCAN_REGIONS_1D, SCAN_IDLE_FALLBACK_MS, SCAN_IDLE_MS, acceptScanValue, detectorGroups, isStableRead, regionsFor, scanZoom, zxingRegions } from '../src/barcode.js';
 import { PROXY_HOSTS_KEY, PROXY_HOSTS_TTL_MS, fetchAadeShop, fetchReceipt, isProxyFirstHost, parseAadeFhmPage, parseAadeSummary, parseMyData, parseUbl, rememberProxyHost, receiptId } from '../src/receipt.js';
 import { allowedAadePage, allowedHost } from '../src/receipt-domains.js';
 import { parseTollBarcode } from '../src/toll-barcode.js';
@@ -189,4 +189,40 @@ test('one anonymous count per scan: toll barcode → toll (no station name, 1.9.
   assert.deepEqual(scanTimingFields({ cam: -1, ms: 'x', torch: 'yes' }), {});
   assert.deepEqual(scanTimingFields({ cam: 999999, ms: 12.6, torch: false }), { cam: 120000, ms: 13, torch: 0 });
   assert.ok(JSON.stringify({ type: 'supermarket', store: 'x'.repeat(40), success: false, via: 'on-device', cam: 120000, ms: 120000, torch: 1, t: 1 }).length < 200, 'fits the stats worker body limit');
+});
+
+test('product accept() keeps a valid toll Code128 and still rejects a non-product 36-digit string', () => {
+  assert.equal(acceptScanValue('product', TOLL), true);
+  assert.equal(acceptScanValue('product', '052026112408562200211818601003700001'), true);
+  assert.equal(acceptScanValue('product', '9'.repeat(36)), false);
+  assert.equal(acceptScanValue('product', '5201234567890'), true);
+  assert.equal(acceptScanValue('product', ''), false);
+  assert.equal(acceptScanValue('receipt', TOLL), true);
+  assert.equal(acceptScanValue('all', 'https://e-invoicing.gr/x'), true);
+  assert.equal(acceptScanValue('bill', 'RF18539007547034'), true);
+});
+
+test('live ZXing in receipt/«all» uses only the wide 1D regions, not the tight centre crop', () => {
+  assert.deepEqual(zxingRegions('receipt'), SCAN_REGIONS_1D);
+  assert.deepEqual(zxingRegions('all'), SCAN_REGIONS_1D);
+  assert.ok(zxingRegions('receipt').every((r) => r[2] >= 0.8));
+  assert.notDeepEqual(zxingRegions('product'), SCAN_REGIONS_1D, 'product ZXing still uses the QR centre crop');
+  assert.deepEqual(zxingRegions('product'), regionsFor(['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'data_matrix', 'qr_code']));
+  assert.equal(SCAN_IDLE_FALLBACK_MS, 5000);
+  assert.equal(SCAN_IDLE_MS, 8000);
+});
+
+test('receipt/«all» scanner: after 5s idle, snapshot the frame and run the photo OCR path; hint mentions a photo', () => {
+  const app = readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');
+  const src = readFileSync(new URL('../src/barcode.js', import.meta.url), 'utf8');
+  assert.match(src, /regions: zxingRegions\(mode\)/);
+  assert.match(src, /acceptScanValue\(mode, value\)/);
+  assert.doesNotMatch(src, /ChecksumError|return_errors:\s*true/);
+  const open = app.slice(app.indexOf('async function idleScanFallback'), app.indexOf('function openUniversalScan'));
+  assert.match(open, /idleMs: qr === true \|\| qr === 'all' \? SCAN_IDLE_FALLBACK_MS/);
+  assert.match(open, /idleScanFallback\(dialog, status, qr\)/);
+  assert.match(open, /captureVideoFrame\(/);
+  assert.match(open, /loadReceiptPhoto\(file\)/);
+  assert.match(app, /βγάλε φωτογραφία την απόδειξη/);
+  assert.match(app, /async function idleScanFallback\(/);
 });

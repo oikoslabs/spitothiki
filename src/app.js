@@ -1,6 +1,6 @@
 import { MAX_QUANTITY, expiringItems, createPantryItem, createShoppingItem, expiringWithin, expiryStatus, expiryWarning, finishItemToShopping, normalizeSearch, normalizeUnit, pantrySummary, receiveShoppingItem, returnShoppingItem, shoppingListText, syncShoppingWithItem, toggleShoppingItem } from './domain.js';
 import { filterRows, searchFieldHtml } from './list-search.js';
-import { adoptCamera, decodeImageCodes, lookupBarcode, normalizeBarcode, requestCamera, startScanner, warmScanner } from './barcode.js';
+import { adoptCamera, captureVideoFrame, decodeImageCodes, lookupBarcode, normalizeBarcode, requestCamera, SCAN_IDLE_FALLBACK_MS, startScanner, warmScanner } from './barcode.js';
 import { isUrlCode, lastTollAmount, parseTollBarcode, parseTollText, tollAmountFromText } from './toll-barcode.js';
 import { authProviders, firebaseConfig } from './firebase-config.js';
 import { loadState, parseBackup, saveState } from './storage.js';
@@ -1222,6 +1222,26 @@ function takeScanTiming() {
 }
 const TORCH_HINT_MS = 3000;
 const TILL_SKIP_HINT = 'Αυτός είναι ο barcode του ταμείου και δεν έχει τα είδη. Στόχευσε το QR της απόδειξης (συνήθως κάτω δεξιά).';
+const IDLE_PHOTO_HINT = 'Δεν το πιάνει; Κράτα το κινητό λίγο πιο μακριά (15–20 εκ.), με καλό φως, ή βγάλε φωτογραφία την απόδειξη.';
+
+// Receipt/«all»: after a few seconds with no decode, snapshot the live frame and run the photo OCR path
+// (printed digits + receipt text). The bars on thermal toll receipts often never decode in the camera.
+async function idleScanFallback(dialog, status, qr) {
+  if (!dialog.open) return;
+  if (qr !== true && qr !== 'all') {
+    status.textContent = t('Δεν το πιάνει; Κράτα το κινητό λίγο πιο μακριά (15–20 εκ.) και με καλό φως.');
+    return;
+  }
+  status.textContent = t('Δεν το διάβασε η κάμερα· δοκιμάζω από φωτογραφία του καρέ…');
+  const file = await captureVideoFrame(document.querySelector('#scan-video'));
+  if (!dialog.open) return;
+  if (!file) { status.textContent = t(IDLE_PHOTO_HINT); return; }
+  closeScanner();
+  dialog.close();
+  if (!document.querySelector('#receipt-dialog')?.open) openReceiptDialog();
+  loadReceiptPhoto(file);
+}
+
 async function openScanner({ onCode = fillFromBarcode, qr = false, confident = null } = {}) {
   const dialog = document.querySelector('#scan-dialog');
   const status = document.querySelector('#scan-status');
@@ -1261,7 +1281,8 @@ async function openScanner({ onCode = fillFromBarcode, qr = false, confident = n
       // Receipt/«all» scans: a receipt's till barcode (date + till + transaction) is skipped so the QR can be read.
       skip: qr === true || qr === 'all' ? (v) => Boolean(parseStoreReceiptBarcode(v)) : null,
       onSkip: () => { if (dialog.open) status.textContent = t(TILL_SKIP_HINT); },
-      onIdle: () => { if (dialog.open) status.textContent = t(qr === 'all' ? 'Δεν το πιάνει; Κράτα το κινητό λίγο πιο μακριά (15–20 εκ.), με καλό φως, ή πάτα «📎 Από φωτογραφία ή PDF».' : 'Δεν το πιάνει; Κράτα το κινητό λίγο πιο μακριά (15–20 εκ.) και με καλό φως.'); } });
+      idleMs: qr === true || qr === 'all' ? SCAN_IDLE_FALLBACK_MS : undefined,
+      onIdle: () => { if (dialog.open) idleScanFallback(dialog, status, qr); } });
     if (ac.signal.aborted || !dialog.open) { closeScanner(); return; }
     if (stopScanner?.hasTorch) torch.hidden = false;
     // Some phones report the flashlight only a moment after the camera starts.

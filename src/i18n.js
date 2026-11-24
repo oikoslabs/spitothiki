@@ -1067,6 +1067,8 @@ const EN = {
   'Διάβασα τον barcode του ταμείου ({date}), όχι το QR. Αυτός ο barcode δεν έχει τα είδη της απόδειξης, γι’ αυτό δεν μπορεί να ανοίξει. Σκάναρε το QR της απόδειξης (συνήθως κάτω δεξιά) ή βγάλε της φωτογραφία.': "I read the till barcode ({date}), not the QR. That barcode doesn't hold the receipt's items, so it can't be opened. Scan the receipt's QR (usually bottom right) or take a photo of it.",
   'Δεν το πιάνει; Κράτα το κινητό λίγο πιο μακριά (15–20 εκ.), με καλό φως, ή πάτα «📎 Από φωτογραφία ή PDF».': 'Not reading it? Hold the phone a little further away (15–20 cm), in good light, or tap «📎 From a photo or PDF».',
   'Δεν το πιάνει; Κράτα το κινητό λίγο πιο μακριά (15–20 εκ.) και με καλό φως.': 'Not reading it? Hold the phone a little further away (15–20 cm), in good light.',
+  'Δεν το πιάνει; Κράτα το κινητό λίγο πιο μακριά (15–20 εκ.), με καλό φως, ή βγάλε φωτογραφία την απόδειξη.': 'Not reading it? Hold the phone a little further away (15–20 cm), in good light, or take a photo of the receipt.',
+  'Δεν το διάβασε η κάμερα· δοκιμάζω από φωτογραφία του καρέ…': 'The camera didn’t read it; trying from a snapshot of this frame…',
   'Από φωτογραφία ή PDF': 'From a photo or PDF',
   'ΣΑΡΩΣΗ': 'SCAN',
   'Τι να κάνω;': 'What should I do?',
