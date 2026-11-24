@@ -7,18 +7,18 @@ import { dictionaries } from '../src/i18n.js';
 const read = (f) => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
 
 test('v1.9.48 release: version, cache v168, toll photo/OCR fallback, live idle snapshot, updated guide', () => {
-  assert.match(read('package.json'), /"version": "1\.9\.48"/);
-  assert.equal((read('index.html').match(/data-no-i18n>1\.9\.48</g) || []).length, 2);
+  assert.match(read('package.json'), /"version": "1\.9\.49"/);
+  assert.equal((read('index.html').match(/data-no-i18n>1\.9\.49</g) || []).length, 2);
   const html = read('index.html');
-  assert.match(html, /styles\.css\?v=168/);
-  assert.match(html, /src\/app\.js\?v=168/);
-  assert.doesNotMatch(html, /v=168-preview/);
+  assert.match(html, /styles\.css\?v=169/);
+  assert.match(html, /src\/app\.js\?v=169/);
+  assert.doesNotMatch(html, /v=169-preview/);
   assert.doesNotMatch(html, /Σκολαρ|Skolarikis|Giannis |Γιάννης /);
   const sw = read('sw.js');
-  assert.match(sw, /CACHE_VERSION = 'v168';/);
-  assert.doesNotMatch(sw, /CACHE_VERSION = 'v168-preview'/);
-  assert.match(sw, /styles\.css\?v=168'/);
-  assert.match(sw, /src\/app\.js\?v=168'/);
+  assert.match(sw, /CACHE_VERSION = 'v169';/);
+  assert.doesNotMatch(sw, /CACHE_VERSION = 'v169-preview'/);
+  assert.match(sw, /styles\.css\?v=169'/);
+  assert.match(sw, /src\/app\.js\?v=169'/);
   const app = read('src/app.js');
   assert.match(app, /idleScanFallback/);
   assert.match(app, /captureVideoFrame/);
@@ -28,7 +28,7 @@ test('v1.9.48 release: version, cache v168, toll photo/OCR fallback, live idle s
   assert.match(barcode, /zxingRegions/);
   assert.doesNotMatch(barcode, /ChecksumError|return_errors:\s*true/);
   const whats = GUIDE_SECTIONS.find((s) => s.id === 'whats-new');
-  assert.equal(whats.title, 'Τι νέο στην 1.9.48');
+  assert.equal(whats.title, 'Τι νέο στην 1.9.49');
   const text = [whats.intro, ...whats.bullets].join('\n');
   assert.match(text, /φωτογραφία/);
   assert.match(text, /5 δευτερόλεπτα/);

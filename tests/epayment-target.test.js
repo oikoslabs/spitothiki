@@ -204,7 +204,7 @@ test('UI: insights card, no Pro gate, cached in the SW shell, English strings pr
   assert.doesNotMatch(mod, /isPro|proGate|calendarProEnabled/);
   assert.match(i18n, /EPAY_EN/);
   assert.match(sw, /src\/epayment-target\.js/);
-  assert.match(sw, /CACHE_VERSION = 'v168'/);
+  assert.match(sw, /CACHE_VERSION = 'v169'/);
   assert.match(css, /#epay-card/);
   for (const key of Object.keys(EPAY_EN)) {
     assert.ok(dictionaries.en[key], key);

@@ -83,7 +83,7 @@ test('guide is in the menu, settings, starter, welcome and SW cache v125', () =>
   assert.match(app, /onboard-guide/);
   assert.match(app, /function helpButton/);
   const sw = read('sw.js');
-  assert.match(sw, /CACHE_VERSION = 'v168'/);
+  assert.match(sw, /CACHE_VERSION = 'v169'/);
   assert.ok(sw.includes("./src/guide.js"));
 });
 
@@ -120,7 +120,7 @@ test('guide covers last prices, electronic payments, receipt links, CSV export a
   const byId = Object.fromEntries(GUIDE_SECTIONS.map((section) => [section.id, section]));
   const textOf = (id) => [byId[id].intro, ...byId[id].bullets].join('\n');
   const whats = byId['whats-new'];
-  assert.equal(whats.title, 'Τι νέο στην 1.9.48');
+  assert.equal(whats.title, 'Τι νέο στην 1.9.49');
   assert.match(whats.intro, /Τελευταίες τιμές|στόχος ηλεκτρονικών|λινκ|Excel/);
   assert.match(textOf('whats-new'), /📈 Τελευταίες τιμές/);
   assert.match(textOf('whats-new'), /💳 Στόχος ηλεκτρονικών πληρωμών/);

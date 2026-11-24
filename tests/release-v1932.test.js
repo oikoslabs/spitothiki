@@ -5,10 +5,10 @@ import { readFileSync } from 'node:fs';
 const read = (f) => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
 
 test('v1.9.32 release: version, cache bump, owner flag hardening and deferred SW reload', () => {
-  assert.match(read('package.json'), /"version": "1\.9\.48"/);
-  assert.equal((read('index.html').match(/data-no-i18n>1\.9\.48</g) || []).length, 2);
+  assert.match(read('package.json'), /"version": "1\.9\.49"/);
+  assert.equal((read('index.html').match(/data-no-i18n>1\.9\.49</g) || []).length, 2);
   const sw = read('sw.js');
-  assert.match(sw, /CACHE_VERSION = 'v168';/);
+  assert.match(sw, /CACHE_VERSION = 'v169';/);
   const app = read('src/app.js');
   assert.match(app, /reloadWhenIdle/);
   assert.match(app, /addEventListener\('close'/);
