@@ -55,3 +55,18 @@ test('toll barcode: real 36-digit read from 23/11/2026 (Rupaki morning receipt)'
 test('toll barcode: the ghost EAN-13 from a partial Code128 read is not a toll', () => {
   assert.equal(parseTollBarcode('7289822868460'), null);
 });
+
+// 1.9.48: toll receipt from another station (Dimokratias), amount written as "2,55 €".
+import { parseTollText as _ptt, parseTollBarcode as _ptb } from '../src/toll-barcode.js';
+import { test as _t } from 'node:test';
+import _assert from 'node:assert/strict';
+_t('toll OCR: trailing € amount and generic operator for unknown station', () => {
+  const r = _ptt('ΣΤΑΘΜΟΣ ΔΙΟΔΙΩΝ ΔΗΜΟΚΡΑΤΙΑΣ Α.\n24/11/2026 08:56:22 2118186\nCategory 2\nΑξία με ΦΠΑ 24,00% 2,55 €\nΣΥΝΟΛΟ 2,55 €\nΜΕΤΡΗΤΑ 5,00 €\nΡΕΣΤΑ 2,45 €');
+  _assert.equal(r.amount, 2.55);
+  _assert.equal(r.operator, 'Διόδια');
+  _assert.equal(r.receiptNo, '2118186');
+  _assert.equal(_ptb('05202611240856220021181860100370001').date, '2026-11-24');
+});
+_t('toll OCR: Attiki Odos keeps its name', () => {
+  _assert.equal(_ptt('ΑΤΤΙΚΗ ΟΔΟΣ\n14/10/2026 16:33:47 8353391\nΕΥΡΩ 2,55').operator, 'Αττική Οδός');
+});

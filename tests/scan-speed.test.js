@@ -177,12 +177,12 @@ test('AADE: the scan result is exactly as before (instant, no network); fetchAad
   assert.equal(n, 0);
 });
 
-test('one anonymous count per scan: toll barcode → toll/Attiki Odos via barcode; timings are plain numbers only', async () => {
+test('one anonymous count per scan: toll barcode → toll (no station name, 1.9.48) via barcode; timings are plain numbers only', async () => {
   const calls = [];
   const opts = { storage: memory(), sendScan: (e) => sendScanEvent(e, { fetchImpl: async (u, o) => { calls.push(JSON.parse(o.body)); return { ok: true }; }, online: true, origin: 'https://spitothiki.web.app' }) };
   const toll = parseTollBarcode(TOLL);
   assert.equal(await reportScan({ receipt: { issuerName: toll.operator }, success: true, via: 'barcode', proxied: false, cam: 1450, ms: 1460, torch: 1 }, opts), true);
-  assert.deepEqual(calls[0], { type: 'toll', store: 'Attiki Odos', success: true, via: 'barcode', cam: 1450, ms: 1460, torch: 1 });
+  assert.deepEqual(calls[0], { type: 'toll', store: '', success: true, via: 'barcode', cam: 1450, ms: 1460, torch: 1 });
   assert.ok(!JSON.stringify(calls[0]).includes(toll.receiptNo), 'no receipt number');
   await reportScan({ receipt: {}, success: true, via: 'aade', proxied: false }, opts);
   assert.deepEqual(calls[1], { type: 'other', store: '', success: true, via: 'aade' });
