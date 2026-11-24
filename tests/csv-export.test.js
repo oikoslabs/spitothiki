@@ -156,7 +156,7 @@ test('UI: Settings + insights buttons, download/share, SW cache, English strings
   assert.match(app, /text\/csv/);
   assert.match(i18n, /CSV_EXPORT_EN/);
   assert.match(sw, /src\/csv-export\.js/);
-  assert.match(sw, /CACHE_VERSION = 'v163'/);
+  assert.match(sw, /CACHE_VERSION = 'v165'/);
   for (const key of Object.keys(CSV_EXPORT_EN)) {
     assert.ok(dictionaries.en[key], key);
     assert.equal(dictionaries.el[key], key);

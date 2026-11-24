@@ -6,7 +6,7 @@ test('v1.9.25 release: version, cache bump, scan dialog INP fix', () => {
   assert.match(read('package.json'), /"version": "1\.9\.47"/);
   assert.equal((read('index.html').match(/data-no-i18n>1\.9\.47</g) || []).length, 2);
   const sw = read('sw.js');
-  assert.match(sw, /CACHE_VERSION = 'v163';/);
+  assert.match(sw, /CACHE_VERSION = 'v165';/);
   const app = read('src/app.js');
   assert.match(app, /status\.textContent = t\('Ανοίγει η κάμερα…'\)/);
   assert.match(app, /adoptCamera\(requestCamera\(\), ac\.signal\)/);

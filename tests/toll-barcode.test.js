@@ -55,3 +55,83 @@ test('toll barcode: real 36-digit read from 23/11/2026 (Rupaki morning receipt)'
 test('toll barcode: the ghost EAN-13 from a partial Code128 read is not a toll', () => {
   assert.equal(parseTollBarcode('7289822868460'), null);
 });
+
+// 1.9.48: toll receipt from another station (Dimokratias), amount written as "2,55 €".
+import { parseTollText as _ptt, parseTollBarcode as _ptb } from '../src/toll-barcode.js';
+import { test as _t } from 'node:test';
+import _assert from 'node:assert/strict';
+_t('toll OCR: trailing € amount and generic operator for unknown station', () => {
+  const r = _ptt('ΣΤΑΘΜΟΣ ΔΙΟΔΙΩΝ ΔΗΜΟΚΡΑΤΙΑΣ Α.\n24/11/2026 08:56:22 2118186\nCategory 2\nΑξία με ΦΠΑ 24,00% 2,55 €\nΣΥΝΟΛΟ 2,55 €\nΜΕΤΡΗΤΑ 5,00 €\nΡΕΣΤΑ 2,45 €');
+  _assert.equal(r.amount, 2.55);
+  _assert.equal(r.operator, 'Διόδια');
+  _assert.equal(r.receiptNo, '2118186');
+  _assert.equal(_ptb('052026112408562200211818601003700001').date, '2026-11-24');
+});
+_t('toll OCR: Attiki Odos keeps its name', () => {
+  _assert.equal(_ptt('ΑΤΤΙΚΗ ΟΔΟΣ\n14/10/2026 16:33:47 8353391\nΕΥΡΩ 2,55').operator, 'Αττική Οδός');
+});
+
+
+import { readFileSync } from 'node:fs';
+import { parseTollDigitsFromText } from '../src/toll-barcode.js';
+
+// Defective-print receipt (Dimokratias, 24/11/2026): the bars do not decode; the printed digits and OCR text do.
+const DIMOKRATIAS_DIGITS = '052026112408562200211818601003700001';
+const DIMOKRATIAS_TEXT = `ΠΛΗΡΩΜΗΣ ΔΙΟΔΙΩΝ
+1 Category 2
+ΑΣΙΑ ΜΕ ΦΠΑ  24,00%  ΕΥΡΩ  2,55
+ΣΥΝΟΛΟ  ΕΥΡΩ  2,55
+ΜΕΤΡΗΤΑ  ΕΥΡΩ  5,00
+ΡΕΣΤΑ  ΕΥΡΩ  2,45
+ΣΤΑΘΜΟΣ ΔΙΟΔΙΩΝ ΔΗΜΟΚΡΑΤΙΑΣ Α.
+24/11/2026 08:56:22  2118186  1
+ACHW-L01 4057
+ΝΟΜΙΜΗ ΑΠΟΔΕΙΞΗ-ΔΙΑΤΗΡΗΣΤΕ ΤΟ ΠΑΡΟΝ
+${DIMOKRATIAS_DIGITS}
+`;
+
+test('toll barcode: printed 36-digit string from Dimokratias receipt (defective bars)', () => {
+  assert.equal(DIMOKRATIAS_DIGITS.length, 36);
+  const r = parseTollBarcode(DIMOKRATIAS_DIGITS);
+  assert.deepEqual([r.date, r.time, r.receiptNo, r.prefix, r.id], ['2026-11-24', '08:56:22', '2118186', '05', 'toll:2118186:2026-11-24']);
+  assert.ok(!('amount' in r) || !r.amount, 'digit format does not encode the amount');
+  assert.doesNotMatch(DIMOKRATIAS_DIGITS, /255/);
+});
+
+test('toll OCR fallback: digits alone (no Greek keywords) still prefill date, time, receipt', () => {
+  const r = parseTollText(DIMOKRATIAS_DIGITS);
+  assert.deepEqual([r.date, r.time, r.receiptNo, r.id], ['2026-11-24', '08:56:22', '2118186', 'toll:2118186:2026-11-24']);
+  assert.equal(r.amount, 0);
+  assert.equal(r.operator, 'Διόδια');
+});
+
+test('toll OCR fallback: spaced digits and O/Ο look-alikes', () => {
+  const spaced = '0520 261124 085622 002118186 01003700001';
+  const ocrO = 'O52O261124O85622OO2118186O1OO37OOOO1';
+  assert.equal(parseTollDigitsFromText(spaced).receiptNo, '2118186');
+  assert.equal(parseTollDigitsFromText(ocrO).receiptNo, '2118186');
+  assert.equal(parseTollText(`junk\n${spaced}\n`).receiptNo, '2118186');
+});
+
+test('toll OCR fallback: Dimokratias photo text + digits, amount from ΣΥΝΟΛΟ not from the tail', () => {
+  const r = parseTollText(DIMOKRATIAS_TEXT);
+  assert.deepEqual([r.date, r.time, r.receiptNo, r.amount, r.operator, r.id], ['2026-11-24', '08:56:22', '2118186', 2.55, 'Διόδια', 'toll:2118186:2026-11-24']);
+  // Tail 01003700001 must not be read as 3.70 / 0.01 / 37.00
+  assert.equal(r.amount, 2.55);
+  assert.equal(parseTollText(DIMOKRATIAS_TEXT.replace(DIMOKRATIAS_DIGITS, '')).amount, 2.55);
+});
+
+test('toll OCR fallback: text without digits still works; supermarket text still rejected', () => {
+  const textOnly = 'ΣΤΑΘΜΟΣ ΔΙΟΔΙΩΝ ΔΗΜΟΚΡΑΤΙΑΣ Α.\n24/11/2026 08:56:22  2118186  1\nΣΥΝΟΛΟ ΕΥΡΩ 2,55';
+  const r = parseTollText(textOnly);
+  assert.deepEqual([r.date, r.time, r.receiptNo, r.amount, r.operator], ['2026-11-24', '08:56:22', '2118186', 2.55, 'Διόδια']);
+  assert.equal(parseTollText('ΣΚΛΑΒΕΝΙΤΗΣ\n24/11/2026 08:56:22 2118186\nΣΥΝΟΛΟ 12,40'), null);
+  assert.equal(parseTollDigitsFromText('ΣΚΛΑΒΕΝΙΤΗΣ\n24/11/2026 08:56:22 2118186\nΣΥΝΟΛΟ 12,40'), null);
+});
+
+test('receipt photo path uses OCR/digit fallback even when till lines also parse', () => {
+  const app = readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');
+  assert.match(app, /const tollText = parseTollText\(result\?\.text\);/);
+  assert.match(app, /if \(tollText\) \{ tollToTransport\(tollText, 'photo'\); return; \}/);
+  assert.doesNotMatch(app, /tollText && !result\.parsed\.lines\.length/);
+});

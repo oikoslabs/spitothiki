@@ -108,6 +108,12 @@ export const SCAN_REGIONS = [[0.1, 0.25, 0.8, 0.5], [0, 0, 1, 1], [0.275, 0.325,
 export const SCAN_REGIONS_1D = SCAN_REGIONS.slice(0, 2);
 const TWO_D = ['qr_code', 'data_matrix', 'pdf417'];
 export const regionsFor = (formats = []) => (formats.some((f) => TWO_D.includes(f)) ? SCAN_REGIONS : SCAN_REGIONS_1D);
+// Live ZXing in receipt/«all»: only the wide box and the full frame, so a dense 36-digit
+// toll Code128 can fit. The tight centre crop stays on the native 2D detector (small QRs).
+export function zxingRegions(mode) {
+  if (mode === 'receipt' || mode === 'all') return SCAN_REGIONS_1D;
+  return regionsFor(scanFormats(mode));
+}
 // Native detector groups: in receipt and «all» mode a 2D detector (QR…) and a 1D detector alternate (ML Kit is much
 // slower per frame with every format in one detector); product/bill keep one detector. Pure, unit-tested.
 export function detectorGroups(mode, nativeFormats = []) {
@@ -120,6 +126,15 @@ export function detectorGroups(mode, nativeFormats = []) {
 // need two identical consecutive reads — even when `confident` would accept them.
 export function isEanUpcCode(value) {
   return /^(?:\d{6,8}|\d{12,13})$/.test(String(value ?? '').trim());
+}
+
+// Product mode only accepts retail/GS1 barcodes — plus a valid toll Code128, so the
+// pantry «📷 Σάρωση» button does not silently drop a decoded toll receipt.
+export function acceptScanValue(mode, value) {
+  if (!value) return false;
+  if (parseTollBarcode(value)) return true;
+  if (mode === 'product') return Boolean(interpretCode(value).barcode);
+  return true;
 }
 
 // Accept rule: HTTP(S) links and valid toll barcodes on the first read in every mode;
@@ -139,7 +154,7 @@ const rememberEngine = (name) => { try { name === 'zxing' ? localStorage.setItem
 
 // Starts the camera in <video> and calls onCode once with the first accepted code.
 // Native BarcodeDetector where it supports the mode's formats, plus ZXing (TRY_HARDER) as a second decoder.
-// Scans ~8 times/s over SCAN_REGIONS. onIdle() fires once if nothing was read for 8 s.
+// Scans ~8 times/s over SCAN_REGIONS. onIdle() fires once if nothing was read for idleMs (default 8 s).
 // Returns stop(); stop.torch(on) toggles the flashlight when supported (stop.hasTorch).
 // skip(value) → true: a code that is read but not wanted (e.g. a receipt's till barcode); onSkip(value) is told once per value and scanning goes on.
 export const CAMERA_CONSTRAINTS = { video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false };
@@ -147,6 +162,23 @@ export const CAMERA_CONSTRAINTS = { video: { facingMode: { ideal: 'environment' 
 export function requestCamera(constraints = CAMERA_CONSTRAINTS) {
   if (!navigator.mediaDevices?.getUserMedia) throw new Error('Η κάμερα δεν είναι διαθέσιμη σε αυτόν τον browser.');
   return navigator.mediaDevices.getUserMedia(constraints);
+}
+
+// Still frame from the live <video> for the receipt-photo OCR path when the bars never decode.
+export function captureVideoFrame(video, { type = 'image/jpeg', quality = 0.92 } = {}) {
+  const w = video?.videoWidth, h = video?.videoHeight;
+  if (!w || !h) return Promise.resolve(null);
+  const canvas = document.createElement('canvas');
+  canvas.width = w; canvas.height = h;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+  return new Promise((resolve) => {
+    const done = (blob) => {
+      if (!blob) return resolve(null);
+      resolve(new File([blob], 'scan-frame.jpg', { type: blob.type || type }));
+    };
+    if (canvas.toBlob) canvas.toBlob(done, type, quality);
+    else done(null);
+  });
 }
 
 // If the dialog is closed (signal aborted) before getUserMedia resolves, stop the tracks so the stream is not leaked.
@@ -167,7 +199,10 @@ export function warmScanner() {
 
 const abortError = () => new DOMException('The operation was aborted.', 'AbortError');
 
-export async function startScanner(video, onCode, { qr = false, confident = null, onIdle = null, skip = null, onSkip = null, signal = null, stream: givenStream = null, streamPromise = null } = {}) {
+export const SCAN_IDLE_MS = 8000;
+export const SCAN_IDLE_FALLBACK_MS = 5000;
+
+export async function startScanner(video, onCode, { qr = false, confident = null, onIdle = null, idleMs = SCAN_IDLE_MS, skip = null, onSkip = null, signal = null, stream: givenStream = null, streamPromise = null } = {}) {
   if (signal?.aborted) throw abortError();
   // Start (or adopt) the camera first and show the preview, then set up BarcodeDetector / ZXing.
   // Detector init on Android can take a long time and used to run before getUserMedia, blocking the dialog paint (INP).
@@ -190,7 +225,7 @@ export async function startScanner(video, onCode, { qr = false, confident = null
   if (signal?.aborted) { abandon(); throw abortError(); }
   const nativeFormats = wanted.filter((f) => native.includes(f));
   // Product mode accepts retail barcodes and GS1 DataMatrix / GS1 QR / Digital Link; other QR codes are ignored.
-  const accept = (value) => mode !== 'product' || interpretCode(value).barcode;
+  const accept = (value) => acceptScanValue(mode, value);
   const plan = scanEnginePlan(nativeFormats, prefersZxing());
   const decoders = []; // { name, decode(canvas) → string }
   if (plan.native) {
@@ -204,7 +239,7 @@ export async function startScanner(video, onCode, { qr = false, confident = null
   const addZxing = () => {
     zxingReady ||= loadZxing().then((ZXing) => {
       const reader = new ZXing.BrowserMultiFormatReader(new Map([[2, zxingFormats(mode)], [3, true]])); // POSSIBLE_FORMATS, TRY_HARDER
-      decoders.push({ name: 'zxing', regions: regionsFor(scanFormats(mode)), seen: 0, decode: async (c) => { try { return reader.decodeFromCanvas(c).getText(); } catch { return ''; } } });
+      decoders.push({ name: 'zxing', regions: zxingRegions(mode), seen: 0, decode: async (c) => { try { return reader.decodeFromCanvas(c).getText(); } catch { return ''; } } });
     });
     return zxingReady;
   };
@@ -216,7 +251,7 @@ export async function startScanner(video, onCode, { qr = false, confident = null
   const last = new Map(); // decoder index → previous value
   const skipped = new Set();
   const zxingTimer = decoders.some((d) => d.name === 'zxing') ? 0 : setTimeout(() => { if (!stopped) addZxing().catch(() => {}); }, plan.zxingDelayMs);
-  if (onIdle) idleTimer = setTimeout(() => { if (!stopped) onIdle(); }, 8000);
+  if (onIdle) idleTimer = setTimeout(() => { if (!stopped) onIdle(); }, idleMs);
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
   const stop = () => { if (stopped) return; stopped = true; clearTimeout(zxingTimer); clearTimeout(idleTimer); abandon(); signal?.removeEventListener?.('abort', stop); };

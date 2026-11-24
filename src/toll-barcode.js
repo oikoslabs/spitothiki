@@ -3,6 +3,7 @@
 // decodes to 36 digits: 05 | 20261014163347 | 008353391 | 00998700009
 //                       ?? | date+time       | receipt   | unknown (no amount in it)
 // Lenient: non-digits (e.g. "]C0", spaces) are ignored, 35–40 digits accepted, the timestamp is searched near the start.
+const ATTIKI_RE = /ΑΤΤΙΚΗ\s*Ο[ΔΛ]ΟΣ|ATTIKI\s*ODOS/i;
 const TOLL_TEXT_RE = /ΑΤΤΙΚΗ\s*Ο[ΔΛ]ΟΣ|ATTIKI\s*ODOS|ΔΙΟΔΙ|ΔΙΟΔ|ΣΤΑΘΜΟΣ\s+Δ|ΠΛΗΡΩΜΗΣ\s+Δ|TOLL|[A-Z]{3}[-~ ]?L0?\d{1,2}\s+\d{3,5}/i;
 
 function validStamp(y, mo, d, h, mi, s) {
@@ -24,7 +25,25 @@ export function parseTollBarcode(value) {
     const receiptNo = String(Number(m[7]));
     if (receiptNo === '0') continue;
     const date = `${m[1]}-${m[2]}-${m[3]}`;
-    return { kind: 'toll', operator: 'Αττική Οδός', prefix: digits.slice(0, i), date, time: `${m[4]}:${m[5]}:${m[6]}`, receiptNo, tail: digits.slice(i + 23), id: tollId(receiptNo, date), raw: digits };
+    return { kind: 'toll', operator: 'Διόδια', prefix: digits.slice(0, i), date, time: `${m[4]}:${m[5]}:${m[6]}`, receiptNo, tail: digits.slice(i + 23), id: tollId(receiptNo, date), raw: digits };
+  }
+  return null;
+}
+
+// Printed digits under a toll barcode (often clearer than the bars when the print is defective).
+// Looks at digit-heavy lines and compact digit runs; O/Ο from OCR are treated as 0.
+export function parseTollDigitsFromText(text = '') {
+  const asDigits = (s) => String(s).replace(/[OΟoο]/g, '0').replace(/\D/g, '');
+  for (const line of String(text).split(/\n/)) {
+    const digits = asDigits(line);
+    if (digits.length >= 35 && digits.length <= 40) {
+      const parsed = parseTollBarcode(digits);
+      if (parsed) return parsed;
+    }
+  }
+  for (const run of String(text).match(/\d(?:[\d\s.,OΟoο-]{33,50})\d/g) || []) {
+    const parsed = parseTollBarcode(asDigits(run));
+    if (parsed) return parsed;
   }
   return null;
 }
@@ -33,7 +52,8 @@ export function parseTollBarcode(value) {
 export function tollAmountFromText(text = '') {
   const counts = new Map();
   for (const line of String(text).split(/\n/)) {
-    const m = /(?:ΕΥΡΩ|EYPΩ|EYPO|EUR|€)\s*(\d{1,3})\s?[.,]\s?(\d{2})\d?\s*$/i.exec(line.trim());
+    const m = /(?:ΕΥΡΩ|EYPΩ|EYPO|EUR|€)\s*(\d{1,3})\s?[.,]\s?(\d{2})\d?\s*$/i.exec(line.trim())
+      || /(?:^|\s)(\d{1,3})\s?[.,]\s?(\d{2})\s*(?:€|EUR|ΕΥΡΩ)\s*$/i.exec(line.trim());
     if (!m) continue;
     const v = Number(`${m[1]}.${m[2]}`);
     if (v > 0 && v < 100) counts.set(v, (counts.get(v) || 0) + (/ΣΥΝΟΛ|CYNOA|CYROAO|ΜΕΤΡΗΤ|TOTAL/i.test(line) ? 1.5 : 1));
@@ -43,16 +63,27 @@ export function tollAmountFromText(text = '') {
   return best;
 }
 
-// Toll receipt from OCR text alone: needs a toll keyword and a "dd/mm/yyyy hh:mm:ss  receiptNo" line.
+// Toll receipt from OCR text: printed barcode digits and/or a "dd/mm/yyyy hh:mm:ss  receiptNo" line.
+// Amount is taken from the text (the known digit format does not encode it). A confident digit
+// string is enough on its own; otherwise a toll keyword plus the date/receipt line is required.
 export function parseTollText(text = '') {
   const t = String(text);
-  if (!TOLL_TEXT_RE.test(t)) return null;
-  const m = /(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2}):(\d{2})\s+(\d{5,9})\b/.exec(t);
-  if (!m) return null;
-  const [d, mo, y, h, mi, s] = m.slice(1, 7).map(Number);
-  if (!validStamp(y, mo, d, h, mi, s)) return null;
-  const date = `${m[3]}-${m[2]}-${m[1]}`, receiptNo = String(Number(m[7]));
-  return { kind: 'toll', operator: 'Αττική Οδός', prefix: '', date, time: `${m[4]}:${m[5]}:${m[6]}`, receiptNo, id: tollId(receiptNo, date), amount: tollAmountFromText(t) };
+  const fromDigits = parseTollDigitsFromText(t);
+  const m = /(\d{2})[/.-](\d{2})[/.-](\d{4})\s+(\d{2}):(\d{2}):(\d{2})\s+(\d{5,9})\b/.exec(t);
+  let fromLine = null;
+  if (m) {
+    const [d, mo, y, h, mi, s] = m.slice(1, 7).map(Number);
+    if (validStamp(y, mo, d, h, mi, s) && (fromDigits || TOLL_TEXT_RE.test(t))) {
+      const date = `${m[3]}-${m[2]}-${m[1]}`, receiptNo = String(Number(m[7]));
+      fromLine = { kind: 'toll', operator: 'Διόδια', prefix: '', date, time: `${m[4]}:${m[5]}:${m[6]}`, receiptNo, id: tollId(receiptNo, date) };
+    }
+  }
+  if (!fromDigits && !fromLine) return null;
+  if (!fromDigits && !TOLL_TEXT_RE.test(t)) return null;
+  const amount = tollAmountFromText(t);
+  const operator = ATTIKI_RE.test(t) ? 'Αττική Οδός' : 'Διόδια';
+  const base = fromDigits || fromLine;
+  return { ...base, operator, amount };
 }
 
 // Default amount: the most recent toll entry saved from a toll barcode/receipt.
