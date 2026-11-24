@@ -7,16 +7,16 @@ import { dictionaries } from '../src/i18n.js';
 const read = (f) => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
 
 test('v1.9.35 release: version, cache v143, sign-in benefits and once-only prompts', () => {
-  assert.match(read('package.json'), /"version": "1\.9\.48"/);
-  assert.equal((read('index.html').match(/data-no-i18n>1\.9\.48</g) || []).length, 2);
+  assert.match(read('package.json'), /"version": "1\.9\.49"/);
+  assert.equal((read('index.html').match(/data-no-i18n>1\.9\.49</g) || []).length, 2);
   const html = read('index.html');
-  assert.match(html, /styles\.css\?v=168/);
-  assert.match(html, /src\/app\.js\?v=168/);
+  assert.match(html, /styles\.css\?v=169/);
+  assert.match(html, /src\/app\.js\?v=169/);
   const sw = read('sw.js');
-  assert.match(sw, /CACHE_VERSION = 'v168';/);
+  assert.match(sw, /CACHE_VERSION = 'v169';/);
   assert.doesNotMatch(sw, /CACHE_VERSION = 'v142-preview'/);
-  assert.match(sw, /styles\.css\?v=168/);
-  assert.match(sw, /src\/app\.js\?v=168/);
+  assert.match(sw, /styles\.css\?v=169/);
+  assert.match(sw, /src\/app\.js\?v=169/);
   const app = read('src/app.js');
   assert.match(app, /signin-benefits/);
   assert.match(app, /function offerSigninPrompt/);
