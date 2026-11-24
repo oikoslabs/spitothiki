@@ -59,6 +59,7 @@ import { THEME_KEY, applyTheme, currentTheme } from './theme.js';
 import { initSource, sourceSignup, reportScan, applyOwnerTestStatus } from './source.js';
 import { isOwnerEmail } from './owner.js';
 import { TESTER_COLLAPSE_KEY, TWA_SESSION_KEY, isPlayApp, showTesterCard, TESTER_GROUP_URL, TESTER_PLAY_URL } from './tester-card.js';
+import { IOS_INSTALL_CLOSE, IOS_INSTALL_DISMISS_KEY, IOS_INSTALL_RESHOW, IOS_INSTALL_SETTINGS, iosInstallBrowserForHint, iosInstallCopy, shouldShowIosInstallHint } from './ios-install.js';
 
 const viewRoot = document.querySelector('#view-content');
 const itemDialog = document.querySelector('#item-dialog');
@@ -338,6 +339,7 @@ function renderGuide() {
       <h2>${escapeHtml(section.icon)} ${escapeHtml(displayGuideHeading(section))}</h2>
       <p class="guide-intro">${escapeHtml(t(section.intro))}</p>
       <ul class="guide-bullets">${section.bullets.map((bullet) => `<li>${escapeHtml(t(bullet))}</li>`).join('')}</ul>
+      ${section.id === 'tips' ? `<p class="guide-ios-install"><button class="text-button" type="button" data-action="ios-install-reshow" id="guide-ios-install">${escapeHtml(t(IOS_INSTALL_RESHOW))}</button></p>` : ''}
     </section>`).join('');
   const empty = `<p class="subtle-empty" id="guide-empty">${escapeHtml(t('Δεν βρήκα ενότητες για «{query}».', { query: guideQuery.trim() }))}</p>`;
   return `${renderHeader(t('Οδηγός'), t('Πώς δουλεύει η Σπιτοθήκη'))}
@@ -403,6 +405,34 @@ function renderInventoryCard(item) {
 }
 
 const SIGNIN_DISMISS_KEY = 'spitothiki:signin-card-dismissed';
+// Session-only: the guide / Settings “show again” control can re-open the iOS hint even on a desktop.
+let iosInstallForceOnce = false;
+function iosInstallHintOpts() {
+  const nav = globalThis.navigator || {};
+  return {
+    userAgent: nav.userAgent || '',
+    platform: nav.platform || '',
+    maxTouchPoints: nav.maxTouchPoints || 0,
+    standalone: Boolean(nav.standalone),
+    displayModeStandalone: Boolean(globalThis.matchMedia?.('(display-mode: standalone)')?.matches),
+    dismissed: readKey(IOS_INSTALL_DISMISS_KEY) === '1',
+    search: String(globalThis.location?.search || ''),
+    forceOnce: iosInstallForceOnce
+  };
+}
+function renderIosInstallHint() {
+  const opts = iosInstallHintOpts();
+  if (!shouldShowIosInstallHint(opts)) return '';
+  const copy = iosInstallCopy(iosInstallBrowserForHint(opts));
+  return `<section class="signin-card ios-install-hint" id="home-ios-install" aria-labelledby="home-ios-install-title">
+    <header class="signin-head"><span class="signin-icon" aria-hidden="true">📱</span>
+    <h2 id="home-ios-install-title">${escapeHtml(t(copy.title))}</h2>
+    <button class="icon-button signin-close" type="button" data-action="ios-install-dismiss" aria-label="${escapeHtml(t(IOS_INSTALL_CLOSE))}" title="${escapeHtml(t(IOS_INSTALL_CLOSE))}">×</button></header>
+    <p class="ios-install-intro">${escapeHtml(t(copy.intro))}</p>
+    <p class="ios-install-steps">${escapeHtml(t(copy.primary))}</p>
+    <p class="ios-install-more">${escapeHtml(t(copy.secondary))}</p>
+  </section>`;
+}
 function signinDismissedAt() { try { return Number(localStorage.getItem(SIGNIN_DISMISS_KEY)) || 0; } catch { return 0; } }
 // Compact nudge on the home screen while sync is available but the user is signed out.
 function renderSigninCard() {
@@ -757,7 +787,7 @@ function renderOverview() {
     ${renderHomeGuide()}
     ${renderHomePrimary()}
     ${summary.expired ? `<div class="alert-banner" role="status">${t(summary.expired === 1 ? '⚠️ Έχεις {count} προϊόν που έχει λήξει. Έλεγξέ τα πριν τα χρησιμοποιήσεις.' : '⚠️ Έχεις {count} προϊόντα που έχουν λήξει. Έλεγξέ τα πριν τα χρησιμοποιήσεις.', { count: summary.expired })}</div>` : ''}
-    ${renderStarterCard()}${renderSigninCard()}${renderProtectCard()}${renderTesterCard()}
+    ${renderIosInstallHint()}${renderStarterCard()}${renderSigninCard()}${renderProtectCard()}${renderTesterCard()}
     <section class="stats-grid home-stats" aria-label="Σύνοψη αποθέματος">
       <button class="stat-card" type="button" data-action="home-card" data-card="all" id="home-card-all"><span class="stat-icon">🧺</span><div><strong>${summary.products}</strong><span>προϊόντα στο σπίτι</span></div></button>
       <button class="stat-card" type="button" data-action="home-card" data-card="expiring" id="home-card-expiring"><span class="stat-icon amber">◷</span><div><strong>${summary.expiringSoon + summary.expired}</strong><span>λήγουν ή έληξαν</span></div></button>
@@ -920,6 +950,7 @@ function renderSettings() {
         <p class="we-dont-link"><a href="./privacy.html" target="_blank" rel="noopener">${escapeHtml(t('Πλήρης πολιτική απορρήτου'))}</a></p>
       </aside>
       <p class="about-contact"><a href="mailto:oikoslabs.apps@gmail.com" data-no-i18n>oikoslabs.apps@gmail.com</a> · <a href="./privacy.html" target="_blank" rel="noopener">${escapeHtml(t('Πολιτική απορρήτου'))}</a> · <a href="https://oikoslabs.github.io" target="_blank" rel="noopener" data-link="oikoslabs-site">${escapeHtml(t('Ιστότοπος Oikos Labs'))}</a></p>
+      <p class="ios-install-settings"><button class="text-button" type="button" data-action="ios-install-reshow" id="settings-ios-install">${escapeHtml(t(IOS_INSTALL_SETTINGS))}</button></p>
       <p>${escapeHtml(t('Ακολούθησε τη Σπιτοθήκη για νέα και tips.'))}</p>
       <div class="settings-actions" id="about-links"><a class="button button-quiet" data-link="facebook-about" href="https://www.facebook.com/people/SpitoThiki/61596458362898/" target="_blank" rel="noopener">Facebook</a><a class="button button-quiet" data-link="telegram-about" href="https://t.me/spitothiki" target="_blank" rel="noopener">Telegram</a><a class="button button-quiet" data-link="tiktok-about" href="https://www.tiktok.com/@spitothikiapp" target="_blank" rel="noopener">TikTok</a></div></section></div>
     <details class="panel collapsible settings-more" id="settings-advanced" ${openAttr('settings-advanced')}><summary><h2>Για προχωρημένους</h2><span class="field-hint">Ρύθμιση αποδείξεων, δοκιμαστικά δεδομένα, διαγραφή όλων</span></summary>
@@ -4820,6 +4851,16 @@ function handleAction(button) {
   else if (action === 'sheet-drive') { closeProtectSheet(); driveConnect(); }
   else if (action === 'sheet-later') closeProtectSheet();
   else if (action === 'home-signin-dismiss') { try { localStorage.setItem(SIGNIN_DISMISS_KEY, String(Date.now())); } catch {} renderApp(); }
+  else if (action === 'ios-install-dismiss') { writeKey(IOS_INSTALL_DISMISS_KEY, '1'); iosInstallForceOnce = false; renderApp(); }
+  else if (action === 'ios-install-reshow') {
+    writeKey(IOS_INSTALL_DISMISS_KEY, null);
+    iosInstallForceOnce = true;
+    const sheet = document.querySelector('#menu-sheet');
+    if (sheet?.open) sheet.close();
+    if (activeView !== 'overview') navigate('overview');
+    else renderApp();
+    requestAnimationFrame(() => document.querySelector('#home-ios-install')?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
+  }
   else if (action === 'home-card') {
     // Each home count card opens the matching view: all products / only expiring / the open shopping list.
     const card = button.dataset.card;

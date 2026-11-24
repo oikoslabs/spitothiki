@@ -12,6 +12,7 @@ import { CALENDAR_EN } from './calendar.js';
 import { PRICE_HISTORY_EN } from './price-history.js';
 import { EPAY_EN } from './epayment-target.js';
 import { CSV_EXPORT_EN } from './csv-export.js';
+import { IOS_INSTALL_EN } from './ios-install.js';
 
 export const LANG_KEY = 'spitothiki:lang';
 export const LANGS = ['el', 'en'];
@@ -38,6 +39,7 @@ const EN = {
   ...PRICE_HISTORY_EN,
   ...EPAY_EN,
   ...CSV_EXPORT_EN,
+  ...IOS_INSTALL_EN,
   "Κράτα ένα αντίγραφο των δεδομένων σου": "Keep a backup of your data",
   "Το τελευταίο αντίγραφο έγινε {date}.": "Your last backup was on {date}.",
   "Δεν έχεις κάνει ακόμα αντίγραφο. Αν αλλάξεις κινητό, θα το χρειαστείς.": "You have no backup yet. You will need one if you change phone.",

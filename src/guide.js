@@ -230,7 +230,9 @@ export const GUIDE_SECTIONS = [
     numbered: false,
     intro: 'Μικρές λεπτομέρειες που γλιτώνουν λάθη.',
     bullets: [
-      'Άνοιξε τη Σπιτοθήκη στο spitothiki.web.app. Από το μενού του browser (Chrome ή Safari) μπορείς να την προσθέσεις στην αρχική οθόνη του κινητού σου. Δεν χρειάζεται λογαριασμός.',
+      'Άνοιξε τη Σπιτοθήκη στο spitothiki.web.app. Δεν χρειάζεται λογαριασμός. Σε Android, από το μενού του Chrome μπορείς να πατήσεις «Εγκατάσταση» ή «Προσθήκη στην οθόνη αρχικής».',
+      'Σε iPhone ή iPad, στο Safari: πάτα το κουμπί κοινοποίησης (τετράγωνο με βελάκι πάνω) → «Προσθήκη στην οθόνη Αφετηρίας» → «Προσθήκη».',
+      'Σε Chrome, Brave ή άλλο browser στο iPhone: πάτα κοινοποίηση (πάνω δεξιά ή στο μενού ⋯) → «Προσθήκη στην οθόνη Αφετηρίας». Αν δεν υπάρχει, άνοιξε τη σελίδα στο Safari.',
       'Η εφαρμογή είναι δωρεάν, χωρίς διαφημίσεις, και δουλεύει και χωρίς internet. Τα δεδομένα μένουν στο κινητό ώσπου να συνδεθείς.',
       'Μοίρασε τη λίστα αγορών με το κουμπί κοινοποίησης και, αν ψωνίζεις συχνά στο ίδιο κατάστημα, όρισε τη σειρά των διαδρόμων.',
       'Για απορίες ή προβλήματα, γράψε στο oikoslabs.apps@gmail.com.'
@@ -372,6 +374,9 @@ export const GUIDE_EN = {
   'Χρήσιμα tips': 'Useful tips',
   'Μικρές λεπτομέρειες που γλιτώνουν λάθη.': 'Small details that help you avoid mistakes.',
   'Άνοιξε τη Σπιτοθήκη στο spitothiki.web.app. Από το μενού του browser (Chrome ή Safari) μπορείς να την προσθέσεις στην αρχική οθόνη του κινητού σου. Δεν χρειάζεται λογαριασμός.': 'Open Spitothiki at spitothiki.web.app. From the browser menu (Chrome or Safari) you can add it to your phone’s home screen. No account is needed.',
+  'Άνοιξε τη Σπιτοθήκη στο spitothiki.web.app. Δεν χρειάζεται λογαριασμός. Σε Android, από το μενού του Chrome μπορείς να πατήσεις «Εγκατάσταση» ή «Προσθήκη στην οθόνη αρχικής».': 'Open Spitothiki at spitothiki.web.app. No account is needed. On Android, from the Chrome menu you can tap “Install” or “Add to Home screen”.',
+  'Σε iPhone ή iPad, στο Safari: πάτα το κουμπί κοινοποίησης (τετράγωνο με βελάκι πάνω) → «Προσθήκη στην οθόνη Αφετηρίας» → «Προσθήκη».': 'On iPhone or iPad, in Safari: tap the share button (square with an arrow up) → “Add to Home Screen” → “Add”.',
+  'Σε Chrome, Brave ή άλλο browser στο iPhone: πάτα κοινοποίηση (πάνω δεξιά ή στο μενού ⋯) → «Προσθήκη στην οθόνη Αφετηρίας». Αν δεν υπάρχει, άνοιξε τη σελίδα στο Safari.': 'In Chrome, Brave or another browser on iPhone: tap share (top right or in the ⋯ menu) → “Add to Home Screen”. If it is not there, open the page in Safari.',
   'Η εφαρμογή είναι δωρεάν, χωρίς διαφημίσεις, και δουλεύει και χωρίς internet. Τα δεδομένα μένουν στο κινητό ώσπου να συνδεθείς.': 'The app is free, with no ads, and works offline too. Your data stays on the phone until you sign in.',
   'Μοίρασε τη λίστα αγορών με το κουμπί κοινοποίησης και, αν ψωνίζεις συχνά στο ίδιο κατάστημα, όρισε τη σειρά των διαδρόμων.': 'Share the shopping list with the share button and, if you often shop at the same store, set the aisle order.',
   'Για απορίες ή προβλήματα, γράψε στο oikoslabs.apps@gmail.com.': 'For questions or problems, write to oikoslabs.apps@gmail.com.',
