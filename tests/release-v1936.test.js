@@ -10,8 +10,8 @@ test('v1.9.36 release: version, cache v144 and the 2026-11-15 recipe batch', () 
   assert.match(read('package.json'), /"version": "1\.9\.48"/);
   assert.equal((read('index.html').match(/data-no-i18n>1\.9\.48</g) || []).length, 2);
   const sw = read('sw.js');
-  assert.match(sw, /CACHE_VERSION = 'v165';/);
-  assert.match(sw, /styles\.css\?v=165/);
+  assert.match(sw, /CACHE_VERSION = 'v168';/);
+  assert.match(sw, /styles\.css\?v=168/);
   const batch = RECIPE_BATCHES['2026-11-15'];
   assert.equal(batch.length, 8);
   const recipes = batch.map((id) => BUILTIN_RECIPES.find((r) => r.id === id));

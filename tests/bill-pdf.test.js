@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { findDates, findDuplicateBill, findRf, itemsToLines, mergeBill, parseBillText } from '../src/bill-pdf.js';
+import { findDates, findDuplicateBill, findRf, itemsToLines, mergeBill, isUtilityBill, parseBillText, pdfRenderScale, MAX_BILL_CANVAS_SIDE, MAX_BILL_CANVAS_PIXELS } from '../src/bill-pdf.js';
+import { parseBillCode, parseEydapBarcode } from '../src/bills.js';
 
 const fx = (name) => readFileSync(new URL(`./fixtures/bills/${name}`, import.meta.url), 'utf8');
 
@@ -100,4 +101,52 @@ test('bill text: RF block fallback never guesses (single amount, two dates, earl
   assert.deepEqual(((b) => [b.amount, b.due])(parseBillText(`X\n${rf}\n5,00 €\n5,00 €\n01/10/2026\nπαλιό\n\n\n\n\n\n\n\n\n15/10/2026`)), [5, '']);
   // labels still win over the block
   assert.deepEqual(((b) => [b.amount, b.due])(parseBillText(`Ποσό πληρωμής 40,00 €\nΛήξη 30/10/2026\n${rf}\n47,60 €\n47,60 €\n28/10/2026`)), [40, '2026-10-30']);
+});
+
+test('bill text: current ΕΥΔΑΠ layout (ΠΡΩΤΕΥΟΥΣΑΣ, ΠΛΗΡΩΤΕΟ, ignores μερικό σύνολο, invoice + payment line)', () => {
+  const b = parseBillText(fx('eydap-current.txt'));
+  assert.deepEqual([b.name, b.type, b.amount, b.due, b.reference], ['ΕΥΔΑΠ', 'water', 36.4, '2027-03-15', '202700100001234581']);
+  assert.deepEqual(b.period, { from: '2026-11-10', to: '2027-02-08' });
+});
+
+test('bill text: ΕΥΔΑΠ header without the logo still names the provider', () => {
+  const b = parseBillText('ΛΟΓΑΡΙΑΣΜΟΣ ΥΔΡΕΥΣΗΣ ΚΑΙ ΑΠΟΧΕΤΕΥΣΗΣ\nΕΤΑΙΡΕΙΑ ΥΔΡΕΥΣΗΣ ΚΑΙ ΑΠΟΧΕΤΕΥΣΗΣ ΠΡΩΤΕΥΟΥΣΑΣ Α.Ε.\nΠΟΣΟ ΠΛΗΡΩΜΗΣ (ΕΥΡΩ) 36,40\nΛΗΞΗ ΠΡΟΘΕΣΜΙΑΣ ΠΛΗΡΩΜΗΣ 15/03/2027');
+  assert.deepEqual([b.name, b.type, b.amount, b.due], ['ΕΥΔΑΠ', 'water', 36.4, '2027-03-15']);
+});
+
+test('bill text: ΕΥΔΑΠ payment line fills amount, due and code when labels are missing', () => {
+  const b = parseBillText('Scanned with CamScanner\n>2027031510472836< 0000036400< 10021< 42>');
+  assert.deepEqual([b.name, b.type, b.amount, b.due, b.reference], ['ΕΥΔΑΠ', 'water', 36.4, '2027-03-15', '2027031510472836']);
+});
+
+test('mergeBill: a valid EYDAP barcode fills name, amount, due and reference (and beats a wrong OCR amount)', () => {
+  const text = parseBillText('ΛΟΓΑΡΙΑΣΜΟΣ ΥΔΡΕΥΣΗΣ ΚΑΙ ΑΠΟΧΕΤΕΥΣΗΣ\nΠΟΣΟ ΠΛΗΡΩΜΗΣ (ΕΥΡΩ) 99,00');
+  const m = mergeBill(text, [], ['|2027031510472836|0000036400|10021|42|']);
+  assert.deepEqual([m.name, m.type, m.amount, m.due, m.reference, m.sources.amount, m.sources.due, m.sources.name], ['ΕΥΔΑΠ', 'water', 36.4, '2027-03-15', '2027031510472836', 'code', 'code', 'text']);
+});
+
+test('EYDAP barcode: Luhn failure is rejected and text is used instead', () => {
+  assert.equal(parseEydapBarcode('|2027031510472836|0000036401|10021|42|'), null);
+  const m = mergeBill(parseBillText('ΠΟΣΟ ΠΛΗΡΩΜΗΣ (ΕΥΡΩ) 36,40\nΛΗΞΗ ΠΡΟΘΕΣΜΙΑΣ ΠΛΗΡΩΜΗΣ 15/03/2027'), [], ['|2027031510472836|0000036401|10021|42|']);
+  assert.deepEqual([m.amount, m.due, m.reference], [36.4, '2027-03-15', '']);
+});
+
+test('pdfRenderScale: A4 can go up to ~250 dpi; a huge CamScanner page is capped', () => {
+  const a4 = pdfRenderScale(595, 842, 3.5);
+  assert.ok(a4 <= 3.5);
+  assert.ok(595 * a4 <= MAX_BILL_CANVAS_SIDE + 1);
+  assert.ok(842 * a4 <= MAX_BILL_CANVAS_SIDE + 1);
+  assert.ok(595 * a4 * 842 * a4 <= MAX_BILL_CANVAS_PIXELS + 1);
+  const huge = pdfRenderScale(3300, 4680, 3.5);
+  assert.ok(huge < 1);
+  assert.ok(4680 * huge <= MAX_BILL_CANVAS_SIDE + 1);
+  assert.ok(3300 * huge * 4680 * huge <= MAX_BILL_CANVAS_PIXELS + 1);
+  assert.equal(pdfRenderScale(595, 842, 2) <= 2, true);
+});
+
+test('isUtilityBill: known providers with amount/due are bills; a supermarket receipt is not', () => {
+  assert.equal(isUtilityBill(parseBillText(fx('eydap-current.txt'))), true);
+  assert.equal(isUtilityBill(parseBillText(fx('dei.txt'))), true);
+  assert.equal(isUtilityBill(parseBillText('ΣΚΛΑΒΕΝΙΤΗΣ\nΓΑΛΑ 1,89 13%\nΨΩΜΙ 1,20 13%\nΣΥΝΟΛΟ 3,09')), false);
+  assert.equal(isUtilityBill(parseBillText('')), false);
 });

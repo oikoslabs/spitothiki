@@ -1,5 +1,5 @@
 // Import a utility bill from a PDF (or photo): text via pdf.js (lazy, SW-cached), OCR fallback via Tesseract.js.
-import { guessBillType, parseBillCode, validRf } from './bills.js';
+import { findEydapCode, guessBillType, parseBillCode, validRf } from './bills.js';
 
 // v1.9.4: self-hosted pdf.js 6.4.299 (vendor/, fingerprints in vendor/SHA256SUMS).
 export const PDFJS_URL = new URL('../vendor/pdfjs-6.4.299/pdf.min.mjs', import.meta.url).href;
@@ -7,7 +7,7 @@ export const PDFJS_WORKER_URL = new URL('../vendor/pdfjs-6.4.299/pdf.worker.min.
 
 export const PROVIDERS = [
   { name: 'ΔΕΗ', type: 'electricity', re: /\bΔΕΗ\b|\bDEI\b|ΔΗΜΟΣΙΑ ΕΠΙΧΕΙΡΗΣΗ ΗΛΕΚΤΡΙΣΜΟΥ|\bPPC\b|MYDEI|DEI\.GR/ },
-  { name: 'ΕΥΔΑΠ', type: 'water', re: /ΕΥΔΑΠ|E\.?Y\.?D\.?A\.?P|ΕΤΑΙΡΕΙΑ ΥΔΡΕΥΣΗΣ (ΚΑΙ|&) ΑΠΟΧΕΤΕΥΣΗΣ ΠΡΩΤΕΥΟΥΣΗΣ/ },
+  { name: 'ΕΥΔΑΠ', type: 'water', re: /ΕΥΔΑΠ|E\.?Y\.?D\.?A\.?P|ΕΤΑΙΡΕΙΑ ΥΔΡΕΥΣΗΣ (ΚΑΙ|&) ΑΠΟΧΕΤΕΥΣΗΣ ΠΡΩΤΕΥΟΥΣ[ΗΑ]Σ|ΛΟΓΑΡΙΑΣΜΟΣ ΥΔΡΕΥΣΗΣ (ΚΑΙ|&) ΑΠΟΧΕΤΕΥΣΗΣ/ },
   { name: 'ΕΥΑΘ', type: 'water', re: /ΕΥΑΘ|EYATH|ΥΔΡΕΥΣΗΣ (ΚΑΙ|&) ΑΠΟΧΕΤΕΥΣΗΣ ΘΕΣΣΑΛΟΝΙΚΗΣ/ },
   { name: 'ΔΕΥΑ', type: 'water', re: /Δ\.?Ε\.?Υ\.?Α\.?\s?[Α-Ω]/ },
   { name: 'Cosmote', type: 'phone', re: /COSMOTE|\bΟΤΕ\b|\bOTE\b/ },
@@ -65,6 +65,7 @@ const DATE_HEADERS = /(?:ΗΜΕΡΟΜΗΝΙΑ|ΗΜ\/ΝΙΑ|ΗΜ\.)\s*[Α-ΩA-Z]+
 const MONEY_HEADERS = /(?:ΣΥΝΟΛΙΚΟ\s+|ΤΕΛΙΚΟ\s+)?ΠΟΣΟ(?:\s+ΠΡΟΣ)?\s*[Α-Ω]*|ΣΥΝΟΛ[Α-Ω]*(?:\s+ΠΡΟΣ)?\s*[Α-Ω]*|ΠΛΗΡΩΤΕΟ\s*[Α-Ω]*|ΥΠΟΛΟΙΠ[Α-Ω]*|ΦΠΑ|ΑΞΙΑ\s*[Α-Ω]*|ΟΦΕΙΛ[Α-Ω]*/g;
 const ANY_LABEL = (p) => AMOUNT_LABELS.some((re) => re.test(p)) || DUE_LABELS.some((re) => re.test(p));
 const PERIOD = /(?:ΠΕΡΙΟΔΟΣ[^\d]{0,30}|ΑΠΟ\s)(\d{1,2})\s?[/.-]\s?(\d{1,2})\s?[/.-]\s?(\d{4}|\d{2})\s*(?:-|–|ΕΩΣ|ΜΕΧΡΙ|ΩΣ|TO)\s*(\d{1,2})\s?[/.-]\s?(\d{1,2})\s?[/.-]\s?(\d{4}|\d{2})/;
+const INVOICE = /ΑΡΙΘΜΟΣ ΠΑΡΑΣΤΑΤΙΚΟΥ[^\d]{0,16}(\d{4})\s*(\d{4})\s*(\d{4})\s*(\d{4})\s*(\d{2})/;
 
 const BARE_PERIOD = /^(\d{1,2})[/.](\d{1,2})[/.](\d{4})\s*[-–]\s*(\d{1,2})[/.](\d{1,2})[/.](\d{4})$/;
 // No labels in the text (some bills draw them as graphics, e.g. Vodafone Business / SOFTONE): use the payment
@@ -135,6 +136,9 @@ export function findRf(text) {
   return fallback ? { reference: fallback, rfValid: false } : { reference: '', rfValid: false };
 }
 
+export function isUtilityBill(parsed) {
+  return Boolean(parsed && parsed.name && (parsed.amount != null || parsed.due || parsed.reference));
+}
 export function parseBillText(text) {
   const raw = String(text || '').split(/\r?\n/).map((l) => l.replace(/\t/g, '   ').trim()).filter(Boolean);
   const rows = raw.map((l) => ({ text: l.replace(/\s+/g, ' '), cells: l.split(/\s{2,}/).map((c) => c.trim()).filter(Boolean) }));
@@ -142,18 +146,22 @@ export function parseBillText(text) {
   const all = plain(lines.join('\n'));
   let provider = null; let at = Infinity;
   for (const entry of PROVIDERS) { const m = all.match(entry.re); if (m && m.index < at) { provider = entry; at = m.index; } }
-  const amount = findLabeled(rows, AMOUNT_LABELS, AMOUNT_SKIP, amountValues, MONEY_HEADERS);
-  const due = findLabeled(rows, DUE_LABELS, DUE_SKIP, dateValues, DATE_HEADERS);
+  const labeledAmount = findLabeled(rows, AMOUNT_LABELS, AMOUNT_SKIP, amountValues, MONEY_HEADERS);
+  const labeledDue = findLabeled(rows, DUE_LABELS, DUE_SKIP, dateValues, DATE_HEADERS);
   const periodMatch = all.match(PERIOD) || lines.map((l) => plain(l).match(BARE_PERIOD)).find(Boolean);
   const rf = findRf(lines.join('\n'));
+  const eydap = findEydapCode(text);
+  const invoice = all.match(INVOICE);
+  const invoiceRef = invoice ? invoice.slice(1).join('') : '';
   const period = periodMatch ? { from: isoDate(periodMatch[1], periodMatch[2], periodMatch[3]), to: isoDate(periodMatch[4], periodMatch[5], periodMatch[6]) } : null;
-  const block = (amount == null || !due) && rf.reference ? paymentBlock(lines, rf.reference, period) : {};
+  const block = (labeledAmount == null || !labeledDue) && rf.reference ? paymentBlock(lines, rf.reference, period) : {};
+  if (!provider && eydap) provider = { name: 'ΕΥΔΑΠ', type: 'water' };
   const name = provider?.name || '';
   return {
     name, provider: name, type: provider?.type || (name ? guessBillType(name) : 'other'),
-    amount: amount ?? block.amount ?? null, due: due || block.due || '',
+    amount: labeledAmount ?? block.amount ?? eydap?.amount ?? null, due: labeledDue || block.due || eydap?.due || '',
     period,
-    reference: rf.reference, rfValid: rf.rfValid
+    reference: rf.reference || invoiceRef || eydap?.reference || '', rfValid: rf.rfValid
   };
 }
 
@@ -166,8 +174,13 @@ export function mergeBill(base, extra = [], codes = []) {
     const c = parseBillCode(raw);
     if (!c) continue;
     if (c.amount != null && c.amount > 0) { out.amount = c.amount; out.sources.amount = 'code'; }
-    if (c.rfValid && (!out.rfValid || !out.reference)) { out.reference = c.reference; out.rfValid = true; out.sources.reference = 'code'; }
     if (c.due) { out.due = c.due; out.sources.due = 'code'; }
+    if (c.reference && (!out.reference || (c.rfValid && !out.rfValid))) {
+      if (c.rfValid || c.kind === 'eydap' || c.kind === 'epc' || c.kind === 'rf' || c.kind === 'barcode') {
+        out.reference = c.reference; out.rfValid = Boolean(c.rfValid); out.sources.reference = 'code';
+      }
+    }
+    if (!out.name && c.name) { out.name = c.name; out.provider = c.name; out.type = c.type || guessBillType(c.name); out.sources.name = 'code'; }
   }
   for (const e of extra) {
     if (!e) continue;
@@ -226,12 +239,42 @@ async function pdfText(doc, maxPages = 3) {
   }
   return out.join('\n');
 }
-async function renderPage(doc, n, scale) {
-  const page = await doc.getPage(n);
-  const viewport = page.getViewport({ scale });
-  const canvas = document.createElement('canvas'); canvas.width = viewport.width; canvas.height = viewport.height;
-  await page.render({ canvasContext: canvas.getContext('2d'), viewport, canvas }).promise;
+// Cap PDF/photo canvases so mobile Chrome does not OOM Tesseract (pixdata_malloc fail)
+// or freeze the UI. ~2500px long side / 8 MP is enough for OCR and barcodes.
+export const MAX_BILL_CANVAS_SIDE = 2500;
+export const MAX_BILL_CANVAS_PIXELS = 8_000_000;
+export function pdfRenderScale(pageWidth, pageHeight, preferredScale = 3.5) {
+  const w = Math.max(1, Number(pageWidth) || 1);
+  const h = Math.max(1, Number(pageHeight) || 1);
+  const bySide = MAX_BILL_CANVAS_SIDE / Math.max(w, h);
+  const byPixels = Math.sqrt(MAX_BILL_CANVAS_PIXELS / (w * h));
+  const scale = Math.min(preferredScale, bySide, byPixels);
+  return Math.max(0.25, Math.round(scale * 100) / 100);
+}
+export function fitBillCanvas(source, maxSide = MAX_BILL_CANVAS_SIDE, maxPixels = MAX_BILL_CANVAS_PIXELS) {
+  const w = source.width || source.naturalWidth || 0;
+  const h = source.height || source.naturalHeight || 0;
+  if (!w || !h) return source;
+  const scale = Math.min(1, maxSide / Math.max(w, h), Math.sqrt(maxPixels / (w * h)));
+  if (scale >= 0.99) return source;
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(w * scale));
+  canvas.height = Math.max(1, Math.round(h * scale));
+  canvas.getContext('2d').drawImage(source, 0, 0, canvas.width, canvas.height);
   return canvas;
+}
+async function renderPage(doc, n, preferredScale = 2) {
+  const page = await doc.getPage(n);
+  const base = page.getViewport({ scale: 1 });
+  const scale = pdfRenderScale(base.width, base.height, preferredScale);
+  const viewport = page.getViewport({ scale });
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.floor(viewport.width));
+  canvas.height = Math.max(1, Math.floor(viewport.height));
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('canvas');
+  await page.render({ canvasContext: ctx, viewport, canvas }).promise;
+  return fitBillCanvas(canvas);
 }
 async function pageCodes(canvas, decodeImpl) {
   try {
@@ -242,11 +285,12 @@ async function pageCodes(canvas, decodeImpl) {
 }
 
 async function ocrCanvas(canvas, onProgress, recognizeImpl) {
-  if (recognizeImpl) return (await recognizeImpl(canvas)).text;
+  const input = fitBillCanvas(canvas);
+  if (recognizeImpl) return (await recognizeImpl(input)).text || '';
   const { getWorker } = await import('./receipt-photo.js');
   const worker = await getWorker(onProgress);
-  const { data } = await worker.recognize(canvas, { rotateAuto: true });
-  return data.text;
+  const { data } = await worker.recognize(input, { rotateAuto: true });
+  return data?.text || '';
 }
 
 // File (PDF or image) -> { text, source: 'pdf' | 'ocr', parsed } with parsed.sources = { amount: 'code'|'text'|'ocr', … }.
@@ -258,33 +302,65 @@ export async function readBillFile(file, { onProgress, onParsed, recognizeImpl, 
   const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name || '');
   if (!isPdf) {
     const { preprocess } = await import('./receipt-photo.js');
-    const img = await new Promise((resolve, reject) => { const url = URL.createObjectURL(file); const el = new Image(); el.onload = () => resolve(el); el.onerror = () => reject(new Error('Δεν ήταν δυνατό να ανοίξει το αρχείο.')); el.src = url; });
+    const img = await new Promise((resolve, reject) => { const url = URL.createObjectURL(file); const el = new Image(); el.onload = () => { URL.revokeObjectURL(url); resolve(el); }; el.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Δεν ήταν δυνατό να ανοίξει το αρχείο.')); }; el.src = url; });
     onProgress?.({ status: 'ocr' });
-    const text = await ocrCanvas(preprocess(img), onProgress, recognizeImpl);
-    const parsed = mergeBill(parseBillText(text));
-    return { text, source: 'ocr', parsed };
+    let canvas = fitBillCanvas(preprocess(img));
+    let text = '';
+    let ocrFailed = false;
+    try { text = await withTimeout((async () => ocrCanvas(canvas, onProgress, recognizeImpl))(), ocrTimeoutMs, ''); }
+    catch { ocrFailed = true; }
+    if (!text) ocrFailed = true;
+    const codes = await withTimeout((async () => pageCodes(canvas, decodeImpl))(), codeTimeoutMs, []);
+    let parsed = mergeBill(parseBillText(text), [], codes);
+    // Same idea as receipt photos: if the upright read missed amount or due, try the other orientations.
+    if (parsed.amount == null || !parsed.due) {
+      for (const angle of [90, 270, 180]) {
+        if (parsed.amount != null && parsed.due) break;
+        const rotated = fitBillCanvas(preprocess(img, angle));
+        let ocrText = '';
+        try { ocrText = await withTimeout((async () => ocrCanvas(rotated, onProgress, recognizeImpl))(), ocrTimeoutMs, ''); }
+        catch { ocrText = ''; }
+        const moreCodes = await withTimeout((async () => pageCodes(rotated, decodeImpl))(), codeTimeoutMs, []);
+        if (ocrText) { text = ocrText; ocrFailed = false; parsed = mergeBill(parsed, [parseBillText(ocrText)], moreCodes); }
+        else if (moreCodes.length) parsed = mergeBill(parsed, [], moreCodes);
+      }
+    }
+    if (parsed.amount != null || parsed.due || parsed.name || parsed.reference) ocrFailed = false;
+    return { text, source: 'ocr', parsed, ocrFailed };
   }
   onProgress?.({ status: 'pdf' });
   const lib = await loadPdfjs();
   const doc = await lib.getDocument({ data: new Uint8Array(await file.arrayBuffer()), isEvalSupported: false }).promise;
   let text = await pdfText(doc);
   let source = 'pdf';
-  const scanned = text.replace(/\s/g, '').length < 40;
+  // Image-only / CamScanner PDFs often have a short or watermark-only text layer. Those need a
+  // higher-resolution render (~250 dpi) so OCR and barcodes can read the page image.
+  const scanned = text.replace(/\s/g, '').length < 80 || /CAMSCANNER|SCANNED WITH|SCANNED BY CAM/i.test(text);
   let parsed = mergeBill(parseBillText(text));
   if (!scanned) { try { onParsed?.(parsed, 'text'); } catch {} }
-  let canvas = null;
-  const page1 = async () => (canvas ||= await renderPage(doc, 1, 2));
-  // QR / barcodes on page 1 (EPC QR carries the amount).
+  let canvas = null; let canvasPromise = null;
+  const preferredScale = scanned || parsed.amount == null || !parsed.due ? 3.5 : 2;
+  const page1 = async () => {
+    if (canvas) return canvas;
+    if (!canvasPromise) canvasPromise = renderPage(doc, 1, preferredScale).then((c) => { canvas = c; return c; });
+    return canvasPromise;
+  };
+  // QR / barcodes on page 1 (EPC QR carries the amount; EYDAP payment barcodes carry amount + due).
   const codes = await withTimeout((async () => pageCodes(await page1(), decodeImpl))(), codeTimeoutMs, []);
   if (codes.length) { parsed = mergeBill(parsed, [], codes); if (!scanned) { try { onParsed?.(parsed, 'code'); } catch {} } }
-  if (scanned || parsed.amount == null || !parsed.due) {
-    // Scanned PDF, or the text layer lacks amount/due (often printed as an image): OCR page 1 for what's missing.
+  let ocrFailed = false;
+  if (scanned || parsed.amount == null || !parsed.due || !parsed.name) {
+    // Scanned PDF, or the text layer lacks fields (often printed as an image): OCR page 1 for what's missing.
     onProgress?.({ status: 'ocr' });
-    const ocrText = await withTimeout((async () => ocrCanvas(await page1(), onProgress, recognizeImpl))(), ocrTimeoutMs, '');
+    let ocrText = '';
+    try { ocrText = await withTimeout((async () => ocrCanvas(await page1(), onProgress, recognizeImpl))(), ocrTimeoutMs, ''); }
+    catch { ocrText = ''; }
     if (ocrText) {
       if (scanned) { text = ocrText; source = 'ocr'; parsed = mergeBill(parseBillText(ocrText), [], codes); for (const k of Object.keys(parsed.sources)) if (parsed.sources[k] === 'text') parsed.sources[k] = 'ocr'; }
       else parsed = mergeBill(parsed, [parseBillText(ocrText)]);
+    } else if (parsed.amount == null && !parsed.due && !parsed.name) {
+      ocrFailed = true;
     }
   }
-  return { text, source, parsed };
+  return { text, source, parsed, ocrFailed };
 }
