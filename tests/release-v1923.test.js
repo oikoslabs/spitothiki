@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 const read = (f) => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
 test('v1.9.23 release: version, cache bump and on-device scan counts', () => {
-  assert.match(read('package.json'), /"version": "1\.9\.47"/);
-  assert.equal((read('index.html').match(/data-no-i18n>1\.9\.47</g) || []).length, 2);
+  assert.match(read('package.json'), /"version": "1\.9\.48"/);
+  assert.equal((read('index.html').match(/data-no-i18n>1\.9\.48</g) || []).length, 2);
   const sw = read('sw.js');
   assert.match(sw, /CACHE_VERSION = 'v165';/);
   assert.match(read('src/source.js'), /reportScan/);

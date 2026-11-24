@@ -4,7 +4,7 @@
 // on every open). A new deploy still shows up: the browser re-checks sw.js on every open, a new CACHE_VERSION
 // installs a fresh copy of the shell, and the page reloads once on «controllerchange».
 // Bump CACHE_VERSION on EVERY deploy that changes any app file; old caches are deleted on activate.
-// v165: preview of 1.9.48 — live camera idle snapshot + product-mode toll accept + wide ZXing 1D regions.
+// v165: v1.9.48 release: toll photo/OCR fallback, live idle snapshot, product-mode toll accept, wide ZXing 1D regions.
 // v164: preview of 1.9.48 — toll receipt OCR fallback when the barcode bars don't decode.
 const CACHE_VERSION = 'v165';
 const CACHE = `spitothiki-${CACHE_VERSION}`;

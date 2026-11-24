@@ -79,7 +79,7 @@ test('About card ships in the service worker cache notes', () => {
   const sw = read('sw.js');
   assert.match(sw, /CACHE_VERSION = 'v165'/);
   assert.match(sw, /About card in Settings with Facebook, Telegram and the official TikTok account/);
-  assert.match(read('package.json'), /"version": "1\.9\.47"/);
+  assert.match(read('package.json'), /"version": "1\.9\.48"/);
 });
 
 test('About trust line only uses claims already in the privacy policy', () => {

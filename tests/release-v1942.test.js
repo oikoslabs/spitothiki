@@ -7,8 +7,8 @@ import { dictionaries } from '../src/i18n.js';
 const read = (f) => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
 
 test('v1.9.42 release: version, cache v158, prices, e-payments, link import, CSV export, updated guide', () => {
-  assert.match(read('package.json'), /"version": "1\.9\.47"/);
-  assert.equal((read('index.html').match(/data-no-i18n>1\.9\.47</g) || []).length, 2);
+  assert.match(read('package.json'), /"version": "1\.9\.48"/);
+  assert.equal((read('index.html').match(/data-no-i18n>1\.9\.48</g) || []).length, 2);
   const html = read('index.html');
   assert.match(html, /styles\.css\?v=165/);
   assert.match(html, /src\/app\.js\?v=165/);
@@ -48,7 +48,7 @@ test('v1.9.42 release: version, cache v158, prices, e-payments, link import, CSV
   assert.ok(searchGuide('1.9.42').some((s) => s.id === 'whats-new'));
   assert.ok(searchGuide('1.9.41').some((s) => s.id === 'whats-new'));
   const whats = GUIDE_SECTIONS.find((s) => s.id === 'whats-new');
-  assert.equal(whats.title, 'Τι νέο στην 1.9.47');
+  assert.equal(whats.title, 'Τι νέο στην 1.9.48');
   assert.ok(dictionaries.en[whats.title]);
   assert.ok(dictionaries.en[whats.intro]);
   for (const b of whats.bullets) assert.ok(dictionaries.en[b], `EN missing: ${b}`);
