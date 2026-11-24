@@ -543,6 +543,7 @@ const EN = {
   "Κανένας λογαριασμός ακόμη": "No bills yet",
   "Πρόσθεσε ΔΕΗ, νερό, ενοίκιο ή συνδρομές για να θυμάσαι πότε λήγουν.": "Add electricity, water, rent or subscriptions to remember when they are due.",
   "Ο κωδικός δεν αναγνωρίστηκε. Συμπλήρωσε τα στοιχεία με το χέρι.": "The code was not recognised. Fill in the details by hand.",
+  "Βρέθηκε barcode λογαριασμού": "Bill barcode found",
   "Βρέθηκε barcode ΕΥΔΑΠ: συμπληρώθηκαν πάροχος, ποσό, λήξη και κωδικός πληρωμής.": "EYDAP barcode found: provider, amount, due date and payment code filled in.",
   "Βρέθηκε QR πληρωμής: συμπληρώθηκαν δικαιούχος, ποσό και κωδικός πληρωμής.": "Payment QR found: payee, amount and payment code filled in.",
   "Βρέθηκε έγκυρος κωδικός πληρωμής.": "Valid payment code found.",

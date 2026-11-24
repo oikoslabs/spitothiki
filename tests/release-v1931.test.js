@@ -8,7 +8,7 @@ test('v1.9.31 release: version, cache bump, anonymous t=1 owner/preview flag', (
   assert.match(read('package.json'), /"version": "1\.9\.48"/);
   assert.equal((read('index.html').match(/data-no-i18n>1\.9\.48</g) || []).length, 2);
   const sw = read('sw.js');
-  assert.match(sw, /CACHE_VERSION = 'v167';/);
+  assert.match(sw, /CACHE_VERSION = 'v168';/);
   assert.match(sw, /src\/owner\.js/);
   const owner = read('src/owner.js');
   assert.match(owner, /export async function isOwnerEmail/);

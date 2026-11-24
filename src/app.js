@@ -17,7 +17,7 @@ import { RECURRING_INTERVALS, applyRecurring, createRecurring, dueFromSnapshot, 
 import { MEAL_SLOTS, copyPreviousWeek, createMeal, recipeFromMealDb, shiftDays, weekDays, weekShoppingNeeds, weekStart } from './mealplan.js';
 import { BUILTIN_RECIPES, RECIPE_CATS } from './recipes.js';
 import { BILL_ICONS, BILL_PERIODS, BILL_TYPES, applyAutoPay, autoPayFor, incomeTaxPlan, billCountInfo, billsMonthList, billsMonthSplit, scheduledDebits, billStats, billsDue, createBill, guessBillType, paidHistory, parseBillCode, unpaidBills, payBill, unpayBill } from './bills.js';
-import { findDuplicateBill, readBillFile } from './bill-pdf.js';
+import { findDuplicateBill, isUtilityBill, parseBillText, readBillFile } from './bill-pdf.js';
 import { initDietUi, renderDietSection } from './diet-ui.js';
 import { SHARED, cleanName, memberNames, monthBalance, monthExpenses, payerOf, setPayer, settlementsFor } from './whopaid.js';
 import { lastScanDate, pushDates, scanNudgeDates, pushSupported, pushSubscription, syncPush, stopPush } from './push.js';
@@ -1276,6 +1276,7 @@ async function openScanner({ onCode = fillFromBarcode, qr = false, confident = n
       // and the pantry/cart product scanner (not only receipt mode / handleScanned).
       const toll = parseTollBarcode(code);
       if (toll) { tollToTransport(toll); return; }
+      if (routeCode(code).route === 'bill') { navigate('bills'); openBillDialog(); applyBillCode(code); return; }
       onCode(code);
     }, { qr, confident, signal: ac.signal, streamPromise,
       // Receipt/«all» scans: a receipt's till barcode (date + till + transaction) is skipped so the QR can be read.
@@ -1423,12 +1424,13 @@ async function handleScanFile(file) {
   showToast('Ανάγνωση εικόνας…');
   let codes = [];
   try { codes = await decodeImageCodes(file, { mode: 'all', timeBudgetMs: 6000 }); } catch {}
-  if (codes.length) { handleScanned(codes.find(isUrlCode) || codes[0]); return; }
-  showChoice({ title: 'Δεν βρέθηκε κωδικός', message: t('Δεν βρήκα QR ή barcode στην εικόνα. Τι είναι;'), choices: [
-    { label: 'Απόδειξη', primary: true, run: () => { openReceiptDialog(); loadReceiptPhoto(file); } },
-    { label: 'Λογαριασμός', run: () => { navigate('bills'); importBillFile(file); } },
-    { label: 'Κλείσιμο', run: () => {} }
-  ] });
+  if (codes.length) {
+    const pick = codes.find((c) => routeCode(c).route === 'bill') || codes.find((c) => routeCode(c).route === 'toll') || codes.find(isUrlCode) || codes[0];
+    handleScanned(pick);
+    return;
+  }
+  if (!document.querySelector('#receipt-dialog')?.open) openReceiptDialog();
+  loadReceiptPhoto(file);
 }
 
 // ---------- First-run setup (3 questions) ----------
@@ -1880,6 +1882,8 @@ async function loadReceiptPhoto(file) {
     const codes = await decodeImageCodes(file).catch(() => []);
     link = codes.find(isUrlCode) || '';
     const aadeLink = link && classifyReceiptUrl(link).kind === 'aade';
+    const billCode = codes.find((c) => routeCode(c).route === 'bill');
+    if (billCode && !previous) { applyBillParsed(routeCode(billCode).bill, 'code'); return; }
     if (link && !previous && !aadeLink && receiptTarget !== 'transport') { loadReceipt(link); return; }
     toll = codes.map(parseTollBarcode).find(Boolean) || null;
   } catch {}
@@ -1900,6 +1904,8 @@ async function loadReceiptPhoto(file) {
     if (toll) { tollToTransport({ ...toll, amount: tollAmountFromText(result?.text) }, 'photo'); return; }
     const tollText = parseTollText(result?.text);
     if (tollText) { tollToTransport(tollText, 'photo'); return; }
+    const bill = parseBillText(result?.text || '');
+    if (!previous && receiptTarget !== 'transport' && isUtilityBill(bill)) { applyBillParsed(bill, 'ocr'); return; }
     let qrReceipt = previous?.receipt && previous.receipt.format === 'AADE' ? previous.receipt : null;
     if (!qrReceipt && link && classifyReceiptUrl(link).kind === 'aade') {
       try { qrReceipt = await fetchReceipt(link, { proxy: receiptProxy() }); }
@@ -1945,6 +1951,7 @@ function receiptCode(code) {
   if (isUrlCode(value)) { loadReceipt(value); return; }
   const toll = parseTollBarcode(value);
   if (toll) { tollToTransport(toll); return; }
+  if (routeCode(value).route === 'bill') { navigate('bills'); openBillDialog(); applyBillCode(value); return; }
   const till = parseStoreReceiptBarcode(value);
   if (till) { receiptState = { step: 'start', error: t('Διάβασα τον barcode του ταμείου ({date}), όχι το QR. Αυτός ο barcode δεν έχει τα είδη της απόδειξης, γι’ αυτό δεν μπορεί να ανοίξει. Σκάναρε το QR της απόδειξης (συνήθως κάτω δεξιά) ή βγάλε της φωτογραφία.', { date: formatDate(till.date) }), raw: value.slice(0, 120) }; renderReceipt(); return; }
   receiptState = { step: 'start', error: t('Αυτός ο κωδικός δεν είναι το QR της απόδειξης (μπορεί να είναι κάρτα πόντων ή ο barcode του ταμείου). Σκάναρε το QR της απόδειξης ή βγάλε φωτογραφία την απόδειξη.'), raw: value.slice(0, 120) };
@@ -3799,6 +3806,26 @@ function openBillDialog(id = '') {
   document.querySelector('#bill-dialog').showModal();
 }
 
+function applyBillParsed(parsed, source = 'ocr') {
+  if (!parsed || (!parsed.name && parsed.amount == null && !parsed.due && !parsed.reference)) return false;
+  document.querySelector('#receipt-dialog')?.close();
+  navigate('bills');
+  if (!document.querySelector('#bill-dialog')?.open) openBillDialog();
+  const form = document.querySelector('#bill-form');
+  const status = document.querySelector('#bill-scan-status');
+  if (parsed.reference) form.elements.reference.value = parsed.reference;
+  if (parsed.amount != null) form.elements.amount.value = parsed.amount;
+  if (parsed.due) form.elements.due.value = parsed.due;
+  if (parsed.name && !form.elements.name.value) { form.elements.name.value = parsed.name; if (!form.dataset.typeTouched) form.elements.type.value = parsed.type || guessBillType(parsed.name); }
+  if ((parsed.type === 'water' || parsed.kind === 'eydap') && !form.elements.billId.value) { form.elements.type.value = 'water'; form.elements.period.value = '4'; form.dataset.typeTouched = '1'; }
+  else if (parsed.type === 'electricity' && !form.elements.billId.value) { form.elements.type.value = 'electricity'; form.elements.period.value = '1'; form.dataset.typeTouched = '1'; }
+  if (parsed.period) { form.elements.billingFrom.value = parsed.period.from || ''; form.elements.billingTo.value = parsed.period.to || ''; }
+  rememberAutoPay(form);
+  const found = [parsed.name && t('πάροχος'), parsed.amount != null && t('ποσό'), parsed.due && t('λήξη'), parsed.reference && t('κωδικός πληρωμής (έλεγξέ τον)'), parsed.period && t('περίοδος {from} – {to}', { from: formatDate(parsed.period.from), to: formatDate(parsed.period.to) })].filter(Boolean);
+  if (found.length) status.textContent = `${t(source === 'code' ? 'Βρέθηκε barcode λογαριασμού' : 'Από αναγνώριση εικόνας')}: ${found.join(', ')}. ${t('Έλεγξε και πάτα Αποθήκευση.')}`;
+  return true;
+}
+
 function applyBillCode(code) {
   const dialog = document.querySelector('#bill-dialog');
   if (!dialog.open) dialog.showModal();
@@ -3819,6 +3846,8 @@ function applyBillCode(code) {
 }
 
 window.__spitoApplyBillCode = applyBillCode;
+window.__spitoHandleScanned = handleScanned;
+window.__spitoHandleScanFile = handleScanFile;
 
 // New bill of a provider already paid by direct debit: tick «πάγια εντολή» (unless the user changed it).
 function rememberAutoPay(form) {

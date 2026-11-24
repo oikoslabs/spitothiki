@@ -136,6 +136,9 @@ export function findRf(text) {
   return fallback ? { reference: fallback, rfValid: false } : { reference: '', rfValid: false };
 }
 
+export function isUtilityBill(parsed) {
+  return Boolean(parsed && parsed.name && (parsed.amount != null || parsed.due || parsed.reference));
+}
 export function parseBillText(text) {
   const raw = String(text || '').split(/\r?\n/).map((l) => l.replace(/\t/g, '   ').trim()).filter(Boolean);
   const rows = raw.map((l) => ({ text: l.replace(/\s+/g, ' '), cells: l.split(/\s{2,}/).map((c) => c.trim()).filter(Boolean) }));
