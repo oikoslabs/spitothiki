@@ -236,12 +236,42 @@ async function pdfText(doc, maxPages = 3) {
   }
   return out.join('\n');
 }
-async function renderPage(doc, n, scale) {
-  const page = await doc.getPage(n);
-  const viewport = page.getViewport({ scale });
-  const canvas = document.createElement('canvas'); canvas.width = viewport.width; canvas.height = viewport.height;
-  await page.render({ canvasContext: canvas.getContext('2d'), viewport, canvas }).promise;
+// Cap PDF/photo canvases so mobile Chrome does not OOM Tesseract (pixdata_malloc fail)
+// or freeze the UI. ~2500px long side / 8 MP is enough for OCR and barcodes.
+export const MAX_BILL_CANVAS_SIDE = 2500;
+export const MAX_BILL_CANVAS_PIXELS = 8_000_000;
+export function pdfRenderScale(pageWidth, pageHeight, preferredScale = 3.5) {
+  const w = Math.max(1, Number(pageWidth) || 1);
+  const h = Math.max(1, Number(pageHeight) || 1);
+  const bySide = MAX_BILL_CANVAS_SIDE / Math.max(w, h);
+  const byPixels = Math.sqrt(MAX_BILL_CANVAS_PIXELS / (w * h));
+  const scale = Math.min(preferredScale, bySide, byPixels);
+  return Math.max(0.25, Math.round(scale * 100) / 100);
+}
+export function fitBillCanvas(source, maxSide = MAX_BILL_CANVAS_SIDE, maxPixels = MAX_BILL_CANVAS_PIXELS) {
+  const w = source.width || source.naturalWidth || 0;
+  const h = source.height || source.naturalHeight || 0;
+  if (!w || !h) return source;
+  const scale = Math.min(1, maxSide / Math.max(w, h), Math.sqrt(maxPixels / (w * h)));
+  if (scale >= 0.99) return source;
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(w * scale));
+  canvas.height = Math.max(1, Math.round(h * scale));
+  canvas.getContext('2d').drawImage(source, 0, 0, canvas.width, canvas.height);
   return canvas;
+}
+async function renderPage(doc, n, preferredScale = 2) {
+  const page = await doc.getPage(n);
+  const base = page.getViewport({ scale: 1 });
+  const scale = pdfRenderScale(base.width, base.height, preferredScale);
+  const viewport = page.getViewport({ scale });
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.floor(viewport.width));
+  canvas.height = Math.max(1, Math.floor(viewport.height));
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('canvas');
+  await page.render({ canvasContext: ctx, viewport, canvas }).promise;
+  return fitBillCanvas(canvas);
 }
 async function pageCodes(canvas, decodeImpl) {
   try {
@@ -252,11 +282,12 @@ async function pageCodes(canvas, decodeImpl) {
 }
 
 async function ocrCanvas(canvas, onProgress, recognizeImpl) {
-  if (recognizeImpl) return (await recognizeImpl(canvas)).text;
+  const input = fitBillCanvas(canvas);
+  if (recognizeImpl) return (await recognizeImpl(input)).text || '';
   const { getWorker } = await import('./receipt-photo.js');
   const worker = await getWorker(onProgress);
-  const { data } = await worker.recognize(canvas, { rotateAuto: true });
-  return data.text;
+  const { data } = await worker.recognize(input, { rotateAuto: true });
+  return data?.text || '';
 }
 
 // File (PDF or image) -> { text, source: 'pdf' | 'ocr', parsed } with parsed.sources = { amount: 'code'|'text'|'ocr', … }.
@@ -270,22 +301,29 @@ export async function readBillFile(file, { onProgress, onParsed, recognizeImpl, 
     const { preprocess } = await import('./receipt-photo.js');
     const img = await new Promise((resolve, reject) => { const url = URL.createObjectURL(file); const el = new Image(); el.onload = () => { URL.revokeObjectURL(url); resolve(el); }; el.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Δεν ήταν δυνατό να ανοίξει το αρχείο.')); }; el.src = url; });
     onProgress?.({ status: 'ocr' });
-    let canvas = preprocess(img);
-    let text = await ocrCanvas(canvas, onProgress, recognizeImpl);
+    let canvas = fitBillCanvas(preprocess(img));
+    let text = '';
+    let ocrFailed = false;
+    try { text = await withTimeout((async () => ocrCanvas(canvas, onProgress, recognizeImpl))(), ocrTimeoutMs, ''); }
+    catch { ocrFailed = true; }
+    if (!text) ocrFailed = true;
     const codes = await withTimeout((async () => pageCodes(canvas, decodeImpl))(), codeTimeoutMs, []);
     let parsed = mergeBill(parseBillText(text), [], codes);
     // Same idea as receipt photos: if the upright read missed amount or due, try the other orientations.
     if (parsed.amount == null || !parsed.due) {
       for (const angle of [90, 270, 180]) {
         if (parsed.amount != null && parsed.due) break;
-        const rotated = preprocess(img, angle);
-        const ocrText = await withTimeout((async () => ocrCanvas(rotated, onProgress, recognizeImpl))(), ocrTimeoutMs, '');
+        const rotated = fitBillCanvas(preprocess(img, angle));
+        let ocrText = '';
+        try { ocrText = await withTimeout((async () => ocrCanvas(rotated, onProgress, recognizeImpl))(), ocrTimeoutMs, ''); }
+        catch { ocrText = ''; }
         const moreCodes = await withTimeout((async () => pageCodes(rotated, decodeImpl))(), codeTimeoutMs, []);
-        if (ocrText) { text = ocrText; parsed = mergeBill(parsed, [parseBillText(ocrText)], moreCodes); }
+        if (ocrText) { text = ocrText; ocrFailed = false; parsed = mergeBill(parsed, [parseBillText(ocrText)], moreCodes); }
         else if (moreCodes.length) parsed = mergeBill(parsed, [], moreCodes);
       }
     }
-    return { text, source: 'ocr', parsed };
+    if (parsed.amount != null || parsed.due || parsed.name || parsed.reference) ocrFailed = false;
+    return { text, source: 'ocr', parsed, ocrFailed };
   }
   onProgress?.({ status: 'pdf' });
   const lib = await loadPdfjs();
@@ -297,25 +335,29 @@ export async function readBillFile(file, { onProgress, onParsed, recognizeImpl, 
   const scanned = text.replace(/\s/g, '').length < 80 || /CAMSCANNER|SCANNED WITH|SCANNED BY CAM/i.test(text);
   let parsed = mergeBill(parseBillText(text));
   if (!scanned) { try { onParsed?.(parsed, 'text'); } catch {} }
-  let canvas = null; let canvasScale = 0;
-  const page1 = async (scale) => {
-    if (canvas && canvasScale === scale) return canvas;
-    canvas = await renderPage(doc, 1, scale);
-    canvasScale = scale;
-    return canvas;
+  let canvas = null; let canvasPromise = null;
+  const preferredScale = scanned || parsed.amount == null || !parsed.due ? 3.5 : 2;
+  const page1 = async () => {
+    if (canvas) return canvas;
+    if (!canvasPromise) canvasPromise = renderPage(doc, 1, preferredScale).then((c) => { canvas = c; return c; });
+    return canvasPromise;
   };
-  const renderScale = scanned || parsed.amount == null || !parsed.due ? 3.5 : 2;
   // QR / barcodes on page 1 (EPC QR carries the amount; EYDAP payment barcodes carry amount + due).
-  const codes = await withTimeout((async () => pageCodes(await page1(renderScale), decodeImpl))(), codeTimeoutMs, []);
+  const codes = await withTimeout((async () => pageCodes(await page1(), decodeImpl))(), codeTimeoutMs, []);
   if (codes.length) { parsed = mergeBill(parsed, [], codes); if (!scanned) { try { onParsed?.(parsed, 'code'); } catch {} } }
+  let ocrFailed = false;
   if (scanned || parsed.amount == null || !parsed.due || !parsed.name) {
     // Scanned PDF, or the text layer lacks fields (often printed as an image): OCR page 1 for what's missing.
     onProgress?.({ status: 'ocr' });
-    const ocrText = await withTimeout((async () => ocrCanvas(await page1(renderScale), onProgress, recognizeImpl))(), ocrTimeoutMs, '');
+    let ocrText = '';
+    try { ocrText = await withTimeout((async () => ocrCanvas(await page1(), onProgress, recognizeImpl))(), ocrTimeoutMs, ''); }
+    catch { ocrText = ''; }
     if (ocrText) {
       if (scanned) { text = ocrText; source = 'ocr'; parsed = mergeBill(parseBillText(ocrText), [], codes); for (const k of Object.keys(parsed.sources)) if (parsed.sources[k] === 'text') parsed.sources[k] = 'ocr'; }
       else parsed = mergeBill(parsed, [parseBillText(ocrText)]);
+    } else if (parsed.amount == null && !parsed.due && !parsed.name) {
+      ocrFailed = true;
     }
   }
-  return { text, source, parsed };
+  return { text, source, parsed, ocrFailed };
 }

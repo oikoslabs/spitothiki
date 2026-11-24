@@ -10,12 +10,12 @@ test('v1.9.34 release: version, cache v142, day sheet and typed dots', () => {
   assert.match(read('package.json'), /"version": "1\.9\.48"/);
   assert.equal((read('index.html').match(/data-no-i18n>1\.9\.48</g) || []).length, 2);
   const html = read('index.html');
-  assert.match(html, /styles\.css\?v=166/);
-  assert.match(html, /src\/app\.js\?v=166/);
+  assert.match(html, /styles\.css\?v=167/);
+  assert.match(html, /src\/app\.js\?v=167/);
   assert.match(html, /id="cal-day-sheet"/);
   const sw = read('sw.js');
-  assert.match(sw, /CACHE_VERSION = 'v166';/);
-  assert.match(sw, /styles\.css\?v=166/);
+  assert.match(sw, /CACHE_VERSION = 'v167';/);
+  assert.match(sw, /styles\.css\?v=167/);
   const app = read('src/app.js');
   assert.match(app, /function openCalDaySheet/);
   assert.match(app, /dayDots\(/);

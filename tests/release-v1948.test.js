@@ -6,19 +6,19 @@ import { dictionaries } from '../src/i18n.js';
 
 const read = (f) => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
 
-test('v1.9.48 release: version, cache v166, toll photo/OCR fallback, live idle snapshot, updated guide', () => {
+test('v1.9.48 release: version, cache v167, toll photo/OCR fallback, live idle snapshot, updated guide', () => {
   assert.match(read('package.json'), /"version": "1\.9\.48"/);
   assert.equal((read('index.html').match(/data-no-i18n>1\.9\.48</g) || []).length, 2);
   const html = read('index.html');
-  assert.match(html, /styles\.css\?v=166/);
-  assert.match(html, /src\/app\.js\?v=166/);
-  assert.doesNotMatch(html, /v=166-preview/);
+  assert.match(html, /styles\.css\?v=167/);
+  assert.match(html, /src\/app\.js\?v=167/);
+  assert.doesNotMatch(html, /v=167-preview/);
   assert.doesNotMatch(html, /Σκολαρ|Skolarikis|Giannis |Γιάννης /);
   const sw = read('sw.js');
-  assert.match(sw, /CACHE_VERSION = 'v166';/);
-  assert.doesNotMatch(sw, /CACHE_VERSION = 'v166-preview'/);
-  assert.match(sw, /styles\.css\?v=166'/);
-  assert.match(sw, /src\/app\.js\?v=166'/);
+  assert.match(sw, /CACHE_VERSION = 'v167';/);
+  assert.doesNotMatch(sw, /CACHE_VERSION = 'v167-preview'/);
+  assert.match(sw, /styles\.css\?v=167'/);
+  assert.match(sw, /src\/app\.js\?v=167'/);
   const app = read('src/app.js');
   assert.match(app, /idleScanFallback/);
   assert.match(app, /captureVideoFrame/);

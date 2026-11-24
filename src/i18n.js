@@ -628,6 +628,8 @@ const EN = {
   "Συμπλήρωσε: {fields}.": "Please fill in: {fields}.",
   "Έλεγξε και πάτα Αποθήκευση.": "Check and press Save.",
   "Δεν βρέθηκαν στοιχεία λογαριασμού στο αρχείο. Συμπλήρωσε τα στοιχεία με το χέρι.": "No bill details found in the file. Fill them in by hand.",
+  "Δεν διαβάστηκε — δοκίμασε φωτογραφία": "Could not be read — try a photo",
+  "Δεν διαβάστηκε η φωτογραφία. Συμπλήρωσε τα στοιχεία με το χέρι.": "The photo could not be read. Fill in the details by hand.",
   "Δεν ήταν δυνατή η ανάγνωση του αρχείου. Συμπλήρωσε τα στοιχεία με το χέρι.": "Could not read the file. Fill in the details by hand.",
   "Δεν βρέθηκε το κοινοποιημένο αρχείο.": "The shared file was not found.",
   "Δεν ήταν δυνατό να ανοίξει το αρχείο.": "Could not open the file.",

@@ -3818,6 +3818,8 @@ function applyBillCode(code) {
     : t('Ο κωδικός αποθηκεύτηκε ως αναφορά πληρωμής. Συμπλήρωσε ποσό και λήξη.');
 }
 
+window.__spitoApplyBillCode = applyBillCode;
+
 // New bill of a provider already paid by direct debit: tick «πάγια εντολή» (unless the user changed it).
 function rememberAutoPay(form) {
   if (form.dataset.autoPayTouched || form.elements.billId.value) return;
@@ -3874,12 +3876,16 @@ async function importBillFile(file) {
         : final ? t('Δεν βρέθηκαν στοιχεία λογαριασμού στο αρχείο. Συμπλήρωσε τα στοιχεία με το χέρι.') : status.textContent;
       setBillDuplicate(parsed.name || parsed.reference ? findDuplicateBill(state.bills || [], { ...parsed, amount: parsed.amount ?? 0 }) : null);
     };
-    const { parsed, source } = await readBillFile(file, {
+    const { parsed, source, ocrFailed } = await readBillFile(file, {
       recognizeImpl: window.__spitoOcrMock, decodeImpl: window.__spitoBillCodesMock,
       onParsed: (p) => { early = p; fill(p, 'pdf', false); },
       onProgress: (m) => { if (early) return; status.textContent = m.status === 'recognizing text' ? t('Αναγνώριση κειμένου… {pct}%', { pct: Math.round((m.progress || 0) * 100) }) : m.status === 'ocr' ? t('Το PDF δεν έχει κείμενο· αναγνώριση από εικόνα…') : t('Ανάγνωση λογαριασμού…'); }
     });
     fill(parsed, source, true);
+    if (ocrFailed && current() && !parsed.name && parsed.amount == null && !parsed.due) {
+      const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name || '');
+      status.textContent = t(isPdf ? 'Δεν διαβάστηκε — δοκίμασε φωτογραφία' : 'Δεν διαβάστηκε η φωτογραφία. Συμπλήρωσε τα στοιχεία με το χέρι.');
+    }
   } catch (error) {
     if (early) { fill(early, 'pdf', true); return; }
     if (!current()) return;

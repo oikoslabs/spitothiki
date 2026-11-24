@@ -11,7 +11,7 @@ test('v1.9.30 release: version, cache bump, calendar bill status and guide', () 
   assert.match(read('package.json'), /"version": "1\.9\.48"/);
   assert.equal((read('index.html').match(/data-no-i18n>1\.9\.48</g) || []).length, 2);
   const sw = read('sw.js');
-  assert.match(sw, /CACHE_VERSION = 'v166';/);
+  assert.match(sw, /CACHE_VERSION = 'v167';/);
   const today = '2026-11-14';
   assert.equal(billCalendarStatus({ due: '2026-11-10', paid: false }, today).overdue, true);
   assert.equal(billCalendarStatus({ due: '2026-11-20', paid: false }, today).pending, true);

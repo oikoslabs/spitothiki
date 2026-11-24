@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { findDates, findDuplicateBill, findRf, itemsToLines, mergeBill, parseBillText } from '../src/bill-pdf.js';
+import { findDates, findDuplicateBill, findRf, itemsToLines, mergeBill, parseBillText, pdfRenderScale, MAX_BILL_CANVAS_SIDE, MAX_BILL_CANVAS_PIXELS } from '../src/bill-pdf.js';
 import { parseBillCode, parseEydapBarcode } from '../src/bills.js';
 
 const fx = (name) => readFileSync(new URL(`./fixtures/bills/${name}`, import.meta.url), 'utf8');
@@ -129,4 +129,17 @@ test('EYDAP barcode: Luhn failure is rejected and text is used instead', () => {
   assert.equal(parseEydapBarcode('|2027031510472836|0000036401|10021|42|'), null);
   const m = mergeBill(parseBillText('ΠΟΣΟ ΠΛΗΡΩΜΗΣ (ΕΥΡΩ) 36,40\nΛΗΞΗ ΠΡΟΘΕΣΜΙΑΣ ΠΛΗΡΩΜΗΣ 15/03/2027'), [], ['|2027031510472836|0000036401|10021|42|']);
   assert.deepEqual([m.amount, m.due, m.reference], [36.4, '2027-03-15', '']);
+});
+
+test('pdfRenderScale: A4 can go up to ~250 dpi; a huge CamScanner page is capped', () => {
+  const a4 = pdfRenderScale(595, 842, 3.5);
+  assert.ok(a4 <= 3.5);
+  assert.ok(595 * a4 <= MAX_BILL_CANVAS_SIDE + 1);
+  assert.ok(842 * a4 <= MAX_BILL_CANVAS_SIDE + 1);
+  assert.ok(595 * a4 * 842 * a4 <= MAX_BILL_CANVAS_PIXELS + 1);
+  const huge = pdfRenderScale(3300, 4680, 3.5);
+  assert.ok(huge < 1);
+  assert.ok(4680 * huge <= MAX_BILL_CANVAS_SIDE + 1);
+  assert.ok(3300 * huge * 4680 * huge <= MAX_BILL_CANVAS_PIXELS + 1);
+  assert.equal(pdfRenderScale(595, 842, 2) <= 2, true);
 });
