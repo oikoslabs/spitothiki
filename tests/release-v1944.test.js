@@ -5,8 +5,8 @@ import { readFileSync } from 'node:fs';
 const read = (f) => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
 
 test('v1.9.44 release: version, cache v160, more supermarket and fuel chains in scan counts', () => {
-  assert.match(read('package.json'), /"version": "1\.9\.49"/);
-  assert.equal((read('index.html').match(/data-no-i18n>1\.9\.49</g) || []).length, 2);
+  assert.match(read('package.json'), /"version": "1\.9\.50"/);
+  assert.equal((read('index.html').match(/data-no-i18n>1\.9\.50</g) || []).length, 2);
   const html = read('index.html');
   assert.match(html, /styles\.css\?v=170/);
   assert.match(html, /src\/app\.js\?v=170/);

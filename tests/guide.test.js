@@ -17,7 +17,7 @@ test('guide has a numbered manual ending with useful tips, 2–4 bullets each', 
   assert.equal(numbered.length, 17);
   for (const section of GUIDE_SECTIONS) {
     assert.ok(section.intro.trim());
-    const max = section.id === 'shopping' ? 8 : section.id === 'receipts' ? 7 : (section.id === 'settings' || section.id === 'spending' || section.id === 'pantry' || section.id === 'tips') ? 6 : section.id === 'whats-new' ? 5 : 4;
+    const max = section.id === 'shopping' ? 8 : section.id === 'receipts' ? 7 : (section.id === 'settings' || section.id === 'spending' || section.id === 'pantry' || section.id === 'tips') ? 6 : section.id === 'whats-new' ? 6 : 4;
     assert.ok(section.bullets.length >= 2 && section.bullets.length <= max, section.id);
   }
 });
@@ -120,7 +120,7 @@ test('guide covers last prices, electronic payments, receipt links, CSV export a
   const byId = Object.fromEntries(GUIDE_SECTIONS.map((section) => [section.id, section]));
   const textOf = (id) => [byId[id].intro, ...byId[id].bullets].join('\n');
   const whats = byId['whats-new'];
-  assert.equal(whats.title, 'Τι νέο στην 1.9.49');
+  assert.equal(whats.title, 'Τι νέο στην 1.9.50');
   assert.match(whats.intro, /Τελευταίες τιμές|στόχος ηλεκτρονικών|λινκ|Excel/);
   assert.match(textOf('whats-new'), /📈 Τελευταίες τιμές/);
   assert.match(textOf('whats-new'), /💳 Στόχος ηλεκτρονικών πληρωμών/);

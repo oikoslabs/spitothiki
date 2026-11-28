@@ -57,6 +57,6 @@ test('v1.9.16 disposable: wired into signup (app + firebase) and English string'
   const sw = read('sw.js');
   assert.match(sw, /CACHE_VERSION = 'v170'/);
   assert.ok(sw.includes("'./src/disposable-email.js'"));
-  assert.match(read('package.json'), /"version": "1\.9\.49"/);
-  assert.match(read('index.html'), /data-no-i18n>1\.9\.49</);
+  assert.match(read('package.json'), /"version": "1\.9\.50"/);
+  assert.match(read('index.html'), /data-no-i18n>1\.9\.50</);
 });

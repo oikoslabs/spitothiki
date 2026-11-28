@@ -4,7 +4,7 @@
 // on every open). A new deploy still shows up: the browser re-checks sw.js on every open, a new CACHE_VERSION
 // installs a fresh copy of the shell, and the page reloads once on «controllerchange».
 // Bump CACHE_VERSION on EVERY deploy that changes any app file; old caches are deleted on activate.
-// v170: preview — live scanner keeps scanning when idle (no more 5 s snapshot that closed the camera and failed close-up toll receipts).
+// v170: v1.9.50 release: the live scanner no longer closes and fails when a toll receipt is held close (keeps scanning, tips to move back).
 // v169: v1.9.49 release: EYDAP bills from PDF/photo/barcode/main scan, canvas cap so scanned PDFs do not hang, iOS install hint.
 // v168: preview — general scan routes utility bills (EYDAP etc.) to the bills form, not a purchase.
 // v167: preview — cap bill OCR canvas (~2500px/8MP) so CamScanner PDFs do not OOM on phones.
