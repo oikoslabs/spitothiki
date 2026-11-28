@@ -7,11 +7,11 @@ import { RECIPE_BATCHES } from '../src/recipe-data.js';
 const read = (f) => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
 
 test('v1.9.36 release: version, cache v144 and the 2026-11-15 recipe batch', () => {
-  assert.match(read('package.json'), /"version": "1\.9\.50"/);
-  assert.equal((read('index.html').match(/data-no-i18n>1\.9\.50</g) || []).length, 2);
+  assert.match(read('package.json'), /"version": "1\.9\.51"/);
+  assert.equal((read('index.html').match(/data-no-i18n>1\.9\.51</g) || []).length, 2);
   const sw = read('sw.js');
-  assert.match(sw, /CACHE_VERSION = 'v170';/);
-  assert.match(sw, /styles\.css\?v=170/);
+  assert.match(sw, /CACHE_VERSION = 'v171';/);
+  assert.match(sw, /styles\.css\?v=171/);
   const batch = RECIPE_BATCHES['2026-11-15'];
   assert.equal(batch.length, 8);
   const recipes = batch.map((id) => BUILTIN_RECIPES.find((r) => r.id === id));
