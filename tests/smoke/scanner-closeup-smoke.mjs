@@ -19,7 +19,7 @@ async function run(video, seconds) {
   if (/127\.0\.0\.1|localhost/.test(url)) await p.setBypassServiceWorker(true);
   await p.evaluateOnNewDocument(() => { Object.defineProperty(navigator, 'language', { get: () => 'el-GR' }); });
   await p.setRequestInterception(true);
-  p.on('request', (r) => (/cloudflareinsights|\/stats/.test(r.url()) && r.method() === 'POST' ? r.respond({ status: 204, body: '' }) : /cloudflareinsights/.test(r.url()) ? r.abort() : r.continue()));
+  p.on('request', (r) => (/cloudflareinsights|-stats\.|\/stats/.test(r.url()) && r.method() === 'POST' ? r.respond({ status: 204, body: '' }) : /cloudflareinsights/.test(r.url()) ? r.abort() : r.continue()));
   await p.goto(url, { waitUntil: 'networkidle0' });
   await p.evaluate(() => { localStorage.clear(); localStorage.setItem('spitothiki:onboarded', '1'); });
   await p.reload({ waitUntil: 'networkidle0' });
