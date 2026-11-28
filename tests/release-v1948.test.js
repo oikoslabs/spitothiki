@@ -7,8 +7,8 @@ import { dictionaries } from '../src/i18n.js';
 const read = (f) => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
 
 test('v1.9.48 release: version, cache v168, toll photo/OCR fallback, live idle snapshot, updated guide', () => {
-  assert.match(read('package.json'), /"version": "1\.9\.49"/);
-  assert.equal((read('index.html').match(/data-no-i18n>1\.9\.49</g) || []).length, 2);
+  assert.match(read('package.json'), /"version": "1\.9\.50"/);
+  assert.equal((read('index.html').match(/data-no-i18n>1\.9\.50</g) || []).length, 2);
   const html = read('index.html');
   assert.match(html, /styles\.css\?v=170/);
   assert.match(html, /src\/app\.js\?v=170/);
@@ -29,7 +29,7 @@ test('v1.9.48 release: version, cache v168, toll photo/OCR fallback, live idle s
   assert.match(barcode, /zxingRegions/);
   assert.doesNotMatch(barcode, /ChecksumError|return_errors:\s*true/);
   const whats = GUIDE_SECTIONS.find((s) => s.id === 'whats-new');
-  assert.equal(whats.title, 'Τι νέο στην 1.9.49');
+  assert.equal(whats.title, 'Τι νέο στην 1.9.50');
   const text = [whats.intro, ...whats.bullets].join('\n');
   assert.match(text, /φωτογραφία/);
   assert.match(text, /5 δευτερόλεπτα/);

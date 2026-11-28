@@ -8,8 +8,8 @@ import { dictionaries } from '../src/i18n.js';
 const read = (f) => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
 
 test('v1.9.30 release: version, cache bump, calendar bill status and guide', () => {
-  assert.match(read('package.json'), /"version": "1\.9\.49"/);
-  assert.equal((read('index.html').match(/data-no-i18n>1\.9\.49</g) || []).length, 2);
+  assert.match(read('package.json'), /"version": "1\.9\.50"/);
+  assert.equal((read('index.html').match(/data-no-i18n>1\.9\.50</g) || []).length, 2);
   const sw = read('sw.js');
   assert.match(sw, /CACHE_VERSION = 'v170';/);
   const today = '2026-11-14';
