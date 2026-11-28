@@ -10,12 +10,12 @@ test('v1.9.33 release: version, cache v141, home sign-in card and guide', () => 
   assert.match(read('package.json'), /"version": "1\.9\.49"/);
   assert.equal((read('index.html').match(/data-no-i18n>1\.9\.49</g) || []).length, 2);
   const html = read('index.html');
-  assert.match(html, /styles\.css\?v=169/);
-  assert.match(html, /src\/app\.js\?v=169/);
+  assert.match(html, /styles\.css\?v=170/);
+  assert.match(html, /src\/app\.js\?v=170/);
   const sw = read('sw.js');
-  assert.match(sw, /CACHE_VERSION = 'v169';/);
+  assert.match(sw, /CACHE_VERSION = 'v170';/);
   assert.doesNotMatch(sw, /CACHE_VERSION = 'v141-preview'/);
-  assert.match(sw, /styles\.css\?v=169/);
+  assert.match(sw, /styles\.css\?v=170/);
   const app = read('src/app.js');
   assert.match(app, /signin-nudge/);
   assert.match(app, /id="home-signin-card"/);

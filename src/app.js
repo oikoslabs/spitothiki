@@ -1,6 +1,6 @@
 import { MAX_QUANTITY, expiringItems, createPantryItem, createShoppingItem, expiringWithin, expiryStatus, expiryWarning, finishItemToShopping, normalizeSearch, normalizeUnit, pantrySummary, receiveShoppingItem, returnShoppingItem, shoppingListText, syncShoppingWithItem, toggleShoppingItem } from './domain.js';
 import { filterRows, searchFieldHtml } from './list-search.js';
-import { adoptCamera, captureVideoFrame, decodeImageCodes, lookupBarcode, normalizeBarcode, requestCamera, SCAN_IDLE_FALLBACK_MS, startScanner, warmScanner } from './barcode.js';
+import { adoptCamera, captureVideoFrame, decodeImageCodes, lookupBarcode, normalizeBarcode, requestCamera, SCAN_IDLE_FALLBACK_MS, scanMode, startScanner, warmScanner } from './barcode.js';
 import { isUrlCode, lastTollAmount, parseTollBarcode, parseTollText, tollAmountFromText } from './toll-barcode.js';
 import { authProviders, firebaseConfig } from './firebase-config.js';
 import { loadState, parseBackup, saveState } from './storage.js';
@@ -1253,24 +1253,44 @@ function takeScanTiming() {
 }
 const TORCH_HINT_MS = 3000;
 const TILL_SKIP_HINT = 'Αυτός είναι ο barcode του ταμείου και δεν έχει τα είδη. Στόχευσε το QR της απόδειξης (συνήθως κάτω δεξιά).';
-const IDLE_PHOTO_HINT = 'Δεν το πιάνει; Κράτα το κινητό λίγο πιο μακριά (15–20 εκ.), με καλό φως, ή βγάλε φωτογραφία την απόδειξη.';
+const IDLE_FAR_HINT_FILE = 'Δεν το πιάνει ακόμα; Απομάκρυνε λίγο το κινητό (15–20 εκ.) ώστε να χωράει όλη η απόδειξη και να εστιάσει η κάμερα, ή πάτα «📎 Από φωτογραφία ή PDF». Συνεχίζω να ψάχνω…';
+const IDLE_ASSIST_TRIES = 3;
+const IDLE_ASSIST_GAP_MS = 2500;
 
-// Receipt/«all»: after a few seconds with no decode, snapshot the live frame and run the photo OCR path
-// (printed digits + receipt text). The bars on thermal toll receipts often never decode in the camera.
-async function idleScanFallback(dialog, status, qr) {
-  if (!dialog.open) return;
-  if (qr !== true && qr !== 'all') {
-    status.textContent = t('Δεν το πιάνει; Κράτα το κινητό λίγο πιο μακριά (15–20 εκ.) και με καλό φως.');
-    return;
+// SW v170 (ships in 1.9.50): receipt/«all» idle help that never ends the live scan.
+// v1.9.48 snapshotted ONE live frame after 5 s, closed the camera and sent the frame to the photo OCR. Held close,
+// that frame is out of focus or the bars overflow it, so the OCR failed, the scan was rejected and counted as a
+// failed photo scan, although moving the phone back a little would have read it a second later.
+// Now the camera keeps scanning; in the background a few frames are tried as still images (barcode/QR, and one
+// quiet OCR pass for the printed toll digits / toll text). Only a hit closes the scanner; a miss is never shown as
+// an error and never counted. The user gets the «hold it further away» hint and the photo/PDF button.
+async function idleScanAssist({ dialog, status, qr, signal, onFound }) {
+  const alive = () => dialog.open && !signal.aborted;
+  if (!alive()) return;
+  if (qr !== true && qr !== 'all') { status.textContent = t('Δεν το πιάνει; Κράτα το κινητό λίγο πιο μακριά (15–20 εκ.) και με καλό φως.'); return; }
+  document.querySelector('#scan-file-row').hidden = false;
+  status.textContent = t(IDLE_FAR_HINT_FILE);
+  const video = document.querySelector('#scan-video');
+  for (let i = 0; i < IDLE_ASSIST_TRIES && alive(); i += 1) {
+    const file = await captureVideoFrame(video).catch(() => null);
+    if (!alive()) return;
+    if (file) {
+      const codes = await decodeImageCodes(file, { mode: scanMode(qr), timeBudgetMs: 2500 }).catch(() => []);
+      if (!alive()) return;
+      const code = codes.find((c) => parseTollBarcode(c) || isUrlCode(c) || routeCode(c).route === 'bill');
+      if (code) { onFound({ code }); return; }
+      if (i === 0) {
+        try {
+          const { ocrReceipt } = await import('./receipt-photo.js');
+          const result = await ocrReceipt(file, { recognizeImpl: window.__spitoOcrMock, angles: [0] });
+          if (!alive()) return;
+          const toll = parseTollText(result?.text);
+          if (toll) { onFound({ toll }); return; }
+        } catch {}
+      }
+    }
+    await new Promise((resolve) => setTimeout(resolve, IDLE_ASSIST_GAP_MS));
   }
-  status.textContent = t('Δεν το διάβασε η κάμερα· δοκιμάζω από φωτογραφία του καρέ…');
-  const file = await captureVideoFrame(document.querySelector('#scan-video'));
-  if (!dialog.open) return;
-  if (!file) { status.textContent = t(IDLE_PHOTO_HINT); return; }
-  closeScanner();
-  dialog.close();
-  if (!document.querySelector('#receipt-dialog')?.open) openReceiptDialog();
-  loadReceiptPhoto(file);
 }
 
 async function openScanner({ onCode = fillFromBarcode, qr = false, confident = null } = {}) {
@@ -1298,23 +1318,37 @@ async function openScanner({ onCode = fillFromBarcode, qr = false, confident = n
   await afterPaint(); // let the dialog paint before detector setup (INP)
   if (!dialog.open) ac.abort();
   try {
-    stopScanner = await startScanner(document.querySelector('#scan-video'), (code) => {
+    const markRead = () => {
       clearTimeout(torchHintTimer);
       scanTiming = { start: scanStart, readAt: nowMs(), cam: Math.round(nowMs() - scanStart), torch: torch.getAttribute('aria-pressed') === 'true' ? 1 : 0 };
-      stopScanner = null;
-      dialog.close();
-      // Every scanner mode: a valid toll Code128 goes to Μετακινήσεις, including «📷 Σάρωση»
-      // and the pantry/cart product scanner (not only receipt mode / handleScanned).
+    };
+    // Every scanner mode: a valid toll Code128 goes to Μετακινήσεις, including «📷 Σάρωση»
+    // and the pantry/cart product scanner (not only receipt mode / handleScanned).
+    const routeRead = (code) => {
       const toll = parseTollBarcode(code);
       if (toll) { tollToTransport(toll); return; }
       if (routeCode(code).route === 'bill') { navigate('bills'); openBillDialog(); applyBillCode(code); return; }
       onCode(code);
+    };
+    // A hit from the idle helper (a still frame): stop the camera, then route it like a live read.
+    const onAssistFound = ({ code, toll }) => {
+      if (!dialog.open || ac.signal.aborted) return;
+      markRead();
+      closeScanner();
+      if (toll) { tollToTransport(toll, 'photo'); return; }
+      routeRead(code);
+    };
+    stopScanner = await startScanner(document.querySelector('#scan-video'), (code) => {
+      markRead();
+      stopScanner = null;
+      dialog.close();
+      routeRead(code);
     }, { qr, confident, signal: ac.signal, streamPromise,
       // Receipt/«all» scans: a receipt's till barcode (date + till + transaction) is skipped so the QR can be read.
       skip: qr === true || qr === 'all' ? (v) => Boolean(parseStoreReceiptBarcode(v)) : null,
       onSkip: () => { if (dialog.open) status.textContent = t(TILL_SKIP_HINT); },
       idleMs: qr === true || qr === 'all' ? SCAN_IDLE_FALLBACK_MS : undefined,
-      onIdle: () => { if (dialog.open) idleScanFallback(dialog, status, qr); } });
+      onIdle: () => { if (dialog.open) idleScanAssist({ dialog, status, qr, signal: ac.signal, onFound: onAssistFound }); } });
     if (ac.signal.aborted || !dialog.open) { closeScanner(); return; }
     if (stopScanner?.hasTorch) torch.hidden = false;
     // Some phones report the flashlight only a moment after the camera starts.

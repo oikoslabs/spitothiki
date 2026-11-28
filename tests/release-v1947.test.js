@@ -10,8 +10,8 @@ test('v1.9.47 release: version, cache v163, homepage privacy link, Limited Use, 
   assert.match(read('package.json'), /"version": "1\.9\.49"/);
   assert.equal((read('index.html').match(/data-no-i18n>1\.9\.49</g) || []).length, 2);
   const html = read('index.html');
-  assert.match(html, /styles\.css\?v=169/);
-  assert.match(html, /src\/app\.js\?v=169/);
+  assert.match(html, /styles\.css\?v=170/);
+  assert.match(html, /src\/app\.js\?v=170/);
   assert.doesNotMatch(html, /v=169-preview/);
   assert.match(html, /<a href="\.\/privacy\.html">Πολιτική απορρήτου<\/a>/);
   assert.match(html, /mailto:oikoslabs\.apps@gmail\.com/);
@@ -19,10 +19,10 @@ test('v1.9.47 release: version, cache v163, homepage privacy link, Limited Use, 
   assert.match(html, /Η Σπιτοθήκη είναι δωρεάν εφαρμογή της Oikos Labs/);
   assert.doesNotMatch(html, /Σκολαρ|Skolarikis|Giannis |Γιάννης /);
   const sw = read('sw.js');
-  assert.match(sw, /CACHE_VERSION = 'v169';/);
+  assert.match(sw, /CACHE_VERSION = 'v170';/);
   assert.doesNotMatch(sw, /CACHE_VERSION = 'v163-preview'/);
-  assert.match(sw, /styles\.css\?v=169'/);
-  assert.match(sw, /src\/app\.js\?v=169'/);
+  assert.match(sw, /styles\.css\?v=170'/);
+  assert.match(sw, /src\/app\.js\?v=170'/);
   const privacy = read('privacy.html');
   assert.match(privacy, /23 Νοεμβρίου 2026/);
   assert.match(privacy, /23 November 2026/);

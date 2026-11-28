@@ -10,17 +10,18 @@ test('v1.9.48 release: version, cache v168, toll photo/OCR fallback, live idle s
   assert.match(read('package.json'), /"version": "1\.9\.49"/);
   assert.equal((read('index.html').match(/data-no-i18n>1\.9\.49</g) || []).length, 2);
   const html = read('index.html');
-  assert.match(html, /styles\.css\?v=169/);
-  assert.match(html, /src\/app\.js\?v=169/);
+  assert.match(html, /styles\.css\?v=170/);
+  assert.match(html, /src\/app\.js\?v=170/);
   assert.doesNotMatch(html, /v=169-preview/);
   assert.doesNotMatch(html, /Σκολαρ|Skolarikis|Giannis |Γιάννης /);
   const sw = read('sw.js');
-  assert.match(sw, /CACHE_VERSION = 'v169';/);
+  assert.match(sw, /CACHE_VERSION = 'v170';/);
   assert.doesNotMatch(sw, /CACHE_VERSION = 'v169-preview'/);
-  assert.match(sw, /styles\.css\?v=169'/);
-  assert.match(sw, /src\/app\.js\?v=169'/);
+  assert.match(sw, /styles\.css\?v=170'/);
+  assert.match(sw, /src\/app\.js\?v=170'/);
   const app = read('src/app.js');
-  assert.match(app, /idleScanFallback/);
+  // v1.9.50: the idle snapshot no longer closes the camera (idleScanAssist), see scan-speed.test.js.
+  assert.match(app, /idleScanAssist/);
   assert.match(app, /captureVideoFrame/);
   assert.match(app, /loadReceiptPhoto\(file\)/);
   const barcode = read('src/barcode.js');
