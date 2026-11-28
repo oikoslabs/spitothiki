@@ -58,7 +58,7 @@ import { daysUntil, escapeHtml, expiryLabel, formatDate, localDateKey, readKey, 
 import { THEME_KEY, applyTheme, currentTheme } from './theme.js';
 import { initSource, sourceSignup, reportScan, applyOwnerTestStatus } from './source.js';
 import { isOwnerEmail } from './owner.js';
-import { TESTER_COLLAPSE_KEY, TWA_SESSION_KEY, isPlayApp, showTesterCard, TESTER_GROUP_URL, TESTER_PLAY_URL } from './tester-card.js';
+import { TESTER_KEY, TWA_SESSION_KEY, isAndroid, isPlayApp, showTesterCard, TESTER_GROUP_URL, TESTER_PLAY_URL } from './tester-card.js';
 import { IOS_INSTALL_CLOSE, IOS_INSTALL_DISMISS_KEY, IOS_INSTALL_RESHOW, IOS_INSTALL_SETTINGS, iosInstallBrowserForHint, iosInstallCopy, shouldShowIosInstallHint } from './ios-install.js';
 
 const viewRoot = document.querySelector('#view-content');
@@ -482,22 +482,19 @@ function renderProtectCard() {
     <div class="protect-actions">${protectButtons('protect')}</div>
     <button class="icon-button signin-close" type="button" data-action="protect-snooze" aria-label="${escapeHtml(t('Απόκρυψη για 14 ημέρες'))}" title="${escapeHtml(t('Απόκρυψη για 14 ημέρες'))}">×</button></section>`;
 }
-// Play Store tester invite: visible for everyone until public launch (TESTER_INVITE_UNTIL_LAUNCH).
-// × collapses to a one-line banner; it does not disappear. Past dismissals (TESTER_KEY) are ignored.
+// Play Store tester invite: Android browsers only, until public launch (TESTER_INVITE_UNTIL_LAUNCH).
+// Hidden in the installed Play/TWA app. × dismisses it for good (TESTER_KEY).
 function renderTesterCard() {
-  if (!showTesterCard({ playApp: testerCtx })) return '';
-  let collapsed = false; try { collapsed = localStorage.getItem(TESTER_COLLAPSE_KEY) === '1'; } catch {}
+  let done = false; try { done = localStorage.getItem(TESTER_KEY) === '1'; } catch {}
+  if (!showTesterCard({ playApp: testerCtx, android: isAndroid(navigator.userAgent), done })) return '';
   const title = escapeHtml(t('Βοήθησε να βγει η Σπιτοθήκη στο Play Store!'));
-  if (collapsed) {
-    return `<button class="tester-banner" type="button" data-action="tester-expand" id="home-tester-card" aria-expanded="false"><span aria-hidden="true">📱</span> <span>${title}</span></button>`;
-  }
   const link = (url, label, id) => `<a class="button button-primary" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" id="${id}">${escapeHtml(t(label))}</a>`;
-  return `<section class="signin-card tester-card" id="home-tester-card" aria-labelledby="home-tester-title" aria-expanded="true"><span class="signin-icon" aria-hidden="true">📱</span>
-    <div class="signin-text"><h2 id="home-tester-title">${title}</h2><p>${escapeHtml(t('Χρειαζόμαστε δοκιμαστές με Android για 14 μέρες. Δύο βήματα, με τον ίδιο λογαριασμό Google και στα δύο:'))}</p>
+  return `<section class="signin-card tester-card" id="home-tester-card" aria-labelledby="home-tester-title"><span class="signin-icon" aria-hidden="true">📱</span>
+    <div class="signin-text"><h2 id="home-tester-title">${title}</h2><p>${escapeHtml(t('Βοήθησέ μας να βγει η Σπιτοθήκη στο Google Play. Θέλει περίπου 1 λεπτό, είναι δωρεάν και τίποτα δεν αλλάζει στα δεδομένα σου. Δύο βήματα, με τον ίδιο λογαριασμό Google και στα δύο:'))}</p>
     <ol class="tester-steps"><li>${escapeHtml(t('Μπες στην ομάδα δοκιμαστών στο Google Groups (πάτα «Join group» / «Συμμετοχή στην ομάδα»).'))} ${link(TESTER_GROUP_URL, '1. Ομάδα δοκιμαστών', 'home-tester-group')}</li>
     <li>${escapeHtml(t('Μετά άνοιξε τη σελίδα δοκιμής του Google Play, πάτα «Become a tester» και εγκατάστησε την εφαρμογή από το Play Store.'))} ${link(TESTER_PLAY_URL, '2. Δοκιμή στο Google Play', 'home-tester-play')}</li></ol>
-    <p class="field-hint">${escapeHtml(t('Η Σπιτοθήκη δεν μπορεί να δει αν ολοκλήρωσες τα βήματα. Αν σε ρωτήσει για λογαριασμό, διάλεξε αυτόν που έχεις στο Play Store. Πάτα το × για να μαζέψεις την κάρτα σε μία γραμμή· μένει στην αρχική μέχρι να βγει η εφαρμογή.'))}</p></div>
-    <button class="icon-button signin-close" type="button" data-action="tester-collapse" aria-label="${escapeHtml(t('Σύμπτυξη πρόσκλησης δοκιμής'))}" title="${escapeHtml(t('Σύμπτυξη πρόσκλησης δοκιμής'))}">×</button></section>`;
+    <p class="field-hint">${escapeHtml(t('Η Σπιτοθήκη δεν μπορεί να δει αν ολοκλήρωσες τα βήματα. Αν σε ρωτήσει για λογαριασμό, διάλεξε αυτόν που έχεις στο Play Store. Πάτα το × αν δεν θέλεις να ξαναδείς αυτό το μήνυμα.'))}</p></div>
+    <button class="icon-button signin-close" type="button" data-action="tester-done" aria-label="${escapeHtml(t('Μην το εμφανίσεις ξανά'))}" title="${escapeHtml(t('Μην το εμφανίσεις ξανά'))}">×</button></section>`;
 }
 // v1.9.0: empty app → one clear first step instead of the «only on this phone» warning. Gone after the first save.
 function renderStarterCard() {
@@ -4878,8 +4875,7 @@ function handleAction(button) {
   } else if (action === 'clear-pantry-status') { pantryStatus = ''; renderApp(); }
   else if (action === 'home-signin' || action === 'protect-signin') goToSignin();
   else if (action === 'protect-drive') driveConnect();
-  else if (action === 'tester-collapse') { writeKey(TESTER_COLLAPSE_KEY, '1'); renderApp(); document.querySelector('#home-tester-card')?.focus(); }
-  else if (action === 'tester-expand') { writeKey(TESTER_COLLAPSE_KEY, null); renderApp(); document.querySelector('#home-tester-card')?.focus(); }
+  else if (action === 'tester-done') { writeKey(TESTER_KEY, '1'); renderApp(); }
   else if (action === 'protect-snooze') { writeKey(PROTECT_SNOOZE_KEY, String(snoozeUntilFrom())); renderApp(); }
   else if (action === 'sheet-signin') { pressFeedback(button); afterPaint(() => { closeProtectSheet(); goToSignin(); }); }
   else if (action === 'sheet-drive') { closeProtectSheet(); driveConnect(); }
