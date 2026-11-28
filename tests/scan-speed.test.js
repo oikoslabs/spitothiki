@@ -212,17 +212,23 @@ test('live ZXing in receipt/«all» uses only the wide 1D regions, not the tight
   assert.equal(SCAN_IDLE_MS, 8000);
 });
 
-test('receipt/«all» scanner: after 5s idle, snapshot the frame and run the photo OCR path; hint mentions a photo', () => {
+test('receipt/«all» scanner: after 5s idle the live scan keeps running; frames are tried quietly, a miss never closes or counts', () => {
   const app = readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');
   const src = readFileSync(new URL('../src/barcode.js', import.meta.url), 'utf8');
   assert.match(src, /regions: zxingRegions\(mode\)/);
   assert.match(src, /acceptScanValue\(mode, value\)/);
   assert.doesNotMatch(src, /ChecksumError|return_errors:\s*true/);
-  const open = app.slice(app.indexOf('async function idleScanFallback'), app.indexOf('function openUniversalScan'));
+  const open = app.slice(app.indexOf('async function idleScanAssist'), app.indexOf('function openUniversalScan'));
+  const assist = app.slice(app.indexOf('async function idleScanAssist'), app.indexOf('async function openScanner'));
   assert.match(open, /idleMs: qr === true \|\| qr === 'all' \? SCAN_IDLE_FALLBACK_MS/);
-  assert.match(open, /idleScanFallback\(dialog, status, qr\)/);
-  assert.match(open, /captureVideoFrame\(/);
-  assert.match(open, /loadReceiptPhoto\(file\)/);
-  assert.match(app, /βγάλε φωτογραφία την απόδειξη/);
-  assert.match(app, /async function idleScanFallback\(/);
+  assert.match(open, /idleScanAssist\(\{ dialog, status, qr, signal: ac\.signal, onFound: onAssistFound \}\)/);
+  assert.match(assist, /captureVideoFrame\(/);
+  assert.match(assist, /decodeImageCodes\(file/);
+  assert.match(assist, /angles: \[0\]/);
+  // v1.9.48 regression: the idle snapshot closed the camera and sent a blurry close-up frame to the photo OCR,
+  // which failed and was counted as a failed scan. The helper must never do either on a miss.
+  assert.doesNotMatch(assist, /loadReceiptPhoto|closeScanner|dialog\.close|reportScan/);
+  assert.doesNotMatch(app, /async function idleScanFallback\(/);
+  assert.match(assist, /#scan-file-row'\)\.hidden = false/);
+  assert.match(app, /Απομάκρυνε λίγο το κινητό \(15–20 εκ\.\)/);
 });

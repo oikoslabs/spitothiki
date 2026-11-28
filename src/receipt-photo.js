@@ -117,7 +117,8 @@ export async function getWorker(onProgress) {
 const score = (result) => result.parsed.lines.length * 25 + (result.parsed.date ? 10 : 0) + (result.parsed.total ? 5 : 0) + result.confidence / 4;
 
 // OCRs the photo, trying the other orientations when the upright read finds nothing useful.
-export async function ocrReceipt(file, { onProgress, recognizeImpl } = {}) {
+// `angles` lets a quick background read (live camera frame) stay on the upright pass only.
+export async function ocrReceipt(file, { onProgress, recognizeImpl, angles = [0, 90, 270, 180] } = {}) {
   const img = await loadImage(file);
   const recognize = recognizeImpl || (async (canvas) => {
     const worker = await getWorker(onProgress);
@@ -125,7 +126,7 @@ export async function ocrReceipt(file, { onProgress, recognizeImpl } = {}) {
     return { text: data.text, confidence: data.confidence };
   });
   let best = null;
-  for (const angle of [0, 90, 270, 180]) {
+  for (const angle of angles) {
     onProgress?.({ status: 'orientation', angle });
     const { text, confidence } = await recognize(preprocess(img, angle));
     const result = { angle, text, confidence, parsed: parseReceiptText(text) };

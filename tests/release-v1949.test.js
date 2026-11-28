@@ -6,20 +6,20 @@ import { dictionaries } from '../src/i18n.js';
 
 const read = (f) => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
 
-test('v1.9.49 release: version, cache v169, EYDAP bills, iOS install hint, updated guide', () => {
+test('v1.9.49 release: version, cache v169/v170, EYDAP bills, iOS install hint, updated guide', () => {
   assert.match(read('package.json'), /"version": "1\.9\.49"/);
   assert.equal((read('index.html').match(/data-no-i18n>1\.9\.49</g) || []).length, 2);
   const html = read('index.html');
-  assert.match(html, /styles\.css\?v=169/);
-  assert.match(html, /src\/app\.js\?v=169/);
+  assert.match(html, /styles\.css\?v=170/);
+  assert.match(html, /src\/app\.js\?v=170/);
   assert.match(html, /src\/ios-install\.js/);
   assert.doesNotMatch(html, /v=169-preview/);
   assert.doesNotMatch(html, /Σκολαρ|Skolarikis|Giannis |Γιάννης /);
   const sw = read('sw.js');
-  assert.match(sw, /CACHE_VERSION = 'v169';/);
+  assert.match(sw, /CACHE_VERSION = 'v170';/);
   assert.doesNotMatch(sw, /CACHE_VERSION = 'v169-preview'/);
-  assert.match(sw, /styles\.css\?v=169'/);
-  assert.match(sw, /src\/app\.js\?v=169'/);
+  assert.match(sw, /styles\.css\?v=170'/);
+  assert.match(sw, /src\/app\.js\?v=170'/);
   assert.match(sw, /src\/ios-install\.js/);
   const bills = read('src/bill-pdf.js');
   assert.match(bills, /isUtilityBill/);
